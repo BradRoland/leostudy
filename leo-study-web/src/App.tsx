@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { FireFlame, type FireFlameOption } from '@9am/fire-flame-react'
 import './App.css'
@@ -9,6 +9,7 @@ type CodeFilter = CodeSet | 'all'
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home'
 type DurationFilter = 15 | 30 | 60 | 'all'
+type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library'
 
 type HomeLeaderboardEntry = {
   userId: string
@@ -16,6 +17,9 @@ type HomeLeaderboardEntry = {
   avatarUrl: string
   supporterTier: SupporterTier
   nameStyle: NameStyle
+  bio: string
+  agency: string
+  isOwner: boolean
   value: number
 }
 
@@ -52,6 +56,15 @@ type SpeedTestQuestion = {
   explanation: string
 }
 
+type ScenarioQuestion = {
+  id: string
+  codeSet: CodeSet
+  prompt: string
+  choices: string[]
+  correctIndex: number
+  explanation: string
+}
+
 type CodePerformance = {
   correctCount: number
   incorrectCount: number
@@ -76,6 +89,7 @@ type LeaderboardEntry = {
   bio: string
   agency: string
   nameStyle: NameStyle
+  isOwner: boolean
   matchDuration: number | null
   matchFilter: CodeFilter | null
   score: number
@@ -143,7 +157,8 @@ const gameHighScoreSeed = {
   gravity: 0,
 }
 const avatarBucket = (import.meta.env.VITE_SUPABASE_AVATAR_BUCKET || 'avatars').trim()
-const defaultAvatarUrl = '/default-avatar.svg'
+const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.svg`
+const defaultAvatarPngUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.png`
 
 const codeSetLabel: Record<CodeSet, string> = {
   penal: 'Penal',
@@ -159,9 +174,50 @@ const tierLabel: Record<SupporterTier, string> = {
 }
 
 const supporterTierOrder: SupporterTier[] = ['free', 'tier2', 'tier5', 'tier10']
+const ownerEmail = 'brad@thespeck.net'
+const ownerUsername = 'jake'
+const avatarCropFrameSize = 280
+const avatarOutputSize = 512
 
 function tierRank(tier: SupporterTier) {
   return supporterTierOrder.indexOf(tier)
+}
+
+function isOwnerIdentity(username: string, email?: string) {
+  const normalizedName = username.trim().toLowerCase()
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+  return normalizedName === ownerUsername || normalizedEmail === ownerEmail
+}
+
+async function createCroppedAvatarFile(sourceUrl: string, zoom: number, offsetX: number, offsetY: number, sourceName: string) {
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Could not load image for cropping.'))
+    img.src = sourceUrl
+  })
+
+  const canvas = document.createElement('canvas')
+  canvas.width = avatarOutputSize
+  canvas.height = avatarOutputSize
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Could not initialize crop canvas.')
+
+  const coverScale = Math.max(avatarOutputSize / image.naturalWidth, avatarOutputSize / image.naturalHeight) * zoom
+  const drawWidth = image.naturalWidth * coverScale
+  const drawHeight = image.naturalHeight * coverScale
+  const offsetScale = avatarOutputSize / avatarCropFrameSize
+  const drawX = (avatarOutputSize - drawWidth) / 2 + offsetX * offsetScale
+  const drawY = (avatarOutputSize - drawHeight) / 2 + offsetY * offsetScale
+
+  context.clearRect(0, 0, avatarOutputSize, avatarOutputSize)
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight)
+
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png', 0.95))
+  if (!blob) throw new Error('Could not create cropped image.')
+
+  const baseName = sourceName.replace(/\.[^/.]+$/, '').replace(/[^a-z0-9-_]+/gi, '_').slice(0, 40) || 'avatar'
+  return new File([blob], `${baseName}_cropped.png`, { type: 'image/png' })
 }
 
 const profileFontOptions = [
@@ -326,6 +382,115 @@ function buildDeck(questions: QuizQuestion[], filter: CodeFilter) {
   return deck
 }
 
+function parseScenarioStatement(statement: string) {
+  const clean = statement.trim().replace(/\s+/g, ' ')
+  const questionIndex = clean.lastIndexOf('?')
+  if (questionIndex < 0 || questionIndex >= clean.length - 1) {
+    return { prompt: clean, choice: '' }
+  }
+  const prompt = clean.slice(0, questionIndex + 1).trim()
+  const choice = clean.slice(questionIndex + 1).trim()
+  return { prompt, choice }
+}
+
+function buildScenarioQuestions(rows: SpeedTestQuestion[]) {
+  const grouped = new Map<string, SpeedTestQuestion[]>()
+  for (const row of rows) {
+    const groupId = row.id.replace(/-(t|f)$/i, '')
+    const existing = grouped.get(groupId) ?? []
+    existing.push(row)
+    grouped.set(groupId, existing)
+  }
+
+  const scenarios: ScenarioQuestion[] = []
+
+  for (const [groupId, groupRows] of grouped.entries()) {
+    const pair = groupRows.filter((row) => /-(t|f)$/i.test(row.id))
+    if (pair.length >= 2) {
+      const parsedChoices = pair.map((row) => {
+        const parsed = parseScenarioStatement(row.statement)
+        return { row, prompt: parsed.prompt, choice: parsed.choice || (row.isTrue ? 'True' : 'False') }
+      })
+      const prompt = parsedChoices[0].prompt
+      const shuffledChoices = shuffle(parsedChoices.map((item) => item.choice))
+      const correctChoice = parsedChoices.find((item) => item.row.isTrue)?.choice || parsedChoices[0].choice
+      scenarios.push({
+        id: groupId,
+        codeSet: pair[0].codeSet,
+        prompt,
+        choices: shuffledChoices,
+        correctIndex: Math.max(0, shuffledChoices.indexOf(correctChoice)),
+        explanation: (pair.find((row) => row.isTrue) || pair[0]).explanation,
+      })
+      continue
+    }
+
+    const row = groupRows[0]
+    if (!row) continue
+    scenarios.push({
+      id: groupId,
+      codeSet: row.codeSet,
+      prompt: row.statement.trim(),
+      choices: ['True', 'False'],
+      correctIndex: row.isTrue ? 0 : 1,
+      explanation: row.explanation,
+    })
+  }
+
+  const poolsByCodeSet: Record<CodeSet, string[]> = {
+    penal: [],
+    hs: [],
+    vehicle: [],
+  }
+
+  for (const scenario of scenarios) {
+    const correctChoice = scenario.choices[scenario.correctIndex]?.trim()
+    if (!correctChoice) continue
+    if (!poolsByCodeSet[scenario.codeSet].includes(correctChoice)) {
+      poolsByCodeSet[scenario.codeSet].push(correctChoice)
+    }
+  }
+
+  const globalPool = Array.from(new Set([...poolsByCodeSet.penal, ...poolsByCodeSet.hs, ...poolsByCodeSet.vehicle]))
+  const genericDistractors = [
+    'Detention with reasonable suspicion',
+    'Consensual encounter, no detention',
+    'Probable cause for arrest exists',
+    'Insufficient legal basis for search',
+    'Search lawful under consent exception',
+    'Evidence may be suppressed in court',
+  ]
+
+  return shuffle(
+    scenarios.map((scenario) => {
+      const correctChoice = scenario.choices[scenario.correctIndex]
+      const sameSetPool = poolsByCodeSet[scenario.codeSet].filter((choice) => choice !== correctChoice)
+      const crossPool = globalPool.filter((choice) => choice !== correctChoice && !sameSetPool.includes(choice))
+
+      const distractors: string[] = []
+      for (const choice of shuffle(sameSetPool)) {
+        if (distractors.length >= 3) break
+        if (!distractors.includes(choice)) distractors.push(choice)
+      }
+      for (const choice of shuffle(crossPool)) {
+        if (distractors.length >= 3) break
+        if (!distractors.includes(choice)) distractors.push(choice)
+      }
+      for (const choice of genericDistractors) {
+        if (distractors.length >= 3) break
+        if (choice !== correctChoice && !distractors.includes(choice)) distractors.push(choice)
+      }
+
+      const finalChoices = shuffle([correctChoice, ...distractors.slice(0, 3)])
+      return {
+        ...scenario,
+        choices: finalChoices,
+        correctIndex: finalChoices.indexOf(correctChoice),
+      }
+    }),
+  )
+}
+
 function performanceKey(codeSet: CodeSet, section: string) {
   return `${codeSet}|${section.trim().toLowerCase()}`
 }
@@ -484,6 +649,8 @@ function normalizeAvatarPath(rawValue: string): string {
 function toPublicAvatarUrl(rawValue: string): string {
   const avatarPath = normalizeAvatarPath(rawValue)
   if (!avatarPath) return ''
+  if (avatarPath === defaultAvatarUrl.replace(/^\/+/, '')) return ''
+  if (!avatarPath.includes('/')) return ''
 
   if (supabase) {
     const { data } = supabase.storage.from(avatarBucket).getPublicUrl(avatarPath)
@@ -493,20 +660,6 @@ function toPublicAvatarUrl(rawValue: string): string {
   const baseUrl = (import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '')
   if (!baseUrl) return ''
   return `${baseUrl}/storage/v1/object/public/${avatarBucket}/${avatarPath}`
-}
-
-function toAvatarPath(rawValue: string): string {
-  const normalized = normalizeAvatarPath(rawValue)
-  if (normalized) {
-    return normalized
-  }
-  const value = rawValue.trim()
-  if (!value) return ''
-  if (!/^https?:\/\//i.test(value)) return value.replace(/^\/+/, '')
-  const marker = `/storage/v1/object/public/${avatarBucket}/`
-  const markerIndex = value.indexOf(marker)
-  if (markerIndex < 0) return ''
-  return value.slice(markerIndex + marker.length)
 }
 
 function mapProfileRow(row: Record<string, unknown>, userId: string): UserProfile {
@@ -534,12 +687,55 @@ function displayNameClass(tier: SupporterTier, hasStyle: boolean) {
   return tierNameClass(tier)
 }
 
-function providerLabel(rawProvider: string) {
-  const normalized = rawProvider.trim().toLowerCase()
-  if (!normalized || normalized === 'email') return 'Email'
-  if (normalized === 'google') return 'Google'
-  if (normalized === 'apple') return 'Apple'
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+function AppIcon({ name, className = '' }: { name: AppIconName; className?: string }) {
+  const commonProps = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  if (name === 'study') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M4 5.5h7a3 3 0 0 1 3 3V19H7a3 3 0 0 0-3 3Z" />
+        <path d="M20 5.5h-7a3 3 0 0 0-3 3V19h7a3 3 0 0 1 3 3Z" />
+      </svg>
+    )
+  }
+  if (name === 'games') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M8 10h8a4 4 0 0 1 3.7 5.5l-1.4 3.3a2 2 0 0 1-3 .9l-2.3-1.6a2 2 0 0 0-2.3 0l-2.3 1.6a2 2 0 0 1-3-.9L4.3 15.5A4 4 0 0 1 8 10Z" />
+        <path d="M8 14h2" />
+        <path d="M9 13v2" />
+        <circle cx="15.5" cy="14.5" r="0.8" fill="currentColor" />
+        <circle cx="17.8" cy="16.1" r="0.8" fill="currentColor" />
+      </svg>
+    )
+  }
+  if (name === 'scenarios') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M12 3 4 7v5c0 5 3.4 8.7 8 9.9 4.6-1.2 8-4.9 8-9.9V7Z" />
+        <path d="m9.3 12 1.9 1.9 3.8-3.8" />
+      </svg>
+    )
+  }
+  if (name === 'support') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M12 21s-7-4.3-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.7-7 10-7 10Z" />
+      </svg>
+    )
+  }
+  if (name === 'library') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M4 5h4v15H4zM10 3h4v17h-4zM16 7h4v13h-4z" />
+      </svg>
+    )
+  }
+  return (
+    <svg {...commonProps} className={className} aria-hidden>
+      <path d="M3 11.5 12 4l9 7.5" />
+      <path d="M5.5 10.5V20h13v-9.5" />
+    </svg>
+  )
 }
 
 function App() {
@@ -562,6 +758,16 @@ function App() {
   const [showSignUpPasswordConfirm, setShowSignUpPasswordConfirm] = useState(false)
   const [profileUsername, setProfileUsername] = useState('')
   const [profileAvatar, setProfileAvatar] = useState<File | null>(null)
+  const [profileAvatarPreviewUrl, setProfileAvatarPreviewUrl] = useState('')
+  const [avatarCropSourceUrl, setAvatarCropSourceUrl] = useState('')
+  const [avatarCropSourceName, setAvatarCropSourceName] = useState('')
+  const [avatarCropOpen, setAvatarCropOpen] = useState(false)
+  const [avatarCropZoom, setAvatarCropZoom] = useState(1)
+  const [avatarCropX, setAvatarCropX] = useState(0)
+  const [avatarCropY, setAvatarCropY] = useState(0)
+  const [accountNewPassword, setAccountNewPassword] = useState('')
+  const [accountConfirmPassword, setAccountConfirmPassword] = useState('')
+  const [showAccountPassword, setShowAccountPassword] = useState(false)
   const [authError, setAuthError] = useState('')
   const [authSuccess, setAuthSuccess] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
@@ -587,6 +793,7 @@ function App() {
   const [selectedLeaderboardEntry, setSelectedLeaderboardEntry] = useState<LeaderboardEntry | null>(null)
   const [selectedLeaderboardIsTop, setSelectedLeaderboardIsTop] = useState(false)
   const [stateHydrated, setStateHydrated] = useState(false)
+  const [celebration, setCelebration] = useState<{ title: string; subtitle: string; burst: number } | null>(null)
   const [homeStudyTimeLeaders, setHomeStudyTimeLeaders] = useState<HomeLeaderboardEntry[]>([])
   const [homeMostMasteredLeaders, setHomeMostMasteredLeaders] = useState<HomeLeaderboardEntry[]>([])
   const [homeMatchingDurationFilter, setHomeMatchingDurationFilter] = useState<DurationFilter>('all')
@@ -606,6 +813,7 @@ function App() {
   const recentCodesRef = useRef<string[]>([])
 
   const [flashcardIndex, setFlashcardIndex] = useState(0)
+  const [flashcardOrder, setFlashcardOrder] = useState<string[]>([])
   const [flipped, setFlipped] = useState(false)
 
   const [matchFilter, setMatchFilter] = useState<CodeFilter>('all')
@@ -616,11 +824,13 @@ function App() {
   const [matchRunning, setMatchRunning] = useState(false)
   const [matchCards, setMatchCards] = useState<MatchCard[]>([])
   const [selectedCards, setSelectedCards] = useState<string[]>([])
+  const [wrongCardIds, setWrongCardIds] = useState<string[]>([])
   const [matchedPairIds, setMatchedPairIds] = useState<string[]>([])
   const [recentMatchSections, setRecentMatchSections] = useState<string[]>([])
   const [matchDone, setMatchDone] = useState(false)
   const [matchSessionDuration, setMatchSessionDuration] = useState(30)
   const [matchSessionFilter, setMatchSessionFilter] = useState<CodeFilter>('all')
+  const [showMatchSetupModal, setShowMatchSetupModal] = useState(false)
   const [leaderboardDurationFilter, setLeaderboardDurationFilter] = useState(30)
   const [leaderboardCodeFilter, setLeaderboardCodeFilter] = useState<CodeFilter>('all')
 
@@ -636,14 +846,17 @@ function App() {
   const [speedSessionQuestions, setSpeedSessionQuestions] = useState<QuizQuestion[]>([])
   const [speedSessionDuration, setSpeedSessionDuration] = useState(30)
   const [speedSessionFilter, setSpeedSessionFilter] = useState<CodeFilter>('all')
+  const [showSpeedSetupModal, setShowSpeedSetupModal] = useState(false)
   const [speedFeedback, setSpeedFeedback] = useState('')
   const [speedLeaderboardDurationFilter, setSpeedLeaderboardDurationFilter] = useState(30)
   const [speedLeaderboardCodeFilter, setSpeedLeaderboardCodeFilter] = useState<CodeFilter>('all')
-  const [scenarioDeck, setScenarioDeck] = useState<SpeedTestQuestion[]>([])
-  const [scenarioCurrentQuestion, setScenarioCurrentQuestion] = useState<SpeedTestQuestion | null>(null)
+  const [scenarioDeck, setScenarioDeck] = useState<ScenarioQuestion[]>([])
+  const [scenarioCurrentQuestion, setScenarioCurrentQuestion] = useState<ScenarioQuestion | null>(null)
   const [scenarioResult, setScenarioResult] = useState<string>('')
   const [gamesMode, setGamesMode] = useState<'matching' | 'speed'>('matching')
   const lastAppStateUpdateRef = useRef(0)
+  const highScoresRef = useRef(gameHighScoreSeed)
+  const leaderboardRef = useRef<LeaderboardEntry[]>([])
   const matchScoreRef = useRef(0)
   const matchRoundRef = useRef(1)
   const speedScoreRef = useRef(0)
@@ -662,6 +875,14 @@ function App() {
       window.localStorage.removeItem('pending_profile_setup')
     }
   }, [])
+
+  useEffect(
+    () => () => {
+      if (avatarCropSourceUrl) URL.revokeObjectURL(avatarCropSourceUrl)
+      if (profileAvatarPreviewUrl) URL.revokeObjectURL(profileAvatarPreviewUrl)
+    },
+    [avatarCropSourceUrl, profileAvatarPreviewUrl],
+  )
 
   useEffect(() => {
     if (!profileMenuOpen) return
@@ -719,6 +940,14 @@ function App() {
   useEffect(() => {
     matchScoreRef.current = matchScore
   }, [matchScore])
+
+  useEffect(() => {
+    highScoresRef.current = highScores
+  }, [highScores])
+
+  useEffect(() => {
+    leaderboardRef.current = leaderboard
+  }, [leaderboard])
 
   useEffect(() => {
     matchRoundRef.current = matchRound
@@ -839,6 +1068,7 @@ function App() {
         bio: detailsByUserId[String(entry.user_id)]?.bio || '',
         agency: detailsByUserId[String(entry.user_id)]?.agency || '',
         nameStyle: detailsByUserId[String(entry.user_id)]?.nameStyle || { ...defaultNameStyle },
+        isOwner: isOwnerIdentity(profilesByUserId[String(entry.user_id)]?.username || ''),
         matchDuration: typeof entry.match_duration === 'number' ? entry.match_duration : null,
         matchFilter: (['all', 'penal', 'hs', 'vehicle'].includes(String(entry.match_filter))
           ? String(entry.match_filter)
@@ -903,6 +1133,9 @@ function App() {
         avatarUrl: profile.avatarUrl,
         supporterTier: profile.supporterTier,
         nameStyle: parsed.profileDetails.nameStyle,
+        bio: parsed.profileDetails.bio,
+        agency: parsed.profileDetails.agency,
+        isOwner: isOwnerIdentity(profile.username),
         value: parsed.profileDetails.stats.studySeconds,
       })
       const masteredCount = Object.values(parsed.performance).filter((item) => item.correctCount >= 10).length
@@ -912,12 +1145,15 @@ function App() {
         avatarUrl: profile.avatarUrl,
         supporterTier: profile.supporterTier,
         nameStyle: parsed.profileDetails.nameStyle,
+        bio: parsed.profileDetails.bio,
+        agency: parsed.profileDetails.agency,
+        isOwner: isOwnerIdentity(profile.username),
         value: masteredCount,
       })
     }
 
-    setHomeStudyTimeLeaders(studyRows.sort((left, right) => right.value - left.value).slice(0, 5))
-    setHomeMostMasteredLeaders(masteredRows.sort((left, right) => right.value - left.value).slice(0, 5))
+    setHomeStudyTimeLeaders(studyRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
+    setHomeMostMasteredLeaders(masteredRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
   }
 
   useEffect(() => {
@@ -1142,6 +1378,15 @@ function App() {
     )
   }, [sections, studyFilter])
 
+  const orderedFlashcards = useMemo(() => {
+    if (filteredFlashcards.length === 0) return []
+    if (flashcardOrder.length === 0) return filteredFlashcards
+    const byId = new Map(filteredFlashcards.map((card) => [card.id, card]))
+    const ordered = flashcardOrder.map((id) => byId.get(id)).filter(Boolean) as Flashcard[]
+    if (ordered.length !== filteredFlashcards.length) return filteredFlashcards
+    return ordered
+  }, [filteredFlashcards, flashcardOrder])
+
   const matchingLeaderboard = useMemo(
     () =>
       topEntryPerUser(
@@ -1168,6 +1413,7 @@ function App() {
       topEntryPerUser(
         leaderboard
           .filter((entry) => entry.game === 'Matching')
+          .filter((entry) => entry.score > 0)
           .filter((entry) => (homeMatchingDurationFilter === 'all' ? true : entry.matchDuration === homeMatchingDurationFilter))
           .filter((entry) => (homeMatchingCodeFilter === 'all' ? true : entry.matchFilter === homeMatchingCodeFilter)),
       )
@@ -1179,6 +1425,7 @@ function App() {
       topEntryPerUser(
         leaderboard
           .filter((entry) => entry.game === 'Speed Test')
+          .filter((entry) => entry.score > 0)
           .filter((entry) => (homeSpeedDurationFilter === 'all' ? true : entry.matchDuration === homeSpeedDurationFilter))
           .filter((entry) => (homeSpeedCodeFilter === 'all' ? true : entry.matchFilter === homeSpeedCodeFilter)),
       )
@@ -1190,11 +1437,14 @@ function App() {
     const base = questions.filter((question) => question.prompt.startsWith('Which section number matches:'))
     return speedFilter === 'all' ? base : base.filter((question) => question.codeSet === speedFilter)
   }, [questions, speedFilter])
+  const scenarioQuestionBank = useMemo(() => buildScenarioQuestions(speedQuestions), [speedQuestions])
 
   useEffect(() => {
+    const nextOrder = shuffle(filteredFlashcards.map((card) => card.id))
+    setFlashcardOrder(nextOrder)
     setFlashcardIndex(0)
     setFlipped(false)
-  }, [studyFilter])
+  }, [studyFilter, filteredFlashcards])
 
   const setNextQuizQuestion = (forceRebuild = false) => {
     const recentSections = recentCodesRef.current
@@ -1239,7 +1489,18 @@ function App() {
           setMatchDone(true)
           const finalMatchScore = matchScoreRef.current
           const finalMatchRound = matchRoundRef.current
+          const previousBest = highScoresRef.current.matching
+          const globalBest = leaderboardRef.current
+            .filter((entry) => entry.game === 'Matching')
+            .reduce((max, entry) => Math.max(max, entry.score), 0)
+          const isPersonalBest = finalMatchScore > previousBest
+          const isGlobalBest = finalMatchScore > globalBest
           setHighScores((previous) => ({ ...previous, matching: Math.max(previous.matching, finalMatchScore) }))
+          if (isGlobalBest) {
+            triggerCelebration('🏆 New #1 Matching Score', `${finalMatchScore} points`)
+          } else if (isPersonalBest) {
+            triggerCelebration('🎉 New Personal Best', `Matching: ${finalMatchScore} points`)
+          }
 
           if (supabase && currentUserId) {
             void (async () => {
@@ -1347,6 +1608,7 @@ function App() {
     setMatchCards(shuffle(cards))
     setMatchedPairIds([])
     setSelectedCards([])
+    setWrongCardIds([])
     setRecentMatchSections((previous) => [...previous, ...selected.map((item) => item.sectionNumber.toLowerCase())].slice(-18))
   }
 
@@ -1371,9 +1633,23 @@ function App() {
     }))
   }
 
+  const beginMatchingFromSetup = () => {
+    setShowMatchSetupModal(false)
+    startMatching()
+  }
+
+  const exitMatchingSession = () => {
+    setMatchRunning(false)
+    setMatchDone(false)
+    setSelectedCards([])
+    setWrongCardIds([])
+    setMatchedPairIds([])
+  }
+
   const nextSpeedQuestion = (candidateDeck?: QuizQuestion[], previousId?: string) => {
-    let deck = candidateDeck ? [...candidateDeck] : [...speedDeck]
-    if (deck.length === 0) {
+    const usingProvidedDeck = Array.isArray(candidateDeck)
+    let deck = usingProvidedDeck ? [...candidateDeck] : [...speedDeck]
+    if (!usingProvidedDeck && deck.length === 0) {
       deck = shuffle(speedSessionQuestions)
     }
     if (deck.length === 0) {
@@ -1390,8 +1666,16 @@ function App() {
   }
 
   const startSpeedTest = () => {
-    const pool = speedQuestionBank.slice()
+    const pool = speedQuestionBank.filter((question) => speedFilter === 'all' || question.codeSet === speedFilter)
     const initialDeck = shuffle(pool)
+    if (initialDeck.length === 0) {
+      setSpeedCurrentQuestion(null)
+      setSpeedDeck([])
+      setSpeedRunning(false)
+      setSpeedDone(false)
+      setSpeedFeedback('')
+      return
+    }
     setSpeedSessionQuestions(pool)
     setSpeedSessionDuration(speedDuration)
     setSpeedSessionFilter(speedFilter)
@@ -1413,6 +1697,17 @@ function App() {
     }))
   }
 
+  const beginSpeedFromSetup = () => {
+    setShowSpeedSetupModal(false)
+    startSpeedTest()
+  }
+
+  const exitSpeedSession = () => {
+    setSpeedRunning(false)
+    setSpeedDone(false)
+    setSpeedFeedback('')
+  }
+
   const answerSpeedQuestion = (choiceIndex: number) => {
     if (!speedRunning || !speedCurrentQuestion) return
     const isCorrect = choiceIndex === speedCurrentQuestion.correctIndex
@@ -1431,10 +1726,10 @@ function App() {
     }, 150)
   }
 
-  const nextScenarioQuestion = (candidateDeck?: SpeedTestQuestion[], previousId?: string) => {
+  const nextScenarioQuestion = (candidateDeck?: ScenarioQuestion[], previousId?: string) => {
     let deck = candidateDeck ? [...candidateDeck] : [...scenarioDeck]
     if (deck.length === 0) {
-      deck = shuffle(speedQuestions)
+      deck = shuffle(scenarioQuestionBank)
     }
     if (deck.length === 0) {
       setScenarioCurrentQuestion(null)
@@ -1450,11 +1745,11 @@ function App() {
     setScenarioResult('')
   }
 
-  const answerScenario = (answerTrue: boolean) => {
+  const answerScenario = (choiceIndex: number) => {
     if (!scenarioCurrentQuestion) return
-    const isCorrect = answerTrue === scenarioCurrentQuestion.isTrue
+    const isCorrect = choiceIndex === scenarioCurrentQuestion.correctIndex
     incrementUserStats((stats) => ({ ...stats, scenariosReviewed: stats.scenariosReviewed + 1 }))
-    setScenarioResult(isCorrect ? 'Correct' : `Incorrect • Correct answer: ${scenarioCurrentQuestion.isTrue ? 'True' : 'False'}`)
+    setScenarioResult(isCorrect ? 'Correct' : `Incorrect • Correct answer: ${scenarioCurrentQuestion.choices[scenarioCurrentQuestion.correctIndex]}`)
   }
 
   useEffect(() => {
@@ -1467,14 +1762,21 @@ function App() {
     if (isMatch) {
       setMatchedPairIds((previous) => [...previous, selected[0].pairId])
       setMatchScore((score) => score + 10)
+      setWrongCardIds([])
       markPerformance(selected[0].codeSet, selected[0].sectionNumber, true)
+      setSelectedCards([])
+      return
     } else {
       setMatchScore((score) => Math.max(0, score - 5))
+      setWrongCardIds(selected.map((card) => card.id))
       markPerformance(selected[0].codeSet, selected[0].sectionNumber, false)
       markPerformance(selected[1].codeSet, selected[1].sectionNumber, false)
     }
 
-    const timeout = setTimeout(() => setSelectedCards([]), 320)
+    const timeout = setTimeout(() => {
+      setSelectedCards([])
+      setWrongCardIds([])
+    }, 260)
     return () => clearTimeout(timeout)
   }, [selectedCards, matchCards])
 
@@ -1497,6 +1799,18 @@ function App() {
           setSpeedDone(true)
           const finalSpeedScore = speedScoreRef.current
           const finalAnswered = speedAnsweredCountRef.current
+          const previousBest = highScoresRef.current.rapidFire
+          const globalBest = leaderboardRef.current
+            .filter((entry) => entry.game === 'Speed Test')
+            .reduce((max, entry) => Math.max(max, entry.score), 0)
+          const isPersonalBest = finalSpeedScore > previousBest
+          const isGlobalBest = finalSpeedScore > globalBest
+          setHighScores((previous) => ({ ...previous, rapidFire: Math.max(previous.rapidFire, finalSpeedScore) }))
+          if (isGlobalBest) {
+            triggerCelebration('🏆 New #1 Speed Score', `${finalSpeedScore} points`)
+          } else if (isPersonalBest) {
+            triggerCelebration('🎉 New Personal Best', `Speed: ${finalSpeedScore} points`)
+          }
 
           if (supabase && currentUserId) {
             void (async () => {
@@ -1537,7 +1851,7 @@ function App() {
   useEffect(() => {
     setScenarioDeck([])
     nextScenarioQuestion([])
-  }, [speedQuestions])
+  }, [scenarioQuestionBank])
 
   const submitSignIn = async () => {
     if (!supabase) return
@@ -1655,7 +1969,7 @@ function App() {
     setAuthError('')
     setAuthSuccess('')
 
-    let avatarPath = profile?.avatarPath || toAvatarPath(profile?.avatarUrl || '')
+    let avatarPath = profile?.avatarPath || ''
 
     if (profileAvatar) {
       const extension = profileAvatar.name.split('.').pop() || 'jpg'
@@ -1698,6 +2012,8 @@ function App() {
     setProfileUsername(mapped.username)
     setForceProfileSetup(false)
     setProfileAvatar(null)
+    if (profileAvatarPreviewUrl) URL.revokeObjectURL(profileAvatarPreviewUrl)
+    setProfileAvatarPreviewUrl('')
     await supabase
       .from('app_state')
       .upsert(
@@ -1715,6 +2031,72 @@ function App() {
     await refreshHomeLeaderboards()
     setAuthSuccess('All changes saved')
     setTimeout(() => setAuthSuccess(''), 1600)
+    setAuthLoading(false)
+  }
+
+  const updateAccountPassword = async () => {
+    if (!supabase) return
+    if (accountNewPassword.length < 6) {
+      setAuthError('Password must be at least 6 characters.')
+      return
+    }
+    if (accountNewPassword !== accountConfirmPassword) {
+      setAuthError('Passwords do not match.')
+      return
+    }
+
+    setAuthLoading(true)
+    setAuthError('')
+    setAuthSuccess('')
+
+    const { error } = await supabase.auth.updateUser({ password: accountNewPassword })
+    if (error) {
+      setAuthError(error.message)
+      setAuthLoading(false)
+      return
+    }
+
+    setAccountNewPassword('')
+    setAccountConfirmPassword('')
+    setShowAccountPassword(false)
+    setAuthSuccess('Password updated.')
+    setTimeout(() => setAuthSuccess(''), 1600)
+    setAuthLoading(false)
+  }
+
+  const linkGoogleAccount = async () => {
+    if (!supabase) return
+    if (currentUserProvider.toLowerCase() === 'google') {
+      setAuthSuccess('Google is already linked to this account.')
+      setTimeout(() => setAuthSuccess(''), 1600)
+      return
+    }
+
+    setAuthLoading(true)
+    setAuthError('')
+    setAuthSuccess('')
+
+    const authApi = supabase.auth as unknown as {
+      linkIdentity?: (params: { provider: 'google'; options?: { redirectTo?: string } }) => Promise<{ error: { message?: string } | null }>
+    }
+    if (typeof authApi.linkIdentity !== 'function') {
+      setAuthError('Account linking is not available in this build of Supabase auth.')
+      setAuthLoading(false)
+      return
+    }
+
+    const { error } = await authApi.linkIdentity({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/profile` },
+    })
+
+    if (error) {
+      setAuthError(error.message || 'Could not link Google account.')
+      setAuthLoading(false)
+      return
+    }
+
+    setAuthSuccess('Continue with Google to finish linking your account.')
     setAuthLoading(false)
   }
 
@@ -1746,6 +2128,18 @@ function App() {
     setShowSignUpPassword(false)
     setShowSignUpPasswordConfirm(false)
     setProfileAvatar(null)
+    if (profileAvatarPreviewUrl) URL.revokeObjectURL(profileAvatarPreviewUrl)
+    setProfileAvatarPreviewUrl('')
+    if (avatarCropSourceUrl) URL.revokeObjectURL(avatarCropSourceUrl)
+    setAvatarCropSourceUrl('')
+    setAvatarCropSourceName('')
+    setAvatarCropOpen(false)
+    setAvatarCropZoom(1)
+    setAvatarCropX(0)
+    setAvatarCropY(0)
+    setAccountNewPassword('')
+    setAccountConfirmPassword('')
+    setShowAccountPassword(false)
     setProfileUsername('')
     setProfileDetails({
       bio: '',
@@ -1854,9 +2248,22 @@ function App() {
   const isSignInPage = currentPath === '/signin'
   const isSignUpPage = currentPath === '/signup'
   const isHomePage = currentPath === '/home'
+  const isStudyPage = currentPath === '/study'
+  const isGamesPage = currentPath === '/games'
+  const isScenariosPage = currentPath === '/scenarios'
+  const isLibraryPage = currentPath === '/library'
   const isSupportPage = currentPath === '/support'
   const isProfilePage = currentPath === '/profile'
   const isStatsPage = currentPath === '/stats'
+  const isKnownAuthedPage =
+    isHomePage ||
+    isStudyPage ||
+    isGamesPage ||
+    isScenariosPage ||
+    isLibraryPage ||
+    isSupportPage ||
+    isProfilePage ||
+    isStatsPage
   const needsProfileSetup = Boolean(authReady && currentUserId && profile && !profile.username && forceProfileSetup)
 
   useEffect(() => {
@@ -1866,6 +2273,28 @@ function App() {
       setActiveTab('home')
     }
   }, [authReady, currentUserId, currentPath, navigate])
+
+  useEffect(() => {
+    if (isHomePage) {
+      setActiveTab('home')
+      return
+    }
+    if (isStudyPage) {
+      setActiveTab('study')
+      return
+    }
+    if (isGamesPage) {
+      setActiveTab('games')
+      return
+    }
+    if (isScenariosPage) {
+      setActiveTab('scenarios')
+      return
+    }
+    if (isLibraryPage) {
+      setActiveTab('library')
+    }
+  }, [isHomePage, isStudyPage, isGamesPage, isScenariosPage, isLibraryPage])
 
   const refreshSupporterTier = async () => {
     if (!supabase || !currentUserId || !profile) return
@@ -1889,6 +2318,79 @@ function App() {
       ...previous,
       stats: updater(previous.stats),
     }))
+  }
+  const triggerCelebration = (title: string, subtitle: string) => {
+    setCelebration({ title, subtitle, burst: Date.now() })
+    window.setTimeout(() => {
+      setCelebration((current) => (current?.title === title ? null : current))
+    }, 2200)
+  }
+  const avatarFor = (rawValue?: string) => {
+    const value = String(rawValue || '').trim()
+    return value.length > 0 ? value : defaultAvatarUrl
+  }
+  const handleAvatarImageError = (event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget
+    const stage = image.dataset.fallbackApplied || '0'
+    if (stage === '0') {
+      image.dataset.fallbackApplied = '1'
+      image.src = defaultAvatarUrl
+      return
+    }
+    if (stage === '1') {
+      image.dataset.fallbackApplied = '2'
+      image.src = defaultAvatarPngUrl
+    }
+  }
+  const openAvatarCropper = (file: File | null) => {
+    if (!file) return
+    const sourceUrl = URL.createObjectURL(file)
+    if (avatarCropSourceUrl) URL.revokeObjectURL(avatarCropSourceUrl)
+    setAvatarCropSourceUrl(sourceUrl)
+    setAvatarCropSourceName(file.name)
+    setAvatarCropZoom(1)
+    setAvatarCropX(0)
+    setAvatarCropY(0)
+    setAvatarCropOpen(true)
+  }
+  const cancelAvatarCrop = () => {
+    if (avatarCropSourceUrl) URL.revokeObjectURL(avatarCropSourceUrl)
+    setAvatarCropSourceUrl('')
+    setAvatarCropSourceName('')
+    setAvatarCropOpen(false)
+  }
+  const applyAvatarCrop = async () => {
+    if (!avatarCropSourceUrl) return
+    try {
+      const cropped = await createCroppedAvatarFile(avatarCropSourceUrl, avatarCropZoom, avatarCropX, avatarCropY, avatarCropSourceName)
+      if (profileAvatarPreviewUrl) URL.revokeObjectURL(profileAvatarPreviewUrl)
+      const previewUrl = URL.createObjectURL(cropped)
+      setProfileAvatar(cropped)
+      setProfileAvatarPreviewUrl(previewUrl)
+      cancelAvatarCrop()
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not crop image.')
+    }
+  }
+  const openHomeProfile = (entry: HomeLeaderboardEntry, metric: string, isTop: boolean) => {
+    setSelectedLeaderboardEntry({
+      id: `home-${metric}-${entry.userId}`,
+      userId: entry.userId,
+      game: metric,
+      playerName: entry.playerName,
+      avatarUrl: entry.avatarUrl,
+      supporterTier: entry.supporterTier,
+      bio: entry.bio,
+      agency: entry.agency,
+      nameStyle: entry.nameStyle,
+      isOwner: entry.isOwner,
+      matchDuration: null,
+      matchFilter: null,
+      score: entry.value,
+      round: 0,
+      createdAt: Date.now(),
+    })
+    setSelectedLeaderboardIsTop(isTop)
   }
 
   useEffect(() => {
@@ -1950,7 +2452,7 @@ function App() {
   }, [profileDetails.stats.studyModeCounts])
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isHomePage ? 'home-page' : ''}`}>
       {!isSupabaseConfigured ? (
         <div className="onboarding-overlay">
           <div className="onboarding-card">
@@ -2114,6 +2616,7 @@ function App() {
 
       {authReady && !currentUserId && !isSignInPage && !isSignUpPage ? <Navigate to="/signup" replace /> : null}
       {authReady && currentUserId && (isSignInPage || isSignUpPage) ? <Navigate to="/home" replace /> : null}
+      {authReady && currentUserId && !isKnownAuthedPage ? <Navigate to="/home" replace /> : null}
       {needsProfileSetup ? (
         <div className="onboarding-overlay">
           <div className="onboarding-card">
@@ -2128,7 +2631,7 @@ function App() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(event) => setProfileAvatar(event.target.files?.[0] || null)}
+                onChange={(event) => openAvatarCropper(event.target.files?.[0] || null)}
               />
             </label>
             <label>
@@ -2156,6 +2659,7 @@ function App() {
 
       {authReady && currentUserId ? (
         <>
+      {!isHomePage ? (
       <header className="top-header">
         <div className="header-left">
           {showHomeButton ? (
@@ -2166,15 +2670,18 @@ function App() {
                 navigate('/home')
               }}
             >
-              {isSupportPage ? '← Back' : 'Home'}
+              <AppIcon name="home" className="button-icon" />
+              {isSupportPage ? 'Back' : 'Home'}
             </button>
           ) : null}
-          <h1>{isProfilePage ? 'Profile' : isStatsPage ? 'Stats' : isHomePage ? 'Home' : isSupportPage ? 'Support Creator' : activeTab === 'study' ? 'Study' : activeTab === 'library' ? 'Library' : activeTab === 'games' ? 'Games' : 'Scenarios'}</h1>
+          {!isHomePage ? (
+            <h1>{isProfilePage ? 'Profile' : isStatsPage ? 'Stats' : isSupportPage ? 'Support Creator' : activeTab === 'study' ? 'Study' : activeTab === 'library' ? 'Library' : activeTab === 'games' ? 'Games' : 'Scenarios'}</h1>
+          ) : null}
         </div>
         {profile ? (
           <div className="profile-shortcut-wrap" ref={profileMenuRef}>
             <button className="profile-shortcut" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="Open profile menu">
-              {profile.avatarUrl ? <img src={profile.avatarUrl} alt={profile.username} className="profile-shortcut-image" /> : <span className="profile-shortcut-fallback" />}
+              <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="profile-shortcut-image" onError={handleAvatarImageError} />
             </button>
             <span className={`profile-shortcut-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
               {profile.username || 'Profile'}
@@ -2207,21 +2714,70 @@ function App() {
           </div>
         ) : null}
       </header>
+      ) : null}
 
       <main className="content-area">
         {!isProfilePage && !isStatsPage && isHomePage && (
           <section className="home-section">
             <div className="card home-hero">
-              <p className="eyebrow">Welcome</p>
-              <h2 className={displayNameClass(activeProfileTier, true)} style={displayNameStyle(profileDetails.nameStyle, activeProfileTier)}>
-                {activeProfileName}
-              </h2>
-              <p className="muted">Pick your focus and keep building momentum.</p>
+              <div className="home-hero-head">
+                <div>
+                  <p className="eyebrow">Welcome</p>
+                  <h2 className={displayNameClass(activeProfileTier, true)} style={displayNameStyle(profileDetails.nameStyle, activeProfileTier)}>
+                    {activeProfileName}
+                  </h2>
+                  <p className="muted">Pick your focus and keep building momentum.</p>
+                </div>
+                {profile ? (
+                  <div className="profile-shortcut-wrap home-hero-profile" ref={profileMenuRef}>
+                    <button className="profile-shortcut" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="Open profile menu">
+                      <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="profile-shortcut-image" onError={handleAvatarImageError} />
+                    </button>
+                    {profileMenuOpen ? (
+                      <div className="profile-menu">
+                        <button
+                          className="profile-menu-item"
+                          onClick={() => {
+                            setProfileMenuOpen(false)
+                            navigate('/profile')
+                          }}
+                        >
+                          Settings
+                        </button>
+                        <button
+                          className="profile-menu-item"
+                          onClick={() => {
+                            setProfileMenuOpen(false)
+                            navigate('/stats')
+                          }}
+                        >
+                          Stats
+                        </button>
+                        <button className="profile-menu-item danger-item" onClick={signOut}>
+                          Sign Out
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
               <div className="home-actions">
-                <button className="primary" onClick={() => { setActiveTab('study'); navigate('/') }}>Go Study</button>
-                <button className="secondary" onClick={() => { setActiveTab('games'); navigate('/') }}>Play Games</button>
-                <button className="secondary" onClick={() => { setActiveTab('scenarios'); navigate('/') }}>Run Scenarios</button>
-                <button className="secondary" onClick={() => navigate('/support')}>Support Creator</button>
+                <button className="primary" onClick={() => { setActiveTab('study'); navigate('/study') }}>
+                  <AppIcon name="study" className="button-icon" />
+                  Go Study
+                </button>
+                <button className="secondary" onClick={() => { setActiveTab('games'); navigate('/games') }}>
+                  <AppIcon name="games" className="button-icon" />
+                  Play Games
+                </button>
+                <button className="secondary" onClick={() => { setActiveTab('scenarios'); navigate('/scenarios') }}>
+                  <AppIcon name="scenarios" className="button-icon" />
+                  Run Scenarios
+                </button>
+                <button className="secondary" onClick={() => navigate('/support')}>
+                  <AppIcon name="support" className="button-icon" />
+                  Support Creator
+                </button>
               </div>
             </div>
 
@@ -2229,11 +2785,19 @@ function App() {
               <div className="card">
                 <h3>Most Study Hours</h3>
                 {homeStudyTimeLeaders.length === 0 ? <p className="muted">No data yet.</p> : homeStudyTimeLeaders.map((entry, index) => (
-                  <div key={`home-hours-${entry.userId}-${index}`} className="leader-row">
+                  <button
+                    key={`home-hours-${entry.userId}-${index}`}
+                    type="button"
+                    className="leader-row leader-row-button"
+                    onClick={() => openHomeProfile(entry, 'Study Hours', index === 0)}
+                  >
                     <span>#{index + 1}</span>
                     <span className="leader-player">
-                      <span className="leader-avatar-frame">
-                        <img src={entry.avatarUrl} alt={entry.playerName} className="leader-avatar" />
+                      <span className="leader-avatar-wrap">
+                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                        <span className="leader-avatar-frame">
+                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                        </span>
                       </span>
                       <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
                         {entry.playerName}
@@ -2241,7 +2805,7 @@ function App() {
                     </span>
                     <span>Study</span>
                     <span>{formatStudyTime(entry.value)}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
 
@@ -2290,8 +2854,11 @@ function App() {
                   >
                     <span>#{index + 1}</span>
                     <span className="leader-player">
-                      <span className="leader-avatar-frame">
-                        <img src={entry.avatarUrl} alt={entry.playerName} className="leader-avatar" />
+                      <span className="leader-avatar-wrap">
+                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                        <span className="leader-avatar-frame">
+                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                        </span>
                       </span>
                       <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
                         {entry.playerName}
@@ -2348,8 +2915,11 @@ function App() {
                   >
                     <span>#{index + 1}</span>
                     <span className="leader-player">
-                      <span className="leader-avatar-frame">
-                        <img src={entry.avatarUrl} alt={entry.playerName} className="leader-avatar" />
+                      <span className="leader-avatar-wrap">
+                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                        <span className="leader-avatar-frame">
+                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                        </span>
                       </span>
                       <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
                         {entry.playerName}
@@ -2364,11 +2934,19 @@ function App() {
               <div className="card">
                 <h3>Most Mastered Codes</h3>
                 {homeMostMasteredLeaders.length === 0 ? <p className="muted">No data yet.</p> : homeMostMasteredLeaders.map((entry, index) => (
-                  <div key={`home-mastered-${entry.userId}-${index}`} className="leader-row">
+                  <button
+                    key={`home-mastered-${entry.userId}-${index}`}
+                    type="button"
+                    className="leader-row leader-row-button"
+                    onClick={() => openHomeProfile(entry, 'Mastered Codes', index === 0)}
+                  >
                     <span>#{index + 1}</span>
                     <span className="leader-player">
-                      <span className="leader-avatar-frame">
-                        <img src={entry.avatarUrl} alt={entry.playerName} className="leader-avatar" />
+                      <span className="leader-avatar-wrap">
+                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                        <span className="leader-avatar-frame">
+                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                        </span>
                       </span>
                       <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
                         {entry.playerName}
@@ -2376,7 +2954,7 @@ function App() {
                     </span>
                     <span>Codes</span>
                     <span>{entry.value}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -2432,7 +3010,7 @@ function App() {
           </section>
         ) : null}
 
-        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && activeTab === 'library' && (
+        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isLibraryPage && (
           <section>
             <div className="segmented">
               {(['penal', 'hs', 'vehicle'] as CodeSet[]).map((filter) => (
@@ -2462,7 +3040,7 @@ function App() {
           </section>
         )}
 
-        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && activeTab === 'study' && (
+        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isStudyPage && (
           <section className="study-section">
             <div className="segmented">
               {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
@@ -2549,25 +3127,34 @@ function App() {
               ) : (
                 <>
                   <button className={flipped ? 'flashcard flipped' : 'flashcard'} onClick={() => setFlipped((value) => !value)}>
-                    <div className="face front">{filteredFlashcards[flashcardIndex]?.front}</div>
-                    <div className="face back">{filteredFlashcards[flashcardIndex]?.back}</div>
+                    <div className="face front">{orderedFlashcards[flashcardIndex]?.front}</div>
+                    <div className="face back">{orderedFlashcards[flashcardIndex]?.back}</div>
                   </button>
-                  <div className="actions-row">
+                  <div className="actions-row flashcard-nav">
                 <button
-                  className="secondary"
+                  className="secondary flashcard-nav-btn"
                   onClick={() => {
                     setFlipped(false)
-                    setFlashcardIndex((current) => (current === 0 ? filteredFlashcards.length - 1 : current - 1))
+                    setFlashcardIndex((current) => (current === 0 ? orderedFlashcards.length - 1 : current - 1))
                     incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }))
                   }}
                 >
                   Previous
                 </button>
                 <button
-                  className="secondary"
+                  className="secondary flashcard-nav-btn"
                   onClick={() => {
                     setFlipped(false)
-                    setFlashcardIndex((current) => (current + 1) % filteredFlashcards.length)
+                    setFlashcardIndex((current) => {
+                      if (current < orderedFlashcards.length - 1) return current + 1
+                      const lastCardId = orderedFlashcards[current]?.id
+                      let reshuffled = shuffle(filteredFlashcards.map((card) => card.id))
+                      if (reshuffled.length > 1 && reshuffled[0] === lastCardId) {
+                        ;[reshuffled[0], reshuffled[1]] = [reshuffled[1], reshuffled[0]]
+                      }
+                      setFlashcardOrder(reshuffled)
+                      return 0
+                    })
                     incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }))
                   }}
                 >
@@ -2580,7 +3167,7 @@ function App() {
           </section>
         )}
 
-        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && activeTab === 'games' && (
+        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isGamesPage && (
           <section className="games-section">
             <div className="game-scores">
               <button
@@ -2588,14 +3175,16 @@ function App() {
                 className={gamesMode === 'matching' ? 'card compact game-mode-card game-mode-active' : 'card compact game-mode-card'}
                 onClick={() => setGamesMode('matching')}
               >
-                Matching
+                <span className="game-mode-title"><AppIcon name="games" className="button-icon" /> Matching</span>
+                <span className="muted tiny">Match code sections fast</span>
               </button>
               <button
                 type="button"
                 className={gamesMode === 'speed' ? 'card compact game-mode-card game-mode-active' : 'card compact game-mode-card'}
                 onClick={() => setGamesMode('speed')}
               >
-                Speed Test
+                <span className="game-mode-title"><AppIcon name="study" className="button-icon" /> Speed Test</span>
+                <span className="muted tiny">Answer as many as possible</span>
               </button>
               <article className="card compact muted-box">Gravity (Disabled)</article>
             </div>
@@ -2604,81 +3193,83 @@ function App() {
               <>
             <h2>Matching</h2>
             {!matchRunning && !matchDone ? (
-              <div className="card">
-                <label>
-                  Code Set
-                  <div className="segmented">
-                    {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                      <button
-                        key={filter}
-                        className={matchFilter === filter ? 'seg active' : 'seg'}
-                        onClick={() => setMatchFilter(filter)}
-                      >
-                        {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                      </button>
-                    ))}
-                  </div>
-                </label>
-                <label>
-                  Time
-                  <div className="segmented">
-                    {[15, 30, 60].map((time) => (
-                      <button key={time} className={matchDuration === time ? 'seg active' : 'seg'} onClick={() => setMatchDuration(time)}>
-                        {time}s
-                      </button>
-                    ))}
-                  </div>
-                </label>
-                <button className="primary game-start-button" onClick={startMatching}>
+              <div className="card game-launch-card">
+                <button className="primary game-start-button" onClick={() => setShowMatchSetupModal(true)}>
+                  <AppIcon name="games" className="button-icon" />
                   Start Matching
                 </button>
               </div>
             ) : null}
 
-            {matchRunning ? (
-              <div className="card">
-                <div className="quiz-top">
-                  <span>Time: {matchRemaining}s</span>
-                  <span>Round: {matchRound}</span>
-                  <span>Score: {matchScore}</span>
-                </div>
-                <div className="match-grid">
-                  {matchCards.map((card) => {
-                    const selected = selectedCards.includes(card.id)
-                    const matched = matchedPairIds.includes(card.pairId)
-                    return (
-                      <button
-                        key={card.id}
-                        className={`match-card ${selected ? 'match-selected' : ''} ${matched ? 'match-done' : ''}`}
-                        disabled={matched || selected || selectedCards.length >= 2}
-                        onClick={() => setSelectedCards((previous) => [...previous, card.id])}
-                      >
-                        <small>{card.kind === 'code' ? 'Penal code' : 'Definition'}</small>
-                        <strong>{card.text}</strong>
-                      </button>
-                    )
-                  })}
+            {(matchRunning || matchDone) ? (
+              <div className="match-session-overlay">
+                <div className={matchDone && !matchRunning ? 'match-session-shell match-session-shell-done' : 'match-session-shell'}>
+                  {matchRunning ? (
+                    <>
+                  <div className="match-session-top">
+                    <span>Time: {matchRemaining}s</span>
+                    <span>Round: {matchRound}</span>
+                    <span>Score: {matchScore}</span>
+                  </div>
+                  <div className="match-session-controls">
+                    <button
+                      className="secondary match-exit-button"
+                      onClick={() => {
+                        const confirmed = window.confirm('Exit current matching game? This round will end.')
+                        if (confirmed) exitMatchingSession()
+                      }}
+                    >
+                      Exit Match
+                    </button>
+                  </div>
+                    </>
+                  ) : null}
+                  {matchRunning ? (
+                    <div className="match-grid match-grid-session">
+                      {matchCards.map((card) => {
+                        const selected = selectedCards.includes(card.id)
+                        const matched = matchedPairIds.includes(card.pairId)
+                        return (
+                          <button
+                            key={card.id}
+                            className={`match-card ${selected ? 'match-selected' : ''} ${matched ? 'match-done' : ''} ${wrongCardIds.includes(card.id) ? 'match-wrong' : ''}`}
+                            disabled={matched || selected || selectedCards.length >= 2}
+                            onClick={() => setSelectedCards((previous) => [...previous, card.id])}
+                          >
+                            <small>{card.kind === 'code' ? 'Penal code' : 'Definition'}</small>
+                            <strong>{card.text}</strong>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                  {matchDone && !matchRunning ? (
+                    <div className="card session-card">
+                      <h3>Session Complete</h3>
+                      <div className="match-session-top match-session-top-finished">
+                        <span>Time: {matchRemaining}s</span>
+                        <span>Round: {matchRound}</span>
+                        <span>Score: {matchScore}</span>
+                      </div>
+                      <p>Your score: {matchScore}</p>
+                      <p>High score: {Math.max(highScores.matching, matchScore)}</p>
+                      <p>Round reached: {matchRound}</p>
+                      <div className="actions-row">
+                        <button className="primary" onClick={startMatching}>
+                          Retry
+                        </button>
+                        <button className="secondary" onClick={exitMatchingSession}>
+                          Exit
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : null}
 
-            {matchDone && !matchRunning ? (
-              <div className="card session-card">
-                <h3>Session Complete</h3>
-                <p>Your score: {matchScore}</p>
-                <p>High score: {Math.max(highScores.matching, matchScore)}</p>
-                <p>Round reached: {matchRound}</p>
-                <div className="actions-row">
-                  <button className="primary" onClick={startMatching}>
-                    Replay
-                  </button>
-                  <button className="secondary" onClick={() => setMatchDone(false)}>
-                    Exit
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
+            {!matchRunning && !matchDone ? (
+            <>
             <h2>Matching Leaderboard</h2>
             <div className="card">
               {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
@@ -2717,7 +3308,7 @@ function App() {
                   <button
                     key={entry.id}
                     type="button"
-                    className="leader-row leader-row-button"
+                    className="leader-row leader-row-button game-leader-row"
                     onClick={() => {
                       setSelectedLeaderboardEntry(entry)
                       setSelectedLeaderboardIsTop(index === 0)
@@ -2725,37 +3316,23 @@ function App() {
                   >
                     <span>#{index + 1}</span>
                     <span className="leader-player">
-                      {entry.avatarUrl ? (
-                        <span className="leader-avatar-wrap">
-                          {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                          <span className="leader-avatar-frame">
-                            <img
-                              src={entry.avatarUrl}
-                              alt={entry.playerName}
-                              className="leader-avatar"
-                              onError={(event) => {
-                                const image = event.currentTarget
-                                const currentSource = image.getAttribute('src') || ''
-                                if (currentSource.includes('%2F')) {
-                                  image.src = currentSource.replace(/%2F/g, '/')
-                                }
-                              }}
-                            />
-                          </span>
+                      <span className="leader-avatar-wrap">
+                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                        <span className="leader-avatar-frame">
+                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                         </span>
-                      ) : (
-                        <span className="leader-avatar-frame leader-avatar-fallback" />
-                      )}
+                      </span>
                       <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
                         {entry.playerName}
                       </span>
                     </span>
-                    <span>{entry.game}</span>
                     <span>{entry.score}</span>
                   </button>
                 ))
               )}
             </div>
+            </>
+            ) : null}
               </>
             ) : null}
 
@@ -2763,77 +3340,78 @@ function App() {
               <>
             <h2>Speed Test</h2>
             {!speedRunning && !speedDone ? (
-              <div className="card">
-                <label>
-                  Code Set
-                  <div className="segmented">
-                    {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                      <button
-                        key={`speed-filter-${filter}`}
-                        className={speedFilter === filter ? 'seg active' : 'seg'}
-                        onClick={() => setSpeedFilter(filter)}
-                      >
-                        {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                      </button>
-                    ))}
-                  </div>
-                </label>
-                <label>
-                  Time
-                  <div className="segmented">
-                    {[15, 30, 60].map((time) => (
-                      <button
-                        key={`speed-time-${time}`}
-                        className={speedDuration === time ? 'seg active' : 'seg'}
-                        onClick={() => setSpeedDuration(time)}
-                      >
-                        {time}s
-                      </button>
-                    ))}
-                  </div>
-                </label>
-                <button className="primary game-start-button" onClick={startSpeedTest} disabled={speedQuestionBank.length === 0}>
+              <div className="card game-launch-card">
+                <button className="primary game-start-button" onClick={() => setShowSpeedSetupModal(true)} disabled={speedQuestionBank.length === 0}>
+                  <AppIcon name="study" className="button-icon" />
                   Start Speed Test
                 </button>
                 {speedQuestionBank.length === 0 ? <p className="muted">No speed test questions loaded.</p> : null}
               </div>
             ) : null}
 
-            {speedRunning && speedCurrentQuestion ? (
-              <div className="card quiz-card">
-                <div className="quiz-top">
-                  <span>Time: {speedRemaining}s</span>
-                  <span>Score: {speedScore}</span>
-                  <span>Answered: {speedAnsweredCount}</span>
+            {(speedRunning || speedDone) ? (
+              <div className="speed-session-overlay">
+                <div className={speedDone && !speedRunning ? 'speed-session-shell speed-session-shell-done' : 'speed-session-shell'}>
+                  {speedRunning ? (
+                    <>
+                      <div className="speed-session-controls">
+                        <button
+                          className="secondary speed-exit-button"
+                          onClick={() => {
+                            const confirmed = window.confirm('Exit current speed test? This session will end.')
+                            if (confirmed) exitSpeedSession()
+                          }}
+                        >
+                          Exit Test
+                        </button>
+                      </div>
+                      <div className="speed-session-top">
+                        <span>Time: {speedRemaining}s</span>
+                        <span>Score: {speedScore}</span>
+                        <span>Answered: {speedAnsweredCount}</span>
+                      </div>
+                    </>
+                  ) : null}
+                  {speedRunning && speedCurrentQuestion ? (
+                    <div className="card quiz-card speed-session-card">
+                      <h3>{speedCurrentQuestion.prompt}</h3>
+                      <div className="choices">
+                        {speedCurrentQuestion.choices.map((choice, index) => (
+                          <button
+                            key={`speed-choice-${speedCurrentQuestion.id}-${index}`}
+                            className="choice"
+                            onClick={() => answerSpeedQuestion(index)}
+                          >
+                            {choice}
+                          </button>
+                        ))}
+                      </div>
+                      {speedFeedback ? <p className={speedFeedback.startsWith('Correct') ? 'good' : 'bad'}>{speedFeedback}</p> : null}
+                    </div>
+                  ) : null}
+
+                  {speedDone && !speedRunning ? (
+                    <div className="card session-card">
+                      <h3>Session Complete</h3>
+                      <div className="speed-session-top speed-session-top-finished">
+                        <span>Time: {speedRemaining}s</span>
+                        <span>Score: {speedScore}</span>
+                        <span>Answered: {speedAnsweredCount}</span>
+                      </div>
+                      <p>Your score: {speedScore}</p>
+                      <p>Questions answered: {speedAnsweredCount}</p>
+                      <div className="actions-row">
+                        <button className="primary" onClick={startSpeedTest}>Replay</button>
+                        <button className="secondary" onClick={exitSpeedSession}>Exit</button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-                <h3>{speedCurrentQuestion.prompt}</h3>
-                <div className="choices">
-                  {speedCurrentQuestion.choices.map((choice, index) => (
-                    <button
-                      key={`speed-choice-${speedCurrentQuestion.id}-${index}`}
-                      className="choice"
-                      onClick={() => answerSpeedQuestion(index)}
-                    >
-                      {choice}
-                    </button>
-                  ))}
-                </div>
-                {speedFeedback ? <p className={speedFeedback.startsWith('Correct') ? 'good' : 'bad'}>{speedFeedback}</p> : null}
               </div>
             ) : null}
 
-            {speedDone && !speedRunning ? (
-              <div className="card session-card">
-                <h3>Session Complete</h3>
-                <p>Your score: {speedScore}</p>
-                <p>Questions answered: {speedAnsweredCount}</p>
-                <div className="actions-row">
-                  <button className="primary" onClick={startSpeedTest}>Replay</button>
-                  <button className="secondary" onClick={() => setSpeedDone(false)}>Exit</button>
-                </div>
-              </div>
-            ) : null}
-
+            {!speedRunning && !speedDone ? (
+            <>
             <h2>Speed Test Leaderboard</h2>
             <div className="card">
               {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
@@ -2872,7 +3450,7 @@ function App() {
                   <button
                     key={`speed-${entry.id}`}
                     type="button"
-                    className="leader-row leader-row-button"
+                    className="leader-row leader-row-button game-leader-row"
                     onClick={() => {
                       setSelectedLeaderboardEntry(entry)
                       setSelectedLeaderboardIsTop(index === 0)
@@ -2880,61 +3458,51 @@ function App() {
                   >
                     <span>#{index + 1}</span>
                     <span className="leader-player">
-                      {entry.avatarUrl ? (
-                        <span className="leader-avatar-wrap">
-                          {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                          <span className="leader-avatar-frame">
-                            <img
-                              src={entry.avatarUrl}
-                              alt={entry.playerName}
-                              className="leader-avatar"
-                              onError={(event) => {
-                                const image = event.currentTarget
-                                const currentSource = image.getAttribute('src') || ''
-                                if (currentSource.includes('%2F')) {
-                                  image.src = currentSource.replace(/%2F/g, '/')
-                                }
-                              }}
-                            />
-                          </span>
+                      <span className="leader-avatar-wrap">
+                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                        <span className="leader-avatar-frame">
+                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                         </span>
-                      ) : (
-                        <span className="leader-avatar-frame leader-avatar-fallback" />
-                      )}
+                      </span>
                       <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
                         {entry.playerName}
                       </span>
                     </span>
-                    <span>{entry.game}</span>
                     <span>{entry.score}</span>
                   </button>
                 ))
               )}
             </div>
+            </>
+            ) : null}
               </>
             ) : null}
           </section>
         )}
 
-        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && activeTab === 'scenarios' && (
+        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isScenariosPage && (
           <section>
             <h2>Scenario Drills</h2>
             <div className="card">
               {scenarioCurrentQuestion ? (
                 <>
-                  <h3>{scenarioCurrentQuestion.statement}</h3>
-                  <div className="actions-row">
-                    <button className="primary" onClick={() => answerScenario(true)} disabled={Boolean(scenarioResult)}>
-                      True
-                    </button>
-                    <button className="secondary" onClick={() => answerScenario(false)} disabled={Boolean(scenarioResult)}>
-                      False
-                    </button>
+                  <h3>{scenarioCurrentQuestion.prompt}</h3>
+                  <div className="actions-row scenario-actions">
+                    {scenarioCurrentQuestion.choices.map((choice, index) => (
+                      <button
+                        key={`scenario-choice-${scenarioCurrentQuestion.id}-${index}`}
+                        className={index === 0 ? 'primary scenario-answer-btn' : 'secondary scenario-answer-btn'}
+                        onClick={() => answerScenario(index)}
+                        disabled={Boolean(scenarioResult)}
+                      >
+                        {choice}
+                      </button>
+                    ))}
                   </div>
                   {scenarioResult ? <p className={scenarioResult.startsWith('Correct') ? 'good' : 'bad'}>{scenarioResult}</p> : null}
                   {scenarioResult ? (
                     <div className="card compact">
-                      <p><strong>Answer:</strong> {scenarioCurrentQuestion.isTrue ? 'True' : 'False'}</p>
+                      <p><strong>Answer:</strong> {scenarioCurrentQuestion.choices[scenarioCurrentQuestion.correctIndex]}</p>
                       <p className="muted">{scenarioCurrentQuestion.explanation}</p>
                     </div>
                   ) : null}
@@ -2975,24 +3543,9 @@ function App() {
         {isProfilePage && profile && (
           <section>
             <div className="card profile-page-card">
-              <p>Email: {currentUserEmail || 'Unknown'}</p>
-              <p>Provider: {providerLabel(currentUserProvider)}</p>
-              {profile.avatarUrl ? (
-                <div className="avatar-frame">
-                  <img
-                    src={profile.avatarUrl}
-                    alt={profile.username}
-                    className="avatar"
-                    onError={(event) => {
-                      const image = event.currentTarget
-                      const currentSource = image.getAttribute('src') || ''
-                      if (currentSource.includes('%2F')) {
-                        image.src = currentSource.replace(/%2F/g, '/')
-                      }
-                    }}
-                  />
-                </div>
-              ) : null}
+              <div className="avatar-frame">
+                <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
+              </div>
               <label>
                 Username
                 <input value={profileUsername} onChange={(event) => setProfileUsername(event.target.value)} />
@@ -3002,7 +3555,7 @@ function App() {
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(event) => setProfileAvatar(event.target.files?.[0] || null)}
+                  onChange={(event) => openAvatarCropper(event.target.files?.[0] || null)}
                 />
               </label>
               <label>
@@ -3189,6 +3742,47 @@ function App() {
                 ))}
               </div>
               <p className="muted">Current tier: {tierLabel[profile.supporterTier]}</p>
+              <p className="muted">Email: {currentUserEmail || 'Unknown'}</p>
+              <h3>Account Security</h3>
+              <button className="secondary" onClick={linkGoogleAccount} disabled={authLoading || currentUserProvider.toLowerCase() === 'google'}>
+                {currentUserProvider.toLowerCase() === 'google' ? 'Google Linked' : 'Link Google Account'}
+              </button>
+              <label>
+                New password
+                <div className="password-row">
+                  <input
+                    type={showAccountPassword ? 'text' : 'password'}
+                    value={accountNewPassword}
+                    onChange={(event) => setAccountNewPassword(event.target.value)}
+                  />
+                  <button type="button" className="password-eye" onClick={() => setShowAccountPassword((value) => !value)} aria-label="Toggle new password visibility">
+                    {showAccountPassword ? (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M3 3l18 18" />
+                        <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
+                        <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
+                        <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </label>
+              <label>
+                Verify new password
+                <input
+                  type={showAccountPassword ? 'text' : 'password'}
+                  value={accountConfirmPassword}
+                  onChange={(event) => setAccountConfirmPassword(event.target.value)}
+                />
+              </label>
+              <button className="secondary" onClick={updateAccountPassword} disabled={authLoading || accountNewPassword.length === 0 || accountConfirmPassword.length === 0}>
+                Change Password
+              </button>
               <button className="secondary" onClick={refreshSupporterTier}>
                 Refresh Tier
               </button>
@@ -3228,28 +3822,141 @@ function App() {
               </button>
             </div>
             <div className="leader-player">
-              {selectedLeaderboardEntry.avatarUrl ? (
-                <span className="leader-avatar-wrap">
-                  {selectedLeaderboardIsTop ? <span className="leader-crown leader-crown-modal" aria-label="Top Player">👑</span> : null}
-                  <span className="leader-avatar-frame modal-avatar">
-                    <img src={selectedLeaderboardEntry.avatarUrl} alt={selectedLeaderboardEntry.playerName} className="leader-avatar" />
-                  </span>
+              <span className="leader-avatar-wrap">
+                {selectedLeaderboardIsTop ? <span className="leader-crown leader-crown-modal" aria-label="Top Player">👑</span> : null}
+                <span className="leader-avatar-frame modal-avatar">
+                  <img src={avatarFor(selectedLeaderboardEntry.avatarUrl)} alt={selectedLeaderboardEntry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                 </span>
-              ) : (
-                <span className="leader-avatar-frame leader-avatar-fallback modal-avatar" />
-              )}
+              </span>
               <div>
                 <h3 className={displayNameClass(selectedLeaderboardEntry.supporterTier, true)} style={displayNameStyle(selectedLeaderboardEntry.nameStyle, selectedLeaderboardEntry.supporterTier)}>
                   {selectedLeaderboardEntry.playerName}
                 </h3>
                 <p className="muted">Tier: {tierLabel[selectedLeaderboardEntry.supporterTier]}</p>
+                {selectedLeaderboardEntry.isOwner ? <p className="owner-pill">Owner</p> : null}
               </div>
             </div>
             <p><strong>Agency:</strong> {selectedLeaderboardEntry.agency || 'Not provided'}</p>
             <p><strong>About Me:</strong> {selectedLeaderboardEntry.bio || 'Not provided'}</p>
             <p className="muted">
-              Best {selectedLeaderboardEntry.game} score: {selectedLeaderboardEntry.score} • Round {selectedLeaderboardEntry.round}
+              {selectedLeaderboardEntry.round > 0
+                ? `Best ${selectedLeaderboardEntry.game} score: ${selectedLeaderboardEntry.score} • Round ${selectedLeaderboardEntry.round}`
+                : `${selectedLeaderboardEntry.game}: ${selectedLeaderboardEntry.game === 'Study Hours' ? formatStudyTime(selectedLeaderboardEntry.score) : selectedLeaderboardEntry.score}`}
             </p>
+          </div>
+        </div>
+      ) : null}
+
+      {celebration ? (
+        <div className="celebration-overlay" aria-live="polite">
+          <div className="celebration-card">
+            <h3>{celebration.title}</h3>
+            <p>{celebration.subtitle}</p>
+          </div>
+          <div className="celebration-burst" key={`burst-${celebration.burst}`}>
+            {Array.from({ length: 52 }).map((_, index) => (
+              <span key={`confetti-${celebration.burst}-${index}`} className="confetti-dot" style={{ ['--i' as string]: `${index}` }} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {avatarCropOpen ? (
+        <div className="profile-modal-overlay" onClick={cancelAvatarCrop}>
+          <div className="card avatar-crop-card" onClick={(event) => event.stopPropagation()}>
+            <h3>Crop Profile Picture</h3>
+            <div className="avatar-crop-frame">
+              <img
+                src={avatarCropSourceUrl}
+                alt="Crop preview"
+                className="avatar-crop-image"
+                style={{
+                  transform: `translate(calc(-50% + ${avatarCropX}px), calc(-50% + ${avatarCropY}px)) scale(${avatarCropZoom})`,
+                }}
+              />
+            </div>
+            <div className="avatar-crop-controls">
+              <label>
+                Zoom: {avatarCropZoom.toFixed(2)}x
+                <input type="range" min={1} max={3} step={0.01} value={avatarCropZoom} onChange={(event) => setAvatarCropZoom(Number(event.target.value))} />
+              </label>
+              <label>
+                Horizontal
+                <input type="range" min={-140} max={140} step={1} value={avatarCropX} onChange={(event) => setAvatarCropX(Number(event.target.value))} />
+              </label>
+              <label>
+                Vertical
+                <input type="range" min={-140} max={140} step={1} value={avatarCropY} onChange={(event) => setAvatarCropY(Number(event.target.value))} />
+              </label>
+            </div>
+            <div className="actions-row">
+              <button className="secondary" onClick={cancelAvatarCrop}>Cancel</button>
+              <button className="primary" onClick={applyAvatarCrop}>Use This Crop</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showMatchSetupModal ? (
+        <div className="profile-modal-overlay" onClick={() => setShowMatchSetupModal(false)}>
+          <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
+            <h3>Matching Settings</h3>
+            <label className="game-control">
+              Code Set
+              <div className="segmented">
+                {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                  <button key={`match-setup-${filter}`} className={matchFilter === filter ? 'seg active' : 'seg'} onClick={() => setMatchFilter(filter)}>
+                    {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label className="game-control">
+              Time
+              <div className="segmented">
+                {[15, 30, 60].map((time) => (
+                  <button key={`match-setup-time-${time}`} className={matchDuration === time ? 'seg active' : 'seg'} onClick={() => setMatchDuration(time)}>
+                    {time}s
+                  </button>
+                ))}
+              </div>
+            </label>
+            <div className="actions-row">
+              <button className="secondary" onClick={() => setShowMatchSetupModal(false)}>Cancel</button>
+              <button className="primary" onClick={beginMatchingFromSetup}>Start</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showSpeedSetupModal ? (
+        <div className="profile-modal-overlay" onClick={() => setShowSpeedSetupModal(false)}>
+          <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
+            <h3>Speed Test Settings</h3>
+            <label className="game-control">
+              Code Set
+              <div className="segmented">
+                {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                  <button key={`speed-setup-${filter}`} className={speedFilter === filter ? 'seg active' : 'seg'} onClick={() => setSpeedFilter(filter)}>
+                    {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label className="game-control">
+              Time
+              <div className="segmented">
+                {[15, 30, 60].map((time) => (
+                  <button key={`speed-setup-time-${time}`} className={speedDuration === time ? 'seg active' : 'seg'} onClick={() => setSpeedDuration(time)}>
+                    {time}s
+                  </button>
+                ))}
+              </div>
+            </label>
+            <div className="actions-row">
+              <button className="secondary" onClick={() => setShowSpeedSetupModal(false)}>Cancel</button>
+              <button className="primary" onClick={beginSpeedFromSetup} disabled={speedQuestionBank.length === 0}>Start</button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -3267,10 +3974,21 @@ function App() {
             className={(tab.key === 'home' ? isHomePage : !isHomePage && activeTab === tab.key) ? 'tab active' : 'tab'}
             onClick={() => {
               setActiveTab(tab.key as AppTab)
-              navigate(tab.key === 'home' ? '/home' : '/')
+              const pathByTab: Record<AppTab, string> = {
+                home: '/home',
+                study: '/study',
+                games: '/games',
+                scenarios: '/scenarios',
+                library: '/library',
+              }
+              navigate(pathByTab[tab.key as AppTab])
             }}
           >
-            {tab.label}
+            <AppIcon
+              name={tab.key === 'home' ? 'home' : tab.key === 'study' ? 'study' : tab.key === 'games' ? 'games' : tab.key === 'scenarios' ? 'scenarios' : 'library'}
+              className="tab-icon"
+            />
+            <span className="tab-label">{tab.label}</span>
           </button>
         ))}
       </nav>
