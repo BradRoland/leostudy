@@ -1,0 +1,1213 @@
+[
+  {
+    "id": "mc-1-t",
+    "codeSet": "vehicle",
+    "statement": "Officer Lopez stops a car for a traffic violation. After handling the citation, Lopez asks the driver if he is carrying any drugs. The driver replies, \"Go ahead and check,\" and opens the trunk, revealing illegal narcotics. No force or commands were used by Lopez. What type of contact is this, and was the search legal? It was a traffic detention, and the search was legal because the driver freely consented.",
+    "isTrue": true,
+    "explanation": "consented to the search. Consent is a recognized exception to the warrant requirement, so the search of the trunk was legal."
+  },
+  {
+    "id": "mc-1-f",
+    "codeSet": "vehicle",
+    "statement": "Officer Lopez stops a car for a traffic violation. After handling the citation, Lopez asks the driver if he is carrying any drugs. The driver replies, \"Go ahead and check,\" and opens the trunk, revealing illegal narcotics. No force or commands were used by Lopez. What type of contact is this, and was the search legal? It was a detention, and the search was illegal because there was no warrant or probable cause.",
+    "isTrue": false,
+    "explanation": "consented to the search. Consent is a recognized exception to the warrant requirement, so the search of the trunk was legal."
+  },
+  {
+    "id": "mc-2-t",
+    "codeSet": "penal",
+    "statement": "Two officers approach a man standing on a sidewalk in a high-crime area late at night. They identify themselves and ask if they can speak with him. The man says, \"No, thanks,\" and starts to walk away. One officer then steps in front of the man and orders him to sit on the curb. At that moment, this encounter has escalated into: A detention, because the officer’s actions would make a reasonable person feel they are not free to leave.",
+    "isTrue": true,
+    "explanation": "voluntary contact into a detention. A reasonable person in that situation would not feel free to leave, which is the hallmark of a detention (requiring reasonable suspicion)."
+  },
+  {
+    "id": "mc-2-f",
+    "codeSet": "penal",
+    "statement": "Two officers approach a man standing on a sidewalk in a high-crime area late at night. They identify themselves and ask if they can speak with him. The man says, \"No, thanks,\" and starts to walk away. One officer then steps in front of the man and orders him to sit on the curb. At that moment, this encounter has escalated into: A consensual encounter, because the man is free to leave if he chooses.",
+    "isTrue": false,
+    "explanation": "voluntary contact into a detention. A reasonable person in that situation would not feel free to leave, which is the hallmark of a detention (requiring reasonable suspicion)."
+  },
+  {
+    "id": "mc-3-t",
+    "codeSet": "penal",
+    "statement": "Officer Green initiates a casual conversation with a man in a park (consensual encounter). Without any indication of criminal activity, Green grabs the man’s arm and says, \"You fit the description of a thief, you’re not going anywhere.\" Green finds stolen property in the man’s backpack during this unlawful detention. What is the likely consequence of this action? The stolen property may be suppressed (excluded) as evidence, because it was found as a result of an unlawful detention.",
+    "isTrue": true,
+    "explanation": "encounter into an unlawful detention, any evidence obtained (the stolen property) can be excluded under the exclusionary rule due to the constitutional violation."
+  },
+  {
+    "id": "mc-3-f",
+    "codeSet": "penal",
+    "statement": "Officer Green initiates a casual conversation with a man in a park (consensual encounter). Without any indication of criminal activity, Green grabs the man’s arm and says, \"You fit the description of a thief, you’re not going anywhere.\" Green finds stolen property in the man’s backpack during this unlawful detention. What is the likely consequence of this action? The stolen property will be admissible in court because it was evidence of a crime.",
+    "isTrue": false,
+    "explanation": "encounter into an unlawful detention, any evidence obtained (the stolen property) can be excluded under the exclusionary rule due to the constitutional violation."
+  },
+  {
+    "id": "mc-4-t",
+    "codeSet": "penal",
+    "statement": "Late at night, Officer Kim observes a person walking back and forth in front of a closed warehouse, peering into windows. The area has had recent burglaries. Officer Kim stops and questions the individual. Which is true regarding this stop? The stop is lawful because Officer Kim has reasonable suspicion based on the person’s behavior and the context.",
+    "isTrue": true,
+    "explanation": "burglary-prone area), the officer has reasonable suspicion that the person might be casing for a burglary. This justifies a temporary detention for investigation."
+  },
+  {
+    "id": "mc-4-f",
+    "codeSet": "penal",
+    "statement": "Late at night, Officer Kim observes a person walking back and forth in front of a closed warehouse, peering into windows. The area has had recent burglaries. Officer Kim stops and questions the individual. Which is true regarding this stop? The stop is unlawful because looking into windows is not a crime. 1",
+    "isTrue": false,
+    "explanation": "burglary-prone area), the officer has reasonable suspicion that the person might be casing for a burglary. This justifies a temporary detention for investigation."
+  },
+  {
+    "id": "mc-5-t",
+    "codeSet": "vehicle",
+    "statement": "Officer Singh lawfully detains a suspect on reasonable suspicion of carrying illegal drugs. The suspect is cooperative and shows no signs of being armed. Nevertheless, Singh conducts a pat-down search and finds a small bag of cocaine in the suspect’s pocket. Was this pat search lawful, and what is the outcome for the evidence? No, the frisk was not justified without specific facts suggesting the suspect was armed; the cocaine may be suppressed as the fruit of an unlawful search.",
+    "isTrue": true,
+    "explanation": "specific articulable facts that the person might be armed and dangerous. Here there was no indication of weapons or danger. Conducting the frisk without that justification was unlawful, so the cocaine found would likely be inadmissible."
+  },
+  {
+    "id": "mc-5-f",
+    "codeSet": "vehicle",
+    "statement": "Officer Singh lawfully detains a suspect on reasonable suspicion of carrying illegal drugs. The suspect is cooperative and shows no signs of being armed. Nevertheless, Singh conducts a pat-down search and finds a small bag of cocaine in the suspect’s pocket. Was this pat search lawful, and what is the outcome for the evidence? Yes, the frisk was lawful, and the cocaine is admissible since all evidence found during a detention is valid.",
+    "isTrue": false,
+    "explanation": "specific articulable facts that the person might be armed and dangerous. Here there was no indication of weapons or danger. Conducting the frisk without that justification was unlawful, so the cocaine found would likely be inadmissible."
+  },
+  {
+    "id": "tf-6",
+    "codeSet": "penal",
+    "statement": "Using handcuffs on a person during a detention automatically means the person has been arrested.",
+    "isTrue": false,
+    "explanation": "an arrest, as long as the use of restraints is reasonably necessary (for officer safety or to prevent flight). It remains a detention if it’s brief and justified by the circumstances."
+  },
+  {
+    "id": "mc-7-t",
+    "codeSet": "penal",
+    "statement": "Officer Davis responds to a 911 call about a robbery. A witness on scene provides a description of the suspect and points down the street, saying, \"He ran that way.\" Officer Davis sees a man matching the description running. Davis detains the man, and the witness positively identifies him as the robber. At that point, Officer Davis arrests the man. Which statement is correct? The arrest is lawful because Officer Davis now has probable cause based on the witness’s identification.",
+    "isTrue": true,
+    "explanation": "of the suspect gave Officer Davis probable cause to believe this man committed the robbery, making the arrest lawful. Officers do not need to witness a felony personally if they have reliable information providing probable cause."
+  },
+  {
+    "id": "mc-7-f",
+    "codeSet": "penal",
+    "statement": "Officer Davis responds to a 911 call about a robbery. A witness on scene provides a description of the suspect and points down the street, saying, \"He ran that way.\" Officer Davis sees a man matching the description running. Davis detains the man, and the witness positively identifies him as the robber. At that point, Officer Davis arrests the man. Which statement is correct? The arrest is unlawful because the officer did not personally see the robbery happen.",
+    "isTrue": false,
+    "explanation": "of the suspect gave Officer Davis probable cause to believe this man committed the robbery, making the arrest lawful. Officers do not need to witness a felony personally if they have reliable information providing probable cause."
+  },
+  {
+    "id": "mc-8-t",
+    "codeSet": "penal",
+    "statement": "Which of the following is NOT required as part of a lawful arrest? The arresting officer must physically touch or handcuff the suspect to signify custody. 2",
+    "isTrue": true,
+    "explanation": "the person peacefully submits. The key elements are the officer’s authority and intent to arrest, the subject’s understanding (or reasonable awareness) of being arrested, and the subject’s submission to custody. Informing the person of the reason for the arrest is also required (with few exceptions)."
+  },
+  {
+    "id": "mc-8-f",
+    "codeSet": "penal",
+    "statement": "Which of the following is NOT required as part of a lawful arrest? The arresting officer must have the intention to take the person into custody.",
+    "isTrue": false,
+    "explanation": "the person peacefully submits. The key elements are the officer’s authority and intent to arrest, the subject’s understanding (or reasonable awareness) of being arrested, and the subject’s submission to custody. Informing the person of the reason for the arrest is also required (with few exceptions)."
+  },
+  {
+    "id": "mc-9-t",
+    "codeSet": "vehicle",
+    "statement": "Officer Chen stops a suspect who matches a burglary suspect’s description. Chen has only reasonable suspicion at this point. The suspect cannot provide ID. Officer Chen puts the suspect in the patrol car and drives him to the station for fingerprinting without placing him under arrest. Which of the following is true? This action is an arrest, because moving the suspect to another location exceeds a brief detention.",
+    "isTrue": true,
+    "explanation": "without probable cause goes beyond the scope of a temporary detention. It is considered a de facto arrest, which was not justified here because the officer only had reasonable suspicion and no arrest warrant or probable cause."
+  },
+  {
+    "id": "mc-9-f",
+    "codeSet": "vehicle",
+    "statement": "Officer Chen stops a suspect who matches a burglary suspect’s description. Chen has only reasonable suspicion at this point. The suspect cannot provide ID. Officer Chen puts the suspect in the patrol car and drives him to the station for fingerprinting without placing him under arrest. Which of the following is true? This is still just a detention because Chen did not formally arrest the suspect.",
+    "isTrue": false,
+    "explanation": "without probable cause goes beyond the scope of a temporary detention. It is considered a de facto arrest, which was not justified here because the officer only had reasonable suspicion and no arrest warrant or probable cause."
+  },
+  {
+    "id": "tf-10",
+    "codeSet": "penal",
+    "statement": "When making an arrest, a peace officer must inform the person of the officer’s authority, the intent to arrest, and the cause of the arrest, unless the person is caught in the act or other exigent circumstances make it unreasonable to do so.",
+    "isTrue": true,
+    "explanation": "their identity, that they are being arrested, and the reason for the arrest at the time of arrest, unless it’s obviously impractical (for example, the suspect is actively fighting or fleeing)."
+  },
+  {
+    "id": "mc-11-t",
+    "codeSet": "penal",
+    "statement": "A shop owner calls the police after a man shoplifted merchandise and fled. An hour later, Officer Reed spots a man matching the suspect’s description. The shop owner identifies him, and wants him arrested. The theft is a misdemeanor and Officer Reed did not witness it occur. What can Officer Reed legally do? Reed can accept a private person’s arrest from the shop owner, then take the suspect into custody.",
+    "isTrue": true,
+    "explanation": "cannot arrest on their own authority. However, the victim (shop owner) can initiate a private person’s arrest. The officer can then accept custody of the suspect on that citizen’s arrest and proceed with booking. (Option A is the general rule, but it misses the private person’s arrest remedy in this scenario.)"
+  },
+  {
+    "id": "mc-11-f",
+    "codeSet": "penal",
+    "statement": "A shop owner calls the police after a man shoplifted merchandise and fled. An hour later, Officer Reed spots a man matching the suspect’s description. The shop owner identifies him, and wants him arrested. The theft is a misdemeanor and Officer Reed did not witness it occur. What can Officer Reed legally do? Reed cannot make a warrantless arrest for a misdemeanor not committed in his presence; he should advise the shop owner to seek a warrant.",
+    "isTrue": false,
+    "explanation": "cannot arrest on their own authority. However, the victim (shop owner) can initiate a private person’s arrest. The officer can then accept custody of the suspect on that citizen’s arrest and proceed with booking. (Option A is the general rule, but it misses the private person’s arrest remedy in this scenario.)"
+  },
+  {
+    "id": "tf-12",
+    "codeSet": "penal",
+    "statement": "A peace officer may arrest a suspect without a warrant for a felony, even if the felony was not committed in the officer’s presence, as long as the officer has probable cause to believe the suspect committed the felony.",
+    "isTrue": true,
+    "explanation": "the officer’s presence for a warrantless arrest. If the officer has probable cause to believe an 3 individual committed a felony (whether it happened in the officer’s view or not), the officer can lawfully arrest the person without an arrest warrant."
+  },
+  {
+    "id": "mc-13-t",
+    "codeSet": "penal",
+    "statement": "Officers have an arrest warrant for Sam, who is wanted for felony assault. They track Sam to his friend’s apartment. The friend refuses to let the officers in. Which of the following is the proper legal course of action for the officers? Leave and obtain a search warrant for Sam at that address, or seek consent/exigent circumstances, before entering.",
+    "isTrue": true,
+    "explanation": "reasonably believe the suspect is inside), but it does not authorize entry into a third party’s home without consent or exigent circumstances. The officers should obtain a search warrant for the location (or find a lawful exception) rather than forcing entry solely on Sam’s arrest warrant."
+  },
+  {
+    "id": "mc-13-f",
+    "codeSet": "penal",
+    "statement": "Officers have an arrest warrant for Sam, who is wanted for felony assault. They track Sam to his friend’s apartment. The friend refuses to let the officers in. Which of the following is the proper legal course of action for the officers? Use force to enter the apartment immediately under the authority of the arrest warrant.",
+    "isTrue": false,
+    "explanation": "reasonably believe the suspect is inside), but it does not authorize entry into a third party’s home without consent or exigent circumstances. The officers should obtain a search warrant for the location (or find a lawful exception) rather than forcing entry solely on Sam’s arrest warrant."
+  },
+  {
+    "id": "mc-14-t",
+    "codeSet": "penal",
+    "statement": "Officer Garcia has a valid arrest warrant for a suspect. Upon arriving at the suspect’s house, Garcia and his team force entry through the front door without knocking or announcing themselves, and they arrest the suspect inside. No emergency circumstances existed. Which statement is true about this entry? It was unlawful, because officers must generally announce their presence and purpose before forcing entry (knock and notice), absent exigent circumstances.",
+    "isTrue": true,
+    "explanation": "announce their identity and purpose, and wait a reasonable time (knock and notice) before forcing entry, unless there is an exigent circumstance (like danger or imminent evidence destruction). Here, no exception was present, so the unannounced forced entry violated that requirement."
+  },
+  {
+    "id": "mc-14-f",
+    "codeSet": "penal",
+    "statement": "Officer Garcia has a valid arrest warrant for a suspect. Upon arriving at the suspect’s house, Garcia and his team force entry through the front door without knocking or announcing themselves, and they arrest the suspect inside. No emergency circumstances existed. Which statement is true about this entry? It was lawful, because an arrest warrant authorizes immediate entry by force.",
+    "isTrue": false,
+    "explanation": "announce their identity and purpose, and wait a reasonable time (knock and notice) before forcing entry, unless there is an exigent circumstance (like danger or imminent evidence destruction). Here, no exception was present, so the unannounced forced entry violated that requirement."
+  },
+  {
+    "id": "tf-15",
+    "codeSet": "penal",
+    "statement": "In California, at what times may an arrest for a misdemeanor be made inside a home if using an arrest warrant (absent special circumstances or endorsements)? Only between 6 AM and 10 PM, unless the warrant expressly allows nighttime service.",
+    "isTrue": true,
+    "explanation": "for a misdemeanor in a dwelling at night (10 PM to 6 AM) unless the warrant is endorsed for nighttime service or certain exigent circumstances apply. Felony arrest warrants, however, can be served at any time."
+  },
+  {
+    "id": "tf-16",
+    "codeSet": "penal",
+    "statement": "If a crime’s statute of limitations has expired, a peace officer can no longer legally arrest a suspect for that crime.",
+    "isTrue": true,
+    "explanation": "has run out, the suspect can no longer be charged or arrested for that specific offense. For example, most misdemeanors in California have a one-year limitation period. After that period, an arrest for the misdemeanor would not be valid because the case cannot be prosecuted. 4"
+  },
+  {
+    "id": "mc-17-t",
+    "codeSet": "penal",
+    "statement": "During a lawful arrest of a robbery suspect, the suspect attempts to run away. Officer Novak tackles the suspect to the ground and handcuffs him, causing minor scrapes. Was Officer Novak’s use of force permitted? Yes. Officers may use reasonable force to prevent escape and to overcome resistance during a lawful arrest.",
+    "isTrue": true,
+    "explanation": "overcome the suspect’s resistance or attempts to flee. Tackling a fleeing robbery suspect is a reasonable use of force to prevent escape. Minor injuries sustained in the process do not automatically make the force excessive."
+  },
+  {
+    "id": "mc-17-f",
+    "codeSet": "penal",
+    "statement": "During a lawful arrest of a robbery suspect, the suspect attempts to run away. Officer Novak tackles the suspect to the ground and handcuffs him, causing minor scrapes. Was Officer Novak’s use of force permitted? No. Any injury to a suspect indicates the force was excessive and not permitted.",
+    "isTrue": false,
+    "explanation": "overcome the suspect’s resistance or attempts to flee. Tackling a fleeing robbery suspect is a reasonable use of force to prevent escape. Minor injuries sustained in the process do not automatically make the force excessive."
+  },
+  {
+    "id": "mc-18-t",
+    "codeSet": "penal",
+    "statement": "After making an arrest, officers must ensure the suspect is brought before a magistrate without unnecessary delay. In California, this generally means within: 48 hours (excluding weekends and holidays).",
+    "isTrue": true,
+    "explanation": "magistrate within 48 hours of arrest (not counting weekends and holidays), ensuring a timely initial appearance (arraignment) absent extraordinary circumstances."
+  },
+  {
+    "id": "mc-18-f",
+    "codeSet": "penal",
+    "statement": "After making an arrest, officers must ensure the suspect is brought before a magistrate without unnecessary delay. In California, this generally means within: 24 hours.",
+    "isTrue": false,
+    "explanation": "magistrate within 48 hours of arrest (not counting weekends and holidays), ensuring a timely initial appearance (arraignment) absent extraordinary circumstances."
+  },
+  {
+    "id": "tf-19",
+    "codeSet": "penal",
+    "statement": "For many minor misdemeanor offenses, a peace officer has the discretion to issue a citation (release on a written promise to appear) instead of taking the arrestee to jail.",
+    "isTrue": true,
+    "explanation": "misdemeanors, unless certain exceptions apply (for example, domestic violence offenses, or when the subject cannot provide satisfactory identification). This spares the need for immediate booking in minor cases."
+  },
+  {
+    "id": "mc-20-t",
+    "codeSet": "vehicle",
+    "statement": "A traffic officer stops a driver for speeding and discovers the driver is a foreign diplomat with full diplomatic immunity. The driver is also suspected of DUI. What should the officer do? Do not arrest the driver; diplomatic immunity means the officer cannot lawfully arrest or charge the individual, though the officer should ensure the person does not pose an immediate danger.",
+    "isTrue": true,
+    "explanation": "prosecution under U.S. law. The officer should not arrest the diplomat. The officer can take steps to ensure public safety (like not letting an intoxicated person drive), but formal enforcement action like arrest or citation is not allowed in this scenario."
+  },
+  {
+    "id": "mc-20-f",
+    "codeSet": "vehicle",
+    "statement": "A traffic officer stops a driver for speeding and discovers the driver is a foreign diplomat with full diplomatic immunity. The driver is also suspected of DUI. What should the officer do? Arrest the driver for DUI, as public safety overrides diplomatic status.",
+    "isTrue": false,
+    "explanation": "prosecution under U.S. law. The officer should not arrest the diplomat. The officer can take steps to ensure public safety (like not letting an intoxicated person drive), but formal enforcement action like arrest or citation is not allowed in this scenario."
+  },
+  {
+    "id": "mc-21-t",
+    "codeSet": "penal",
+    "statement": "Officer Tran arrests a suspect for burglary. Before any Miranda warning, Tran asks, \"Where’d you hide the stolen goods?\" The suspect responds with an incriminating statement. Which of the following is true regarding this situation? The statement is inadmissible because the suspect was in custody and being interrogated without a Miranda warning.",
+    "isTrue": true,
+    "explanation": "him of his Miranda rights before asking guilt-seeking questions. Because the officer interrogated the suspect without giving a Miranda warning, the suspect’s answer would likely be excluded and cannot be used by the prosecution."
+  },
+  {
+    "id": "mc-21-f",
+    "codeSet": "penal",
+    "statement": "Officer Tran arrests a suspect for burglary. Before any Miranda warning, Tran asks, \"Where’d you hide the stolen goods?\" The suspect responds with an incriminating statement. Which of the following is true regarding this situation? The statement is admissible because it was volunteered by the suspect. 5",
+    "isTrue": false,
+    "explanation": "him of his Miranda rights before asking guilt-seeking questions. Because the officer interrogated the suspect without giving a Miranda warning, the suspect’s answer would likely be excluded and cannot be used by the prosecution."
+  },
+  {
+    "id": "mc-22-t",
+    "codeSet": "penal",
+    "statement": "Which of the following best describes the primary purpose of the Miranda warning? To inform suspects of their constitutional rights so that any statements they give are voluntary and admissible in court.",
+    "isTrue": true,
+    "explanation": "Amendment rights (to remain silent and to an attorney). This helps guarantee that any statements they make are truly voluntary and thus admissible in court, rather than the product of compulsion or ignorance of rights."
+  },
+  {
+    "id": "mc-22-f",
+    "codeSet": "penal",
+    "statement": "Which of the following best describes the primary purpose of the Miranda warning? To intimidate suspects into confessing.",
+    "isTrue": false,
+    "explanation": "Amendment rights (to remain silent and to an attorney). This helps guarantee that any statements they make are truly voluntary and thus admissible in court, rather than the product of compulsion or ignorance of rights."
+  },
+  {
+    "id": "mc-23-t",
+    "codeSet": "vehicle",
+    "statement": "Officer Lee is about to question a suspect in custody. Which of the following demonstrates a proper way to administer Miranda warnings? Officer Lee reads each warning clearly from a Miranda card and asks the suspect if they understand.",
+    "isTrue": true,
+    "explanation": "a Miranda card or form to ensure nothing is omitted or misstated. The officer should then confirm the suspect understands each right. Skipping or paraphrasing to the point of inaccuracy would not be proper, and prior experience of the suspect doesn’t remove the officer’s obligation to advise them of their rights."
+  },
+  {
+    "id": "mc-23-f",
+    "codeSet": "penal",
+    "statement": "Officer Lee is about to question a suspect in custody. Which of the following demonstrates a proper way to administer Miranda warnings? Officer Lee paraphrases the warnings in his own words to shorten the discussion.",
+    "isTrue": false,
+    "explanation": "a Miranda card or form to ensure nothing is omitted or misstated. The officer should then confirm the suspect understands each right. Skipping or paraphrasing to the point of inaccuracy would not be proper, and prior experience of the suspect doesn’t remove the officer’s obligation to advise them of their rights."
+  },
+  {
+    "id": "mc-24-t",
+    "codeSet": "penal",
+    "statement": "A suspect, after hearing the Miranda warnings, says \"I don’t want to talk.\" What must the officers do? Cease any questioning immediately.",
+    "isTrue": true,
+    "explanation": "stop interrogation. They cannot badger the suspect into talking or continue questioning in hopes the suspect changes their mind (at least for a significant period or unless the suspect re-initiates dialogue). The invocation of the right to silence must be scrupulously honored. 6"
+  },
+  {
+    "id": "mc-24-f",
+    "codeSet": "penal",
+    "statement": "A suspect, after hearing the Miranda warnings, says \"I don’t want to talk.\" What must the officers do? Continue questioning since the suspect did not ask for a lawyer.",
+    "isTrue": false,
+    "explanation": "stop interrogation. They cannot badger the suspect into talking or continue questioning in hopes the suspect changes their mind (at least for a significant period or unless the suspect re-initiates dialogue). The invocation of the right to silence must be scrupulously honored. 6"
+  },
+  {
+    "id": "mc-25-t",
+    "codeSet": "penal",
+    "statement": "During a custodial interrogation, the suspect says, \"Maybe I should talk to a lawyer.\" What is the appropriate response by the officers? Clarify the suspect’s statement to determine if they are indeed requesting an attorney.",
+    "isTrue": true,
+    "explanation": "invocation of the right to counsel. Officers should attempt to clarify the suspect’s intent. If the suspect clearly asks for an attorney, all questioning must cease. But until then, officers can clarify rather than automatically ending the interview."
+  },
+  {
+    "id": "mc-25-f",
+    "codeSet": "penal",
+    "statement": "During a custodial interrogation, the suspect says, \"Maybe I should talk to a lawyer.\" What is the appropriate response by the officers? Immediately stop questioning altogether, as this is an invocation of the right to counsel.",
+    "isTrue": false,
+    "explanation": "invocation of the right to counsel. Officers should attempt to clarify the suspect’s intent. If the suspect clearly asks for an attorney, all questioning must cease. But until then, officers can clarify rather than automatically ending the interview."
+  },
+  {
+    "id": "tf-26",
+    "codeSet": "penal",
+    "statement": "If a suspect, after hearing the Miranda warnings, immediately begins answering an officer’s questions, this can be considered an implied waiver of their Miranda rights.",
+    "isTrue": true,
+    "explanation": "will talk or signing a waiver) or implicitly by freely choosing to speak with the police after being informed of those rights. If they begin answering questions without coercion, it’s generally treated as an implied waiver of their right to remain silent and right to counsel."
+  },
+  {
+    "id": "mc-27-t",
+    "codeSet": "hs",
+    "statement": "Officers arrest a man who they believe hid a loaded gun in a public park moments before his arrest. Before giving any Miranda warnings, an officer quickly asks, \"Where’s the gun?\" The man shows them where he stashed it. Is the man's statement admissible in court? Yes, under the public safety exception, because the officers had an urgent concern about a weapon that could harm others.",
+    "isTrue": true,
+    "explanation": "reasonably prompted by an immediate concern for safety (like locating a hidden loaded gun in a public area) without first giving Miranda warnings. The suspect’s response about the gun would likely be admissible despite no prior warning, due to the urgent need to protect the public."
+  },
+  {
+    "id": "mc-27-f",
+    "codeSet": "penal",
+    "statement": "Officers arrest a man who they believe hid a loaded gun in a public park moments before his arrest. Before giving any Miranda warnings, an officer quickly asks, \"Where’s the gun?\" The man shows them where he stashed it. Is the man's statement admissible in court? No, because any unwarned statement made in custody is inadmissible.",
+    "isTrue": false,
+    "explanation": "reasonably prompted by an immediate concern for safety (like locating a hidden loaded gun in a public area) without first giving Miranda warnings. The suspect’s response about the gun would likely be admissible despite no prior warning, due to the urgent need to protect the public."
+  },
+  {
+    "id": "mc-28-t",
+    "codeSet": "vehicle",
+    "statement": "A burglary suspect is arrested and placed in the back of a patrol car. Before any questioning or Miranda warning, he blurts out, \"I can't believe I did it—I broke into that house!\" regarding the burglary. What is true about this statement? It is admissible because it was a spontaneous, volunteered statement not made in response to interrogation.",
+    "isTrue": true,
+    "explanation": "questioning—are not barred by Miranda. Even though the suspect was in custody, the key is that officers had not interrogated or elicited that statement. Thus, his unprompted confession can be used as evidence. (Miranda only applies to custodial interrogation.)"
+  },
+  {
+    "id": "mc-28-f",
+    "codeSet": "vehicle",
+    "statement": "A burglary suspect is arrested and placed in the back of a patrol car. Before any questioning or Miranda warning, he blurts out, \"I can't believe I did it—I broke into that house!\" regarding the burglary. What is true about this statement? It is inadmissible because no Miranda warning was given yet.",
+    "isTrue": false,
+    "explanation": "questioning—are not barred by Miranda. Even though the suspect was in custody, the key is that officers had not interrogated or elicited that statement. Thus, his unprompted confession can be used as evidence. (Miranda only applies to custodial interrogation.)"
+  },
+  {
+    "id": "mc-29-t",
+    "codeSet": "penal",
+    "statement": "Which scenario is an example of an interrogation as opposed to an interview? An officer asks a suspect in custody where he hid the stolen money.",
+    "isTrue": true,
+    "explanation": "reasonably likely to elicit an incriminating response from a suspect. Asking a custodial suspect about the location of stolen money is aimed at obtaining evidence of guilt, so it's an interrogation. In contrast, questioning witnesses, victims, or casual, non-incriminating conversation are considered interviews or routine inquiries, not interrogations."
+  },
+  {
+    "id": "mc-29-f",
+    "codeSet": "penal",
+    "statement": "Which scenario is an example of an interrogation as opposed to an interview? An officer asks a bystander what happened at an accident scene.",
+    "isTrue": false,
+    "explanation": "reasonably likely to elicit an incriminating response from a suspect. Asking a custodial suspect about the location of stolen money is aimed at obtaining evidence of guilt, so it's an interrogation. In contrast, questioning witnesses, victims, or casual, non-incriminating conversation are considered interviews or routine inquiries, not interrogations."
+  },
+  {
+    "id": "mc-30-t",
+    "codeSet": "penal",
+    "statement": "What is the primary goal of a custodial interrogation? To obtain a truthful confession or useful information about a crime.",
+    "isTrue": true,
+    "explanation": "often by obtaining admissions or a confession from the suspect, or learning new facts that help solve the case. It’s not meant as punishment; rather, it’s an investigative tool to uncover evidence lawfully through the suspect’s own statements."
+  },
+  {
+    "id": "mc-30-f",
+    "codeSet": "penal",
+    "statement": "What is the primary goal of a custodial interrogation? To punish the suspect for committing a crime.",
+    "isTrue": false,
+    "explanation": "often by obtaining admissions or a confession from the suspect, or learning new facts that help solve the case. It’s not meant as punishment; rather, it’s an investigative tool to uncover evidence lawfully through the suspect’s own statements."
+  },
+  {
+    "id": "mc-31-t",
+    "codeSet": "penal",
+    "statement": "A suspect in a theft case tells officers, \"I was at the store, but I didn't steal anything.\" This statement is best described as: An admission, because he acknowledged being present, which is a fact that could be incriminating even though he denied guilt.",
+    "isTrue": true,
+    "explanation": "scene) that tends to connect him to the crime, even though he doesn’t outright confess. A confession, by contrast, is a suspect’s complete acknowledgment of guilt (“I did it”). Admitting to being at the location is an incriminating detail (an admission) but not a full confession."
+  },
+  {
+    "id": "mc-31-f",
+    "codeSet": "penal",
+    "statement": "A suspect in a theft case tells officers, \"I was at the store, but I didn't steal anything.\" This statement is best described as: A confession, because he placed himself at the scene.",
+    "isTrue": false,
+    "explanation": "scene) that tends to connect him to the crime, even though he doesn’t outright confess. A confession, by contrast, is a suspect’s complete acknowledgment of guilt (“I did it”). Admitting to being at the location is an incriminating detail (an admission) but not a full confession."
+  },
+  {
+    "id": "mc-32-t",
+    "codeSet": "penal",
+    "statement": "Detectives tell a murder suspect, \"If you confess to what happened, we’ll make sure you get a light sentence.\" The suspect then admits to the crime. Why is this confession likely inadmissible? Because promises of leniency can make a confession involuntary and thus inadmissible.",
+    "isTrue": true,
+    "explanation": "lighter sentence, which is a form of implied leniency. This can overbear a suspect’s will, making the confession coerced and involuntary. As a result, the confession would likely be thrown out and deemed inadmissible in court."
+  },
+  {
+    "id": "mc-32-f",
+    "codeSet": "penal",
+    "statement": "Detectives tell a murder suspect, \"If you confess to what happened, we’ll make sure you get a light sentence.\" The suspect then admits to the crime. Why is this confession likely inadmissible? Because the suspect wasn’t read his rights.",
+    "isTrue": false,
+    "explanation": "lighter sentence, which is a form of implied leniency. This can overbear a suspect’s will, making the confession coerced and involuntary. As a result, the confession would likely be thrown out and deemed inadmissible in court."
+  },
+  {
+    "id": "tf-33",
+    "codeSet": "penal",
+    "statement": "A peace officer can be held liable under federal law for violating someone’s constitutional rights while acting in the course of duty.",
+    "isTrue": true,
+    "explanation": "18 U.S.C. §242 for criminal liability), officers who violate someone’s constitutional rights under color of authority can face lawsuits or even criminal charges. This underscores the importance of abiding by constitutional protections. 8"
+  },
+  {
+    "id": "mc-34-t",
+    "codeSet": "penal",
+    "statement": "The Fourth Amendment to the U.S. Constitution primarily protects individuals against: Unreasonable searches and seizures by the government.",
+    "isTrue": true,
+    "explanation": "requires that most searches and arrests be reasonable, usually meaning conducted with a warrant or a valid exception. (Self-incrimination is protected by the Fifth Amendment; cruel and unusual punishment by the Eighth; double jeopardy by the Fifth.)"
+  },
+  {
+    "id": "mc-34-f",
+    "codeSet": "penal",
+    "statement": "The Fourth Amendment to the U.S. Constitution primarily protects individuals against: Self-incrimination and coerced confessions.",
+    "isTrue": false,
+    "explanation": "requires that most searches and arrests be reasonable, usually meaning conducted with a warrant or a valid exception. (Self-incrimination is protected by the Fifth Amendment; cruel and unusual punishment by the Eighth; double jeopardy by the Fifth.)"
+  },
+  {
+    "id": "mc-35-t",
+    "codeSet": "penal",
+    "statement": "Which constitutional amendment is the Miranda warning designed to protect? The Fifth Amendment",
+    "isTrue": true,
+    "explanation": "compelled self-incrimination. It ensures suspects know they don’t have to speak (right to remain silent) and that they have a right to an attorney, so any statement they do make is truly voluntary and informed."
+  },
+  {
+    "id": "mc-35-f",
+    "codeSet": "penal",
+    "statement": "Which constitutional amendment is the Miranda warning designed to protect? The First Amendment",
+    "isTrue": false,
+    "explanation": "compelled self-incrimination. It ensures suspects know they don’t have to speak (right to remain silent) and that they have a right to an attorney, so any statement they do make is truly voluntary and informed."
+  },
+  {
+    "id": "mc-36-t",
+    "codeSet": "penal",
+    "statement": "The Sixth Amendment guarantees the right to: The assistance of counsel (an attorney) in criminal prosecutions.",
+    "isTrue": true,
+    "explanation": "right to a speedy and public trial, an impartial jury, to confront witnesses, and crucially, the assistance of counsel for defense. (Freedom from unreasonable searches is Fourth Amendment; protection from self-incrimination is Fifth Amendment; due process and equal protection are primarily in the Fourteenth Amendment.)"
+  },
+  {
+    "id": "mc-36-f",
+    "codeSet": "penal",
+    "statement": "The Sixth Amendment guarantees the right to: Be free from unreasonable searches.",
+    "isTrue": false,
+    "explanation": "right to a speedy and public trial, an impartial jury, to confront witnesses, and crucially, the assistance of counsel for defense. (Freedom from unreasonable searches is Fourth Amendment; protection from self-incrimination is Fifth Amendment; due process and equal protection are primarily in the Fourteenth Amendment.)"
+  },
+  {
+    "id": "mc-37-t",
+    "codeSet": "penal",
+    "statement": "Which statement about the Fourteenth Amendment is correct? It extends constitutional rights and due process protections to apply at the state and local level.",
+    "isTrue": true,
+    "explanation": "due process. It’s through the Fourteenth Amendment’s Due Process Clause that most of the Bill of Rights (including the 4th, 5th, 6th Amendment rights important in arrests and searches) are applied to state and local government actions. This means state peace officers are bound by those same constitutional standards."
+  },
+  {
+    "id": "mc-37-f",
+    "codeSet": "penal",
+    "statement": "Which statement about the Fourteenth Amendment is correct? It only applies to federal officers, not state officers.",
+    "isTrue": false,
+    "explanation": "due process. It’s through the Fourteenth Amendment’s Due Process Clause that most of the Bill of Rights (including the 4th, 5th, 6th Amendment rights important in arrests and searches) are applied to state and local government actions. This means state peace officers are bound by those same constitutional standards."
+  },
+  {
+    "id": "tf-38",
+    "codeSet": "penal",
+    "statement": "Every crime generally requires a union of which two fundamental elements? (An act committed or omitted in violation of law, and a culpable mental state or intent.)",
+    "isTrue": true,
+    "explanation": "coupled with a requisite mental state or intent (mens rea). These two must come together (the intent 9 leads to the act). Motive isn't a required element (though it can explain why), and while many crimes involve a victim or harm, the legal elements focus on the unlawful act and the guilty mind."
+  },
+  {
+    "id": "mc-39-t",
+    "codeSet": "penal",
+    "statement": "The California Penal Code defines a \"crime\" as: An act committed or omitted in violation of a law forbidding or commanding it, to which a punishment is annexed upon conviction.",
+    "isTrue": true,
+    "explanation": "or omission in violation of a law that carries a punishment (such as death, imprisonment, fine, removal from office, or disqualification). It’s not based on morality alone or simply harm—there must be a specific law and a prescribed punishment. Civil wrongs (torts) are separate from crimes."
+  },
+  {
+    "id": "mc-39-f",
+    "codeSet": "penal",
+    "statement": "The California Penal Code defines a \"crime\" as: Any immoral act.",
+    "isTrue": false,
+    "explanation": "or omission in violation of a law that carries a punishment (such as death, imprisonment, fine, removal from office, or disqualification). It’s not based on morality alone or simply harm—there must be a specific law and a prescribed punishment. Civil wrongs (torts) are separate from crimes."
+  },
+  {
+    "id": "mc-40-t",
+    "codeSet": "penal",
+    "statement": "The three primary sources of law in our legal system are: Constitutional law, statutory law, and case law.",
+    "isTrue": true,
+    "explanation": "legislatures, and case law (court decisions interpreting laws). Together, these form the basis of legal rules. (Criminal vs civil are types of law, not sources; and while laws exist at federal, state, and local levels, the sources refer to how law is created. Option D lists types of codes but not the fundamental sources.)"
+  },
+  {
+    "id": "mc-40-f",
+    "codeSet": "penal",
+    "statement": "The three primary sources of law in our legal system are: Criminal law, civil law, and common sense.",
+    "isTrue": false,
+    "explanation": "legislatures, and case law (court decisions interpreting laws). Together, these form the basis of legal rules. (Criminal vs civil are types of law, not sources; and while laws exist at federal, state, and local levels, the sources refer to how law is created. Option D lists types of codes but not the fundamental sources.)"
+  },
+  {
+    "id": "mc-41-t",
+    "codeSet": "penal",
+    "statement": "An officer observes a normally law-abiding vendor slightly after hours on a city street, technically violating a city ordinance. Instead of issuing a citation, the officer gives a warning and allows the vendor to pack up. This decision reflects: The spirit of the law, by focusing on the intent and fairness rather than strictly enforcing the letter.",
+    "isTrue": true,
+    "explanation": "nature of the violation and the law’s intent—rather than rigidly enforcing the letter of the law. This approach emphasizes fairness and discretion. There’s no entrapment or neglect here (officers have discretion), and this scenario is still about criminal enforcement (an ordinance) albeit handled informally, not a civil matter."
+  },
+  {
+    "id": "mc-41-f",
+    "codeSet": "penal",
+    "statement": "An officer observes a normally law-abiding vendor slightly after hours on a city street, technically violating a city ordinance. Instead of issuing a citation, the officer gives a warning and allows the vendor to pack up. This decision reflects: Entrapment, by tricking the vendor.",
+    "isTrue": false,
+    "explanation": "nature of the violation and the law’s intent—rather than rigidly enforcing the letter of the law. This approach emphasizes fairness and discretion. There’s no entrapment or neglect here (officers have discretion), and this scenario is still about criminal enforcement (an ordinance) albeit handled informally, not a civil matter."
+  },
+  {
+    "id": "mc-42-t",
+    "codeSet": "penal",
+    "statement": "Which of the following is a civil matter, not a criminal one? A store sues a supplier for breach of contract over a late delivery.",
+    "isTrue": true,
+    "explanation": "from another, typically money, for a wrong that is not defined as a crime). Vandalism, hit-and-run, and theft (shoplifting) are all violations of criminal laws, prosecuted by the state and punishable by fines, imprisonment, or other criminal penalties. 10"
+  },
+  {
+    "id": "mc-42-f",
+    "codeSet": "penal",
+    "statement": "Which of the following is a civil matter, not a criminal one? A suspect commits vandalism by spray-painting graffiti on a wall.",
+    "isTrue": false,
+    "explanation": "from another, typically money, for a wrong that is not defined as a crime). Vandalism, hit-and-run, and theft (shoplifting) are all violations of criminal laws, prosecuted by the state and punishable by fines, imprisonment, or other criminal penalties. 10"
+  },
+  {
+    "id": "mc-43-t",
+    "codeSet": "penal",
+    "statement": "Burglary requires the intent to commit theft or a felony inside at the moment of entry. This intent element makes burglary a: Specific intent crime.",
+    "isTrue": true,
+    "explanation": "perform the act (entering a structure) but also a specific further intent (to commit theft or a felony inside). General intent crimes involve only the intent to do the act itself, and strict liability crimes require no intent at all. Burglary is typically a felony, not inherently a misdemeanor."
+  },
+  {
+    "id": "mc-43-f",
+    "codeSet": "penal",
+    "statement": "Burglary requires the intent to commit theft or a felony inside at the moment of entry. This intent element makes burglary a: General intent crime.",
+    "isTrue": false,
+    "explanation": "perform the act (entering a structure) but also a specific further intent (to commit theft or a felony inside). General intent crimes involve only the intent to do the act itself, and strict liability crimes require no intent at all. Burglary is typically a felony, not inherently a misdemeanor."
+  },
+  {
+    "id": "mc-44-t",
+    "codeSet": "penal",
+    "statement": "Which of the following must be proven to charge someone with an attempted crime? The person had a specific intent to commit the underlying crime and took a direct step toward its commission.",
+    "isTrue": true,
+    "explanation": "that goes beyond mere preparation, coming close to accomplishing the crime, but ultimately falling short or being interrupted. Simply planning or talking, without an act, is not enough. Completing the crime would be the crime itself, not attempt. Doing another crime is irrelevant to the charge of attempt for the intended crime."
+  },
+  {
+    "id": "mc-44-f",
+    "codeSet": "penal",
+    "statement": "Which of the following must be proven to charge someone with an attempted crime? The person discussed the plan but never took any action.",
+    "isTrue": false,
+    "explanation": "that goes beyond mere preparation, coming close to accomplishing the crime, but ultimately falling short or being interrupted. Simply planning or talking, without an act, is not enough. Completing the crime would be the crime itself, not attempt. Doing another crime is irrelevant to the charge of attempt for the intended crime."
+  },
+  {
+    "id": "mc-45-t",
+    "codeSet": "vehicle",
+    "statement": "A daycare worker leaves a toddler alone in a bathtub “just for a minute” while she steps out to text on her phone. The child nearly drowns. The worker didn’t intend any harm, but her extreme carelessness can be characterized as: Criminal negligence.",
+    "isTrue": true,
+    "explanation": "gross deviation from reasonable care. In this scenario, the daycare worker’s behavior is so careless that it could be deemed criminal negligence. There’s no specific intent to harm (so not intentional), and it goes beyond a simple accident or civil negligence because of the obvious serious risk involved."
+  },
+  {
+    "id": "mc-45-f",
+    "codeSet": "vehicle",
+    "statement": "A daycare worker leaves a toddler alone in a bathtub “just for a minute” while she steps out to text on her phone. The child nearly drowns. The worker didn’t intend any harm, but her extreme carelessness can be characterized as: Specific intent to cause harm.",
+    "isTrue": false,
+    "explanation": "gross deviation from reasonable care. In this scenario, the daycare worker’s behavior is so careless that it could be deemed criminal negligence. There’s no specific intent to harm (so not intentional), and it goes beyond a simple accident or civil negligence because of the obvious serious risk involved."
+  },
+  {
+    "id": "mc-46-t",
+    "codeSet": "vehicle",
+    "statement": "John drives the getaway car for a robbery but does not enter the store. Under California law, John can be charged as: A principal in the crime, because he aided and abetted the commission of the robbery.",
+    "isTrue": true,
+    "explanation": "commission is a principal. Driving the getaway car is aiding in the commission of the robbery, so John is a principal to the robbery. (An accessory after the fact is someone who helps a felon avoid capture after the crime; John’s involvement was during the crime.) 11"
+  },
+  {
+    "id": "mc-46-f",
+    "codeSet": "vehicle",
+    "statement": "John drives the getaway car for a robbery but does not enter the store. Under California law, John can be charged as: Only an accessory after the fact, since he didn’t go inside.",
+    "isTrue": false,
+    "explanation": "commission is a principal. Driving the getaway car is aiding in the commission of the robbery, so John is a principal to the robbery. (An accessory after the fact is someone who helps a felon avoid capture after the crime; John’s involvement was during the crime.) 11"
+  },
+  {
+    "id": "mc-47-t",
+    "codeSet": "penal",
+    "statement": "Sara’s friend commits a felony burglary and later, Sara hides him in her attic to help him avoid the police, knowing he’s wanted. What crime can Sara be charged with? Accessory (after the fact) to the burglary.",
+    "isTrue": true,
+    "explanation": "becomes an accessory after the fact to that felony. An accessory is someone who aids a felon to escape arrest or trial, with knowledge of the crime, after it’s been committed. She isn’t a principal in the burglary (she wasn’t involved during its commission) and this isn’t a conspiracy because the crime was already done when she assisted."
+  },
+  {
+    "id": "mc-47-f",
+    "codeSet": "penal",
+    "statement": "Sara’s friend commits a felony burglary and later, Sara hides him in her attic to help him avoid the police, knowing he’s wanted. What crime can Sara be charged with? Burglary, as a principal.",
+    "isTrue": false,
+    "explanation": "becomes an accessory after the fact to that felony. An accessory is someone who aids a felon to escape arrest or trial, with knowledge of the crime, after it’s been committed. She isn’t a principal in the burglary (she wasn’t involved during its commission) and this isn’t a conspiracy because the crime was already done when she assisted."
+  },
+  {
+    "id": "mc-48-t",
+    "codeSet": "penal",
+    "statement": "Which person is legally incapable of committing a crime under California law? A 10-year-old child who does not understand that their act was wrong.",
+    "isTrue": true,
+    "explanation": "criminally liable, such as children under 14 in the absence of clear proof that they knew the wrongfulness of their act. A 10-year-old who doesn’t understand right from wrong cannot form the necessary intent. By contrast, minors 14 and over can generally be delinquent (though handled in juvenile court), voluntary intoxication doesn’t excuse criminal acts outright, and merely failing at a crime still constitutes attempt, which is a crime in itself."
+  },
+  {
+    "id": "mc-48-f",
+    "codeSet": "penal",
+    "statement": "Which person is legally incapable of committing a crime under California law? A 17-year-old who committed a felony.",
+    "isTrue": false,
+    "explanation": "criminally liable, such as children under 14 in the absence of clear proof that they knew the wrongfulness of their act. A 10-year-old who doesn’t understand right from wrong cannot form the necessary intent. By contrast, minors 14 and over can generally be delinquent (though handled in juvenile court), voluntary intoxication doesn’t excuse criminal acts outright, and merely failing at a crime still constitutes attempt, which is a crime in itself."
+  },
+  {
+    "id": "tf-49",
+    "codeSet": "penal",
+    "statement": "Simply running away or hiding from an officer to avoid detention is a misdemeanor, but using or threatening force against an officer elevates the offense to a felony.",
+    "isTrue": true,
+    "explanation": "or refusing to comply) is typically a misdemeanor (Penal Code §148(a)(1)). However, if a suspect uses force or threat against an officer performing duties, it becomes a more serious felony offense (e.g., Penal Code §69)."
+  },
+  {
+    "id": "mc-50-t",
+    "codeSet": "penal",
+    "statement": "A gang member tells a store clerk who witnessed a robbery, \"If you go to the police or testify, you'll regret it. We know where you live.\" The clerk, fearing harm, does not report what he saw. What crime has the gang member committed? Intimidating or dissuading a witness (felony).",
+    "isTrue": true,
+    "explanation": "testifying is the crime of witness intimidation (Penal Code §136.1 in California). It’s a serious felony. Physical harm need not occur; the threat and intent to dissuade are enough. (Disturbing the peace and contempt are unrelated to this scenario.)"
+  },
+  {
+    "id": "mc-50-f",
+    "codeSet": "penal",
+    "statement": "A gang member tells a store clerk who witnessed a robbery, \"If you go to the police or testify, you'll regret it. We know where you live.\" The clerk, fearing harm, does not report what he saw. What crime has the gang member committed? No crime, since no physical harm occurred.",
+    "isTrue": false,
+    "explanation": "testifying is the crime of witness intimidation (Penal Code §136.1 in California). It’s a serious felony. Physical harm need not occur; the threat and intent to dissuade are enough. (Disturbing the peace and contempt are unrelated to this scenario.)"
+  },
+  {
+    "id": "mc-51-t",
+    "codeSet": "penal",
+    "statement": "After a suspect is convicted of assault, the suspect’s brother approaches the victim and says, \"You’ll pay for testifying against my brother.\" The victim feels afraid of being harmed for having testified. What crime has the brother likely committed? Threatening retaliation against a witness or victim. 12",
+    "isTrue": true,
+    "explanation": "or victim (for testifying, aiding prosecution, etc.) is itself a crime (Penal Code §140 in California). This is distinct from the initial assault case—it’s retaliatory and meant to punish or intimidate the person for their testimony, and it’s a felony."
+  },
+  {
+    "id": "mc-51-f",
+    "codeSet": "penal",
+    "statement": "After a suspect is convicted of assault, the suspect’s brother approaches the victim and says, \"You’ll pay for testifying against my brother.\" The victim feels afraid of being harmed for having testified. What crime has the brother likely committed? Simple assault.",
+    "isTrue": false,
+    "explanation": "or victim (for testifying, aiding prosecution, etc.) is itself a crime (Penal Code §140 in California). This is distinct from the initial assault case—it’s retaliatory and meant to punish or intimidate the person for their testimony, and it’s a felony."
+  },
+  {
+    "id": "mc-52-t",
+    "codeSet": "penal",
+    "statement": "A man is under a court-issued domestic violence restraining order that prohibits him from contacting his ex-wife. He calls her and shows up at her house in violation of the order. What crime, if any, can he be charged with? Violating a court order (misdemeanor).",
+    "isTrue": true,
+    "explanation": "misdemeanor (Penal Code §166(a)(4)). The man can be arrested and charged for violating the order. This act is a criminal offense, not just a civil issue, even though restraining orders arise from the court’s authority. (It could also be contempt, but as used here, it’s charged as a misdemeanor under PC 166.)"
+  },
+  {
+    "id": "mc-52-f",
+    "codeSet": "penal",
+    "statement": "A man is under a court-issued domestic violence restraining order that prohibits him from contacting his ex-wife. He calls her and shows up at her house in violation of the order. What crime, if any, can he be charged with? No crime, it’s a civil matter.",
+    "isTrue": false,
+    "explanation": "misdemeanor (Penal Code §166(a)(4)). The man can be arrested and charged for violating the order. This act is a criminal offense, not just a civil issue, even though restraining orders arise from the court’s authority. (It could also be contempt, but as used here, it’s charged as a misdemeanor under PC 166.)"
+  },
+  {
+    "id": "mc-53-t",
+    "codeSet": "penal",
+    "statement": "During a struggle with a peace officer, a suspect manages to grab the officer’s TASER and pull it from the officer’s duty belt. What crime has the suspect committed by doing this? Removing or attempting to remove a weapon (other than a firearm) from an officer, which is a felony.",
+    "isTrue": true,
+    "explanation": "weapon like a TASER or baton) is a felony offense (for example, Penal Code §148(b) covers removing any weapon other than a firearm from an officer). This is distinct from the basic resisting charge and is considered more serious. It doesn’t matter that the suspect hadn’t used it yet; the act of disarming the officer is the crime."
+  },
+  {
+    "id": "mc-53-f",
+    "codeSet": "penal",
+    "statement": "During a struggle with a peace officer, a suspect manages to grab the officer’s TASER and pull it from the officer’s duty belt. What crime has the suspect committed by doing this? Resisting a peace officer, misdemeanor.",
+    "isTrue": false,
+    "explanation": "weapon like a TASER or baton) is a felony offense (for example, Penal Code §148(b) covers removing any weapon other than a firearm from an officer). This is distinct from the basic resisting charge and is considered more serious. It doesn’t matter that the suspect hadn’t used it yet; the act of disarming the officer is the crime."
+  },
+  {
+    "id": "mc-54-t",
+    "codeSet": "penal",
+    "statement": "A man is being taken into custody by two officers when a friend of his intervenes. The friend shoves the officers and pulls the man away, helping him escape. What crime has the friend committed? Rescue of a prisoner (lynching), which is a felony.",
+    "isTrue": true,
+    "explanation": "committed the crime of “lynching” or prisoner rescue (Penal Code §405a in California defines lynching as taking someone from the custody of an officer by rioting, but even aside from the riot definition, forcibly rescuing an arrestee is a felony). It’s a serious offense to interfere with an arrest in this manner. (His belief about fairness is irrelevant to the legality of the act.) 13"
+  },
+  {
+    "id": "mc-54-f",
+    "codeSet": "penal",
+    "statement": "A man is being taken into custody by two officers when a friend of his intervenes. The friend shoves the officers and pulls the man away, helping him escape. What crime has the friend committed? Assault, but not a separate crime regarding the custody.",
+    "isTrue": false,
+    "explanation": "committed the crime of “lynching” or prisoner rescue (Penal Code §405a in California defines lynching as taking someone from the custody of an officer by rioting, but even aside from the riot definition, forcibly rescuing an arrestee is a felony). It’s a serious offense to interfere with an arrest in this manner. (His belief about fairness is irrelevant to the legality of the act.) 13"
+  },
+  {
+    "id": "mc-55-t",
+    "codeSet": "penal",
+    "statement": "An officer lawfully detains a suspect. The suspect gives a false name and date of birth to the officer to avoid being identified (and to hide the fact he has a warrant). The officer later learns his true identity. What can the suspect be charged with for providing the false information? Providing false identification to a peace officer (misdemeanor).",
+    "isTrue": true,
+    "explanation": "a peace officer to evade proper identification or the court process. In this case, the suspect intentionally lied about his identity during a lawful detention, which fits that crime. (Perjury involves lying under oath, which isn’t the case here.)"
+  },
+  {
+    "id": "mc-55-f",
+    "codeSet": "penal",
+    "statement": "An officer lawfully detains a suspect. The suspect gives a false name and date of birth to the officer to avoid being identified (and to hide the fact he has a warrant). The officer later learns his true identity. What can the suspect be charged with for providing the false information? Perjury.",
+    "isTrue": false,
+    "explanation": "a peace officer to evade proper identification or the court process. In this case, the suspect intentionally lied about his identity during a lawful detention, which fits that crime. (Perjury involves lying under oath, which isn’t the case here.)"
+  },
+  {
+    "id": "mc-56-t",
+    "codeSet": "penal",
+    "statement": "Upset about a flight delay, a man calls the airport police from a payphone and falsely reports, \"There's a bomb on one of the planes,\" as a prank. What is the appropriate charge for this false report? Falsely reporting a destructive device (bomb threat), which is a felony.",
+    "isTrue": true,
+    "explanation": "serious offense – a felony – because of the potential for public panic and waste of emergency resources. Even though it was a “prank,” it’s treated as a crime. (It’s not literally terrorism unless other elements are present, but it is a felony false report.)"
+  },
+  {
+    "id": "mc-56-f",
+    "codeSet": "penal",
+    "statement": "Upset about a flight delay, a man calls the airport police from a payphone and falsely reports, \"There's a bomb on one of the planes,\" as a prank. What is the appropriate charge for this false report? No crime, since it was a prank call that didn’t involve an actual bomb.",
+    "isTrue": false,
+    "explanation": "serious offense – a felony – because of the potential for public panic and waste of emergency resources. Even though it was a “prank,” it’s treated as a crime. (It’s not literally terrorism unless other elements are present, but it is a felony false report.)"
+  },
+  {
+    "id": "mc-57-t",
+    "codeSet": "vehicle",
+    "statement": "A group of 20 protesters begins blocking traffic and overturning trash cans. They have no permit and their actions are becoming rowdy and violent. What crime can officers declare and arrest them for? Unlawful assembly – assembling to disturb the peace or commit an unlawful act.",
+    "isTrue": true,
+    "explanation": "act in a violent or boisterous manner, it constitutes an unlawful assembly (Penal Code §407). In this scenario, the group’s destructive and tumultuous behavior qualifies. The First Amendment doesn’t protect violent or lawless conduct. (Failure to disperse would apply after police order the crowd to break up and individuals refuse, which could be a follow-up charge.)"
+  },
+  {
+    "id": "mc-57-f",
+    "codeSet": "vehicle",
+    "statement": "A group of 20 protesters begins blocking traffic and overturning trash cans. They have no permit and their actions are becoming rowdy and violent. What crime can officers declare and arrest them for? Legitimate protest – no crime, since they have First Amendment rights.",
+    "isTrue": false,
+    "explanation": "act in a violent or boisterous manner, it constitutes an unlawful assembly (Penal Code §407). In this scenario, the group’s destructive and tumultuous behavior qualifies. The First Amendment doesn’t protect violent or lawless conduct. (Failure to disperse would apply after police order the crowd to break up and individuals refuse, which could be a follow-up charge.)"
+  },
+  {
+    "id": "mc-58-t",
+    "codeSet": "penal",
+    "statement": "After declaring an unlawful assembly and ordering the crowd to disperse, most people leave, but a few individuals remain and refuse to go. Those individuals can be arrested for: Failing to disperse, a misdemeanor.",
+    "isTrue": true,
+    "explanation": "order, anyone who willfully remains can be arrested for failure to disperse (e.g., Penal Code §§409 or 416). It’s a misdemeanor offense to refuse a lawful order to leave the area of an unlawful assembly or riot. It doesn’t matter if those individuals themselves were not violent; their refusal to obey the dispersal order is the crime. 14"
+  },
+  {
+    "id": "mc-58-f",
+    "codeSet": "penal",
+    "statement": "After declaring an unlawful assembly and ordering the crowd to disperse, most people leave, but a few individuals remain and refuse to go. Those individuals can be arrested for: Trespassing.",
+    "isTrue": false,
+    "explanation": "order, anyone who willfully remains can be arrested for failure to disperse (e.g., Penal Code §§409 or 416). It’s a misdemeanor offense to refuse a lawful order to leave the area of an unlawful assembly or riot. It doesn’t matter if those individuals themselves were not violent; their refusal to obey the dispersal order is the crime. 14"
+  },
+  {
+    "id": "mc-59-t",
+    "codeSet": "penal",
+    "statement": "A high school student emails a death threat to the school principal demanding an A grade. The principal is a public official performing official duties. What crime does the student’s act constitute? Threatening a public officer (or school official) to influence performance of duties, a felony.",
+    "isTrue": true,
+    "explanation": "principal or teacher) with harm to influence them in their official capacity is a crime (Penal Code §71 in California). It’s a felony offense. The student’s email is not viewed as a harmless prank; it’s taken seriously as a criminal threat against an official. (Extortion would involve a demand for property or something of value under threat, which is not exactly the case here.)"
+  },
+  {
+    "id": "mc-59-f",
+    "codeSet": "penal",
+    "statement": "A high school student emails a death threat to the school principal demanding an A grade. The principal is a public official performing official duties. What crime does the student’s act constitute? No crime, because it’s just a prank on a teacher.",
+    "isTrue": false,
+    "explanation": "principal or teacher) with harm to influence them in their official capacity is a crime (Penal Code §71 in California). It’s a felony offense. The student’s email is not viewed as a harmless prank; it’s taken seriously as a criminal threat against an official. (Extortion would involve a demand for property or something of value under threat, which is not exactly the case here.)"
+  },
+  {
+    "id": "tf-60",
+    "codeSet": "penal",
+    "statement": "Probable cause to search means there is a fair probability that evidence of a crime or contraband will be found in the place to be searched.",
+    "isTrue": true,
+    "explanation": "reasonable person to strongly suspect that the items sought are connected to criminal activity and are presently at the location to be searched. It’s more than a hunch – it’s a fair probability based on specific facts."
+  },
+  {
+    "id": "tf-61",
+    "codeSet": "penal",
+    "statement": "To obtain physical evidence from inside a suspect’s body (such as a blood sample), officers generally need a search warrant or valid consent, unless exigent circumstances justify an immediate, warrantless extraction.",
+    "isTrue": true,
+    "explanation": "protected. Typically, police must secure a search warrant or have the suspect’s consent to perform such procedures. Only in emergency conditions — for instance, when waiting for a warrant would mean losing the evidence (like alcohol dissipating in blood, under certain circumstances) — can they proceed without a warrant."
+  },
+  {
+    "id": "mc-62-t",
+    "codeSet": "hs",
+    "statement": "A suspect is about to swallow a small packet of drugs as officers move in to arrest him. To save the evidence (and possibly the suspect’s life), an officer grabs the suspect’s throat briefly to prevent him from swallowing it. Is this permissible? Yes. Officers may use reasonable (non-deadly) force to prevent a suspect from destroying evidence by swallowing, especially for safety reasons.",
+    "isTrue": true,
+    "explanation": "evidence. Stopping a suspect from swallowing contraband (using care not to seriously harm the suspect) is generally permissible. The key is that the force must be proportionate and not likely to cause severe injury (e.g., not using deadly force simply to recover evidence)."
+  },
+  {
+    "id": "mc-62-f",
+    "codeSet": "hs",
+    "statement": "A suspect is about to swallow a small packet of drugs as officers move in to arrest him. To save the evidence (and possibly the suspect’s life), an officer grabs the suspect’s throat briefly to prevent him from swallowing it. Is this permissible? No. Any force to obtain evidence inside a suspect’s body is prohibited without a court order.",
+    "isTrue": false,
+    "explanation": "evidence. Stopping a suspect from swallowing contraband (using care not to seriously harm the suspect) is generally permissible. The key is that the force must be proportionate and not likely to cause severe injury (e.g., not using deadly force simply to recover evidence)."
+  },
+  {
+    "id": "mc-63-t",
+    "codeSet": "vehicle",
+    "statement": "After a DUI crash, the driver is unconscious. Officers have no time to seek a warrant due to the driver’s medical condition potentially dissipating blood alcohol evidence. Hospital staff draw the driver’s blood at the officer’s request. Is this blood draw admissible? Yes, because exigent circumstances (rapidly dissipating alcohol in the bloodstream and an emergency medical situation) can justify a warrantless blood draw. 15",
+    "isTrue": true,
+    "explanation": "cases, there is an exigent circumstances exception. In a case where the suspect is unconscious and evidence is dissipating, and time is critical due to medical treatment, a warrantless blood draw can be deemed reasonable. Absent such exigency, a warrant would normally be needed if the suspect cannot consent."
+  },
+  {
+    "id": "mc-63-f",
+    "codeSet": "vehicle",
+    "statement": "After a DUI crash, the driver is unconscious. Officers have no time to seek a warrant due to the driver’s medical condition potentially dissipating blood alcohol evidence. Hospital staff draw the driver’s blood at the officer’s request. Is this blood draw admissible? No, because an unconscious person cannot consent and a warrant was not obtained.",
+    "isTrue": false,
+    "explanation": "cases, there is an exigent circumstances exception. In a case where the suspect is unconscious and evidence is dissipating, and time is critical due to medical treatment, a warrantless blood draw can be deemed reasonable. Absent such exigency, a warrant would normally be needed if the suspect cannot consent."
+  },
+  {
+    "id": "tf-64",
+    "codeSet": "penal",
+    "statement": "Requiring a suspect to provide fingerprint or handwriting samples does not violate the suspect’s Fifth Amendment right against self-incrimination.",
+    "isTrue": true,
+    "explanation": "identifying characteristics are not considered testimonial evidence. Therefore, compelling a suspect to provide them does not infringe on the Fifth Amendment (though proper legal process should be followed). These are physical evidence, and suspects generally cannot refuse on self-incrimination grounds."
+  },
+  {
+    "id": "mc-65-t",
+    "codeSet": "penal",
+    "statement": "Why must an officer remain neutral and avoid suggestive conduct during a witness identification procedure? To ensure the identification is fair and reliable, protecting the suspect’s due process rights.",
+    "isTrue": true,
+    "explanation": "to avoid inadvertently influencing the witness. If an officer prompts or suggests who the suspect is, it can taint the identification and violate due process. A fair, unbiased procedure helps ensure any identification is based solely on the witness’s memory and is admissible in court."
+  },
+  {
+    "id": "mc-65-f",
+    "codeSet": "penal",
+    "statement": "Why must an officer remain neutral and avoid suggestive conduct during a witness identification procedure? To increase the chance the witness picks the suspect.",
+    "isTrue": false,
+    "explanation": "to avoid inadvertently influencing the witness. If an officer prompts or suggests who the suspect is, it can taint the identification and violate due process. A fair, unbiased procedure helps ensure any identification is based solely on the witness’s memory and is admissible in court."
+  },
+  {
+    "id": "mc-66-t",
+    "codeSet": "penal",
+    "statement": "After a robbery, officers detain a suspect nearby and bring the eyewitness victim to view him within minutes of the crime. To avoid being suggestive during this field show-up, officers should: Refrain from making any comments indicating they believe this is the perpetrator and tell the witness that the person may or may not be the culprit.",
+    "isTrue": true,
+    "explanation": "should simply present the detained person and use a neutral admonition like \"this may or may not be the person.\" They should not suggest that they believe the suspect is guilty. Handcuffing might be necessary for safety but should be minimized in witness view if possible, and showing only a single photo or making confirming statements are inherently suggestive and should be avoided."
+  },
+  {
+    "id": "mc-66-f",
+    "codeSet": "penal",
+    "statement": "After a robbery, officers detain a suspect nearby and bring the eyewitness victim to view him within minutes of the crime. To avoid being suggestive during this field show-up, officers should: Handcuff the suspect in front of the witness to ensure the witness feels safe in identifying him.",
+    "isTrue": false,
+    "explanation": "should simply present the detained person and use a neutral admonition like \"this may or may not be the person.\" They should not suggest that they believe the suspect is guilty. Handcuffing might be necessary for safety but should be minimized in witness view if possible, and showing only a single photo or making confirming statements are inherently suggestive and should be avoided."
+  },
+  {
+    "id": "mc-67-t",
+    "codeSet": "hs",
+    "statement": "Which of the following is a proper way to conduct a photographic lineup (photo spread)? Use a minimum of six photographs, including the suspect and five fillers who generally match the suspect’s description.",
+    "isTrue": true,
+    "explanation": "practice) of similar-looking individuals, one of whom is the suspect. This prevents the suspect from unduly standing out. The witness should view them without suggestion. Showing only the suspect’s photo or making the suspect obvious would be impermissibly suggestive and would undermine the procedure’s validity."
+  },
+  {
+    "id": "mc-67-f",
+    "codeSet": "penal",
+    "statement": "Which of the following is a proper way to conduct a photographic lineup (photo spread)? Show the witness only the suspect’s photo to see if they recognize the suspect.",
+    "isTrue": false,
+    "explanation": "practice) of similar-looking individuals, one of whom is the suspect. This prevents the suspect from unduly standing out. The witness should view them without suggestion. Showing only the suspect’s photo or making the suspect obvious would be impermissibly suggestive and would undermine the procedure’s validity."
+  },
+  {
+    "id": "tf-68",
+    "codeSet": "penal",
+    "statement": "Once a suspect has been formally charged (indicted or arraigned) for a crime, they are entitled to have an attorney present during any physical lineup conducted for that crime.",
+    "isTrue": true,
+    "explanation": "Amendment right to counsel attaches to critical stages, including an in-person lineup identification. At that point, the suspect’s attorney must be allowed to attend the lineup to ensure fairness. Prior to formal charges, there is no such right to counsel at a lineup, but due process still requires the lineup to be non-suggestive."
+  },
+  {
+    "id": "mc-69-t",
+    "codeSet": "vehicle",
+    "statement": "Officer West asks a driver for consent to search his car. The driver says, \"Okay, but not the trunk.\" Officer West searches the passenger compartment and then, despite the limitation, opens the trunk and finds illegal firearms. In court, the driver's attorney moves to suppress the guns. What is the likely result? The firearms will be suppressed because the officer exceeded the scope of the consent.",
+    "isTrue": true,
+    "explanation": "the trunk), officers must respect that limitation. By searching the trunk anyway, Officer West exceeded the scope of the consent, making that part of the search unlawful. Therefore, the firearms found in the trunk would likely be suppressed as evidence."
+  },
+  {
+    "id": "mc-69-f",
+    "codeSet": "vehicle",
+    "statement": "Officer West asks a driver for consent to search his car. The driver says, \"Okay, but not the trunk.\" Officer West searches the passenger compartment and then, despite the limitation, opens the trunk and finds illegal firearms. In court, the driver's attorney moves to suppress the guns. What is the likely result? The firearms will be admitted because consent to search a car includes the trunk.",
+    "isTrue": false,
+    "explanation": "the trunk), officers must respect that limitation. By searching the trunk anyway, Officer West exceeded the scope of the consent, making that part of the search unlawful. Therefore, the firearms found in the trunk would likely be suppressed as evidence."
+  },
+  {
+    "id": "mc-70-t",
+    "codeSet": "vehicle",
+    "statement": "Officer Young stops a man on the street matching a suspect’s description. Without arresting or handcuffing him, Young asks, \"Do you have anything illegal on you?\" The man admits to carrying drugs and is then arrested. The defense argues the statement should be excluded because no Miranda warning was given. What factor is most important in determining if Miranda was required at that moment? Whether the man was \"in custody\" (significantly deprived of freedom) at the time of questioning.",
+    "isTrue": true,
+    "explanation": "whether the stop had evolved into a custodial situation (a formal arrest or its functional equivalent) when the question was asked. If Officer Young’s stop was an investigative detention (not full custody), Miranda is not yet required. If it had become effectively an arrest, then it would be. The determining factor is the degree of restraint on the man’s freedom, not the crime’s severity or time of day."
+  },
+  {
+    "id": "mc-70-f",
+    "codeSet": "vehicle",
+    "statement": "Officer Young stops a man on the street matching a suspect’s description. Without arresting or handcuffing him, Young asks, \"Do you have anything illegal on you?\" The man admits to carrying drugs and is then arrested. The defense argues the statement should be excluded because no Miranda warning was given. What factor is most important in determining if Miranda was required at that moment? The seriousness of the crime being investigated.",
+    "isTrue": false,
+    "explanation": "whether the stop had evolved into a custodial situation (a formal arrest or its functional equivalent) when the question was asked. If Officer Young’s stop was an investigative detention (not full custody), Miranda is not yet required. If it had become effectively an arrest, then it would be. The determining factor is the degree of restraint on the man’s freedom, not the crime’s severity or time of day."
+  },
+  {
+    "id": "mc-71-t",
+    "codeSet": "hs",
+    "statement": "A landlord, without telling the tenant, enters the tenant’s apartment and finds illegal drugs in a closet. He calls the police and hands them the drugs. The tenant argues this was an illegal search. How will the law treat this situation? 17 The drugs are admissible because the Fourth Amendment doesn’t apply to searches done by private citizens acting on their own.",
+    "isTrue": true,
+    "explanation": "individuals. In this scenario, the landlord’s search was a private action, not at the direction of law enforcement. Therefore, although the landlord may have violated the lease or privacy expectations, it wasn’t a constitutional search, and the evidence he turned over can be used by police. (If the landlord had been acting at police request, it might be different, but here he wasn’t an agent of the police initially.)"
+  },
+  {
+    "id": "mc-71-f",
+    "codeSet": "hs",
+    "statement": "A landlord, without telling the tenant, enters the tenant’s apartment and finds illegal drugs in a closet. He calls the police and hands them the drugs. The tenant argues this was an illegal search. How will the law treat this situation? 17 The drugs are inadmissible because the tenant did not consent to the landlord’s search.",
+    "isTrue": false,
+    "explanation": "individuals. In this scenario, the landlord’s search was a private action, not at the direction of law enforcement. Therefore, although the landlord may have violated the lease or privacy expectations, it wasn’t a constitutional search, and the evidence he turned over can be used by police. (If the landlord had been acting at police request, it might be different, but here he wasn’t an agent of the police initially.)"
+  },
+  {
+    "id": "tf-72",
+    "codeSet": "penal",
+    "statement": "If officers obtain evidence as a result of an unlawful search or seizure, not only is that evidence likely inadmissible, but any additional evidence derived from it may also be excluded as \"fruit of the poisonous tree.\"",
+    "isTrue": true,
+    "explanation": "illegally obtained evidence is generally inadmissible, and so is other evidence discovered solely because of the original illegality. For example, if an unlawful search yields a key that leads to another stash of evidence, that later evidence can be suppressed as well, unless an exception applies."
+  },
+  {
+    "id": "tf-73",
+    "codeSet": "vehicle",
+    "statement": "In California, a person on parole generally has waived Fourth Amendment rights to search, allowing peace officers to search the parolee’s residence, vehicle, or person at any time without a warrant or further cause.",
+    "isTrue": true,
+    "explanation": "meaning they must agree to be searched by law enforcement at any time. This significantly reduces their expectation of privacy, so officers can search a parolee without a warrant, probable cause, or suspicion (though not for harassment). Probationers often have similar conditions, depending on the terms."
+  },
+  {
+    "id": "mc-74-t",
+    "codeSet": "vehicle",
+    "statement": "A suspect’s car is lawfully impounded after the suspect’s arrest. Per department policy, an officer conducts an inventory of the vehicle’s contents before towing. During the inventory, the officer finds a bag of stolen credit cards in the trunk. Are these cards admissible as evidence? Yes. Evidence found during a good-faith inventory of an impounded vehicle is admissible, since the search is for safekeeping of property, not investigation.",
+    "isTrue": true,
+    "explanation": "warrant requirement. They are intended to secure and document property, not to search for evidence. As long as the officer followed department policy, any contraband or evidence (like stolen credit cards) found in the course of that inventory is admissible. The trunk can be included if that’s part of the standard inventory procedure."
+  },
+  {
+    "id": "mc-74-f",
+    "codeSet": "vehicle",
+    "statement": "A suspect’s car is lawfully impounded after the suspect’s arrest. Per department policy, an officer conducts an inventory of the vehicle’s contents before towing. During the inventory, the officer finds a bag of stolen credit cards in the trunk. Are these cards admissible as evidence? No. The officer needed a warrant to search the trunk.",
+    "isTrue": false,
+    "explanation": "warrant requirement. They are intended to secure and document property, not to search for evidence. As long as the officer followed department policy, any contraband or evidence (like stolen credit cards) found in the course of that inventory is admissible. The trunk can be included if that’s part of the standard inventory procedure."
+  },
+  {
+    "id": "mc-75-t",
+    "codeSet": "hs",
+    "statement": "Detective Thompson has probable cause that a suspect is selling drugs from his house. Thompson also learns the suspect will be leaving town in two days. The detective secures a search warrant for the house, but due to a clerical delay, the warrant isn’t executed for 12 days. When the team finally searches, they seize evidence. Is there an issue with this search? 18 Yes. In California, a search warrant must be executed within 10 days of issuance; waiting 12 days made the warrant stale and the search invalid.",
+    "isTrue": true,
+    "explanation": "generally have 10 days from the date the warrant is issued to serve it. In this scenario, waiting 12 days violated that requirement, so the warrant had expired, making the search improper and the evidence subject to suppression."
+  },
+  {
+    "id": "mc-75-f",
+    "codeSet": "hs",
+    "statement": "Detective Thompson has probable cause that a suspect is selling drugs from his house. Thompson also learns the suspect will be leaving town in two days. The detective secures a search warrant for the house, but due to a clerical delay, the warrant isn’t executed for 12 days. When the team finally searches, they seize evidence. Is there an issue with this search? 18 No. As long as probable cause still existed, the warrant was fine to execute.",
+    "isTrue": false,
+    "explanation": "generally have 10 days from the date the warrant is issued to serve it. In this scenario, waiting 12 days violated that requirement, so the warrant had expired, making the search improper and the evidence subject to suppression."
+  },
+  {
+    "id": "mc-76-t",
+    "codeSet": "hs",
+    "statement": "Officers develop probable cause that illegal drugs are in a suspect’s house, but they have no warrant. One officer is left to watch the house while another quickly seeks a search warrant. While waiting, the officers prevent the suspect from re-entering the home. Is this action legal? Yes. Temporarily securing the premises from the outside to prevent destruction of evidence while a warrant is obtained is legal.",
+    "isTrue": true,
+    "explanation": "diligently obtaining a search warrant. They didn’t search or enter without a warrant; they only prevented potential evidence destruction. Courts allow this limited action when officers have probable cause and are in the process of getting a warrant."
+  },
+  {
+    "id": "mc-76-f",
+    "codeSet": "hs",
+    "statement": "Officers develop probable cause that illegal drugs are in a suspect’s house, but they have no warrant. One officer is left to watch the house while another quickly seeks a search warrant. While waiting, the officers prevent the suspect from re-entering the home. Is this action legal? No. Without a warrant, officers cannot restrict a suspect’s movement around their property.",
+    "isTrue": false,
+    "explanation": "diligently obtaining a search warrant. They didn’t search or enter without a warrant; they only prevented potential evidence destruction. Courts allow this limited action when officers have probable cause and are in the process of getting a warrant."
+  },
+  {
+    "id": "mc-77-t",
+    "codeSet": "hs",
+    "statement": "Officers are executing a search warrant for stolen jewelry. During the search, one officer opens a small tin box and finds illegal drugs inside. Which is true regarding seizure of the drugs? The drugs can be seized under the Nexus rule, because they were found in plain view during a lawful search and are obviously contraband.",
+    "isTrue": true,
+    "explanation": "reasonably be), the officer can lawfully seize other items in plain view if it’s immediately apparent they are contraband or evidence of a crime. This is known as the Nexus rule – if officers are lawfully searching and come across clearly illegal items, they can take them even if not named in the warrant."
+  },
+  {
+    "id": "mc-77-f",
+    "codeSet": "hs",
+    "statement": "Officers are executing a search warrant for stolen jewelry. During the search, one officer opens a small tin box and finds illegal drugs inside. Which is true regarding seizure of the drugs? The drugs cannot be seized since they weren’t listed in the warrant.",
+    "isTrue": false,
+    "explanation": "reasonably be), the officer can lawfully seize other items in plain view if it’s immediately apparent they are contraband or evidence of a crime. This is known as the Nexus rule – if officers are lawfully searching and come across clearly illegal items, they can take them even if not named in the warrant."
+  },
+  {
+    "id": "mc-78-t",
+    "codeSet": "hs",
+    "statement": "An officer is lawfully inside a home speaking with a resident. The officer notices a bag of illegal drugs on the coffee table in plain sight and seizes it. Why is this seizure lawful? Because the officer had consent to be in the home and the contraband was in plain view, making its seizure legal without a warrant.",
+    "isTrue": true,
+    "explanation": "observed contraband in plain view. Under the plain view doctrine, if the officer has lawful access to 19 the area and it’s immediately apparent that the item is contraband or evidence, the officer can seize it without a warrant."
+  },
+  {
+    "id": "mc-78-f",
+    "codeSet": "hs",
+    "statement": "An officer is lawfully inside a home speaking with a resident. The officer notices a bag of illegal drugs on the coffee table in plain sight and seizes it. Why is this seizure lawful? It isn’t lawful; the officer needed a warrant specifically for the drugs.",
+    "isTrue": false,
+    "explanation": "observed contraband in plain view. Under the plain view doctrine, if the officer has lawful access to 19 the area and it’s immediately apparent that the item is contraband or evidence, the officer can seize it without a warrant."
+  },
+  {
+    "id": "mc-79-t",
+    "codeSet": "penal",
+    "statement": "A deputy walks onto a large rural property without a warrant and finds a field of marijuana plants growing in an open, unfenced area far from the house. Is this a Fourth Amendment search? No. There is no reasonable expectation of privacy in open fields, so the plants can be seized.",
+    "isTrue": true,
+    "explanation": "(curtilage) do not carry a reasonable expectation of privacy, even if they are private property. The deputy’s discovery of the marijuana field did not constitute a search in the constitutional sense, so the plants may be seized and used as evidence."
+  },
+  {
+    "id": "mc-79-f",
+    "codeSet": "penal",
+    "statement": "A deputy walks onto a large rural property without a warrant and finds a field of marijuana plants growing in an open, unfenced area far from the house. Is this a Fourth Amendment search? Yes. Any private property beyond the curtilage is fully protected by the Fourth Amendment.",
+    "isTrue": false,
+    "explanation": "(curtilage) do not carry a reasonable expectation of privacy, even if they are private property. The deputy’s discovery of the marijuana field did not constitute a search in the constitutional sense, so the plants may be seized and used as evidence."
+  },
+  {
+    "id": "mc-80-t",
+    "codeSet": "penal",
+    "statement": "Officer Jones lawfully arrests a suspect in the suspect’s living room for outstanding warrants. After handcuffing the suspect, Jones searches the suspect’s person and the area immediately around the couch where the suspect was sitting, finding a knife under a cushion. Is this search permissible? Yes. After an arrest, an officer may search the arrestee and the area within their immediate reach for weapons or evidence.",
+    "isTrue": true,
+    "explanation": "arrest. This includes a full search of the arrestee’s person and the area within their immediate control (where they might reach for a weapon or destroy evidence). In this case, looking under the couch cushion near the suspect is within that scope, so finding and seizing the knife is permissible."
+  },
+  {
+    "id": "mc-80-f",
+    "codeSet": "penal",
+    "statement": "Officer Jones lawfully arrests a suspect in the suspect’s living room for outstanding warrants. After handcuffing the suspect, Jones searches the suspect’s person and the area immediately around the couch where the suspect was sitting, finding a knife under a cushion. Is this search permissible? No. Once the suspect is handcuffed, the officer cannot search any area around him.",
+    "isTrue": false,
+    "explanation": "arrest. This includes a full search of the arrestee’s person and the area within their immediate control (where they might reach for a weapon or destroy evidence). In this case, looking under the couch cushion near the suspect is within that scope, so finding and seizing the knife is permissible."
+  },
+  {
+    "id": "mc-81-t",
+    "codeSet": "vehicle",
+    "statement": "Police arrest a driver for driving with a suspended license, handcuffing him and securing him in the patrol car. Another officer then searches the driver’s car incident to the arrest and finds illegal drugs under the seat. Will that search incident to arrest be lawful? No. Since the driver was secured and the arrest was for a suspended license (a non-evidence crime), a search of the vehicle was not justified incident to this arrest.",
+    "isTrue": true,
+    "explanation": "access the vehicle, officers cannot search the vehicle incident to arrest unless they have reason to believe evidence related to the offense of arrest might be inside. Driving on a suspended license is not an offense that would yield evidence in the car, so the search in this scenario would be unlawful and the drugs would likely be suppressed."
+  },
+  {
+    "id": "mc-81-f",
+    "codeSet": "vehicle",
+    "statement": "Police arrest a driver for driving with a suspended license, handcuffing him and securing him in the patrol car. Another officer then searches the driver’s car incident to the arrest and finds illegal drugs under the seat. Will that search incident to arrest be lawful? Yes. Any time someone is arrested from a vehicle, officers can search the entire vehicle as incident to arrest.",
+    "isTrue": false,
+    "explanation": "access the vehicle, officers cannot search the vehicle incident to arrest unless they have reason to believe evidence related to the offense of arrest might be inside. Driving on a suspended license is not an offense that would yield evidence in the car, so the search in this scenario would be unlawful and the drugs would likely be suppressed."
+  },
+  {
+    "id": "mc-82-t",
+    "codeSet": "penal",
+    "statement": "Officers respond to a 911 call of a woman screaming inside a house. They arrive, hear continued screams and sounds of a struggle from inside, and the door is locked. What can they do? Enter immediately without a warrant under exigent circumstances to prevent harm.",
+    "isTrue": true,
+    "explanation": "circumstances – specifically the emergency of someone inside possibly being in immediate danger. The immediate need to protect life or prevent serious injury justifies a warrantless entry in this scenario."
+  },
+  {
+    "id": "mc-82-f",
+    "codeSet": "penal",
+    "statement": "Officers respond to a 911 call of a woman screaming inside a house. They arrive, hear continued screams and sounds of a struggle from inside, and the door is locked. What can they do? Wait for a warrant since it’s a private residence.",
+    "isTrue": false,
+    "explanation": "circumstances – specifically the emergency of someone inside possibly being in immediate danger. The immediate need to protect life or prevent serious injury justifies a warrantless entry in this scenario."
+  },
+  {
+    "id": "mc-83-t",
+    "codeSet": "penal",
+    "statement": "A suspect runs from police into his house and slams the door. The officers have probable cause that he just committed a felony assault and were actively chasing him. Can the officers legally enter the home without a warrant? Yes. Under hot pursuit of a fleeing felon, officers can follow into a home to prevent escape.",
+    "isTrue": true,
+    "explanation": "who have been in immediate chase of a suspect can continue the pursuit into a private dwelling without a warrant to prevent the suspect’s escape. They should still announce themselves if feasible, but the warrantless entry is justified by the urgent circumstances."
+  },
+  {
+    "id": "mc-83-f",
+    "codeSet": "penal",
+    "statement": "A suspect runs from police into his house and slams the door. The officers have probable cause that he just committed a felony assault and were actively chasing him. Can the officers legally enter the home without a warrant? No. They must stop at the door and obtain an arrest warrant.",
+    "isTrue": false,
+    "explanation": "who have been in immediate chase of a suspect can continue the pursuit into a private dwelling without a warrant to prevent the suspect’s escape. They should still announce themselves if feasible, but the warrantless entry is justified by the urgent circumstances."
+  },
+  {
+    "id": "mc-84-t",
+    "codeSet": "hs",
+    "statement": "Detectives arrive at a suspect’s apartment to arrest him for drug dealing. They knock and announce, and immediately hear people inside yelling, \"Flush it, flush it!\" The detectives force entry without a warrant and find drugs being dumped in the toilet. Was this warrantless entry justified? Yes. The officers reasonably believed evidence was being destroyed, an exigent circumstance that allowed immediate entry.",
+    "isTrue": true,
+    "explanation": "destroy evidence, they faced an exigent circumstance. The imminent destruction of evidence justified their immediate, warrantless entry to prevent the loss of that evidence. The prior knock-andannounce was appropriately attempted, and the exigency arose from the occupants’ actions."
+  },
+  {
+    "id": "mc-84-f",
+    "codeSet": "hs",
+    "statement": "Detectives arrive at a suspect’s apartment to arrest him for drug dealing. They knock and announce, and immediately hear people inside yelling, \"Flush it, flush it!\" The detectives force entry without a warrant and find drugs being dumped in the toilet. Was this warrantless entry justified? No. They should have obtained a search warrant no matter what.",
+    "isTrue": false,
+    "explanation": "destroy evidence, they faced an exigent circumstance. The imminent destruction of evidence justified their immediate, warrantless entry to prevent the loss of that evidence. The prior knock-andannounce was appropriately attempted, and the exigency arose from the occupants’ actions."
+  },
+  {
+    "id": "mc-85-t",
+    "codeSet": "vehicle",
+    "statement": "Officer Perez knows that Joe is on probation with a search condition. Perez, without any new probable cause, conducts a random search of Joe’s person and vehicle and finds illegal drugs. Is this search valid? Yes. If a person is on probation (or parole) with a valid search waiver, officers can search them or areas under their control without needing additional cause.",
+    "isTrue": true,
+    "explanation": "waiver), they have a significantly reduced expectation of privacy. Officers are generally allowed to search that individual (and areas under their control like their vehicle) at any time, without further cause, as long as the search is not conducted for harassment. Here, Officer Perez’s search would be considered lawful under the probation search terms. 21"
+  },
+  {
+    "id": "mc-85-f",
+    "codeSet": "vehicle",
+    "statement": "Officer Perez knows that Joe is on probation with a search condition. Perez, without any new probable cause, conducts a random search of Joe’s person and vehicle and finds illegal drugs. Is this search valid? No. An officer still needs independent reasonable suspicion to search, even if the person is on probation with a search term.",
+    "isTrue": false,
+    "explanation": "waiver), they have a significantly reduced expectation of privacy. Officers are generally allowed to search that individual (and areas under their control like their vehicle) at any time, without further cause, as long as the search is not conducted for harassment. Here, Officer Perez’s search would be considered lawful under the probation search terms. 21"
+  },
+  {
+    "id": "mc-86-t",
+    "codeSet": "vehicle",
+    "statement": "Officer Kelly stops a car for speeding. Through the window, Kelly sees what appears to be a baggie of methamphetamine on the passenger seat. The driver is detained. What can Officer Kelly legally do regarding the car? Search the car without a warrant under the automobile exception, since there is probable cause to believe it contains contraband.",
+    "isTrue": true,
+    "explanation": "vehicle contains contraband. Under the automobile exception (Carroll doctrine), the officer can search the vehicle (including containers within it that might hold the contraband) immediately without a warrant, due to the mobility of the vehicle and existing probable cause."
+  },
+  {
+    "id": "mc-86-f",
+    "codeSet": "vehicle",
+    "statement": "Officer Kelly stops a car for speeding. Through the window, Kelly sees what appears to be a baggie of methamphetamine on the passenger seat. The driver is detained. What can Officer Kelly legally do regarding the car? Seize the car and wait for a search warrant before looking inside.",
+    "isTrue": false,
+    "explanation": "vehicle contains contraband. Under the automobile exception (Carroll doctrine), the officer can search the vehicle (including containers within it that might hold the contraband) immediately without a warrant, due to the mobility of the vehicle and existing probable cause."
+  },
+  {
+    "id": "mc-87-t",
+    "codeSet": "vehicle",
+    "statement": "During a lawful traffic stop at night, Officer Allen sees the driver nervously reaching under the seat. Fearing the driver might be accessing a weapon, Allen orders him out and conducts a quick search of the passenger compartment for weapons. A loaded pistol is found under the seat. Was this search legal? Yes. With specific suspicion the driver might be armed and dangerous, the officer can do a cursory protective search of the vehicle for weapons.",
+    "isTrue": true,
+    "explanation": "dangerous and may access a weapon, the officer can conduct a limited search of areas in the vehicle where a weapon might be hidden (a protective vehicle sweep). Here, the driver’s furtive movement justified checking under the seat for weapons, making the discovery of the pistol lawful."
+  },
+  {
+    "id": "mc-87-f",
+    "codeSet": "vehicle",
+    "statement": "During a lawful traffic stop at night, Officer Allen sees the driver nervously reaching under the seat. Fearing the driver might be accessing a weapon, Allen orders him out and conducts a quick search of the passenger compartment for weapons. A loaded pistol is found under the seat. Was this search legal? No. The officer needed a search warrant to look under the seat of the car.",
+    "isTrue": false,
+    "explanation": "dangerous and may access a weapon, the officer can conduct a limited search of areas in the vehicle where a weapon might be hidden (a protective vehicle sweep). Here, the driver’s furtive movement justified checking under the seat for weapons, making the discovery of the pistol lawful."
+  },
+  {
+    "id": "tf-88",
+    "codeSet": "vehicle",
+    "statement": "A suspect’s car is impounded for parking violations. During the standard inventory of the vehicle, an officer discovers narcotics hidden in a backpack in the trunk. This evidence is admissible in court.",
+    "isTrue": true,
+    "explanation": "policy (to catalog the vehicle’s contents for safekeeping, not as a pretext to find evidence), any contraband or evidence found during that procedure can be used in court. In this scenario, the officer’s discovery of narcotics in the trunk during a lawful inventory would be admissible."
+  },
+  {
+    "id": "tf-89",
+    "codeSet": "penal",
+    "statement": "Routine booking questions (e.g., asking a suspect’s name, address, date of birth) do not require a Miranda warning because they are not aimed at eliciting incriminating evidence.",
+    "isTrue": true,
+    "explanation": "exempt from Miranda. They are for administrative and identification purposes, not for gathering evidence of a crime. Therefore, officers can ask these basic questions without advising the suspect of the Miranda rights at that time."
+  },
+  {
+    "id": "mc-90-t",
+    "codeSet": "penal",
+    "statement": "A homeowner invites officers inside to discuss a burglary. While inside, an officer asks, \"Do you mind if we take a look around your house for any evidence?\" The homeowner says, \"Go ahead.\" The officers search and find stolen property. Later, the homeowner claims the search was illegal. What is the likely outcome? The search was legal because the homeowner voluntarily consented to it. 22",
+    "isTrue": true,
+    "explanation": "homeowner gave permission for the search, so no warrant or additional cause was required. Officers are not required to advise a person that they have the right to refuse consent (though consent must be freely given, not coerced)."
+  },
+  {
+    "id": "mc-90-f",
+    "codeSet": "penal",
+    "statement": "A homeowner invites officers inside to discuss a burglary. While inside, an officer asks, \"Do you mind if we take a look around your house for any evidence?\" The homeowner says, \"Go ahead.\" The officers search and find stolen property. Later, the homeowner claims the search was illegal. What is the likely outcome? The search was illegal because the officers lacked a warrant.",
+    "isTrue": false,
+    "explanation": "homeowner gave permission for the search, so no warrant or additional cause was required. Officers are not required to advise a person that they have the right to refuse consent (though consent must be freely given, not coerced)."
+  },
+  {
+    "id": "mc-91-t",
+    "codeSet": "penal",
+    "statement": "Officer Hall asks a homeowner for permission to search his house for evidence of a crime. The homeowner hesitates, so Hall says, \"If you don’t let us in, I’ll come back with a warrant and make things difficult for you.\" The homeowner then says, \"Fine, go ahead.\" The search yields evidence. In court, the defense challenges the consent. What is likely to happen? The consent may be deemed involuntary, because it was obtained through a coercive threat of a warrant, and the evidence could be suppressed.",
+    "isTrue": true,
+    "explanation": "coercive – threatening to “make things difficult” – which can invalidate the consent. A court would likely find that the homeowner’s consent was not truly voluntary, and thus the evidence discovered would be suppressed."
+  },
+  {
+    "id": "mc-91-f",
+    "codeSet": "penal",
+    "statement": "Officer Hall asks a homeowner for permission to search his house for evidence of a crime. The homeowner hesitates, so Hall says, \"If you don’t let us in, I’ll come back with a warrant and make things difficult for you.\" The homeowner then says, \"Fine, go ahead.\" The search yields evidence. In court, the defense challenges the consent. What is likely to happen? The consent is valid; the officer was just explaining the inevitable outcome.",
+    "isTrue": false,
+    "explanation": "coercive – threatening to “make things difficult” – which can invalidate the consent. A court would likely find that the homeowner’s consent was not truly voluntary, and thus the evidence discovered would be suppressed."
+  },
+  {
+    "id": "tf-92",
+    "codeSet": "penal",
+    "statement": "Only a person with a reasonable expectation of privacy in the area searched can challenge the legality of a search in court.",
+    "isTrue": true,
+    "explanation": "violated their own reasonable expectation of privacy. For example, one generally can’t object to the search of someone else’s property, because the intrusion did not invade their personal privacy rights."
+  },
+  {
+    "id": "tf-93",
+    "codeSet": "penal",
+    "statement": "In California, private citizens who are not police officers are not bound by the Fourth Amendment, so evidence they discover and hand over to police (without being asked to search) is generally admissible.",
+    "isTrue": true,
+    "explanation": "acting on their own. If a private person finds evidence and turns it over to police without being at the direction of police, the evidence is admissible. (However, if the citizen was acting as an agent of law enforcement, Fourth Amendment rules would apply.)"
+  },
+  {
+    "id": "tf-94",
+    "codeSet": "penal",
+    "statement": "If officers conduct an unlawful search of a home but later discover the same evidence lawfully via an independent source, the evidence may still be admissible despite the initial illegality.",
+    "isTrue": true,
+    "explanation": "holds that evidence initially discovered during an unlawful search can still be admitted if it is later obtained independently by legal means untainted by the original illegality. Similarly, the “inevitable discovery” doctrine allows evidence if it would have been found inevitably by lawful means. These exceptions prevent suppressing evidence that the police obtained separately from any misconduct."
+  },
+  {
+    "id": "tf-95",
+    "codeSet": "penal",
+    "statement": "Probation and parole searches are intended to ensure compliance with the terms of release and do not require the officer to have separate reasonable suspicion or a warrant. 23",
+    "isTrue": true,
+    "explanation": "reduced privacy rights. Officers can generally search them (and areas under their control) without warrants or additional suspicion, as long as the search is not arbitrary or harassment. These conditions are part of the individual’s agreement for remaining in the community under supervision."
+  },
+  {
+    "id": "tf-96",
+    "codeSet": "penal",
+    "statement": "The exclusionary rule is meant to deter police misconduct by excluding illegally obtained evidence, even if that means a guilty person might go free.",
+    "isTrue": true,
+    "explanation": "violating constitutional rights. It does so by removing the incentive to conduct illegal searches or seizures, since any evidence obtained unlawfully can be thrown out in court. This can sometimes result in a person escaping conviction due to lack of admissible evidence, but the rule is considered necessary to uphold constitutional protections."
+  },
+  {
+    "id": "tf-97",
+    "codeSet": "penal",
+    "statement": "An officer can lawfully seize evidence that is in plain view as long as the officer is in a place they have a right to be and it’s immediately apparent the item is contraband or evidence of a crime.",
+    "isTrue": true,
+    "explanation": "three conditions are met: the officer is lawfully present in the location, the item is in plain sight, and the officer immediately recognizes the item as contraband or evidence. Under those circumstances, picking up the item does not violate the Fourth Amendment because no additional search occurs."
+  },
+  {
+    "id": "tf-98",
+    "codeSet": "vehicle",
+    "statement": "A peace officer in California cannot make an arrest for an infraction (like a traffic infraction) because infractions are not punishable by jail time.",
+    "isTrue": true,
+    "explanation": "arrestable offenses – they are handled by citation (ticket) since the only punishment is a fine. There are limited exceptions (e.g., if a person refuses to sign a promise to appear or there’s no satisfactory identification, an officer might arrest to ensure appearance in court), but typically infractions do not result in physical arrest."
+  },
+  {
+    "id": "tf-99",
+    "codeSet": "penal",
+    "statement": "If a person commits a misdemeanor in an officer’s presence, the officer can arrest them then and there without a warrant.",
+    "isTrue": true,
+    "explanation": "for an immediate warrantless arrest (Penal Code §836). The officer directly observed the crime, which satisfies the requirement for warrantless misdemeanor arrests. (If the misdemeanor is not in the officer’s presence, an arrest warrant or a private person’s arrest is generally required, absent statutory exceptions.)"
+  },
+  {
+    "id": "tf-100",
+    "codeSet": "penal",
+    "statement": "A landlord’s valid consent to search a tenant’s apartment is not sufficient; generally, only the tenant (or someone with common authority over the apartment) can give lawful consent to search the tenant’s private space.",
+    "isTrue": true,
+    "explanation": "because the tenant has a reasonable expectation of privacy there. Consent must come from someone who actually has common authority or control over the space (like a co-occupant). There are narrow exceptions (e.g., property owner consent for common areas), but a landlord’s consent to search a rented apartment is not valid against the tenant’s privacy interest. 24"
+  }
+]
