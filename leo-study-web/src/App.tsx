@@ -68,6 +68,7 @@ type ScenarioQuestion = {
 type CodePerformance = {
   correctCount: number
   incorrectCount: number
+  correctStreak?: number
 }
 
 type MatchCard = {
@@ -497,7 +498,7 @@ function performanceKey(codeSet: CodeSet, section: string) {
 
 function mastery(performance?: CodePerformance) {
   if (!performance || performance.correctCount + performance.incorrectCount === 0) return ''
-  if (performance.correctCount >= 10) return 'Mastered'
+  if ((performance.correctStreak ?? 0) >= 20) return 'Mastered'
   return 'Needs Work'
 }
 
@@ -802,6 +803,7 @@ function App() {
   const [homeSpeedCodeFilter, setHomeSpeedCodeFilter] = useState<CodeFilter>('all')
   const [homeMatchingConfigOpen, setHomeMatchingConfigOpen] = useState(false)
   const [homeSpeedConfigOpen, setHomeSpeedConfigOpen] = useState(false)
+  const [homeMasteredInfoOpen, setHomeMasteredInfoOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -862,6 +864,8 @@ function App() {
   const speedScoreRef = useRef(0)
   const speedAnsweredCountRef = useRef(0)
   const quizFireHostRef = useRef<HTMLDivElement | null>(null)
+  const scenarioNextRef = useRef<HTMLDivElement | null>(null)
+  const quizNextRef = useRef<HTMLButtonElement | null>(null)
   const [quizFireWidth, setQuizFireWidth] = useState(0)
 
   useEffect(() => {
@@ -1138,7 +1142,7 @@ function App() {
         isOwner: isOwnerIdentity(profile.username),
         value: parsed.profileDetails.stats.studySeconds,
       })
-      const masteredCount = Object.values(parsed.performance).filter((item) => item.correctCount >= 10).length
+      const masteredCount = Object.values(parsed.performance).filter((item) => mastery(item) === 'Mastered').length
       masteredRows.push({
         userId,
         playerName: profile.username,
@@ -1542,13 +1546,14 @@ function App() {
 
   const markPerformance = (codeSet: CodeSet, sectionNumber: string, correct: boolean) => {
     const key = performanceKey(codeSet, sectionNumber)
-    const current = performance[key] ?? { correctCount: 0, incorrectCount: 0 }
+    const current = performance[key] ?? { correctCount: 0, incorrectCount: 0, correctStreak: 0 }
     const updated: CodePerformance = {
       correctCount: current.correctCount + (correct ? 1 : 0),
       incorrectCount: current.incorrectCount + (correct ? 0 : 1),
+      correctStreak: correct ? (current.correctStreak ?? 0) + 1 : 0,
     }
     setPerformance((previous) => ({ ...previous, [key]: updated }))
-    return current.correctCount < 10 && updated.correctCount >= 10
+    return (current.correctStreak ?? 0) < 20 && (updated.correctStreak ?? 0) >= 20
   }
 
   const answerQuestion = (index: number) => {
@@ -1751,6 +1756,30 @@ function App() {
     incrementUserStats((stats) => ({ ...stats, scenariosReviewed: stats.scenariosReviewed + 1 }))
     setScenarioResult(isCorrect ? 'Correct' : `Incorrect • Correct answer: ${scenarioCurrentQuestion.choices[scenarioCurrentQuestion.correctIndex]}`)
   }
+
+  useEffect(() => {
+    if (!scenarioResult) return
+    const timeout = window.setTimeout(() => {
+      scenarioNextRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 120)
+    return () => window.clearTimeout(timeout)
+  }, [scenarioResult])
+
+  useEffect(() => {
+    if (selectedChoice === null) return
+    const timeout = window.setTimeout(() => {
+      const button = quizNextRef.current
+      if (!button) return
+      const rect = button.getBoundingClientRect()
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+      const targetBottom = viewportHeight - (viewportHeight < 820 ? 160 : 120)
+      if (rect.bottom > targetBottom) {
+        const delta = Math.min(120, Math.max(36, rect.bottom - targetBottom + 18))
+        window.scrollBy({ top: delta, behavior: 'smooth' })
+      }
+    }, 120)
+    return () => window.clearTimeout(timeout)
+  }, [selectedChoice])
 
   useEffect(() => {
     if (selectedCards.length !== 2) return
@@ -2425,7 +2454,7 @@ function App() {
     () =>
       sections.filter((section) => {
         const item = performance[performanceKey(section.codeSet, section.sectionNumber)]
-        return Boolean(item && item.correctCount >= 10)
+        return mastery(item) === 'Mastered'
       }),
     [sections, performance],
   )
@@ -2932,8 +2961,18 @@ function App() {
               </div>
 
               <div className="card">
-                <h3>Most Mastered Codes</h3>
-                {homeMostMasteredLeaders.length === 0 ? <p className="muted">No data yet.</p> : homeMostMasteredLeaders.map((entry, index) => (
+                <div className="card-menu-head">
+                  <h3>Most Mastered Codes</h3>
+                  <button className="icon-menu-button info-button" onClick={() => setHomeMasteredInfoOpen((value) => !value)} aria-label="What is mastered code">
+                    i
+                  </button>
+                </div>
+                {homeMasteredInfoOpen ? (
+                  <div className="home-mastery-help">
+                    A code is mastered only after you answer it correctly 20 times in a row. One wrong answer resets that code’s streak to zero.
+                  </div>
+                ) : null}
+                {homeMostMasteredLeaders.length === 0 ? <p className="muted">Be the first to master a code.</p> : homeMostMasteredLeaders.map((entry, index) => (
                   <button
                     key={`home-mastered-${entry.userId}-${index}`}
                     type="button"
@@ -3110,7 +3149,7 @@ function App() {
                       <>
                         <p className={feedback.startsWith('Correct') ? 'good' : 'bad'}>{feedback}</p>
                         <p className="muted">{currentQuestion.explanation}</p>
-                        <button className="primary" onClick={() => setNextQuizQuestion()}>
+                        <button ref={quizNextRef} className="primary" onClick={() => setNextQuizQuestion()}>
                           Next Question
                         </button>
                       </>
@@ -3481,17 +3520,16 @@ function App() {
         )}
 
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isScenariosPage && (
-          <section>
-            <h2>Scenario Drills</h2>
-            <div className="card">
+          <section className="scenario-section">
+            <div className="card scenario-card">
               {scenarioCurrentQuestion ? (
                 <>
                   <h3>{scenarioCurrentQuestion.prompt}</h3>
-                  <div className="actions-row scenario-actions">
+                  <div className="scenario-actions">
                     {scenarioCurrentQuestion.choices.map((choice, index) => (
                       <button
                         key={`scenario-choice-${scenarioCurrentQuestion.id}-${index}`}
-                        className={index === 0 ? 'primary scenario-answer-btn' : 'secondary scenario-answer-btn'}
+                        className="scenario-answer-btn"
                         onClick={() => answerScenario(index)}
                         disabled={Boolean(scenarioResult)}
                       >
@@ -3506,9 +3544,11 @@ function App() {
                       <p className="muted">{scenarioCurrentQuestion.explanation}</p>
                     </div>
                   ) : null}
-                  <button className="secondary scenario-next" onClick={() => nextScenarioQuestion(undefined, scenarioCurrentQuestion.id)}>
-                    Next Scenario
-                  </button>
+                  <div className="scenario-next-wrap" ref={scenarioNextRef}>
+                    <button className="secondary scenario-next" onClick={() => nextScenarioQuestion(undefined, scenarioCurrentQuestion.id)}>
+                      Next Scenario
+                    </button>
+                  </div>
                 </>
               ) : (
                 <p className="muted">No scenario questions loaded.</p>

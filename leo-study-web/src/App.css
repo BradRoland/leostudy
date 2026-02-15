@@ -249,6 +249,14 @@ body {
   padding-bottom: 5px;
 }
 
+.info-button {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: Inter, sans-serif;
+  font-style: italic;
+  padding-bottom: 0;
+}
+
 .home-score-config {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -263,6 +271,17 @@ body {
   font-size: 0.82rem;
   color: var(--muted);
   font-weight: 600;
+}
+
+.home-mastery-help {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 9px 10px;
+  margin: 2px 0 8px;
+  background: rgba(46, 66, 108, 0.38);
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
 .mini-chip-row {
@@ -559,24 +578,34 @@ button {
 }
 
 .scenario-next {
-  margin-top: 10px;
-  width: min(260px, 100%);
-  min-height: 52px;
+  width: min(180px, 100%);
+  min-height: 44px;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
 }
 
+.scenario-next-wrap {
+  margin-top: 8px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .scenario-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 9px;
   width: 100%;
 }
 
 .scenario-answer-btn {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(87, 104, 146, 0.42);
+  color: #fff;
   min-height: 54px;
   width: 100%;
   justify-content: center;
@@ -584,6 +613,24 @@ button {
   font-weight: 700;
   display: inline-flex;
   align-items: center;
+}
+
+.scenario-answer-btn:hover:not(:disabled) {
+  background: rgba(104, 125, 174, 0.52);
+}
+
+.scenario-answer-btn:disabled {
+  opacity: 0.9;
+}
+
+.scenario-section {
+  margin-top: 2px;
+}
+
+.scenario-card {
+  display: grid;
+  gap: 10px;
+  width: 100%;
 }
 
 .game-start-button {
