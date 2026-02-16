@@ -1,0 +1,632 @@
+[
+  {
+    "id": "pc-pc-37-treason",
+    "category": "pc",
+    "title": "Treason",
+    "question": "Which section number matches: Treason?",
+    "answer": "PC 37",
+    "tags": [
+      "state crimes"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 37",
+    "explanation": "Giving aid and comfort while owing allegiance to the state."
+  },
+  {
+    "id": "pc-pc-69-resisting-or-obstructing-an-executiv",
+    "category": "pc",
+    "title": "Resisting or obstructing an executive officer",
+    "question": "Which section number matches: Resisting or obstructing an executive officer?",
+    "answer": "PC 69",
+    "tags": [
+      "officer",
+      "threats"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 69",
+    "explanation": "Attempting by threats or violence to deter or prevent an executive officer from performing a lawful duty."
+  },
+  {
+    "id": "pc-pc-148-resisting-obstructing-or-delaying-an",
+    "category": "pc",
+    "title": "Resisting, obstructing, or delaying an officer",
+    "question": "Which section number matches: Resisting, obstructing, or delaying an officer?",
+    "answer": "PC 148",
+    "tags": [
+      "officer",
+      "resistance"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 148",
+    "explanation": "Willfully resisting, delaying, or obstructing an officer or EMT from performing duties."
+  },
+  {
+    "id": "pc-pc-187-murder",
+    "category": "pc",
+    "title": "Murder",
+    "question": "Which section number matches: Murder?",
+    "answer": "PC 187",
+    "tags": [
+      "homicide"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 187",
+    "explanation": "Unlawful killing of a human being or fetus with malice aforethought."
+  },
+  {
+    "id": "pc-pc-192-manslaughter",
+    "category": "pc",
+    "title": "Manslaughter",
+    "question": "Which section number matches: Manslaughter?",
+    "answer": "PC 192",
+    "tags": [
+      "homicide"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 192",
+    "explanation": "Killing a human being without malice aforethought."
+  },
+  {
+    "id": "pc-pc-207-kidnapping",
+    "category": "pc",
+    "title": "Kidnapping",
+    "question": "Which section number matches: Kidnapping?",
+    "answer": "PC 207",
+    "tags": [
+      "person crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 207",
+    "explanation": "Moving another person without consent by force or fear."
+  },
+  {
+    "id": "pc-pc-211-robbery",
+    "category": "pc",
+    "title": "Robbery",
+    "question": "Which section number matches: Robbery?",
+    "answer": "PC 211",
+    "tags": [
+      "theft",
+      "force"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 211",
+    "explanation": "Taking personal property from another by force or fear."
+  },
+  {
+    "id": "pc-pc-215-carjacking",
+    "category": "pc",
+    "title": "Carjacking",
+    "question": "Which section number matches: Carjacking?",
+    "answer": "PC 215",
+    "tags": [
+      "vehicle crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 215",
+    "explanation": "Taking a motor vehicle in another's possession by force or fear."
+  },
+  {
+    "id": "pc-pc-236-false-imprisonment",
+    "category": "pc",
+    "title": "False imprisonment",
+    "question": "Which section number matches: False imprisonment?",
+    "answer": "PC 236",
+    "tags": [
+      "person crimes"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 236",
+    "explanation": "Restraining, confining, or detaining a person against their will."
+  },
+  {
+    "id": "pc-pc-240-241-assault",
+    "category": "pc",
+    "title": "Assault",
+    "question": "Which section number matches: Assault?",
+    "answer": "PC 240/241",
+    "tags": [
+      "assaultive"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 240/241",
+    "explanation": "Attempt to commit a violent injury with present ability."
+  },
+  {
+    "id": "pc-pc-242-battery",
+    "category": "pc",
+    "title": "Battery",
+    "question": "Which section number matches: Battery?",
+    "answer": "PC 242",
+    "tags": [
+      "assaultive"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 242",
+    "explanation": "Willful use of force or violence upon another person."
+  },
+  {
+    "id": "pc-pc-243-battery-on-a-significant-other",
+    "category": "pc",
+    "title": "Battery on a significant other",
+    "question": "Which section number matches: Battery on a significant other?",
+    "answer": "PC 243(e)(1)",
+    "tags": [
+      "domestic violence"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 243(e)(1)",
+    "explanation": "Battery on an intimate partner without visible marks."
+  },
+  {
+    "id": "pc-pc-245-assault-with-deadly-weapon",
+    "category": "pc",
+    "title": "Assault with deadly weapon (not firearm)",
+    "question": "Which section number matches: Assault with deadly weapon (not firearm)?",
+    "answer": "PC 245(a)(1)",
+    "tags": [
+      "weapon",
+      "assaultive"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 245(a)(1)",
+    "explanation": "Assault with a deadly weapon other than a firearm, or force likely to produce great bodily injury."
+  },
+  {
+    "id": "pc-pc-245-assault-with-a-firearm",
+    "category": "pc",
+    "title": "Assault with a firearm",
+    "question": "Which section number matches: Assault with a firearm?",
+    "answer": "PC 245(a)(2)",
+    "tags": [
+      "weapon",
+      "firearm"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 245(a)(2)",
+    "explanation": "Using a firearm to assault another person."
+  },
+  {
+    "id": "pc-pc-246-shooting-at-inhabited-dwelling-or-oc",
+    "category": "pc",
+    "title": "Shooting at inhabited dwelling or occupied vehicle",
+    "question": "Which section number matches: Shooting at inhabited dwelling or occupied vehicle?",
+    "answer": "PC 246",
+    "tags": [
+      "firearm"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 246",
+    "explanation": "Willfully discharging a firearm at an inhabited dwelling, occupied building, occupied vehicle, or occupied aircraft."
+  },
+  {
+    "id": "pc-pc-261-rape",
+    "category": "pc",
+    "title": "Rape",
+    "question": "Which section number matches: Rape?",
+    "answer": "PC 261",
+    "tags": [
+      "sex crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 261",
+    "explanation": "Sexual intercourse without consent by force, fear, or against will."
+  },
+  {
+    "id": "pc-pc-261-5-statutory-rape",
+    "category": "pc",
+    "title": "Statutory rape",
+    "question": "Which section number matches: Statutory rape?",
+    "answer": "PC 261.5",
+    "tags": [
+      "sex crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 261.5",
+    "explanation": "Sexual intercourse with a person under 18."
+  },
+  {
+    "id": "pc-pc-272-contributing-to-delinquency-of-a-min",
+    "category": "pc",
+    "title": "Contributing to delinquency of a minor",
+    "question": "Which section number matches: Contributing to delinquency of a minor?",
+    "answer": "PC 272",
+    "tags": [
+      "juvenile"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 272",
+    "explanation": "Act or omission encouraging a minor to become dependent, delinquent, or habitual truant."
+  },
+  {
+    "id": "pc-pc-273-5-spousal-abuse",
+    "category": "pc",
+    "title": "Spousal abuse",
+    "question": "Which section number matches: Spousal abuse?",
+    "answer": "PC 273.5",
+    "tags": [
+      "domestic violence"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 273.5",
+    "explanation": "Abuse causing visible injury against spouse/cohabitant/former partner or parent of shared child."
+  },
+  {
+    "id": "pc-pc-273a-cruelty-to-a-child",
+    "category": "pc",
+    "title": "Cruelty to a child",
+    "question": "Which section number matches: Cruelty to a child?",
+    "answer": "PC 273a",
+    "tags": [
+      "child abuse"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 273a",
+    "explanation": "Causing or permitting unjustifiable pain or placing a child in a dangerous situation."
+  },
+  {
+    "id": "pc-pc-286-sodomy",
+    "category": "pc",
+    "title": "Sodomy",
+    "question": "Which section number matches: Sodomy?",
+    "answer": "PC 286",
+    "tags": [
+      "sex crimes"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 286",
+    "explanation": "Penile penetration of another's anus, regardless of how slight, without consent."
+  },
+  {
+    "id": "pc-pc-287-oral-copulation",
+    "category": "pc",
+    "title": "Oral copulation",
+    "question": "Which section number matches: Oral copulation?",
+    "answer": "PC 287",
+    "tags": [
+      "sex crimes"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 287",
+    "explanation": "Any contact between mouth and another's sexual organ or anus."
+  },
+  {
+    "id": "pc-pc-288-lewd-acts-on-a-child",
+    "category": "pc",
+    "title": "Lewd acts on a child",
+    "question": "Which section number matches: Lewd acts on a child?",
+    "answer": "PC 288(a)",
+    "tags": [
+      "sex crimes",
+      "child"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 288(a)",
+    "explanation": "Willfully touching a child or coercing contact with intent to arouse sexual desires; child under 14."
+  },
+  {
+    "id": "pc-pc-314-indecent-exposure",
+    "category": "pc",
+    "title": "Indecent exposure",
+    "question": "Which section number matches: Indecent exposure?",
+    "answer": "PC 314",
+    "tags": [
+      "public order"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 314",
+    "explanation": "Willfully exposing genitals in presence of others likely to be offended."
+  },
+  {
+    "id": "pc-pc-368-elder-abuse",
+    "category": "pc",
+    "title": "Elder abuse",
+    "question": "Which section number matches: Elder abuse?",
+    "answer": "PC 368",
+    "tags": [
+      "elder abuse"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 368",
+    "explanation": "Physical, financial, or other abuse causing pain or suffering to a person age 65 or older."
+  },
+  {
+    "id": "pc-pc-415-disturbing-the-peace",
+    "category": "pc",
+    "title": "Disturbing the peace",
+    "question": "Which section number matches: Disturbing the peace?",
+    "answer": "PC 415",
+    "tags": [
+      "public order"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 415",
+    "explanation": "Unlawful fighting, unreasonable loud noise, or offensive words likely to provoke immediate violence."
+  },
+  {
+    "id": "pc-pc-417-brandishing-a-weapon-or-firearm",
+    "category": "pc",
+    "title": "Brandishing a weapon or firearm",
+    "question": "Which section number matches: Brandishing a weapon or firearm?",
+    "answer": "PC 417",
+    "tags": [
+      "weapon"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 417",
+    "explanation": "Drawing or exhibiting a deadly weapon in a rude, angry, or threatening manner."
+  },
+  {
+    "id": "pc-pc-422-criminal-threats",
+    "category": "pc",
+    "title": "Criminal threats",
+    "question": "Which section number matches: Criminal threats?",
+    "answer": "PC 422",
+    "tags": [
+      "threats"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 422",
+    "explanation": "Willful threat to kill or seriously injure, verbally/written/electronically, causing reasonable sustained fear."
+  },
+  {
+    "id": "pc-pc-451-arson",
+    "category": "pc",
+    "title": "Arson",
+    "question": "Which section number matches: Arson?",
+    "answer": "PC 451",
+    "tags": [
+      "property crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 451",
+    "explanation": "Willfully and maliciously setting fire to, burning, or causing burning of structure, land, or property."
+  },
+  {
+    "id": "pc-pc-459-burglary",
+    "category": "pc",
+    "title": "Burglary",
+    "question": "Which section number matches: Burglary?",
+    "answer": "PC 459",
+    "tags": [
+      "property crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 459",
+    "explanation": "Entering a structure or locked vehicle with intent to commit theft or felony."
+  },
+  {
+    "id": "pc-pc-466-possession-of-burglary-tools",
+    "category": "pc",
+    "title": "Possession of burglary tools",
+    "question": "Which section number matches: Possession of burglary tools?",
+    "answer": "PC 466",
+    "tags": [
+      "property crimes"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 466",
+    "explanation": "Possession of burglary tools with intent to break or enter to commit theft."
+  },
+  {
+    "id": "pc-pc-470-forgery",
+    "category": "pc",
+    "title": "Forgery",
+    "question": "Which section number matches: Forgery?",
+    "answer": "PC 470",
+    "tags": [
+      "fraud"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 470",
+    "explanation": "Knowingly signing another's name, falsifying legal documents, or presenting false financial/property documents."
+  },
+  {
+    "id": "pc-pc-475-possessing-receiving-forged-items",
+    "category": "pc",
+    "title": "Possessing/receiving forged items",
+    "question": "Which section number matches: Possessing/receiving forged items?",
+    "answer": "PC 475",
+    "tags": [
+      "fraud"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 475",
+    "explanation": "Knowingly possessing or receiving forged items."
+  },
+  {
+    "id": "pc-pc-484-theft",
+    "category": "pc",
+    "title": "Theft",
+    "question": "Which section number matches: Theft?",
+    "answer": "PC 484",
+    "tags": [
+      "property crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 484",
+    "explanation": "Steal, take, carry, lead, or drive away personal property of another."
+  },
+  {
+    "id": "pc-pc-487-grand-theft",
+    "category": "pc",
+    "title": "Grand theft",
+    "question": "Which section number matches: Grand theft?",
+    "answer": "PC 487",
+    "tags": [
+      "property crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 487",
+    "explanation": "Stealing property valued over the threshold amount."
+  },
+  {
+    "id": "pc-pc-496-possession-of-stolen-property",
+    "category": "pc",
+    "title": "Possession of stolen property",
+    "question": "Which section number matches: Possession of stolen property?",
+    "answer": "PC 496",
+    "tags": [
+      "property crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 496",
+    "explanation": "Knowingly buying, selling, or receiving stolen property."
+  },
+  {
+    "id": "pc-pc-591-destruction-of-phone-electric-cable",
+    "category": "pc",
+    "title": "Destruction of phone/electric/cable line",
+    "question": "Which section number matches: Destruction of phone/electric/cable line?",
+    "answer": "PC 591",
+    "tags": [
+      "infrastructure"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 591",
+    "explanation": "Maliciously destroying or taking down communication/electrical lines."
+  },
+  {
+    "id": "pc-pc-594-vandalism",
+    "category": "pc",
+    "title": "Vandalism",
+    "question": "Which section number matches: Vandalism?",
+    "answer": "PC 594",
+    "tags": [
+      "property crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 594",
+    "explanation": "Maliciously defacing, damaging, or destroying property not your own."
+  },
+  {
+    "id": "pc-pc-602-trespassing",
+    "category": "pc",
+    "title": "Trespassing",
+    "question": "Which section number matches: Trespassing?",
+    "answer": "PC 602",
+    "tags": [
+      "property crimes"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 602",
+    "explanation": "Entering/occupying property without permission and refusing to leave when asked."
+  },
+  {
+    "id": "pc-pc-646-9-stalking",
+    "category": "pc",
+    "title": "Stalking",
+    "question": "Which section number matches: Stalking?",
+    "answer": "PC 646.9",
+    "tags": [
+      "harassment"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 646.9",
+    "explanation": "Willfully, maliciously, and repeatedly following or harassing another person."
+  },
+  {
+    "id": "pc-pc-647-lewd-conduct",
+    "category": "pc",
+    "title": "Lewd conduct",
+    "question": "Which section number matches: Lewd conduct?",
+    "answer": "PC 647(a)",
+    "tags": [
+      "public order"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 647(a)",
+    "explanation": "Engaging in or soliciting lewd conduct in public or exposed to public view."
+  },
+  {
+    "id": "pc-pc-647-prostitution",
+    "category": "pc",
+    "title": "Prostitution",
+    "question": "Which section number matches: Prostitution?",
+    "answer": "PC 647(b)",
+    "tags": [
+      "public order"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 647(b)",
+    "explanation": "Engaging in sexual acts in exchange for money, goods, or services."
+  },
+  {
+    "id": "pc-pc-647-public-intoxication",
+    "category": "pc",
+    "title": "Public intoxication",
+    "question": "Which section number matches: Public intoxication?",
+    "answer": "PC 647(f)",
+    "tags": [
+      "public order"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 647(f)",
+    "explanation": "Intoxication to point of inability to care for safety or obstructing public ways."
+  },
+  {
+    "id": "pc-pc-647-peeping",
+    "category": "pc",
+    "title": "Peeping",
+    "question": "Which section number matches: Peeping?",
+    "answer": "PC 647(i)",
+    "tags": [
+      "privacy"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 647(i)",
+    "explanation": "Loitering/prowling on private property and peeking into inhabited structure without lawful business."
+  },
+  {
+    "id": "pc-pc-653m-annoying-telephone-calls",
+    "category": "pc",
+    "title": "Annoying telephone calls",
+    "question": "Which section number matches: Annoying telephone calls?",
+    "answer": "PC 653m",
+    "tags": [
+      "harassment"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 653m",
+    "explanation": "Making repeated calls, threats, or obscene communications by phone/electronic device."
+  },
+  {
+    "id": "pc-pc-664-attempt",
+    "category": "pc",
+    "title": "Attempt",
+    "question": "Which section number matches: Attempt?",
+    "answer": "PC 664",
+    "tags": [
+      "general"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 664",
+    "explanation": "Attempting to commit a crime."
+  },
+  {
+    "id": "pc-pc-1203-2-probation-violation-revocation",
+    "category": "pc",
+    "title": "Probation violation/revocation",
+    "question": "Which section number matches: Probation violation/revocation?",
+    "answer": "PC 1203.2",
+    "tags": [
+      "probation"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 1203.2",
+    "explanation": "Violating terms and conditions of probation."
+  },
+  {
+    "id": "pc-pc-3056-parole-violation",
+    "category": "pc",
+    "title": "Parole violation",
+    "question": "Which section number matches: Parole violation?",
+    "answer": "PC 3056",
+    "tags": [
+      "parole"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 3056",
+    "explanation": "Illegal act or offense breaching parole conditions."
+  }
+]

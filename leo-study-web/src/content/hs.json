@@ -1,0 +1,101 @@
+[
+  {
+    "id": "hs-11350-simple-possession",
+    "category": "hs",
+    "title": "Controlled substance possession",
+    "question": "Which section number matches: Possession of specified controlled substances?",
+    "answer": "H&S 11350",
+    "tags": ["narcotics", "possession"],
+    "difficulty": "medium",
+    "codeSection": "H&S 11350",
+    "explanation": "Unlawful possession of certain controlled substances unless otherwise authorized."
+  },
+  {
+    "id": "hs-11351-possession-for-sale",
+    "category": "hs",
+    "title": "Possession for sale",
+    "question": "Which section number matches: Possession of controlled substance for sale?",
+    "answer": "H&S 11351",
+    "tags": ["narcotics", "sales"],
+    "difficulty": "medium",
+    "codeSection": "H&S 11351",
+    "explanation": "Possession of controlled substances with intent to sell."
+  },
+  {
+    "id": "hs-11377-meth-possession",
+    "category": "hs",
+    "title": "Methamphetamine possession",
+    "question": "Which section number matches: Possession of methamphetamine?",
+    "answer": "H&S 11377",
+    "tags": ["narcotics", "methamphetamine"],
+    "difficulty": "easy",
+    "codeSection": "H&S 11377",
+    "explanation": "Unlawful possession of methamphetamine and related controlled substances."
+  },
+  {
+    "id": "hs-11351-5-rock-cocaine-sales",
+    "category": "hs",
+    "title": "Rock cocaine possession for sale",
+    "question": "Which section number matches: Possession of rock cocaine for sale?",
+    "answer": "H&S 11351.5",
+    "tags": ["narcotics", "sales", "cocaine"],
+    "difficulty": "medium",
+    "codeSection": "H&S 11351.5",
+    "explanation": "Possession of rock cocaine with intent to sell."
+  },
+  {
+    "id": "hs-11352-transport-sales",
+    "category": "hs",
+    "title": "Transporting or selling controlled substance",
+    "question": "Which section number matches: Transporting or selling a controlled substance?",
+    "answer": "H&S 11352",
+    "tags": ["narcotics", "transport", "sales"],
+    "difficulty": "medium",
+    "codeSection": "H&S 11352",
+    "explanation": "Transporting, importing, selling, furnishing, administering, or giving away specified controlled substances."
+  },
+  {
+    "id": "hs-11357-marijuana-possession",
+    "category": "hs",
+    "title": "Marijuana possession",
+    "question": "Which section number matches: Possession of marijuana?",
+    "answer": "H&S 11357",
+    "tags": ["marijuana", "possession"],
+    "difficulty": "easy",
+    "codeSection": "H&S 11357",
+    "explanation": "Unlawful possession of marijuana under prohibited circumstances."
+  },
+  {
+    "id": "hs-11364-paraphernalia",
+    "category": "hs",
+    "title": "Possession of paraphernalia",
+    "question": "Which section number matches: Possession of drug paraphernalia?",
+    "answer": "H&S 11364",
+    "tags": ["narcotics", "paraphernalia"],
+    "difficulty": "easy",
+    "codeSection": "H&S 11364",
+    "explanation": "Possession of opium pipes and other specified drug paraphernalia."
+  },
+  {
+    "id": "hs-11378-meth-sales",
+    "category": "hs",
+    "title": "Methamphetamine possession for sale",
+    "question": "Which section number matches: Possession of methamphetamine for sale?",
+    "answer": "H&S 11378",
+    "tags": ["methamphetamine", "sales"],
+    "difficulty": "medium",
+    "codeSection": "H&S 11378",
+    "explanation": "Possessing methamphetamine with intent to sell."
+  },
+  {
+    "id": "hs-11550-under-influence",
+    "category": "hs",
+    "title": "Under influence of controlled substance",
+    "question": "Which section number matches: Being under the influence of a controlled substance?",
+    "answer": "H&S 11550",
+    "tags": ["narcotics", "under influence"],
+    "difficulty": "medium",
+    "codeSection": "H&S 11550",
+    "explanation": "Willfully using or being under the influence of a controlled substance or narcotic drug."
+  }
+]

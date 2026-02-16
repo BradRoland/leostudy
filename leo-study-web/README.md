@@ -29,6 +29,8 @@ Required vars:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_CONTENT_SOURCE` (`local` or `supabase`, default: `local`)
+- `VITE_OWNER_EMAIL` (optional bootstrap convenience)
 - `VITE_SUPABASE_AVATAR_BUCKET` (default: `avatars`)
 - `VITE_STRIPE_LINK_TIER2`
 - `VITE_STRIPE_LINK_TIER5`
@@ -39,6 +41,8 @@ Required vars:
 - `/Users/jank/Documents/New project/leo-study-web/supabase/schema.sql`
   - Includes `profiles.bio`, `profiles.agency`, and `app_state.profile_details` for profile details.
   - Includes `leaderboard.match_duration` and `leaderboard.match_filter` for categorized matching leaderboards.
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260215_owner_roles_and_content_items.sql`
+  - Adds `user_roles` + `content_items` + owner-only RLS for content editing.
 
 4. Run app:
 
@@ -47,6 +51,91 @@ npm run dev
 ```
 
 - Local: `http://localhost:5173`
+
+## How to add/edit questions locally
+
+Local content lives in:
+
+- `/Users/jank/Documents/New project/leo-study-web/src/content/pc.json`
+- `/Users/jank/Documents/New project/leo-study-web/src/content/hs.json`
+- `/Users/jank/Documents/New project/leo-study-web/src/content/vc.json`
+- `/Users/jank/Documents/New project/leo-study-web/src/content/scenarios.json`
+- `/Users/jank/Documents/New project/leo-study-web/src/content/custom.json` (for future categories)
+
+Set `.env`:
+
+```bash
+VITE_CONTENT_SOURCE=local
+```
+
+Code-item shape (`pc/hs/vc/custom`):
+
+```json
+{
+  "id": "stable-id",
+  "category": "pc",
+  "title": "Short label",
+  "question": "Prompt text",
+  "answer": "PC 148(a)(1)",
+  "tags": ["optional", "tags"],
+  "difficulty": "optional",
+  "codeSection": "PC 148(a)(1)",
+  "explanation": "optional",
+  "sourceUrl": "optional"
+}
+```
+
+Scenario shape (`scenarios.json`):
+
+```json
+{
+  "id": "scenario-id",
+  "category": "scenario",
+  "title": "Scenario label",
+  "scenario": "Story text",
+  "questions": ["Follow-up question 1", "Follow-up question 2"],
+  "expectedAnswer": "optional expected answer",
+  "keyPoints": ["optional key point 1", "optional key point 2"]
+}
+```
+
+Validation behavior:
+- Missing required fields are logged as warnings in browser console.
+- Invalid items are skipped and will not crash the app.
+
+## Owner bootstrap + Content Editor (remote editable)
+
+1. Set env and run migrations.
+2. Assign initial owner (one-time):
+
+```bash
+npm run owner:bootstrap -- owner@email.com
+```
+
+- If an owner already exists, use `--force` only when you intentionally want to reassign.
+- This command uses `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`.
+
+3. Switch content source:
+
+```bash
+VITE_CONTENT_SOURCE=supabase
+```
+
+4. Sign in as owner and open `Profile` (Settings). You will see `Content Editor`:
+- Create/edit/delete content items.
+- Categories are flexible (`pc`, `hs`, `vc`, `scenario`, or any new category string).
+- Non-owner accounts can read published content but cannot mutate content (enforced by RLS).
+
+To keep Supabase and local files in sync:
+
+- Push local files to Supabase:
+```bash
+npm run content:sync
+```
+- Pull Supabase content back into local files:
+```bash
+npm run content:pull
+```
 
 ## Supabase Google auth
 

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type Syntheti
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { FireFlame, type FireFlameOption } from '@9am/fire-flame-react'
 import './App.css'
+import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem } from './content'
+import { useOwner } from './hooks/useOwner'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
@@ -9,7 +11,10 @@ type CodeFilter = CodeSet | 'all'
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home'
 type DurationFilter = 15 | 30 | 60 | 'all'
-type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library'
+type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards'
+type StatsIconName = 'overview' | 'time' | 'words' | 'penal' | 'flashcards' | 'scenarios' | 'streak' | 'game' | 'studyset'
+type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
+type StudyAnswerMode = 'multiple' | 'truefalse'
 
 type HomeLeaderboardEntry = {
   userId: string
@@ -21,6 +26,9 @@ type HomeLeaderboardEntry = {
   agency: string
   isOwner: boolean
   value: number
+  masteredCodes: number
+  studySeconds: number
+  mostStudiedMode: CodeFilter | null
 }
 
 type CodeSection = {
@@ -46,14 +54,6 @@ type Flashcard = {
   codeSet: CodeSet
   front: string
   back: string
-}
-
-type SpeedTestQuestion = {
-  id: string
-  codeSet: CodeSet
-  statement: string
-  isTrue: boolean
-  explanation: string
 }
 
 type ScenarioQuestion = {
@@ -96,6 +96,9 @@ type LeaderboardEntry = {
   score: number
   round: number
   createdAt: number
+  masteredCodes: number
+  studySeconds: number
+  mostStudiedMode: CodeFilter | null
 }
 
 type PersistedState = {
@@ -117,14 +120,35 @@ type UserProfile = {
   avatarPath: string
   avatarUrl: string
   supporterTier: SupporterTier
+  isOwner: boolean
+}
+
+type ContentEditorItem = {
+  id: string
+  category: string
+  type: 'code' | 'scenario' | 'question'
+  title: string
+  question: string
+  answer: string
+  tags: string[]
+  difficulty: string
+  codeSection: string
+  explanation: string
+  sourceUrl: string
+  scenario: string
+  scenarioQuestions: string[]
+  keyPoints: string[]
+  isPublished: boolean
 }
 
 type ProfileDetails = {
   bio: string
   agency: string
+  themeId: string
   nameStyle: NameStyle
   namePresets: NameStylePreset[]
   stats: UserStats
+  algorithmSnapshot?: Record<string, PersistedAlgorithmStat>
 }
 
 type NameStyle = {
@@ -148,6 +172,42 @@ type UserStats = {
   flashcardsReviewed: number
   scenariosReviewed: number
   studyModeCounts: Record<CodeFilter, number>
+}
+
+type SettingsTab = 'profile' | 'customization' | 'support' | 'security' | 'editor'
+
+type MasteryStatus = '' | 'Needs Work' | 'Getting There' | 'On Track' | 'Almost Mastered' | 'Mastered'
+
+type PersistedAlgorithmStat = {
+  codeSet: CodeSet
+  sectionNumber: string
+  title: string
+  correctCount: number
+  incorrectCount: number
+  attempts: number
+  accuracy: number
+  correctStreak: number
+  needScore: number
+  status: MasteryStatus
+}
+
+type AppThemePreset = {
+  id: string
+  name: string
+  swatch: string
+  vars: {
+    bg: string
+    panel: string
+    panelStrong: string
+    border: string
+    text: string
+    muted: string
+    accent: string
+    good: string
+    bad: string
+    bodyRadial: string
+    bodyBase: string
+  }
 }
 
 const gameHighScoreSeed = {
@@ -175,19 +235,11 @@ const tierLabel: Record<SupporterTier, string> = {
 }
 
 const supporterTierOrder: SupporterTier[] = ['free', 'tier2', 'tier5', 'tier10']
-const ownerEmail = 'brad@thespeck.net'
-const ownerUsername = 'jake'
 const avatarCropFrameSize = 280
 const avatarOutputSize = 512
 
 function tierRank(tier: SupporterTier) {
   return supporterTierOrder.indexOf(tier)
-}
-
-function isOwnerIdentity(username: string, email?: string) {
-  const normalizedName = username.trim().toLowerCase()
-  const normalizedEmail = String(email || '').trim().toLowerCase()
-  return normalizedName === ownerUsername || normalizedEmail === ownerEmail
 }
 
 async function createCroppedAvatarFile(sourceUrl: string, zoom: number, offsetX: number, offsetY: number, sourceName: string) {
@@ -245,6 +297,153 @@ const defaultNameStyle: NameStyle = {
 
 const nameColorPalette = ['#ffd76e', '#f0f4ff', '#ff6f78', '#44de8e', '#65b7ff', '#c793ff', '#ff9f43', '#8ff3ff', '#ffec9f', '#ff8dbd']
 
+const appThemePresets: AppThemePreset[] = [
+  {
+    id: 'midnight',
+    name: 'Midnight Blue',
+    swatch: 'linear-gradient(120deg, #0b1f45, #0a1228)',
+    vars: {
+      bg: '#091225',
+      panel: 'rgba(35, 51, 84, 0.72)',
+      panelStrong: 'rgba(41, 58, 97, 0.92)',
+      border: 'rgba(158, 180, 228, 0.22)',
+      text: '#f0f4ff',
+      muted: '#b3bedf',
+      accent: '#4ba4ff',
+      good: '#34d17b',
+      bad: '#ff6666',
+      bodyRadial: '#11306d',
+      bodyBase: '#070d1d',
+    },
+  },
+  {
+    id: 'pastel-sky',
+    name: 'Pastel Sky',
+    swatch: 'linear-gradient(120deg, #9bc9ff, #cde0ff)',
+    vars: {
+      bg: '#e8f2ff',
+      panel: 'rgba(215, 231, 255, 0.84)',
+      panelStrong: 'rgba(204, 222, 251, 0.95)',
+      border: 'rgba(90, 124, 186, 0.3)',
+      text: '#10213f',
+      muted: '#455e8f',
+      accent: '#2f78f4',
+      good: '#26995e',
+      bad: '#c64c5f',
+      bodyRadial: '#82b7ff',
+      bodyBase: '#dcecff',
+    },
+  },
+  {
+    id: 'pastel-rose',
+    name: 'Pastel Rose',
+    swatch: 'linear-gradient(120deg, #ffd6e8, #ffe6c8)',
+    vars: {
+      bg: '#fff7fb',
+      panel: 'rgba(255, 238, 247, 0.86)',
+      panelStrong: 'rgba(255, 232, 243, 0.96)',
+      border: 'rgba(189, 128, 154, 0.26)',
+      text: '#301c2e',
+      muted: '#6f5470',
+      accent: '#ca5f95',
+      good: '#2a9b71',
+      bad: '#c84e62',
+      bodyRadial: '#ffd3ea',
+      bodyBase: '#fff2f7',
+    },
+  },
+  {
+    id: 'pure-white',
+    name: 'Clean White',
+    swatch: 'linear-gradient(120deg, #ffffff, #f5f7fb)',
+    vars: {
+      bg: '#ffffff',
+      panel: 'rgba(248, 250, 254, 0.92)',
+      panelStrong: 'rgba(242, 246, 252, 0.97)',
+      border: 'rgba(132, 148, 177, 0.26)',
+      text: '#101827',
+      muted: '#4c596f',
+      accent: '#2f6ae8',
+      good: '#248a57',
+      bad: '#bf4558',
+      bodyRadial: '#edf2fa',
+      bodyBase: '#f8fafd',
+    },
+  },
+  {
+    id: 'pure-black',
+    name: 'Graphite Black',
+    swatch: 'linear-gradient(120deg, #161616, #080808)',
+    vars: {
+      bg: '#070707',
+      panel: 'rgba(29, 29, 31, 0.82)',
+      panelStrong: 'rgba(36, 36, 39, 0.93)',
+      border: 'rgba(180, 180, 185, 0.24)',
+      text: '#f7f7f7',
+      muted: '#b9b9bf',
+      accent: '#5f9aff',
+      good: '#39c07a',
+      bad: '#ff6c6c',
+      bodyRadial: '#2a2a2f',
+      bodyBase: '#050505',
+    },
+  },
+  {
+    id: 'golden',
+    name: 'Executive Gold',
+    swatch: 'linear-gradient(120deg, #3f2a08, #d5a12a 55%, #8b6312)',
+    vars: {
+      bg: '#1d1406',
+      panel: 'rgba(82, 57, 17, 0.8)',
+      panelStrong: 'rgba(96, 67, 20, 0.93)',
+      border: 'rgba(237, 200, 112, 0.38)',
+      text: '#fff6dc',
+      muted: '#ebd2a0',
+      accent: '#ffd069',
+      good: '#5de3a0',
+      bad: '#ff8a76',
+      bodyRadial: '#b07e21',
+      bodyBase: '#130b03',
+    },
+  },
+  {
+    id: 'ocean-mint',
+    name: 'Ocean Mint',
+    swatch: 'linear-gradient(120deg, #0f3e4a, #3cb9a0)',
+    vars: {
+      bg: '#062b35',
+      panel: 'rgba(18, 65, 79, 0.78)',
+      panelStrong: 'rgba(22, 74, 88, 0.93)',
+      border: 'rgba(124, 210, 205, 0.28)',
+      text: '#e8fcff',
+      muted: '#a8d8de',
+      accent: '#58d0bd',
+      good: '#6df0b0',
+      bad: '#ff8b86',
+      bodyRadial: '#1d6f7f',
+      bodyBase: '#051a23',
+    },
+  },
+  {
+    id: 'lavender-dusk',
+    name: 'Lavender Dusk',
+    swatch: 'linear-gradient(120deg, #4a3f7a, #8f7ad7)',
+    vars: {
+      bg: '#1d1a33',
+      panel: 'rgba(56, 49, 96, 0.78)',
+      panelStrong: 'rgba(67, 57, 111, 0.93)',
+      border: 'rgba(184, 171, 255, 0.26)',
+      text: '#f3f0ff',
+      muted: '#c8c2eb',
+      accent: '#9f8dff',
+      good: '#63dca8',
+      bad: '#ff7c9b',
+      bodyRadial: '#544a91',
+      bodyBase: '#141026',
+    },
+  },
+]
+
 const defaultUserStats: UserStats = {
   studySeconds: 0,
   gamePlays: {
@@ -266,13 +465,28 @@ const stripeTierLinks: Partial<Record<Exclude<SupporterTier, 'free'>, string>> =
   tier5: (import.meta.env.VITE_STRIPE_LINK_TIER5 || '').trim(),
   tier10: (import.meta.env.VITE_STRIPE_LINK_TIER10 || '').trim(),
 }
+const appContentSource = String(import.meta.env.VITE_CONTENT_SOURCE || 'local')
+  .trim()
+  .toLowerCase()
 
-function toCodeSet(raw: string, sectionNumber: string): CodeSet {
-  const value = raw.trim().toLowerCase()
-  const section = sectionNumber.trim().toLowerCase()
-  if (section.startsWith('hs') || value.includes('health') || value === 'hs') return 'hs'
-  if (section.startsWith('vc') || value.includes('vehicle') || value === 'vc') return 'vehicle'
-  return 'penal'
+function createEmptyEditorItem(): ContentEditorItem {
+  return {
+    id: '',
+    category: 'pc',
+    type: 'code',
+    title: '',
+    question: '',
+    answer: '',
+    tags: [],
+    difficulty: '',
+    codeSection: '',
+    explanation: '',
+    sourceUrl: '',
+    scenario: '',
+    scenarioQuestions: [],
+    keyPoints: [],
+    isPublished: true,
+  }
 }
 
 function shortText(text: string, max = 140) {
@@ -295,6 +509,24 @@ function dedupeSections(sections: CodeSection[]) {
     map.set(`${section.codeSet}|${section.sectionNumber.toLowerCase()}`, section)
   }
   return [...map.values()].sort((a, b) => a.sectionNumber.localeCompare(b.sectionNumber))
+}
+
+function contentItemToSection(item: ContentBankItem): CodeSection | null {
+  const codeSet = categoryToCodeSet(item.category, item.codeSection || '')
+  if (!codeSet) return null
+
+  const sectionNumber = (item.codeSection || item.answer || '').trim()
+  const title = item.title.trim()
+  const text = (item.explanation || item.question || '').trim()
+  if (!sectionNumber || !title) return null
+
+  return {
+    id: item.id.trim() || crypto.randomUUID(),
+    codeSet,
+    sectionNumber,
+    title,
+    text,
+  }
 }
 
 function topEntryPerUser(entries: LeaderboardEntry[]) {
@@ -356,140 +588,191 @@ function buildQuestions(sections: CodeSection[]) {
   return questions
 }
 
-function buildDeck(questions: QuizQuestion[], filter: CodeFilter) {
-  const filtered = filter === 'all' ? questions : questions.filter((question) => question.codeSet === filter)
-  const grouped = new Map<string, QuizQuestion[]>()
+function performanceNeedWorkWeight(stats?: CodePerformance) {
+  const correct = stats?.correctCount ?? 0
+  const incorrect = stats?.incorrectCount ?? 0
+  const attempts = correct + incorrect
+  const errorRate = (incorrect + 1) / (attempts + 2)
+  const streak = stats?.correctStreak ?? 0
 
-  for (const question of shuffle(filtered)) {
-    const existing = grouped.get(question.linkedSectionNumber) ?? []
-    existing.push(question)
-    grouped.set(question.linkedSectionNumber, existing)
+  let weight = 1 + errorRate * 4 + Math.max(0, incorrect - correct * 0.5) * 0.2
+  if (attempts === 0) weight += 0.35
+  if (streak >= 20) weight *= 0.18
+  else if (streak >= 10) weight *= 0.45
+  else if (streak >= 5) weight *= 0.7
+  return Math.max(0.1, Math.min(weight, 7))
+}
+
+function buildAdaptiveFlashcardOrder(
+  flashcards: Flashcard[],
+  performance: Record<string, CodePerformance>,
+) {
+  const baseIds = flashcards.map((card) => card.id)
+  const extraIds: string[] = []
+  for (const card of flashcards) {
+    const key = performanceKey(card.codeSet, card.front)
+    const stats = performance[key]
+    const correct = stats?.correctCount ?? 0
+    const incorrect = stats?.incorrectCount ?? 0
+    const streak = stats?.correctStreak ?? 0
+    const attempts = correct + incorrect
+    const errorRate = (incorrect + 1) / (attempts + 2)
+    let repeats = errorRate >= 0.7 ? 4 : errorRate >= 0.55 ? 3 : errorRate >= 0.4 ? 2 : 1
+    if (streak >= 20) repeats = 1
+    else if (streak >= 10) repeats = Math.max(1, repeats - 1)
+    for (let index = 1; index < repeats; index += 1) extraIds.push(card.id)
   }
 
-  const deck: QuizQuestion[] = []
-  while (grouped.size > 0) {
-    for (const key of shuffle([...grouped.keys()])) {
-      const current = grouped.get(key)
-      if (!current || current.length === 0) {
-        grouped.delete(key)
-        continue
+  const shuffledBase = shuffle(baseIds)
+  const shuffledExtras = shuffle(extraIds)
+  const shuffled = [...shuffledBase]
+  for (let index = 0; index < shuffledExtras.length; index += 1) {
+    const insertAt = Math.min(shuffled.length, 1 + index * 2)
+    shuffled.splice(insertAt, 0, shuffledExtras[index])
+  }
+  for (let index = 1; index < shuffled.length; index += 1) {
+    if (shuffled[index] !== shuffled[index - 1]) continue
+    const swapIndex = shuffled.findIndex((item, candidateIndex) => candidateIndex > index && item !== shuffled[index])
+    if (swapIndex > index) [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]]
+  }
+  return shuffled
+}
+
+function weightedSampleUnique<T>(items: T[], count: number, weightOf: (item: T) => number) {
+  const source = [...items]
+  const result: T[] = []
+  while (source.length > 0 && result.length < count) {
+    const weights = source.map((item) => Math.max(0.01, weightOf(item)))
+    const total = weights.reduce((sum, value) => sum + value, 0)
+    let draw = Math.random() * total
+    let selectedIndex = 0
+    for (let index = 0; index < source.length; index += 1) {
+      draw -= weights[index]
+      if (draw <= 0) {
+        selectedIndex = index
+        break
       }
-      const next = current.shift()
-      if (next) deck.push(next)
-      if (current.length === 0) grouped.delete(key)
     }
+    result.push(source[selectedIndex])
+    source.splice(selectedIndex, 1)
   }
-
-  return deck
+  return result
 }
 
-function parseScenarioStatement(statement: string) {
-  const clean = statement.trim().replace(/\s+/g, ' ')
-  const questionIndex = clean.lastIndexOf('?')
-  if (questionIndex < 0 || questionIndex >= clean.length - 1) {
-    return { prompt: clean, choice: '' }
-  }
-  const prompt = clean.slice(0, questionIndex + 1).trim()
-  const choice = clean.slice(questionIndex + 1).trim()
-  return { prompt, choice }
+function categoryToCodeSet(category: string, codeSection = ''): CodeSet | null {
+  const normalized = category.trim().toLowerCase()
+  const section = codeSection.trim().toLowerCase()
+  if (['pc', 'penal', 'penal code'].includes(normalized)) return 'penal'
+  if (['hs', 'h&s', 'health', 'health & safety', 'health and safety'].includes(normalized)) return 'hs'
+  if (['vc', 'vehicle', 'vehicle code'].includes(normalized)) return 'vehicle'
+  if (section.startsWith('pc')) return 'penal'
+  if (section.startsWith('h&s') || section.startsWith('hs')) return 'hs'
+  if (section.startsWith('vc')) return 'vehicle'
+  return null
 }
 
-function buildScenarioQuestions(rows: SpeedTestQuestion[]) {
-  const grouped = new Map<string, SpeedTestQuestion[]>()
-  for (const row of rows) {
-    const groupId = row.id.replace(/-(t|f)$/i, '')
-    const existing = grouped.get(groupId) ?? []
-    existing.push(row)
-    grouped.set(groupId, existing)
-  }
-
-  const scenarios: ScenarioQuestion[] = []
-
-  for (const [groupId, groupRows] of grouped.entries()) {
-    const pair = groupRows.filter((row) => /-(t|f)$/i.test(row.id))
-    if (pair.length >= 2) {
-      const parsedChoices = pair.map((row) => {
-        const parsed = parseScenarioStatement(row.statement)
-        return { row, prompt: parsed.prompt, choice: parsed.choice || (row.isTrue ? 'True' : 'False') }
-      })
-      const prompt = parsedChoices[0].prompt
-      const shuffledChoices = shuffle(parsedChoices.map((item) => item.choice))
-      const correctChoice = parsedChoices.find((item) => item.row.isTrue)?.choice || parsedChoices[0].choice
-      scenarios.push({
-        id: groupId,
-        codeSet: pair[0].codeSet,
-        prompt,
-        choices: shuffledChoices,
-        correctIndex: Math.max(0, shuffledChoices.indexOf(correctChoice)),
-        explanation: (pair.find((row) => row.isTrue) || pair[0]).explanation,
-      })
-      continue
-    }
-
-    const row = groupRows[0]
-    if (!row) continue
-    scenarios.push({
-      id: groupId,
-      codeSet: row.codeSet,
-      prompt: row.statement.trim(),
-      choices: ['True', 'False'],
-      correctIndex: row.isTrue ? 0 : 1,
-      explanation: row.explanation,
-    })
-  }
-
-  const poolsByCodeSet: Record<CodeSet, string[]> = {
-    penal: [],
-    hs: [],
-    vehicle: [],
-  }
-
-  for (const scenario of scenarios) {
-    const correctChoice = scenario.choices[scenario.correctIndex]?.trim()
-    if (!correctChoice) continue
-    if (!poolsByCodeSet[scenario.codeSet].includes(correctChoice)) {
-      poolsByCodeSet[scenario.codeSet].push(correctChoice)
-    }
-  }
-
-  const globalPool = Array.from(new Set([...poolsByCodeSet.penal, ...poolsByCodeSet.hs, ...poolsByCodeSet.vehicle]))
-  const genericDistractors = [
-    'Detention with reasonable suspicion',
-    'Consensual encounter, no detention',
-    'Probable cause for arrest exists',
-    'Insufficient legal basis for search',
-    'Search lawful under consent exception',
-    'Evidence may be suppressed in court',
+function buildScenarioQuestions(rows: ScenarioBankItem[]) {
+  const fallbackDistractors = [
+    'Document observations only and continue routine contact',
+    'Investigate further using articulable facts and legal authority',
+    'Insufficient facts for immediate enforcement action',
+    'Reassess scene safety and gather additional witness evidence',
   ]
 
   return shuffle(
-    scenarios.map((scenario) => {
-      const correctChoice = scenario.choices[scenario.correctIndex]
-      const sameSetPool = poolsByCodeSet[scenario.codeSet].filter((choice) => choice !== correctChoice)
-      const crossPool = globalPool.filter((choice) => choice !== correctChoice && !sameSetPool.includes(choice))
+    rows.flatMap<ScenarioQuestion>((row) => {
+      const codeSet = categoryToCodeSet(row.category, row.codeSection || '') || 'penal'
+      const prompt = row.scenario.trim()
+      const providedChoices = row.questions.map((item) => item.trim()).filter(Boolean).slice(0, 4)
+      const correctChoice = (row.expectedAnswer || '').trim()
 
-      const distractors: string[] = []
-      for (const choice of shuffle(sameSetPool)) {
-        if (distractors.length >= 3) break
-        if (!distractors.includes(choice)) distractors.push(choice)
-      }
-      for (const choice of shuffle(crossPool)) {
-        if (distractors.length >= 3) break
-        if (!distractors.includes(choice)) distractors.push(choice)
-      }
-      for (const choice of genericDistractors) {
-        if (distractors.length >= 3) break
-        if (choice !== correctChoice && !distractors.includes(choice)) distractors.push(choice)
+      if (providedChoices.length >= 2 && correctChoice && providedChoices.includes(correctChoice)) {
+        const randomizedChoices = shuffle([...providedChoices])
+        return [
+          {
+            id: row.id,
+            codeSet,
+            prompt,
+            choices: randomizedChoices,
+            correctIndex: Math.max(0, randomizedChoices.indexOf(correctChoice)),
+            explanation: row.explanation?.trim() || (row.keyPoints || []).join(' '),
+          },
+        ]
       }
 
-      const finalChoices = shuffle([correctChoice, ...distractors.slice(0, 3)])
-      return {
-        ...scenario,
-        choices: finalChoices,
-        correctIndex: finalChoices.indexOf(correctChoice),
-      }
+      const fallback = correctChoice || row.keyPoints?.[0] || row.title || 'Use the best lawful response.'
+      const distractors = fallbackDistractors
+        .filter((item) => item !== fallback)
+        .slice(0, 3)
+      const choices = shuffle([fallback, ...distractors]).slice(0, 4)
+      return [
+        {
+          id: row.id,
+          codeSet,
+          prompt,
+          choices,
+          correctIndex: Math.max(0, choices.indexOf(fallback)),
+          explanation: row.explanation?.trim() || (row.keyPoints || []).join(' '),
+        },
+      ]
     }),
   )
+}
+
+type FireParticle = {
+  id: number
+  left: string
+  size: number
+  delay: string
+  duration: string
+  drift: string
+}
+
+function streakToFireLevel(streak: number) {
+  return streak >= 100 ? 8 : streak >= 75 ? 7 : streak >= 50 ? 6 : streak >= 40 ? 5 : streak >= 30 ? 4 : streak >= 25 ? 3 : streak >= 10 ? 2 : streak >= 5 ? 1 : 0
+}
+
+function buildFireOption(level: number, hostWidth: number): FireFlameOption | undefined {
+  if (level === 0) return undefined
+  const preset = {
+    1: { particleNum: 18, particleDistance: 10 },
+    2: { particleNum: 28, particleDistance: 11 },
+    3: { particleNum: 40, particleDistance: 12 },
+    4: { particleNum: 54, particleDistance: 13 },
+    5: { particleNum: 70, particleDistance: 15 },
+    6: { particleNum: 88, particleDistance: 17 },
+    7: { particleNum: 108, particleDistance: 19 },
+    8: { particleNum: 132, particleDistance: 21 },
+  } as const
+  const heights = { 1: 120, 2: 132, 3: 146, 4: 160, 5: 176, 6: 194, 7: 214, 8: 236 } as const
+  const current = preset[level as keyof typeof preset]
+  const height = heights[level as keyof typeof heights]
+  const width = Math.max(320, hostWidth || 0)
+  return {
+    painterType: 'canvas',
+    w: width,
+    h: height,
+    x: Math.floor(width / 2),
+    y: height - 1,
+    mousemove: false,
+    innerColor: '#ffe0a4',
+    outerColor: '#ff5a24',
+    ...current,
+  }
+}
+
+function buildFireParticles(level: number): FireParticle[] {
+  if (level === 0) return []
+  const counts = [0, 18, 30, 44, 62, 84, 108, 136, 168]
+  const count = counts[level] ?? 180
+  return Array.from({ length: count }, (_, index) => ({
+    id: index,
+    left: `${(index * 29) % 100}%`,
+    size: 8 + ((index * 5 + level * 3) % 16),
+    delay: `${(index % 20) * 0.045}s`,
+    duration: `${0.9 + ((index * 7 + level) % 10) * 0.12}s`,
+    drift: `${((index % 3) - 1) * (8 + level * 2)}px`,
+  }))
 }
 
 function performanceKey(codeSet: CodeSet, section: string) {
@@ -498,8 +781,54 @@ function performanceKey(codeSet: CodeSet, section: string) {
 
 function mastery(performance?: CodePerformance) {
   if (!performance || performance.correctCount + performance.incorrectCount === 0) return ''
-  if ((performance.correctStreak ?? 0) >= 20) return 'Mastered'
+  const correct = performance.correctCount ?? 0
+  const incorrect = performance.incorrectCount ?? 0
+  const attempts = correct + incorrect
+  const streak = performance.correctStreak ?? 0
+  const accuracy = attempts > 0 ? correct / attempts : 0
+
+  if (streak >= 20) return 'Mastered'
+  if (streak >= 15 || (attempts >= 16 && accuracy >= 0.85)) return 'Almost Mastered'
+  if (streak >= 10 || (attempts >= 10 && accuracy >= 0.7)) return 'On Track'
+  if (streak >= 4 || (attempts >= 5 && accuracy >= 0.55)) return 'Getting There'
   return 'Needs Work'
+}
+
+function masteryBadgeClass(status: MasteryStatus) {
+  if (status === 'Mastered') return 'badge-mastered'
+  if (status === 'Almost Mastered') return 'badge-almost'
+  if (status === 'On Track') return 'badge-track'
+  if (status === 'Getting There') return 'badge-getting'
+  return 'badge-work'
+}
+
+function buildAlgorithmSnapshot(
+  sections: CodeSection[],
+  performance: Record<string, CodePerformance>,
+): Record<string, PersistedAlgorithmStat> {
+  const snapshot: Record<string, PersistedAlgorithmStat> = {}
+  for (const section of sections) {
+    const key = performanceKey(section.codeSet, section.sectionNumber)
+    const stats = performance[key]
+    const correct = stats?.correctCount ?? 0
+    const incorrect = stats?.incorrectCount ?? 0
+    const attempts = correct + incorrect
+    const accuracy = attempts > 0 ? Math.round((correct / attempts) * 100) : 0
+    const needScore = Number(performanceNeedWorkWeight(stats).toFixed(4))
+    snapshot[key] = {
+      codeSet: section.codeSet,
+      sectionNumber: section.sectionNumber,
+      title: section.title,
+      correctCount: correct,
+      incorrectCount: incorrect,
+      attempts,
+      accuracy,
+      correctStreak: stats?.correctStreak ?? 0,
+      needScore,
+      status: mastery(stats),
+    }
+  }
+  return snapshot
 }
 
 function sanitizeNameStyle(input: unknown): NameStyle {
@@ -557,6 +886,20 @@ function sanitizeUserStats(input: unknown): UserStats {
   }
 }
 
+function mostStudiedModeFromStats(stats: UserStats): CodeFilter | null {
+  const ranked: CodeFilter[] = ['penal', 'hs', 'vehicle', 'all']
+  let winner: CodeFilter | null = null
+  let max = 0
+  for (const mode of ranked) {
+    const value = stats.studyModeCounts[mode] || 0
+    if (value > max) {
+      max = value
+      winner = mode
+    }
+  }
+  return max > 0 ? winner : null
+}
+
 function hexToRgba(hex: string, alpha: number) {
   const value = hex.replace('#', '')
   const red = Number.parseInt(value.slice(0, 2), 16)
@@ -580,6 +923,12 @@ function displayNameStyle(nameStyle: NameStyle | undefined, tier: SupporterTier)
   }
 }
 
+function getThemePreset(themeId?: string) {
+  const fallback = appThemePresets[0]
+  if (!themeId) return fallback
+  return appThemePresets.find((theme) => theme.id === themeId) || fallback
+}
+
 function sanitizeState(input: unknown): PersistedState {
   const fallback: PersistedState = {
     performance: {},
@@ -588,6 +937,7 @@ function sanitizeState(input: unknown): PersistedState {
     profileDetails: {
       bio: '',
       agency: '',
+      themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
       stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
@@ -611,13 +961,20 @@ function sanitizeState(input: unknown): PersistedState {
         ? {
             bio: String((state.profileDetails as Partial<ProfileDetails>).bio || ''),
             agency: String((state.profileDetails as Partial<ProfileDetails>).agency || ''),
+            themeId: getThemePreset(String((state.profileDetails as Partial<ProfileDetails>).themeId || appThemePresets[0].id)).id,
             nameStyle: sanitizeNameStyle((state.profileDetails as Partial<ProfileDetails>).nameStyle),
             namePresets: sanitizeNamePresets((state.profileDetails as Partial<ProfileDetails>).namePresets),
             stats: sanitizeUserStats((state.profileDetails as Partial<ProfileDetails>).stats),
+            algorithmSnapshot:
+              (state.profileDetails as Partial<ProfileDetails>).algorithmSnapshot &&
+              typeof (state.profileDetails as Partial<ProfileDetails>).algorithmSnapshot === 'object'
+                ? ((state.profileDetails as Partial<ProfileDetails>).algorithmSnapshot as Record<string, PersistedAlgorithmStat>)
+                : undefined,
           }
         : {
             bio: '',
             agency: '',
+            themeId: appThemePresets[0].id,
             nameStyle: { ...defaultNameStyle },
             namePresets: [],
             stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
@@ -673,7 +1030,82 @@ function mapProfileRow(row: Record<string, unknown>, userId: string): UserProfil
     supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String(row.supporter_tier))
       ? String(row.supporter_tier)
       : 'free') as SupporterTier,
+    isOwner: Boolean(row.is_owner),
   }
+}
+
+function rowToEditorItem(row: Record<string, unknown>): ContentEditorItem | null {
+  const id = String(row.id || '').trim()
+  const category = String(row.category || '').trim().toLowerCase()
+  const type = String(row.type || 'code').trim().toLowerCase()
+  const title = String(row.title || '').trim()
+  if (!id || !category || !title) return null
+  if (!['code', 'scenario', 'question'].includes(type)) return null
+
+  return {
+    id,
+    category,
+    type: type as ContentEditorItem['type'],
+    title,
+    question: String(row.question || '').trim(),
+    answer: String(row.answer || '').trim(),
+    tags: Array.isArray(row.tags) ? row.tags.map((entry) => String(entry).trim()).filter(Boolean) : [],
+    difficulty: String(row.difficulty || '').trim(),
+    codeSection: String(row.code_section || '').trim(),
+    explanation: String(row.explanation || '').trim(),
+    sourceUrl: String(row.source_url || '').trim(),
+    scenario: String(row.scenario || '').trim(),
+    scenarioQuestions: Array.isArray(row.scenario_questions) ? row.scenario_questions.map((entry) => String(entry).trim()).filter(Boolean) : [],
+    keyPoints: Array.isArray(row.key_points) ? row.key_points.map((entry) => String(entry).trim()).filter(Boolean) : [],
+    isPublished: row.is_published === false ? false : true,
+  }
+}
+
+function localBundleToEditorItems(): ContentEditorItem[] {
+  const bundle = loadLocalContentBundle()
+  for (const warning of bundle.warnings) console.warn(warning)
+
+  const codeItems = bundle.codeItems.map(
+    (item): ContentEditorItem => ({
+      id: item.id,
+      category: item.category,
+      type: 'code',
+      title: item.title,
+      question: item.question,
+      answer: item.answer || '',
+      tags: item.tags || [],
+      difficulty: item.difficulty || '',
+      codeSection: item.codeSection || '',
+      explanation: item.explanation || '',
+      sourceUrl: item.sourceUrl || '',
+      scenario: '',
+      scenarioQuestions: [],
+      keyPoints: [],
+      isPublished: true,
+    }),
+  )
+
+  const scenarioEditorItems = bundle.scenarioItems.map(
+    (item): ContentEditorItem => ({
+      id: item.id,
+      category: item.category,
+      type: 'scenario',
+      title: item.title,
+      question: '',
+      answer: item.expectedAnswer || '',
+      tags: item.tags || [],
+      difficulty: item.difficulty || '',
+      codeSection: item.codeSection || '',
+      explanation: item.explanation || '',
+      sourceUrl: item.sourceUrl || '',
+      scenario: item.scenario,
+      scenarioQuestions: item.questions || [],
+      keyPoints: item.keyPoints || [],
+      isPublished: true,
+    }),
+  )
+
+  return [...codeItems, ...scenarioEditorItems]
 }
 
 function tierNameClass(tier: SupporterTier) {
@@ -739,15 +1171,106 @@ function AppIcon({ name, className = '' }: { name: AppIconName; className?: stri
   )
 }
 
+function StatsIcon({ name, className = '' }: { name: StatsIconName; className?: string }) {
+  const commonProps = {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.9,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  }
+
+  if (name === 'overview') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M4 19V9" />
+        <path d="M10 19V5" />
+        <path d="M16 19v-7" />
+        <path d="M22 19v-4" />
+      </svg>
+    )
+  }
+  if (name === 'time') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v4l2.7 1.7" />
+      </svg>
+    )
+  }
+  if (name === 'words') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M4 6h16" />
+        <path d="M4 11h12" />
+        <path d="M4 16h10" />
+        <path d="M18 14v6" />
+        <path d="m15.5 17 2.5-3 2.5 3" />
+      </svg>
+    )
+  }
+  if (name === 'penal') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M12 4v16" />
+        <path d="M6 8h12" />
+        <path d="M7 8 5 13h5" />
+        <path d="m17 8 2 5h-5" />
+      </svg>
+    )
+  }
+  if (name === 'flashcards') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <rect x="5" y="6" width="12" height="10" rx="2" />
+        <path d="M9 4h9a2 2 0 0 1 2 2v9" />
+      </svg>
+    )
+  }
+  if (name === 'scenarios') {
+    return <AppIcon name="scenarios" className={className} />
+  }
+  if (name === 'streak') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M12 3c2 2.2 2.8 4 2.5 5.7-.2 1.2-.9 2.2-2.1 3.3" />
+        <path d="M9.5 9.4c-2 1.8-3 3.4-3 5.3 0 3 2.4 5.3 5.5 5.3s5.5-2.3 5.5-5.3c0-2.1-1.2-3.9-3.5-5.8" />
+      </svg>
+    )
+  }
+  if (name === 'game') {
+    return <AppIcon name="games" className={className} />
+  }
+  return <AppIcon name="study" className={className} />
+}
+
 function App() {
   const location = useLocation()
   const navigate = useNavigate()
 
   const [sections, setSections] = useState<CodeSection[]>([])
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
-  const [speedQuestions, setSpeedQuestions] = useState<SpeedTestQuestion[]>([])
+  const [scenarioItems, setScenarioItems] = useState<ScenarioBankItem[]>([])
   const [activeTab, setActiveTab] = useState<AppTab>('home')
-  const [studyFilter, setStudyFilter] = useState<CodeFilter>('all')
+  const [showStudyFlashSetupModal, setShowStudyFlashSetupModal] = useState(false)
+  const [showStudyTestSetupModal, setShowStudyTestSetupModal] = useState(false)
+  const [studyFlashFilter, setStudyFlashFilter] = useState<CodeFilter>('all')
+  const [studyTestFilter, setStudyTestFilter] = useState<CodeFilter>('all')
+  const [studyTestWrongness, setStudyTestWrongness] = useState<StudyWrongness>('needs_work')
+  const [studyTestAnswerMode, setStudyTestAnswerMode] = useState<StudyAnswerMode>('multiple')
+  const [studyTestQuestionCount, setStudyTestQuestionCount] = useState(20)
+  const [studyFlashSessionOpen, setStudyFlashSessionOpen] = useState(false)
+  const [studyFlashSessionFilter, setStudyFlashSessionFilter] = useState<CodeFilter>('all')
+  const [studyFlashSessionOrder, setStudyFlashSessionOrder] = useState<string[]>([])
+  const [studyFlashSessionIndex, setStudyFlashSessionIndex] = useState(0)
+  const [studyFlashSessionFlipped, setStudyFlashSessionFlipped] = useState(false)
+  const [studyTestSessionOpen, setStudyTestSessionOpen] = useState(false)
+  const [studyTestSessionDone, setStudyTestSessionDone] = useState(false)
+  const [studyTestSessionFilter, setStudyTestSessionFilter] = useState<CodeFilter>('all')
+  const [studyTestSessionTotal, setStudyTestSessionTotal] = useState(0)
+  const [studyTestSessionAnswered, setStudyTestSessionAnswered] = useState(0)
+  const [studyTestSessionCorrect, setStudyTestSessionCorrect] = useState(0)
   const [libraryFilter, setLibraryFilter] = useState<CodeSet>('penal')
 
   const [authReady, setAuthReady] = useState(false)
@@ -769,6 +1292,8 @@ function App() {
   const [accountNewPassword, setAccountNewPassword] = useState('')
   const [accountConfirmPassword, setAccountConfirmPassword] = useState('')
   const [showAccountPassword, setShowAccountPassword] = useState(false)
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false)
+  const [resetConfirmText, setResetConfirmText] = useState('')
   const [authError, setAuthError] = useState('')
   const [authSuccess, setAuthSuccess] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
@@ -776,15 +1301,29 @@ function App() {
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile')
   const [forceProfileSetup, setForceProfileSetup] = useState(false)
   const [profileDetails, setProfileDetails] = useState<ProfileDetails>({
     bio: '',
     agency: '',
+    themeId: appThemePresets[0].id,
     nameStyle: { ...defaultNameStyle },
     namePresets: [],
     stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
   })
   const [newPresetName, setNewPresetName] = useState('')
+  const [editorItems, setEditorItems] = useState<ContentEditorItem[]>([])
+  const [editorLoading, setEditorLoading] = useState(false)
+  const [editorError, setEditorError] = useState('')
+  const [editorSuccess, setEditorSuccess] = useState('')
+  const [editorCategoryFilter, setEditorCategoryFilter] = useState('all')
+  const [editorTypeFilter, setEditorTypeFilter] = useState<'all' | 'code' | 'scenario' | 'question'>('all')
+  const [editorSelectedId, setEditorSelectedId] = useState('')
+  const [editorDraft, setEditorDraft] = useState<ContentEditorItem>(createEmptyEditorItem())
+  const [scenarioAnswerMode, setScenarioAnswerMode] = useState<'choices' | 'truefalse'>('choices')
+  const [scenarioOptionInputs, setScenarioOptionInputs] = useState<string[]>(['', '', '', ''])
+  const [scenarioCorrectChoice, setScenarioCorrectChoice] = useState('')
+  const [contentWarning, setContentWarning] = useState('')
 
   const [performance, setPerformance] = useState<Record<string, CodePerformance>>({})
   const [highScores, setHighScores] = useState(gameHighScoreSeed)
@@ -804,6 +1343,8 @@ function App() {
   const [homeMatchingConfigOpen, setHomeMatchingConfigOpen] = useState(false)
   const [homeSpeedConfigOpen, setHomeSpeedConfigOpen] = useState(false)
   const [homeMasteredInfoOpen, setHomeMasteredInfoOpen] = useState(false)
+  const [assistedLearningEnabled, setAssistedLearningEnabled] = useState(true)
+  const [showAssistedLearningInfo, setShowAssistedLearningInfo] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -812,11 +1353,6 @@ function App() {
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null)
   const [feedback, setFeedback] = useState('')
   const [streak, setStreak] = useState(0)
-  const recentCodesRef = useRef<string[]>([])
-
-  const [flashcardIndex, setFlashcardIndex] = useState(0)
-  const [flashcardOrder, setFlashcardOrder] = useState<string[]>([])
-  const [flipped, setFlipped] = useState(false)
 
   const [matchFilter, setMatchFilter] = useState<CodeFilter>('all')
   const [matchDuration, setMatchDuration] = useState(30)
@@ -855,6 +1391,7 @@ function App() {
   const [scenarioDeck, setScenarioDeck] = useState<ScenarioQuestion[]>([])
   const [scenarioCurrentQuestion, setScenarioCurrentQuestion] = useState<ScenarioQuestion | null>(null)
   const [scenarioResult, setScenarioResult] = useState<string>('')
+  const [scenarioStreak, setScenarioStreak] = useState(0)
   const [gamesMode, setGamesMode] = useState<'matching' | 'speed'>('matching')
   const lastAppStateUpdateRef = useRef(0)
   const highScoresRef = useRef(gameHighScoreSeed)
@@ -863,14 +1400,42 @@ function App() {
   const matchRoundRef = useRef(1)
   const speedScoreRef = useRef(0)
   const speedAnsweredCountRef = useRef(0)
+  const recentSpeedSectionsRef = useRef<string[]>([])
   const quizFireHostRef = useRef<HTMLDivElement | null>(null)
+  const scenarioFireHostRef = useRef<HTMLDivElement | null>(null)
   const scenarioNextRef = useRef<HTMLDivElement | null>(null)
   const quizNextRef = useRef<HTMLButtonElement | null>(null)
   const [quizFireWidth, setQuizFireWidth] = useState(0)
+  const [scenarioFireWidth, setScenarioFireWidth] = useState(0)
+  const { isOwner, loading: ownerLoading } = useOwner(currentUserId || null)
+
+  const applyLoadedContentToRuntime = (codeItems: ContentBankItem[], scenarios: ScenarioBankItem[]) => {
+    const sectionsFromItems = codeItems
+      .map((item) => {
+        const section = contentItemToSection(item)
+        if (!section) {
+          console.warn(`[content] skipping item "${item.id}" because it is missing/invalid codeSection or category.`)
+        }
+        return section
+      })
+      .filter((item): item is CodeSection => Boolean(item))
+    const finalSections = dedupeSections(sectionsFromItems).filter((item) => item.sectionNumber && item.title)
+    setSections(finalSections)
+    setQuestions(buildQuestions(finalSections))
+    setScenarioItems(scenarios)
+  }
 
   useEffect(() => {
     document.title = 'LEO Study'
   }, [])
+
+  useEffect(() => {
+    if (!supabase || !currentUserId || !isOwner) {
+      setEditorItems([])
+      return
+    }
+    void loadOwnerEditorItems()
+  }, [currentUserId, isOwner])
 
   useEffect(() => {
     const pendingSetup = window.localStorage.getItem('pending_profile_setup') === '1'
@@ -901,36 +1466,124 @@ function App() {
   }, [profileMenuOpen])
 
   useEffect(() => {
-    const loadCodes = async () => {
-      const files = ['/data/ca_codes_seed.json', '/data/ca_penal_codes_pdf_seed.json', '/data/ca_vehicle_codes_pdf_seed.json']
-      const responses = await Promise.all(files.map((file) => fetch(file).then((result) => (result.ok ? result.json() : []))))
-      const merged = (responses.flat() as Array<Record<string, unknown>>).map((entry) => {
-        const sectionNumber = String(entry.sectionNumber ?? '').trim()
-        return {
-          id: crypto.randomUUID(),
-          codeSet: toCodeSet(String(entry.codeSet ?? ''), sectionNumber),
-          sectionNumber,
-          title: String(entry.title ?? ''),
-          text: String(entry.text ?? ''),
-        } satisfies CodeSection
-      })
-      const finalSections = dedupeSections(merged).filter((item) => item.sectionNumber && item.title)
-      setSections(finalSections)
-      setQuestions(buildQuestions(finalSections))
+    const loadFromSupabase = async () => {
+      if (!supabase) throw new Error('supabase client is not configured')
+      const { data: rows, error } = await supabase
+        .from('content_items')
+        .select('*')
+        .eq('is_published', true)
+        .order('updated_at', { ascending: false })
+
+      if (error) throw new Error(error.message || 'failed loading content_items from supabase')
+
+      const codeItems = (rows || []).reduce<ContentBankItem[]>((accumulator, row, index) => {
+        const value = row as Record<string, unknown>
+        const type = String(value.type || 'code').trim().toLowerCase()
+        if (type === 'scenario') return accumulator
+
+        const id = String(value.id || '').trim()
+        const category = String(value.category || '').trim().toLowerCase()
+        const title = String(value.title || '').trim()
+        const question = String(value.question || '').trim()
+        if (!id || !category || !title || !question) {
+          console.warn(`[content] supabase content_items(code)[${index}] missing required fields, skipping.`)
+          return accumulator
+        }
+
+        accumulator.push({
+          id,
+          category,
+          title,
+          question,
+          answer: String(value.answer || '').trim() || undefined,
+          tags: Array.isArray(value.tags) ? value.tags.map((entry) => String(entry).trim()).filter(Boolean) : [],
+          difficulty: String(value.difficulty || '').trim() || undefined,
+          codeSection: String(value.code_section || '').trim() || undefined,
+          explanation: String(value.explanation || '').trim() || undefined,
+          sourceUrl: String(value.source_url || '').trim() || undefined,
+        })
+        return accumulator
+      }, [])
+
+      const scenarios = (rows || []).reduce<ScenarioBankItem[]>((accumulator, row, index) => {
+        const value = row as Record<string, unknown>
+        const type = String(value.type || 'code').trim().toLowerCase()
+        if (type !== 'scenario') return accumulator
+
+        const id = String(value.id || '').trim()
+        const category = String(value.category || 'scenario').trim().toLowerCase()
+        const title = String(value.title || '').trim()
+        const scenario = String(value.scenario || '').trim()
+        const questions = Array.isArray(value.scenario_questions)
+          ? value.scenario_questions.map((entry) => String(entry).trim()).filter(Boolean)
+          : []
+        if (!id || !category || !title || !scenario || questions.length === 0) {
+          console.warn(`[content] supabase content_items(scenario)[${index}] missing required fields, skipping.`)
+          return accumulator
+        }
+
+        accumulator.push({
+          id,
+          category,
+          title,
+          scenario,
+          questions,
+          expectedAnswer: String(value.answer || '').trim() || undefined,
+          keyPoints: Array.isArray(value.key_points) ? value.key_points.map((entry) => String(entry).trim()).filter(Boolean) : [],
+          tags: Array.isArray(value.tags) ? value.tags.map((entry) => String(entry).trim()).filter(Boolean) : [],
+          difficulty: String(value.difficulty || '').trim() || undefined,
+          codeSection: String(value.code_section || '').trim() || undefined,
+          explanation: String(value.explanation || '').trim() || undefined,
+          sourceUrl: String(value.source_url || '').trim() || undefined,
+        })
+        return accumulator
+      }, [])
+
+      if (codeItems.length === 0 && scenarios.length === 0) throw new Error('content_items is empty')
+      return { codeItems, scenarios }
     }
 
-    loadCodes().catch(() => {
+    const loadContent = async () => {
+      if (appContentSource === 'supabase') {
+        try {
+          const supabaseContent = await loadFromSupabase()
+          setContentWarning('')
+          applyLoadedContentToRuntime(supabaseContent.codeItems, supabaseContent.scenarios)
+          return
+        } catch (error) {
+          console.warn('[content] supabase content unavailable, falling back to local content.', error)
+          setContentWarning('Content editor source unavailable, using local content fallback.')
+        }
+      } else {
+        setContentWarning('')
+      }
+
+      const localBundle = loadLocalContentBundle()
+      for (const warning of localBundle.warnings) console.warn(warning)
+      applyLoadedContentToRuntime(localBundle.codeItems, localBundle.scenarioItems)
+    }
+
+    loadContent().catch((error) => {
+      console.warn('[content] failed to load content source.', error)
       setSections([])
       setQuestions([])
+      setScenarioItems([])
+      setContentWarning('Could not load content source. Check local content files.')
     })
   }, [])
 
   useEffect(() => {
     const measure = () => {
-      const host = quizFireHostRef.current
-      if (!host) return
-      const width = Math.floor(host.getBoundingClientRect().width)
-      if (width > 0) setQuizFireWidth(width)
+      const quizHost = quizFireHostRef.current
+      if (quizHost) {
+        const width = Math.floor(quizHost.getBoundingClientRect().width)
+        if (width > 0) setQuizFireWidth(width)
+      }
+      const scenarioHost = scenarioFireHostRef.current
+      if (scenarioHost) {
+        const width = Math.floor(scenarioHost.getBoundingClientRect().width)
+        if (width > 0) setScenarioFireWidth(width)
+      }
     }
     measure()
     const raf = window.requestAnimationFrame(measure)
@@ -965,29 +1618,6 @@ function App() {
     speedAnsweredCountRef.current = speedAnsweredCount
   }, [speedAnsweredCount])
 
-  useEffect(() => {
-    const loadSpeedQuestions = async () => {
-      const response = await fetch('/data/speed_test_questions.json')
-      if (!response.ok) throw new Error('missing speed test seed')
-      const rows = (await response.json()) as Array<Record<string, unknown>>
-      const mapped = rows
-        .map(
-          (row) =>
-            ({
-              id: String(row.id || crypto.randomUUID()),
-              codeSet: (['penal', 'hs', 'vehicle'].includes(String(row.codeSet)) ? String(row.codeSet) : 'penal') as CodeSet,
-              statement: String(row.statement || ''),
-              isTrue: Boolean(row.isTrue),
-              explanation: String(row.explanation || ''),
-            }) satisfies SpeedTestQuestion,
-        )
-        .filter((row) => row.statement.length > 0)
-      setSpeedQuestions(mapped)
-    }
-
-    loadSpeedQuestions().catch(() => setSpeedQuestions([]))
-  }, [])
-
   const refreshLeaderboard = async () => {
     if (!supabase) return
 
@@ -1006,6 +1636,10 @@ function App() {
     const userIds = [...new Set(rows.map((entry) => String(entry.user_id)))]
     let profilesByUserId: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
     let detailsByUserId: Record<string, ProfileDetails> = {}
+    let masteredCodesByUserId: Record<string, number> = {}
+    let studySecondsByUserId: Record<string, number> = {}
+    let mostStudiedModeByUserId: Record<string, CodeFilter | null> = {}
+    let ownerUserIds = new Set<string>()
 
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
@@ -1029,6 +1663,7 @@ function App() {
         accumulator[String(entry.user_id)] = {
           bio: String(entry.bio || ''),
           agency: String(entry.agency || ''),
+          themeId: appThemePresets[0].id,
           nameStyle: { ...defaultNameStyle },
           namePresets: [],
           stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
@@ -1038,15 +1673,17 @@ function App() {
 
       const { data: appStates } = await supabase
         .from('app_state')
-        .select('user_id,profile_details')
+        .select('user_id,profile_details,performance')
         .in('user_id', userIds)
       for (const row of appStates || []) {
         const userId = String(row.user_id || '')
         if (!userId) continue
-        const details = sanitizeState({ profileDetails: row.profile_details }).profileDetails
+        const parsed = sanitizeState({ profileDetails: row.profile_details, performance: row.performance })
+        const details = parsed.profileDetails
         const existing = detailsByUserId[userId] ?? {
           bio: '',
           agency: '',
+          themeId: appThemePresets[0].id,
           nameStyle: { ...defaultNameStyle },
           namePresets: [],
           stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
@@ -1054,11 +1691,22 @@ function App() {
         detailsByUserId[userId] = {
           bio: existing.bio || details.bio,
           agency: existing.agency || details.agency,
+          themeId: details.themeId || existing.themeId,
           nameStyle: details.nameStyle,
           namePresets: details.namePresets,
           stats: details.stats,
         }
+        masteredCodesByUserId[userId] = Object.values(parsed.performance).filter((item) => mastery(item) === 'Mastered').length
+        studySecondsByUserId[userId] = details.stats.studySeconds
+        mostStudiedModeByUserId[userId] = mostStudiedModeFromStats(details.stats)
       }
+
+      const { data: roleRows } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'owner')
+        .in('user_id', userIds)
+      ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
     }
 
     const mapped = rows.map(
@@ -1072,7 +1720,7 @@ function App() {
         bio: detailsByUserId[String(entry.user_id)]?.bio || '',
         agency: detailsByUserId[String(entry.user_id)]?.agency || '',
         nameStyle: detailsByUserId[String(entry.user_id)]?.nameStyle || { ...defaultNameStyle },
-        isOwner: isOwnerIdentity(profilesByUserId[String(entry.user_id)]?.username || ''),
+        isOwner: ownerUserIds.has(String(entry.user_id || '')),
         matchDuration: typeof entry.match_duration === 'number' ? entry.match_duration : null,
         matchFilter: (['all', 'penal', 'hs', 'vehicle'].includes(String(entry.match_filter))
           ? String(entry.match_filter)
@@ -1080,6 +1728,9 @@ function App() {
         score: Number(entry.score || 0),
         round: Number(entry.round || 0),
         createdAt: Date.parse(String(entry.created_at || '')) || Date.now(),
+        masteredCodes: masteredCodesByUserId[String(entry.user_id)] || 0,
+        studySeconds: studySecondsByUserId[String(entry.user_id)] || 0,
+        mostStudiedMode: mostStudiedModeByUserId[String(entry.user_id)] || null,
       }),
     )
 
@@ -1109,6 +1760,7 @@ function App() {
 
     const userIds = [...new Set(states.map((entry) => String(entry.user_id || '')))].filter(Boolean)
     let profileMap: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
+    let ownerUserIds = new Set<string>()
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')
@@ -1122,6 +1774,13 @@ function App() {
         }
         return accumulator
       }, {})
+
+      const { data: roleRows } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'owner')
+        .in('user_id', userIds)
+      ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
     }
 
     const studyRows: HomeLeaderboardEntry[] = []
@@ -1131,6 +1790,9 @@ function App() {
       if (!userId) continue
       const parsed = sanitizeState({ profileDetails: row.profile_details, performance: row.performance })
       const profile = profileMap[userId] || { username: 'Player', avatarUrl: defaultAvatarUrl, supporterTier: 'free' as SupporterTier }
+      const masteredCount = Object.values(parsed.performance).filter((item) => mastery(item) === 'Mastered').length
+      const studySeconds = parsed.profileDetails.stats.studySeconds
+      const mostStudiedMode = mostStudiedModeFromStats(parsed.profileDetails.stats)
       studyRows.push({
         userId,
         playerName: profile.username,
@@ -1139,10 +1801,12 @@ function App() {
         nameStyle: parsed.profileDetails.nameStyle,
         bio: parsed.profileDetails.bio,
         agency: parsed.profileDetails.agency,
-        isOwner: isOwnerIdentity(profile.username),
-        value: parsed.profileDetails.stats.studySeconds,
+        isOwner: ownerUserIds.has(userId),
+        value: studySeconds,
+        masteredCodes: masteredCount,
+        studySeconds,
+        mostStudiedMode,
       })
-      const masteredCount = Object.values(parsed.performance).filter((item) => mastery(item) === 'Mastered').length
       masteredRows.push({
         userId,
         playerName: profile.username,
@@ -1151,8 +1815,11 @@ function App() {
         nameStyle: parsed.profileDetails.nameStyle,
         bio: parsed.profileDetails.bio,
         agency: parsed.profileDetails.agency,
-        isOwner: isOwnerIdentity(profile.username),
+        isOwner: ownerUserIds.has(userId),
         value: masteredCount,
+        masteredCodes: masteredCount,
+        studySeconds,
+        mostStudiedMode,
       })
     }
 
@@ -1223,7 +1890,7 @@ function App() {
         setProfileUsername(mapped.username)
         setForceProfileSetup(false)
       } else {
-        setProfile({ userId: currentUserId, username: '', avatarPath: '', avatarUrl: defaultAvatarUrl, supporterTier: 'free' })
+        setProfile({ userId: currentUserId, username: '', avatarPath: '', avatarUrl: defaultAvatarUrl, supporterTier: 'free', isOwner: false })
         setProfileUsername('')
         setForceProfileSetup(true)
       }
@@ -1253,6 +1920,7 @@ function App() {
       setProfileDetails({
         bio: profileBio || nextState.profileDetails.bio,
         agency: profileAgency || nextState.profileDetails.agency,
+        themeId: nextState.profileDetails.themeId,
         nameStyle: nextState.profileDetails.nameStyle,
         namePresets: nextState.profileDetails.namePresets,
         stats: nextState.profileDetails.stats,
@@ -1273,6 +1941,7 @@ function App() {
 
     const timeout = setTimeout(() => {
       void (async () => {
+        const algorithmSnapshot = buildAlgorithmSnapshot(sections, performance)
         const { data } = await client
           .from('app_state')
           .upsert(
@@ -1281,7 +1950,10 @@ function App() {
               performance,
               high_scores: highScores,
               best_streak: bestStreak,
-              profile_details: profileDetails,
+              profile_details: {
+                ...profileDetails,
+                algorithmSnapshot,
+              },
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'user_id' },
@@ -1295,7 +1967,7 @@ function App() {
     }, 500)
 
     return () => clearTimeout(timeout)
-  }, [currentUserId, stateHydrated, performance, highScores, bestStreak, profileDetails])
+  }, [currentUserId, stateHydrated, performance, highScores, bestStreak, profileDetails, sections])
 
   useEffect(() => {
     if (!supabase || !currentUserId) return
@@ -1334,6 +2006,7 @@ function App() {
           setProfileDetails((previous) => ({
             bio: String(row.bio || ''),
             agency: String(row.agency || ''),
+            themeId: previous.themeId,
             nameStyle: previous.nameStyle,
             namePresets: previous.namePresets,
             stats: previous.stats,
@@ -1369,27 +2042,27 @@ function App() {
     [sections, libraryFilter],
   )
 
-  const filteredFlashcards = useMemo(() => {
-    const list = studyFilter === 'all' ? sections : sections.filter((section) => section.codeSet === studyFilter)
+  const studyFlashSessionCards = useMemo(() => {
+    const list = studyFlashSessionFilter === 'all'
+      ? sections
+      : sections.filter((section) => section.codeSet === studyFlashSessionFilter)
     return list.map(
       (section) =>
         ({
           id: section.id,
           codeSet: section.codeSet,
           front: section.sectionNumber,
-          back: `${section.title}\n\n${shortText(section.text, 220)}`,
+          back: `${section.title}\n\n${shortText(section.text, 260)}`,
         }) satisfies Flashcard,
     )
-  }, [sections, studyFilter])
-
-  const orderedFlashcards = useMemo(() => {
-    if (filteredFlashcards.length === 0) return []
-    if (flashcardOrder.length === 0) return filteredFlashcards
-    const byId = new Map(filteredFlashcards.map((card) => [card.id, card]))
-    const ordered = flashcardOrder.map((id) => byId.get(id)).filter(Boolean) as Flashcard[]
-    if (ordered.length !== filteredFlashcards.length) return filteredFlashcards
-    return ordered
-  }, [filteredFlashcards, flashcardOrder])
+  }, [sections, studyFlashSessionFilter])
+  const orderedStudyFlashSessionCards = useMemo(() => {
+    if (studyFlashSessionCards.length === 0) return []
+    if (studyFlashSessionOrder.length === 0) return studyFlashSessionCards
+    const byId = new Map(studyFlashSessionCards.map((card) => [card.id, card]))
+    const ordered = studyFlashSessionOrder.map((id) => byId.get(id)).filter(Boolean) as Flashcard[]
+    return ordered.length > 0 ? ordered : studyFlashSessionCards
+  }, [studyFlashSessionCards, studyFlashSessionOrder])
 
   const matchingLeaderboard = useMemo(
     () =>
@@ -1441,47 +2114,174 @@ function App() {
     const base = questions.filter((question) => question.prompt.startsWith('Which section number matches:'))
     return speedFilter === 'all' ? base : base.filter((question) => question.codeSet === speedFilter)
   }, [questions, speedFilter])
-  const scenarioQuestionBank = useMemo(() => buildScenarioQuestions(speedQuestions), [speedQuestions])
+  const scenarioQuestionBank = useMemo(() => buildScenarioQuestions(scenarioItems), [scenarioItems])
 
-  useEffect(() => {
-    const nextOrder = shuffle(filteredFlashcards.map((card) => card.id))
-    setFlashcardOrder(nextOrder)
-    setFlashcardIndex(0)
-    setFlipped(false)
-  }, [studyFilter, filteredFlashcards])
+  const buildStudyTestDeck = (
+    filter: CodeFilter,
+    wrongness: StudyWrongness,
+    answerMode: StudyAnswerMode,
+    questionCount: number,
+  ) => {
+    const pool = questions.filter((question) => filter === 'all' || question.codeSet === filter)
+    if (pool.length === 0) return []
+    const uniqueSections = Array.from(new Set(pool.map((question) => question.linkedSectionNumber.toLowerCase())))
+    const sectionNeedMap = new Map<string, number>()
 
-  const setNextQuizQuestion = (forceRebuild = false) => {
-    const recentSections = recentCodesRef.current
-    const sourceDeck = forceRebuild || quizDeck.length === 0 ? buildDeck(questions, studyFilter) : quizDeck
-    if (sourceDeck.length === 0) {
+    for (const sectionId of uniqueSections) {
+      const question = pool.find((entry) => entry.linkedSectionNumber.toLowerCase() === sectionId)
+      if (!question) continue
+      const stats = performance[performanceKey(question.codeSet, question.linkedSectionNumber)]
+      const correct = stats?.correctCount ?? 0
+      const incorrect = stats?.incorrectCount ?? 0
+      const attempts = correct + incorrect
+      const errorRate = attempts > 0 ? incorrect / attempts : 0.45
+      const streakPenalty = Math.max(0, 1 - (stats?.correctStreak ?? 0) / 20)
+      let score = 1 + errorRate * 3 + streakPenalty * 0.6
+      if ((stats?.correctStreak ?? 0) >= 20) score = 0.15
+      if (attempts === 0) score *= 0.72
+      sectionNeedMap.set(sectionId, Math.max(0.1, score))
+    }
+
+    let candidatePool = [...pool]
+    if (wrongness !== 'balanced' && sectionNeedMap.size > 0) {
+      const rankedSections = [...sectionNeedMap.entries()].sort((left, right) => right[1] - left[1]).map(([key]) => key)
+      const sectionTarget =
+        wrongness === 'most_needs_work'
+          ? Math.max(6, Math.ceil(rankedSections.length * 0.3))
+          : Math.max(10, Math.ceil(rankedSections.length * 0.6))
+      const focusSections = new Set(rankedSections.slice(0, sectionTarget))
+      const focused = pool.filter((question) => focusSections.has(question.linkedSectionNumber.toLowerCase()))
+      if (focused.length > 0) candidatePool = focused
+    }
+
+    const uniqueTarget = Math.max(1, Math.min(questionCount, candidatePool.length))
+    const selected =
+      wrongness === 'balanced'
+        ? shuffle(candidatePool).slice(0, uniqueTarget)
+        : weightedSampleUnique(candidatePool, uniqueTarget, (question) => {
+            const score = sectionNeedMap.get(question.linkedSectionNumber.toLowerCase()) ?? 1
+            return wrongness === 'most_needs_work' ? score * score : score
+          })
+
+    const grouped = new Map<string, QuizQuestion[]>()
+    for (const question of shuffle(selected.length > 0 ? selected : candidatePool)) {
+      const key = question.linkedSectionNumber.toLowerCase()
+      const existing = grouped.get(key) ?? []
+      existing.push(question)
+      grouped.set(key, existing)
+    }
+
+    const sectionOrder = [...grouped.keys()].sort(
+      (left, right) => (sectionNeedMap.get(right) ?? 1) - (sectionNeedMap.get(left) ?? 1),
+    )
+    const roundRobin: QuizQuestion[] = []
+    while (grouped.size > 0) {
+      for (const sectionId of sectionOrder) {
+        const bucket = grouped.get(sectionId)
+        if (!bucket || bucket.length === 0) {
+          grouped.delete(sectionId)
+          continue
+        }
+        const next = bucket.shift()
+        if (next) roundRobin.push(next)
+        if (bucket.length === 0) grouped.delete(sectionId)
+      }
+    }
+
+    if (roundRobin.length > 1 && roundRobin[0].linkedSectionNumber === roundRobin[roundRobin.length - 1].linkedSectionNumber) {
+      ;[roundRobin[0], roundRobin[1]] = [roundRobin[1], roundRobin[0]]
+    }
+
+    const deck: QuizQuestion[] = []
+    const seed = roundRobin.length > 0 ? roundRobin : shuffle(candidatePool)
+    for (let index = 0; index < questionCount; index += 1) {
+      const question = seed[index % seed.length]
+      if (!question) break
+      if (answerMode === 'multiple') {
+        const randomizedChoices = shuffle([...question.choices])
+        deck.push({
+          ...question,
+          id: `${question.id}-mc-${index}`,
+          choices: randomizedChoices,
+          correctIndex: randomizedChoices.indexOf(question.choices[question.correctIndex]),
+        })
+        continue
+      }
+
+      const correctStatement = question.choices[question.correctIndex]
+      const incorrectPool = question.choices.filter((_, choiceIndex) => choiceIndex !== question.correctIndex)
+      const useTrue = Math.random() < 0.5 || incorrectPool.length === 0
+      const statement = useTrue ? correctStatement : incorrectPool[Math.floor(Math.random() * incorrectPool.length)]
+      deck.push({
+        id: `${question.id}-tf-${index}`,
+        codeSet: question.codeSet,
+        linkedSectionNumber: question.linkedSectionNumber,
+        prompt: `${question.prompt}\n\nStatement: ${statement}`,
+        choices: ['True', 'False'],
+        correctIndex: useTrue ? 0 : 1,
+        explanation: `${question.explanation} ${useTrue ? 'This statement is true.' : 'This statement is false.'}`,
+      })
+    }
+    return deck
+  }
+
+  const beginStudyFlashcards = () => {
+    const cards = studyFlashFilter === 'all'
+      ? sections
+      : sections.filter((section) => section.codeSet === studyFlashFilter)
+    if (cards.length === 0) return
+    const flashcards: Flashcard[] = cards.map((section) => ({
+      id: section.id,
+      codeSet: section.codeSet,
+      front: section.sectionNumber,
+      back: `${section.title}\n\n${shortText(section.text, 260)}`,
+    }))
+    const order = assistedLearningEnabled
+      ? buildAdaptiveFlashcardOrder(flashcards, performance)
+      : shuffle(flashcards.map((card) => card.id))
+    setStudyFlashSessionFilter(studyFlashFilter)
+    setStudyFlashSessionOrder(order)
+    setStudyFlashSessionIndex(0)
+    setStudyFlashSessionFlipped(false)
+    setShowStudyFlashSetupModal(false)
+    setStudyFlashSessionOpen(true)
+  }
+
+  const beginStudyTest = () => {
+    const deck = buildStudyTestDeck(studyTestFilter, studyTestWrongness, studyTestAnswerMode, studyTestQuestionCount)
+    if (deck.length === 0) {
+      setCurrentQuestion(null)
+      setStudyTestSessionOpen(false)
+      return
+    }
+    const [first, ...remaining] = deck
+    setStudyTestSessionFilter(studyTestFilter)
+    setStudyTestSessionTotal(deck.length)
+    setStudyTestSessionAnswered(0)
+    setStudyTestSessionCorrect(0)
+    setStudyTestSessionDone(false)
+    setShowStudyTestSetupModal(false)
+    setStudyTestSessionOpen(true)
+    setQuizDeck(remaining)
+    setCurrentQuestion(first)
+    setSelectedChoice(null)
+    setFeedback('')
+    setStreak(0)
+  }
+
+  const advanceStudyTestQuestion = () => {
+    if (!studyTestSessionOpen) return
+    if (quizDeck.length === 0) {
+      setStudyTestSessionDone(true)
       setCurrentQuestion(null)
       return
     }
-
-    let picked = sourceDeck.find((question) => !recentSections.includes(question.linkedSectionNumber.toLowerCase()))
-    if (!picked) picked = sourceDeck[0]
-
-    const nextDeck = [...sourceDeck]
-    const index = nextDeck.findIndex((question) => question.id === picked?.id)
-    if (index >= 0) nextDeck.splice(index, 1)
-
-    if (picked) {
-      setCurrentQuestion(picked)
-      setQuizDeck(nextDeck)
-      recentCodesRef.current = [...recentSections, picked.linkedSectionNumber.toLowerCase()].slice(-5)
-      setSelectedChoice(null)
-      setFeedback('')
-    }
-  }
-
-  useEffect(() => {
-    setQuizDeck([])
-    recentCodesRef.current = []
-    setStreak(0)
+    const [next, ...remaining] = quizDeck
+    setCurrentQuestion(next)
+    setQuizDeck(remaining)
     setSelectedChoice(null)
     setFeedback('')
-    setNextQuizQuestion(true)
-  }, [studyFilter, questions])
+  }
 
   useEffect(() => {
     if (!matchRunning) return
@@ -1547,37 +2347,44 @@ function App() {
   const markPerformance = (codeSet: CodeSet, sectionNumber: string, correct: boolean) => {
     const key = performanceKey(codeSet, sectionNumber)
     const current = performance[key] ?? { correctCount: 0, incorrectCount: 0, correctStreak: 0 }
+    const previousStatus = mastery(current)
     const updated: CodePerformance = {
       correctCount: current.correctCount + (correct ? 1 : 0),
       incorrectCount: current.incorrectCount + (correct ? 0 : 1),
       correctStreak: correct ? (current.correctStreak ?? 0) + 1 : 0,
     }
     setPerformance((previous) => ({ ...previous, [key]: updated }))
-    return (current.correctStreak ?? 0) < 20 && (updated.correctStreak ?? 0) >= 20
+    const nextStatus = mastery(updated)
+    return nextStatus !== previousStatus ? nextStatus : ''
   }
 
   const answerQuestion = (index: number) => {
-    if (!currentQuestion || selectedChoice !== null) return
+    if (!studyTestSessionOpen || !currentQuestion || selectedChoice !== null || studyTestSessionDone) return
     setSelectedChoice(index)
     incrementUserStats((stats) => ({
       ...stats,
       studyModeCounts: {
         ...stats.studyModeCounts,
-        [studyFilter]: stats.studyModeCounts[studyFilter] + 1,
+        [studyTestSessionFilter]: stats.studyModeCounts[studyTestSessionFilter] + 1,
       },
     }))
 
     const isCorrect = index === currentQuestion.correctIndex
-    const masteredNow = markPerformance(currentQuestion.codeSet, currentQuestion.linkedSectionNumber, isCorrect)
+    const stageUpdate = markPerformance(currentQuestion.codeSet, currentQuestion.linkedSectionNumber, isCorrect)
+    setStudyTestSessionAnswered((value) => value + 1)
 
     if (isCorrect) {
       const nextStreak = streak + 1
       setStreak(nextStreak)
       setBestStreak((previous) => Math.max(previous, nextStreak))
-      setFeedback(masteredNow ? 'Correct • Mastered this code.' : 'Correct answer.')
+      setStudyTestSessionCorrect((value) => value + 1)
+      setFeedback(stageUpdate ? `Correct • ${stageUpdate}` : 'Correct answer.')
       return
     }
 
+    if (streak > 0) {
+      triggerCelebration('Streak broken', `Quick Quiz streak ended at ${streak}`)
+    }
     setStreak(0)
     setFeedback('Incorrect answer.')
   }
@@ -1652,28 +2459,27 @@ function App() {
   }
 
   const nextSpeedQuestion = (candidateDeck?: QuizQuestion[], previousId?: string) => {
-    const usingProvidedDeck = Array.isArray(candidateDeck)
-    let deck = usingProvidedDeck ? [...candidateDeck] : [...speedDeck]
-    if (!usingProvidedDeck && deck.length === 0) {
-      deck = shuffle(speedSessionQuestions)
-    }
-    if (deck.length === 0) {
+    const source = Array.isArray(candidateDeck) ? candidateDeck : speedSessionQuestions
+    if (source.length === 0) {
       setSpeedCurrentQuestion(null)
       setSpeedDeck([])
       return
     }
+    const deck = shuffle(source)
     if (previousId && deck.length > 1 && deck[0].id === previousId) {
       ;[deck[0], deck[1]] = [deck[1], deck[0]]
     }
     const [next, ...remaining] = deck
-    setSpeedCurrentQuestion(next)
+    setSpeedCurrentQuestion(next || null)
     setSpeedDeck(remaining)
+    if (next) {
+      recentSpeedSectionsRef.current = [...recentSpeedSectionsRef.current, next.linkedSectionNumber.toLowerCase()].slice(-5)
+    }
   }
 
   const startSpeedTest = () => {
     const pool = speedQuestionBank.filter((question) => speedFilter === 'all' || question.codeSet === speedFilter)
-    const initialDeck = shuffle(pool)
-    if (initialDeck.length === 0) {
+    if (pool.length === 0) {
       setSpeedCurrentQuestion(null)
       setSpeedDeck([])
       setSpeedRunning(false)
@@ -1692,7 +2498,8 @@ function App() {
     setSpeedFeedback('')
     setSpeedDone(false)
     setSpeedRunning(true)
-    nextSpeedQuestion(initialDeck)
+    recentSpeedSectionsRef.current = []
+    nextSpeedQuestion(pool)
     incrementUserStats((stats) => ({
       ...stats,
       gamePlays: {
@@ -1754,6 +2561,14 @@ function App() {
     if (!scenarioCurrentQuestion) return
     const isCorrect = choiceIndex === scenarioCurrentQuestion.correctIndex
     incrementUserStats((stats) => ({ ...stats, scenariosReviewed: stats.scenariosReviewed + 1 }))
+    if (isCorrect) {
+      setScenarioStreak((current) => current + 1)
+    } else {
+      if (scenarioStreak > 0) {
+        triggerCelebration('Streak broken', `Scenario streak ended at ${scenarioStreak}`)
+      }
+      setScenarioStreak(0)
+    }
     setScenarioResult(isCorrect ? 'Correct' : `Incorrect • Correct answer: ${scenarioCurrentQuestion.choices[scenarioCurrentQuestion.correctIndex]}`)
   }
 
@@ -1879,6 +2694,7 @@ function App() {
 
   useEffect(() => {
     setScenarioDeck([])
+    setScenarioStreak(0)
     nextScenarioQuestion([])
   }, [scenarioQuestionBank])
 
@@ -2051,7 +2867,10 @@ function App() {
           performance,
           high_scores: highScores,
           best_streak: bestStreak,
-          profile_details: profileDetails,
+          profile_details: {
+            ...profileDetails,
+            algorithmSnapshot: buildAlgorithmSnapshot(sections, performance),
+          },
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' },
@@ -2173,18 +2992,23 @@ function App() {
     setProfileDetails({
       bio: '',
       agency: '',
+      themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
       stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
     })
     setNewPresetName('')
     setStateHydrated(false)
+    recentSpeedSectionsRef.current = []
+    setShowStudyFlashSetupModal(false)
+    setShowStudyTestSetupModal(false)
+    setStudyFlashSessionOpen(false)
+    setStudyTestSessionOpen(false)
+    setStudyTestSessionDone(false)
   }
 
   const resetEverything = async () => {
     if (!currentUserId) return
-    const confirmed = window.confirm('Are you sure you want to reset all scores, progress, and saved study data? This cannot be undone.')
-    if (!confirmed) return
 
     setAuthError('')
     setAuthSuccess('')
@@ -2208,70 +3032,72 @@ function App() {
     setBestStreak(0)
     setQuizDeck([])
     setCurrentQuestion(null)
+    setSelectedChoice(null)
+    setFeedback('')
     setStreak(0)
+    setScenarioDeck([])
+    setScenarioCurrentQuestion(null)
+    setScenarioResult('')
+    setScenarioStreak(0)
     setMatchDone(false)
     setMatchRunning(false)
+    setMatchCards([])
+    setSelectedCards([])
+    setWrongCardIds([])
+    setMatchedPairIds([])
+    setRecentMatchSections([])
+    setMatchRemaining(matchDuration)
     setSpeedDone(false)
     setSpeedRunning(false)
+    setSpeedDeck([])
+    setSpeedSessionQuestions([])
+    setSpeedCurrentQuestion(null)
+    setSpeedRemaining(speedDuration)
+    setSpeedFeedback('')
     setSpeedScore(0)
     setSpeedAnsweredCount(0)
     setMatchScore(0)
     setMatchRound(1)
+    setShowStudyFlashSetupModal(false)
+    setShowStudyTestSetupModal(false)
+    setStudyFlashSessionOpen(false)
+    setStudyTestSessionOpen(false)
+    setStudyTestSessionDone(false)
+    setStudyTestSessionAnswered(0)
+    setStudyTestSessionCorrect(0)
+    setStudyTestSessionTotal(0)
+    setStudyFlashSessionIndex(0)
+    setStudyFlashSessionOrder([])
+    setStudyFlashSessionFlipped(false)
     setProfileDetails((previous) => ({
       ...previous,
       namePresets: [],
       stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
     }))
-    recentCodesRef.current = []
+    recentSpeedSectionsRef.current = []
     await refreshLeaderboard()
     await refreshHomeLeaderboards()
     setAuthSuccess('All scores and progress were reset.')
     setTimeout(() => setAuthSuccess(''), 1800)
+    setShowResetConfirmModal(false)
+    setResetConfirmText('')
     setAuthLoading(false)
   }
 
-  const fireLevel = streak >= 100 ? 8 : streak >= 75 ? 7 : streak >= 50 ? 6 : streak >= 40 ? 5 : streak >= 30 ? 4 : streak >= 25 ? 3 : streak >= 10 ? 2 : streak >= 5 ? 1 : 0
+  const fireLevel = streakToFireLevel(streak)
   const fireOption = useMemo<FireFlameOption | undefined>(() => {
-    if (fireLevel === 0) return undefined
-    const preset = {
-      1: { particleNum: 18, particleDistance: 10 },
-      2: { particleNum: 28, particleDistance: 11 },
-      3: { particleNum: 40, particleDistance: 12 },
-      4: { particleNum: 54, particleDistance: 13 },
-      5: { particleNum: 70, particleDistance: 15 },
-      6: { particleNum: 88, particleDistance: 17 },
-      7: { particleNum: 108, particleDistance: 19 },
-      8: { particleNum: 132, particleDistance: 21 },
-    } as const
-    const heights = { 1: 120, 2: 132, 3: 146, 4: 160, 5: 176, 6: 194, 7: 214, 8: 236 } as const
-    const current = preset[fireLevel as keyof typeof preset]
-    const height = heights[fireLevel as keyof typeof heights]
-    const width = Math.max(320, quizFireWidth || 0)
-    return {
-      painterType: 'canvas',
-      w: width,
-      h: height,
-      x: Math.floor(width / 2),
-      y: height - 1,
-      mousemove: false,
-      innerColor: '#ffe0a4',
-      outerColor: '#ff5a24',
-      ...current,
-    }
+    return buildFireOption(fireLevel, quizFireWidth)
   }, [fireLevel, quizFireWidth])
   const fireParticles = useMemo(() => {
-    if (fireLevel === 0) return []
-    const counts = [0, 18, 30, 44, 62, 84, 108, 136, 168]
-    const count = counts[fireLevel] ?? 180
-    return Array.from({ length: count }, (_, index) => ({
-      id: index,
-      left: `${(index * 29) % 100}%`,
-      size: 8 + ((index * 5 + fireLevel * 3) % 16),
-      delay: `${(index % 20) * 0.045}s`,
-      duration: `${0.9 + ((index * 7 + fireLevel) % 10) * 0.12}s`,
-      drift: `${((index % 3) - 1) * (8 + fireLevel * 2)}px`,
-    }))
+    return buildFireParticles(fireLevel)
   }, [fireLevel])
+  const scenarioFireLevel = streakToFireLevel(scenarioStreak)
+  const scenarioFireOption = useMemo<FireFlameOption | undefined>(() => {
+    return buildFireOption(scenarioFireLevel, scenarioFireWidth || quizFireWidth)
+  }, [scenarioFireLevel, scenarioFireWidth, quizFireWidth])
+  const scenarioFireParticles = useMemo(() => {
+    return buildFireParticles(scenarioFireLevel)
+  }, [scenarioFireLevel])
 
   const currentPath = location.pathname.toLowerCase()
   const isSignInPage = currentPath === '/signin'
@@ -2339,6 +3165,9 @@ function App() {
   }
 
   const canCustomizeName = profile?.supporterTier === 'tier10'
+  const canUseThemes = tierRank(profile?.supporterTier || 'free') >= tierRank('tier5')
+  const selectedTheme = getThemePreset(canUseThemes ? profileDetails.themeId : appThemePresets[0].id)
+  const isLightTheme = ['pure-white', 'pastel-sky', 'pastel-rose'].includes(selectedTheme.id)
   const activeProfileTier: SupporterTier = profile?.supporterTier || 'free'
   const activeProfileName = profile?.username || 'Officer'
   const showHomeButton = !isHomePage
@@ -2349,9 +3178,10 @@ function App() {
     }))
   }
   const triggerCelebration = (title: string, subtitle: string) => {
-    setCelebration({ title, subtitle, burst: Date.now() })
+    const burst = Date.now()
+    setCelebration({ title, subtitle, burst })
     window.setTimeout(() => {
-      setCelebration((current) => (current?.title === title ? null : current))
+      setCelebration((current) => (current?.burst === burst ? null : current))
     }, 2200)
   }
   const avatarFor = (rawValue?: string) => {
@@ -2371,6 +3201,400 @@ function App() {
       image.src = defaultAvatarPngUrl
     }
   }
+  useEffect(() => {
+    const root = document.documentElement
+    const vars = selectedTheme.vars
+    root.style.setProperty('--bg', vars.bg)
+    root.style.setProperty('--panel', vars.panel)
+    root.style.setProperty('--panel-strong', vars.panelStrong)
+    root.style.setProperty('--border', vars.border)
+    root.style.setProperty('--text', vars.text)
+    root.style.setProperty('--muted', vars.muted)
+    root.style.setProperty('--accent', vars.accent)
+    root.style.setProperty('--good', vars.good)
+    root.style.setProperty('--bad', vars.bad)
+    root.style.setProperty('--body-radial', vars.bodyRadial)
+    root.style.setProperty('--body-base', vars.bodyBase)
+  }, [selectedTheme])
+  const loadOwnerEditorItems = async () => {
+    if (!currentUserId || !isOwner) return
+    setEditorLoading(true)
+    setEditorError('')
+    setEditorSuccess('')
+
+    if (!supabase) {
+      setEditorItems(localBundleToEditorItems())
+      setEditorError('Supabase not configured. Showing local content only.')
+      setEditorLoading(false)
+      return
+    }
+
+    const { data, error } = await supabase.from('content_items').select('*').order('updated_at', { ascending: false }).limit(1000)
+    if (error) {
+      setEditorItems(localBundleToEditorItems())
+      setEditorError(`${error.message || 'Could not load content items.'} Showing local fallback content.`)
+      setEditorLoading(false)
+      return
+    }
+
+    const mapped = (data || [])
+      .map((row) => rowToEditorItem(row as Record<string, unknown>))
+      .filter((item): item is ContentEditorItem => Boolean(item))
+
+    if (mapped.length === 0) {
+      setEditorItems(localBundleToEditorItems())
+      setEditorSuccess('No Supabase content yet. Showing local content so you can edit/import.')
+      setEditorLoading(false)
+      return
+    }
+
+    setEditorItems(mapped)
+    setEditorLoading(false)
+  }
+  const selectEditorItem = (item: ContentEditorItem) => {
+    setEditorSelectedId(item.id)
+    setEditorDraft({ ...item })
+    const normalizedOptions = item.scenarioQuestions.slice(0, 4)
+    while (normalizedOptions.length < 4) normalizedOptions.push('')
+    const isTrueFalse =
+      normalizedOptions.filter(Boolean).length === 2 &&
+      normalizedOptions.map((option) => option.trim().toLowerCase()).includes('true') &&
+      normalizedOptions.map((option) => option.trim().toLowerCase()).includes('false')
+    setScenarioAnswerMode(isTrueFalse ? 'truefalse' : 'choices')
+    setScenarioOptionInputs(normalizedOptions)
+    setScenarioCorrectChoice(item.answer || '')
+    setEditorError('')
+    setEditorSuccess('')
+  }
+  const startNewEditorItem = (category?: string) => {
+    const next = createEmptyEditorItem()
+    next.category = category && category !== 'all' ? category : 'pc'
+    setEditorSelectedId('')
+    setEditorDraft(next)
+    setScenarioAnswerMode('choices')
+    setScenarioOptionInputs(['', '', '', ''])
+    setScenarioCorrectChoice('')
+    setEditorError('')
+    setEditorSuccess('')
+  }
+  const saveEditorItem = async () => {
+    if (!supabase || !currentUserId || !isOwner) return
+    setEditorLoading(true)
+    setEditorError('')
+    setEditorSuccess('')
+
+    const id = editorDraft.id.trim() || crypto.randomUUID()
+    const category = editorDraft.category.trim().toLowerCase()
+    const type = editorDraft.type === 'scenario' ? 'scenario' : 'code'
+    const normalizedCodeSection = editorDraft.codeSection.trim()
+    const normalizedName = editorDraft.title.trim()
+    const normalizedDefinition = editorDraft.explanation.trim()
+    const scenarioPrompt = editorDraft.scenario.trim()
+
+    if (!category) {
+      setEditorError('Category is required.')
+      setEditorLoading(false)
+      return
+    }
+
+    const choiceOptions =
+      scenarioAnswerMode === 'truefalse'
+        ? ['True', 'False']
+        : scenarioOptionInputs
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .slice(0, 4)
+
+    const normalizedCorrectChoice = scenarioCorrectChoice.trim()
+    const normalizedCodeSectionKey = normalizedCodeSection.toLowerCase()
+    const normalizedScenarioKey = scenarioPrompt.toLowerCase()
+
+    if (type === 'scenario') {
+      if (!scenarioPrompt) {
+        setEditorError('Scenario text is required for scenario type.')
+        setEditorLoading(false)
+        return
+      }
+      if (choiceOptions.length < 2) {
+        setEditorError('Add at least two answer choices for scenario.')
+        setEditorLoading(false)
+        return
+      }
+      if (!normalizedCorrectChoice || !choiceOptions.includes(normalizedCorrectChoice)) {
+        setEditorError('Pick the correct scenario answer from your choices.')
+        setEditorLoading(false)
+        return
+      }
+    } else {
+      if (!normalizedCodeSection) {
+        setEditorError('Code section is required.')
+        setEditorLoading(false)
+        return
+      }
+      if (!normalizedName) {
+        setEditorError('Name is required.')
+        setEditorLoading(false)
+        return
+      }
+      if (!normalizedDefinition) {
+        setEditorError('Definition is required.')
+        setEditorLoading(false)
+        return
+      }
+    }
+
+    const localDuplicate = editorItems.find((item) => {
+      if (item.id === id) return false
+      if (type === 'scenario') {
+        return item.type === 'scenario' && item.category === category && item.scenario.trim().toLowerCase() === normalizedScenarioKey
+      }
+      return item.type !== 'scenario' && item.category === category && item.codeSection.trim().toLowerCase() === normalizedCodeSectionKey
+    })
+    if (localDuplicate) {
+      setEditorError(
+        type === 'scenario'
+          ? 'Duplicate scenario detected in this category. Please change the scenario text.'
+          : `Duplicate code section detected: ${normalizedCodeSection}.`,
+      )
+      setEditorLoading(false)
+      return
+    }
+
+    if (supabase) {
+      if (type === 'scenario') {
+        const { data: duplicateRows, error: duplicateError } = await supabase
+          .from('content_items')
+          .select('id')
+          .eq('type', 'scenario')
+          .eq('category', category)
+          .eq('scenario', scenarioPrompt)
+          .neq('id', id)
+          .limit(1)
+        if (duplicateError) {
+          setEditorError(duplicateError.message || 'Could not verify duplicate scenario.')
+          setEditorLoading(false)
+          return
+        }
+        if ((duplicateRows || []).length > 0) {
+          setEditorError('Duplicate scenario already exists in Supabase for this category.')
+          setEditorLoading(false)
+          return
+        }
+      } else {
+        const { data: duplicateRows, error: duplicateError } = await supabase
+          .from('content_items')
+          .select('id')
+          .neq('type', 'scenario')
+          .eq('category', category)
+          .eq('code_section', normalizedCodeSection)
+          .neq('id', id)
+          .limit(1)
+        if (duplicateError) {
+          setEditorError(duplicateError.message || 'Could not verify duplicate code section.')
+          setEditorLoading(false)
+          return
+        }
+        if ((duplicateRows || []).length > 0) {
+          setEditorError(`Duplicate code section already exists in Supabase: ${normalizedCodeSection}.`)
+          setEditorLoading(false)
+          return
+        }
+      }
+    }
+
+    const title = type === 'scenario' ? editorDraft.title.trim() || 'Scenario' : normalizedName
+    const question = type === 'scenario' ? `${scenarioPrompt}\n\nChoose the best answer.` : `Which section number matches: ${title}?`
+    const answer = type === 'scenario' ? normalizedCorrectChoice : normalizedCodeSection
+    const explanation = type === 'scenario' ? editorDraft.explanation.trim() || undefined : normalizedDefinition
+
+    const payload = {
+      id,
+      category,
+      type,
+      title,
+      question,
+      answer,
+      tags: [],
+      difficulty: editorDraft.difficulty.trim() || null,
+      code_section: type === 'scenario' ? null : normalizedCodeSection,
+      explanation: explanation || null,
+      source_url: editorDraft.sourceUrl.trim() || null,
+      scenario: type === 'scenario' ? scenarioPrompt : null,
+      scenario_questions: type === 'scenario' ? choiceOptions : [],
+      key_points: [],
+      is_published: editorDraft.isPublished,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { error } = await supabase.from('content_items').upsert(payload, { onConflict: 'id' })
+    if (error) {
+      const message = error.message || 'Could not save content item.'
+      const hint = message.toLowerCase().includes('content_items')
+        ? ' Run /supabase/migrations/20260215_owner_roles_and_content_items.sql first.'
+        : ''
+      setEditorError(`${message}${hint}`)
+      setEditorLoading(false)
+      return
+    }
+
+    setEditorSuccess('Content item saved.')
+    const updatedItem: ContentEditorItem = {
+      ...editorDraft,
+      id,
+      category,
+      type,
+      title,
+      question,
+      answer,
+      tags: [],
+      difficulty: editorDraft.difficulty.trim(),
+      codeSection: type === 'scenario' ? '' : normalizedCodeSection,
+      explanation: explanation || '',
+      sourceUrl: editorDraft.sourceUrl.trim(),
+      scenario: type === 'scenario' ? scenarioPrompt : '',
+      scenarioQuestions: type === 'scenario' ? choiceOptions : [],
+      keyPoints: [],
+      isPublished: editorDraft.isPublished,
+    }
+    setEditorDraft(updatedItem)
+    setEditorSelectedId(id)
+    await loadOwnerEditorItems()
+
+    if (appContentSource === 'supabase') {
+      const mergedItems = editorItems
+        .map((item) => (item.id === id ? updatedItem : item))
+        .concat(editorItems.some((item) => item.id === id) ? [] : [updatedItem])
+      const nextCodeItems = mergedItems
+        .filter((item) => item.isPublished && item.type !== 'scenario')
+        .map(
+          (item) =>
+            ({
+              id: item.id,
+              category: item.category,
+              title: item.title,
+              question: item.question,
+              answer: item.answer || undefined,
+              tags: item.tags,
+              difficulty: item.difficulty || undefined,
+              codeSection: item.codeSection || undefined,
+              explanation: item.explanation || undefined,
+              sourceUrl: item.sourceUrl || undefined,
+            }) satisfies ContentBankItem,
+        )
+      const nextScenarios = mergedItems
+        .filter((item) => item.isPublished && item.type === 'scenario')
+        .map(
+          (item) =>
+            ({
+              id: item.id,
+              category: item.category,
+              title: item.title,
+              scenario: item.scenario,
+              questions: item.scenarioQuestions,
+              expectedAnswer: item.answer || undefined,
+              keyPoints: item.keyPoints,
+              tags: item.tags,
+              difficulty: item.difficulty || undefined,
+              codeSection: item.codeSection || undefined,
+              explanation: item.explanation || undefined,
+              sourceUrl: item.sourceUrl || undefined,
+            }) satisfies ScenarioBankItem,
+        )
+      applyLoadedContentToRuntime(nextCodeItems, nextScenarios)
+    }
+    setEditorLoading(false)
+  }
+  const deleteEditorItem = async (id: string) => {
+    if (!supabase || !currentUserId || !isOwner) return
+    const confirmed = window.confirm('Delete this content item? This cannot be undone.')
+    if (!confirmed) return
+    setEditorLoading(true)
+    setEditorError('')
+    setEditorSuccess('')
+    const { error } = await supabase.from('content_items').delete().eq('id', id)
+    if (error) {
+      const message = error.message || 'Could not delete content item.'
+      const hint = message.toLowerCase().includes('content_items')
+        ? ' Run /supabase/migrations/20260215_owner_roles_and_content_items.sql first.'
+        : ''
+      setEditorError(`${message}${hint}`)
+      setEditorLoading(false)
+      return
+    }
+    const remaining = editorItems.filter((item) => item.id !== id)
+    setEditorItems(remaining)
+    if (editorSelectedId === id) startNewEditorItem(editorCategoryFilter)
+    setEditorSuccess('Content item deleted.')
+    if (appContentSource === 'supabase') {
+      const nextCodeItems = remaining
+        .filter((item) => item.isPublished && item.type !== 'scenario')
+        .map(
+          (item) =>
+            ({
+              id: item.id,
+              category: item.category,
+              title: item.title,
+              question: item.question,
+              answer: item.answer || undefined,
+              tags: item.tags,
+              difficulty: item.difficulty || undefined,
+              codeSection: item.codeSection || undefined,
+              explanation: item.explanation || undefined,
+              sourceUrl: item.sourceUrl || undefined,
+            }) satisfies ContentBankItem,
+        )
+      const nextScenarios = remaining
+        .filter((item) => item.isPublished && item.type === 'scenario')
+        .map(
+          (item) =>
+            ({
+              id: item.id,
+              category: item.category,
+              title: item.title,
+              scenario: item.scenario,
+              questions: item.scenarioQuestions,
+              expectedAnswer: item.answer || undefined,
+              keyPoints: item.keyPoints,
+              tags: item.tags,
+              difficulty: item.difficulty || undefined,
+              codeSection: item.codeSection || undefined,
+              explanation: item.explanation || undefined,
+              sourceUrl: item.sourceUrl || undefined,
+            }) satisfies ScenarioBankItem,
+        )
+      applyLoadedContentToRuntime(nextCodeItems, nextScenarios)
+    }
+    setEditorLoading(false)
+  }
+  const editorCategoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          ['pc', 'hs', 'vc', 'scenario', ...editorItems.map((item) => item.category.trim().toLowerCase()).filter(Boolean)],
+        ),
+      ).sort(),
+    [editorItems],
+  )
+  const filteredEditorItems = useMemo(() => {
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+    return editorItems
+      .filter((item) => {
+        const categoryMatch = editorCategoryFilter === 'all' || item.category === editorCategoryFilter
+        const typeMatch = editorTypeFilter === 'all' || item.type === editorTypeFilter
+        return categoryMatch && typeMatch
+      })
+      .sort((left, right) => {
+        const categoryOrder = collator.compare(left.category, right.category)
+        if (categoryOrder !== 0) return categoryOrder
+        const typeOrder = collator.compare(left.type, right.type)
+        if (typeOrder !== 0) return typeOrder
+        const leftLabel = left.type === 'scenario' ? left.title : left.codeSection || left.title
+        const rightLabel = right.type === 'scenario' ? right.title : right.codeSection || right.title
+        const labelOrder = collator.compare(leftLabel, rightLabel)
+        if (labelOrder !== 0) return labelOrder
+        return collator.compare(left.id, right.id)
+      })
+  }, [editorItems, editorCategoryFilter, editorTypeFilter])
   const openAvatarCropper = (file: File | null) => {
     if (!file) return
     const sourceUrl = URL.createObjectURL(file)
@@ -2418,6 +3642,9 @@ function App() {
       score: entry.value,
       round: 0,
       createdAt: Date.now(),
+      masteredCodes: entry.masteredCodes,
+      studySeconds: entry.studySeconds,
+      mostStudiedMode: entry.mostStudiedMode,
     })
     setSelectedLeaderboardIsTop(isTop)
   }
@@ -2470,7 +3697,6 @@ function App() {
     () => masteredSections.filter((section) => section.codeSet === 'penal').length,
     [masteredSections],
   )
-  const studyHours = Math.floor(profileDetails.stats.studySeconds / 3600)
   const mostPlayedGame = useMemo(() => {
     const entries = Object.entries(profileDetails.stats.gamePlays) as Array<[keyof UserStats['gamePlays'], number]>
     return entries.sort((left, right) => right[1] - left[1])[0]
@@ -2479,9 +3705,83 @@ function App() {
     const entries = Object.entries(profileDetails.stats.studyModeCounts) as Array<[CodeFilter, number]>
     return entries.sort((left, right) => right[1] - left[1])[0]
   }, [profileDetails.stats.studyModeCounts])
+  const studyNeedsSummary = useMemo(() => {
+    const map: Record<CodeSet, { attempts: number; weightedNeed: number; correct: number; incorrect: number }> = {
+      penal: { attempts: 0, weightedNeed: 0, correct: 0, incorrect: 0 },
+      hs: { attempts: 0, weightedNeed: 0, correct: 0, incorrect: 0 },
+      vehicle: { attempts: 0, weightedNeed: 0, correct: 0, incorrect: 0 },
+    }
+
+    for (const section of sections) {
+      const stats = performance[performanceKey(section.codeSet, section.sectionNumber)]
+      const correct = stats?.correctCount ?? 0
+      const incorrect = stats?.incorrectCount ?? 0
+      const attempts = correct + incorrect
+      if (attempts === 0) continue
+      map[section.codeSet].attempts += attempts
+      map[section.codeSet].correct += correct
+      map[section.codeSet].incorrect += incorrect
+      map[section.codeSet].weightedNeed += performanceNeedWorkWeight(stats)
+    }
+
+    return (['penal', 'hs', 'vehicle'] as CodeSet[]).map((codeSet) => {
+      const attempts = map[codeSet].attempts
+      const needScore = attempts > 0 ? map[codeSet].weightedNeed / attempts : 0
+      const accuracyPercent = attempts > 0 ? Math.round((map[codeSet].correct / attempts) * 100) : 0
+      return { codeSet, attempts, needScore, accuracyPercent }
+    }).sort((left, right) => left.accuracyPercent - right.accuracyPercent)
+  }, [sections, performance])
+  const studyFlashSelectionCount = useMemo(
+    () => sections.filter((section) => studyFlashFilter === 'all' || section.codeSet === studyFlashFilter).length,
+    [sections, studyFlashFilter],
+  )
+  const studyTestSelectionCount = useMemo(
+    () => questions.filter((question) => studyTestFilter === 'all' || question.codeSet === studyTestFilter).length,
+    [questions, studyTestFilter],
+  )
+  const algorithmInsights = useMemo(() => {
+    const analyzed = sections.map((section) => {
+      const stats = performance[performanceKey(section.codeSet, section.sectionNumber)]
+      const correct = stats?.correctCount ?? 0
+      const incorrect = stats?.incorrectCount ?? 0
+      const attempts = correct + incorrect
+      const accuracy = attempts > 0 ? correct / attempts : 0
+      const weight = performanceNeedWorkWeight(stats)
+      const masteredState = mastery(stats)
+      return { section, correct, incorrect, attempts, accuracy, weight, masteredState, streak: stats?.correctStreak ?? 0 }
+    })
+
+    const attempted = analyzed.filter((item) => item.attempts > 0)
+    const totalAttempts = attempted.reduce((sum, item) => sum + item.attempts, 0)
+    const averageAccuracy =
+      attempted.length === 0
+        ? 0
+        : attempted.reduce((sum, item) => sum + item.accuracy, 0) / attempted.length
+    const needsMoreWork = attempted.filter((item) => item.masteredState !== 'Mastered' && item.weight >= 2.0)
+    const stabilized = attempted.filter((item) => item.streak >= 5 || item.accuracy >= 0.8)
+    const mastered = analyzed.filter((item) => item.masteredState === 'Mastered')
+    const focusLoadPercent =
+      totalAttempts === 0
+        ? 0
+        : (needsMoreWork.reduce((sum, item) => sum + item.attempts, 0) / totalAttempts) * 100
+    const topFocusCodes = needsMoreWork
+      .sort((left, right) => right.weight - left.weight || left.accuracy - right.accuracy)
+      .slice(0, 5)
+      .map((item) => item.section.sectionNumber)
+
+    return {
+      trackedCodes: attempted.length,
+      averageAccuracy,
+      needsMoreWorkCount: needsMoreWork.length,
+      stabilizedCount: stabilized.length,
+      masteredCount: mastered.length,
+      focusLoadPercent,
+      topFocusCodes,
+    }
+  }, [sections, performance])
 
   return (
-    <div className={`app-shell ${isHomePage ? 'home-page' : ''}`}>
+    <div className={`app-shell ${isHomePage ? 'home-page' : ''} ${isLightTheme ? 'theme-light theme-glass' : ''} ${selectedTheme.id === 'golden' ? 'theme-gold' : ''}`}>
       {!isSupabaseConfigured ? (
         <div className="onboarding-overlay">
           <div className="onboarding-card">
@@ -2704,7 +4004,7 @@ function App() {
             </button>
           ) : null}
           {!isHomePage ? (
-            <h1>{isProfilePage ? 'Profile' : isStatsPage ? 'Stats' : isSupportPage ? 'Support Creator' : activeTab === 'study' ? 'Study' : activeTab === 'library' ? 'Library' : activeTab === 'games' ? 'Games' : 'Scenarios'}</h1>
+            <h1>{isProfilePage ? 'Settings' : isStatsPage ? 'Stats' : isSupportPage ? 'Support Creator' : activeTab === 'study' ? 'Study' : activeTab === 'library' ? 'Library' : activeTab === 'games' ? 'Games' : 'Scenarios'}</h1>
           ) : null}
         </div>
         {profile ? (
@@ -2746,6 +4046,7 @@ function App() {
       ) : null}
 
       <main className="content-area">
+        {contentWarning ? <p className="muted content-warning">{contentWarning}</p> : null}
         {!isProfilePage && !isStatsPage && isHomePage && (
           <section className="home-section">
             <div className="card home-hero">
@@ -2812,7 +4113,7 @@ function App() {
 
             <div className="home-leaderboard-grid">
               <div className="card">
-                <h3>Most Study Hours</h3>
+                <h3>Most Study Time</h3>
                 {homeStudyTimeLeaders.length === 0 ? <p className="muted">No data yet.</p> : homeStudyTimeLeaders.map((entry, index) => (
                   <button
                     key={`home-hours-${entry.userId}-${index}`}
@@ -3064,14 +4365,22 @@ function App() {
             </div>
             <div className="list">
               {filteredSections.map((section) => {
-                const status = mastery(performance[performanceKey(section.codeSet, section.sectionNumber)])
+                const stats = performance[performanceKey(section.codeSet, section.sectionNumber)]
+                const correct = stats?.correctCount ?? 0
+                const incorrect = stats?.incorrectCount ?? 0
+                const attempts = correct + incorrect
+                const accuracy = attempts > 0 ? Math.round((correct / attempts) * 100) : null
+                const status = mastery(stats)
                 return (
                   <article key={section.id} className="section-row">
                     <div>
                       <h3>{section.sectionNumber}</h3>
                       <p>{section.title}</p>
+                      <p className="section-row-meta">
+                        Accuracy: {accuracy === null ? '--' : `${accuracy}%`} • Attempts: {attempts}
+                      </p>
                     </div>
-                    {status ? <span className={`badge ${status === 'Mastered' ? 'badge-mastered' : 'badge-work'}`}>{status}</span> : null}
+                    {status ? <span className={`badge ${masteryBadgeClass(status)}`}>{status}</span> : null}
                   </article>
                 )
               })}
@@ -3080,55 +4389,203 @@ function App() {
         )}
 
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isStudyPage && (
-          <section className="study-section">
-            <div className="segmented">
-              {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                <button key={filter} className={studyFilter === filter ? 'seg active' : 'seg'} onClick={() => setStudyFilter(filter)}>
-                  {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                </button>
-              ))}
+          <section className="study-section study-hub">
+            <div className="assisted-learning-row">
+              <label className="assisted-learning-toggle">
+                <input
+                  type="checkbox"
+                  checked={assistedLearningEnabled}
+                  onChange={(event) => setAssistedLearningEnabled(event.target.checked)}
+                />
+                Assisted Learning
+              </label>
+              <button
+                className="icon-menu-button info-button"
+                onClick={() => setShowAssistedLearningInfo(true)}
+                aria-label="Assisted Learning info"
+              >
+                i
+              </button>
             </div>
-            <p className="muted stats">{(studyFilter === 'all' ? sections : sections.filter((item) => item.codeSet === studyFilter)).length} flashcards</p>
 
-            <h2>Quick Quiz</h2>
-            <div className="quiz-wrap">
-              <div className={`quiz-fire-host level-${fireLevel}`} ref={quizFireHostRef} aria-hidden>
-                {fireOption ? (
-                  <FireFlame key={`quiz-fire-${fireLevel}-${quizFireWidth}`} option={fireOption} />
-                ) : (
-                  <div className="quiz-fire-anchor-line" />
-                )}
-                {fireLevel > 0 ? (
-                  <div className="quiz-fire-particles">
-                    {fireParticles.map((particle) => (
-                      <span
-                        key={`quiz-fire-particle-${particle.id}`}
-                        className="quiz-fire-particle"
-                        style={{
-                          left: particle.left,
-                          width: `${particle.size}px`,
-                          height: `${Math.round(particle.size * 1.5)}px`,
-                          animationDelay: particle.delay,
-                          animationDuration: particle.duration,
-                          ['--particle-drift' as string]: particle.drift,
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-              {fireLevel > 0 ? (
-                <div className="quiz-fire-line-glow" aria-hidden />
-              ) : null}
-              <div className="card quiz-card">
-                <div className="quiz-top">
-                  <span>Best: {bestStreak}</span>
-                  <span>Streak: {streak}</span>
+            <div className="study-actions-grid">
+              <button className="card study-action-card" onClick={() => setShowStudyFlashSetupModal(true)}>
+                <div className="study-action-icon">
+                  <AppIcon name="flashcards" className="button-icon" />
                 </div>
-                {!currentQuestion ? (
-                  <p>No questions available.</p>
-                ) : (
-                  <>
+                <div>
+                  <h3>Flashcards</h3>
+                  <p className="muted">Open a full-screen flashcard session with smart ordering.</p>
+                </div>
+              </button>
+              <button className="card study-action-card" onClick={() => setShowStudyTestSetupModal(true)}>
+                <div className="study-action-icon">
+                  <AppIcon name="study" className="button-icon" />
+                </div>
+                <div>
+                  <h3>Test</h3>
+                  <p className="muted">Build a full-screen test by subject, mode, and length.</p>
+                </div>
+              </button>
+            </div>
+
+            <article className="card study-focus-block">
+              <div className="study-focus-head">
+                <h3>What To Focus On</h3>
+                <p className="muted">Average correct percentage by category.</p>
+              </div>
+              <div className="study-focus-grid">
+                {studyNeedsSummary.map((item, index) => (
+                  <div key={`study-focus-${item.codeSet}`} className="study-focus-item">
+                    <span className="study-focus-rank">#{index + 1}</span>
+                    <div>
+                      <p className="study-focus-title">{codeSetLabel[item.codeSet]}</p>
+                      <p className="study-focus-meta">
+                        {item.attempts > 0
+                          ? `Average correct: ${item.accuracyPercent}%`
+                          : 'Average correct: --'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>
+        )}
+
+        {isStudyPage && studyFlashSessionOpen ? (
+          <div className="study-session-overlay">
+            <div className="study-session-shell">
+              <div className="study-session-top">
+                <button className="secondary" onClick={() => setStudyFlashSessionOpen(false)}>Exit</button>
+                <span>{studyFlashSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyFlashSessionFilter]}</span>
+                <span>
+                  {orderedStudyFlashSessionCards.length > 0 ? studyFlashSessionIndex + 1 : 0}/{orderedStudyFlashSessionCards.length}
+                </span>
+              </div>
+              {orderedStudyFlashSessionCards.length === 0 ? (
+                <div className="card study-session-empty">
+                  <p>No flashcards found for this selection.</p>
+                  <button className="primary" onClick={() => setStudyFlashSessionOpen(false)}>Back</button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    className={studyFlashSessionFlipped ? 'study-session-flashcard flipped' : 'study-session-flashcard'}
+                    onClick={() => setStudyFlashSessionFlipped((value) => !value)}
+                  >
+                    <div className="face front">{orderedStudyFlashSessionCards[studyFlashSessionIndex]?.front}</div>
+                    <div className="face back">{orderedStudyFlashSessionCards[studyFlashSessionIndex]?.back}</div>
+                  </button>
+                  <div className="study-session-actions">
+                    <button
+                      className="secondary study-session-nav"
+                      onClick={() => {
+                        setStudyFlashSessionFlipped(false)
+                        setStudyFlashSessionIndex((current) => {
+                          if (orderedStudyFlashSessionCards.length === 0) return 0
+                          return current === 0 ? orderedStudyFlashSessionCards.length - 1 : current - 1
+                        })
+                        incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }))
+                      }}
+                    >
+                      Previous
+                    </button>
+                    <button className="secondary study-session-nav" onClick={() => setStudyFlashSessionFlipped((value) => !value)}>
+                      Flip
+                    </button>
+                    <button
+                      className="primary study-session-nav"
+                      onClick={() => {
+                        setStudyFlashSessionFlipped(false)
+                        setStudyFlashSessionIndex((current) => {
+                          if (orderedStudyFlashSessionCards.length === 0) return 0
+                          if (current < orderedStudyFlashSessionCards.length - 1) return current + 1
+                          const lastCardId = orderedStudyFlashSessionCards[current]?.id
+                          let reshuffled = shuffle(studyFlashSessionCards.map((card) => card.id))
+                          if (reshuffled.length > 1 && reshuffled[0] === lastCardId) {
+                            ;[reshuffled[0], reshuffled[1]] = [reshuffled[1], reshuffled[0]]
+                          }
+                          setStudyFlashSessionOrder(reshuffled)
+                          return 0
+                        })
+                        incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }))
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {isStudyPage && studyTestSessionOpen ? (
+          <div className="study-session-overlay">
+            <div className="study-session-shell study-test-shell">
+              <div className="study-session-top">
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    setStudyTestSessionOpen(false)
+                    setStudyTestSessionDone(false)
+                    setCurrentQuestion(null)
+                    setQuizDeck([])
+                    setSelectedChoice(null)
+                    setFeedback('')
+                    setStreak(0)
+                  }}
+                >
+                  Exit
+                </button>
+                <span>{studyTestSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyTestSessionFilter]}</span>
+                <span>{studyTestSessionAnswered}/{studyTestSessionTotal}</span>
+              </div>
+
+              {!studyTestSessionDone && currentQuestion ? (
+                <div className="quiz-wrap study-test-quiz-wrap">
+                  <div
+                    className={`quiz-fire-host level-${fireLevel}`}
+                    ref={(node) => {
+                      quizFireHostRef.current = node
+                      if (!node) return
+                      const width = Math.floor(node.getBoundingClientRect().width)
+                      if (width > 0 && width !== quizFireWidth) setQuizFireWidth(width)
+                    }}
+                    aria-hidden
+                  >
+                    {fireOption ? (
+                      <FireFlame key={`quiz-fire-${fireLevel}-${quizFireWidth}`} option={fireOption} />
+                    ) : (
+                      <div className="quiz-fire-anchor-line" />
+                    )}
+                    {fireLevel > 0 ? (
+                      <div className="quiz-fire-particles">
+                        {fireParticles.map((particle) => (
+                          <span
+                            key={`quiz-fire-particle-${particle.id}`}
+                            className="quiz-fire-particle"
+                            style={{
+                              left: particle.left,
+                              width: `${particle.size}px`,
+                              height: `${Math.round(particle.size * 1.5)}px`,
+                              animationDelay: particle.delay,
+                              animationDuration: particle.duration,
+                              ['--particle-drift' as string]: particle.drift,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  {fireLevel > 0 ? <div className="quiz-fire-line-glow" aria-hidden /> : null}
+
+                  <div className="card quiz-card study-test-card">
+                    <div className="quiz-top">
+                      <span>Best: {bestStreak}</span>
+                      <span>Streak: {streak}</span>
+                    </div>
                     <h3>{currentQuestion.prompt}</h3>
                     <div className="choices">
                       {currentQuestion.choices.map((choice, index) => {
@@ -3149,62 +4606,30 @@ function App() {
                       <>
                         <p className={feedback.startsWith('Correct') ? 'good' : 'bad'}>{feedback}</p>
                         <p className="muted">{currentQuestion.explanation}</p>
-                        <button ref={quizNextRef} className="primary" onClick={() => setNextQuizQuestion()}>
+                        <button ref={quizNextRef} className="primary" onClick={advanceStudyTestQuestion}>
                           Next Question
                         </button>
                       </>
                     ) : null}
-                  </>
-                )}
-              </div>
-            </div>
-
-            <h2>Flashcards</h2>
-            <div className="card flashcard-block">
-              {filteredFlashcards.length === 0 ? (
-                <p>No flashcards.</p>
-              ) : (
-                <>
-                  <button className={flipped ? 'flashcard flipped' : 'flashcard'} onClick={() => setFlipped((value) => !value)}>
-                    <div className="face front">{orderedFlashcards[flashcardIndex]?.front}</div>
-                    <div className="face back">{orderedFlashcards[flashcardIndex]?.back}</div>
-                  </button>
-                  <div className="actions-row flashcard-nav">
-                <button
-                  className="secondary flashcard-nav-btn"
-                  onClick={() => {
-                    setFlipped(false)
-                    setFlashcardIndex((current) => (current === 0 ? orderedFlashcards.length - 1 : current - 1))
-                    incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }))
-                  }}
-                >
-                  Previous
-                </button>
-                <button
-                  className="secondary flashcard-nav-btn"
-                  onClick={() => {
-                    setFlipped(false)
-                    setFlashcardIndex((current) => {
-                      if (current < orderedFlashcards.length - 1) return current + 1
-                      const lastCardId = orderedFlashcards[current]?.id
-                      let reshuffled = shuffle(filteredFlashcards.map((card) => card.id))
-                      if (reshuffled.length > 1 && reshuffled[0] === lastCardId) {
-                        ;[reshuffled[0], reshuffled[1]] = [reshuffled[1], reshuffled[0]]
-                      }
-                      setFlashcardOrder(reshuffled)
-                      return 0
-                    })
-                    incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }))
-                  }}
-                >
-                  Next
-                </button>
                   </div>
-                </>
-              )}
+                </div>
+              ) : null}
+
+              {studyTestSessionDone ? (
+                <div className="card study-test-complete">
+                  <h3>Test Complete</h3>
+                  <p className="muted">
+                    Score: {studyTestSessionCorrect}/{studyTestSessionTotal} ({studyTestSessionTotal > 0 ? Math.round((studyTestSessionCorrect / studyTestSessionTotal) * 100) : 0}%)
+                  </p>
+                  <div className="actions-row">
+                    <button className="secondary" onClick={() => setStudyTestSessionOpen(false)}>Exit</button>
+                    <button className="primary" onClick={beginStudyTest}>Retake Test</button>
+                  </div>
+                </div>
+              ) : null}
             </div>
-          </section>
-        )}
+          </div>
+        ) : null}
 
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isGamesPage && (
           <section className="games-section">
@@ -3412,7 +4837,7 @@ function App() {
                     </>
                   ) : null}
                   {speedRunning && speedCurrentQuestion ? (
-                    <div className="card quiz-card speed-session-card">
+                    <div className="card quiz-card speed-session-card" data-remaining-questions={speedDeck.length}>
                       <h3>{speedCurrentQuestion.prompt}</h3>
                       <div className="choices">
                         {speedCurrentQuestion.choices.map((choice, index) => (
@@ -3521,38 +4946,80 @@ function App() {
 
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isScenariosPage && (
           <section className="scenario-section">
-            <div className="card scenario-card">
-              {scenarioCurrentQuestion ? (
-                <>
-                  <h3>{scenarioCurrentQuestion.prompt}</h3>
-                  <div className="scenario-actions">
-                    {scenarioCurrentQuestion.choices.map((choice, index) => (
-                      <button
-                        key={`scenario-choice-${scenarioCurrentQuestion.id}-${index}`}
-                        className="scenario-answer-btn"
-                        onClick={() => answerScenario(index)}
-                        disabled={Boolean(scenarioResult)}
-                      >
-                        {choice}
-                      </button>
+            <div className="quiz-wrap">
+              <div
+                className={`quiz-fire-host level-${scenarioFireLevel}`}
+                ref={(node) => {
+                  scenarioFireHostRef.current = node
+                  if (!node) return
+                  const width = Math.floor(node.getBoundingClientRect().width)
+                  if (width > 0 && width !== scenarioFireWidth) setScenarioFireWidth(width)
+                }}
+                aria-hidden
+              >
+                {scenarioFireOption ? (
+                  <FireFlame key={`scenario-fire-${scenarioFireLevel}-${scenarioFireWidth || quizFireWidth}`} option={scenarioFireOption} />
+                ) : (
+                  <div className="quiz-fire-anchor-line" />
+                )}
+                {scenarioFireLevel > 0 ? (
+                  <div className="quiz-fire-particles">
+                    {scenarioFireParticles.map((particle) => (
+                      <span
+                        key={`scenario-fire-particle-${particle.id}`}
+                        className="quiz-fire-particle"
+                        style={{
+                          left: particle.left,
+                          width: `${particle.size}px`,
+                          height: `${Math.round(particle.size * 1.5)}px`,
+                          animationDelay: particle.delay,
+                          animationDuration: particle.duration,
+                          ['--particle-drift' as string]: particle.drift,
+                        }}
+                      />
                     ))}
                   </div>
-                  {scenarioResult ? <p className={scenarioResult.startsWith('Correct') ? 'good' : 'bad'}>{scenarioResult}</p> : null}
-                  {scenarioResult ? (
-                    <div className="card compact">
-                      <p><strong>Answer:</strong> {scenarioCurrentQuestion.choices[scenarioCurrentQuestion.correctIndex]}</p>
-                      <p className="muted">{scenarioCurrentQuestion.explanation}</p>
+                ) : null}
+              </div>
+              {scenarioFireLevel > 0 ? (
+                <div className="quiz-fire-line-glow" aria-hidden />
+              ) : null}
+              <div className="card scenario-card">
+                {scenarioCurrentQuestion ? (
+                  <>
+                    <div className="quiz-top">
+                      <span>Scenario Streak: {scenarioStreak}</span>
                     </div>
-                  ) : null}
-                  <div className="scenario-next-wrap" ref={scenarioNextRef}>
-                    <button className="secondary scenario-next" onClick={() => nextScenarioQuestion(undefined, scenarioCurrentQuestion.id)}>
-                      Next Scenario
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="muted">No scenario questions loaded.</p>
-              )}
+                    <h3>{scenarioCurrentQuestion.prompt}</h3>
+                    <div className="scenario-actions">
+                      {scenarioCurrentQuestion.choices.map((choice, index) => (
+                        <button
+                          key={`scenario-choice-${scenarioCurrentQuestion.id}-${index}`}
+                          className="scenario-answer-btn"
+                          onClick={() => answerScenario(index)}
+                          disabled={Boolean(scenarioResult)}
+                        >
+                          {choice}
+                        </button>
+                      ))}
+                    </div>
+                    {scenarioResult ? <p className={scenarioResult.startsWith('Correct') ? 'good' : 'bad'}>{scenarioResult}</p> : null}
+                    {scenarioResult ? (
+                      <div className="card compact">
+                        <p><strong>Answer:</strong> {scenarioCurrentQuestion.choices[scenarioCurrentQuestion.correctIndex]}</p>
+                        <p className="muted">{scenarioCurrentQuestion.explanation}</p>
+                      </div>
+                    ) : null}
+                    <div className="scenario-next-wrap" ref={scenarioNextRef}>
+                      <button className="secondary scenario-next" onClick={() => nextScenarioQuestion(undefined, scenarioCurrentQuestion.id)}>
+                        Next Scenario
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="muted">No scenario questions loaded.</p>
+                )}
+              </div>
             </div>
           </section>
         )}
@@ -3560,285 +5027,791 @@ function App() {
         {isStatsPage && profile ? (
           <section>
             <div className="card profile-page-card">
-              <h3>Study Stats</h3>
-              <p><strong>Total study time:</strong> {studyHours} hour{studyHours === 1 ? '' : 's'}</p>
-              <p><strong>Words mastered:</strong> {masteredWordsCount}</p>
-              <p><strong>Penal codes mastered:</strong> {penalMasteredCount}</p>
-              <p><strong>Flashcards reviewed:</strong> {profileDetails.stats.flashcardsReviewed}</p>
-              <p><strong>Scenarios completed:</strong> {profileDetails.stats.scenariosReviewed}</p>
-              <p>
-                <strong>Most played game:</strong>{' '}
-                {mostPlayedGame && mostPlayedGame[1] > 0 ? `${mostPlayedGame[0] === 'speed' ? 'Speed Test' : 'Matching'} (${mostPlayedGame[1]} plays)` : 'No games yet'}
-              </p>
-              <p>
-                <strong>Most studied set:</strong>{' '}
-                {mostStudiedMode && mostStudiedMode[1] > 0
-                  ? `${mostStudiedMode[0] === 'all' ? 'All' : codeSetLabel[mostStudiedMode[0] as CodeSet]} (${mostStudiedMode[1]} quiz answers)`
-                  : 'No study data yet'}
-              </p>
+              <div className="stats-heading">
+                <span className="stats-heading-icon" aria-hidden>
+                  <StatsIcon name="overview" className="stats-icon-svg" />
+                </span>
+                <h3>Study Stats</h3>
+              </div>
+              <p className="muted">Track your progress across study, games, and scenarios.</p>
+              <div className="stats-grid">
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="time" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Total Study Time</p>
+                  <p className="stats-value">{formatStudyTime(profileDetails.stats.studySeconds)}</p>
+                </article>
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="words" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Words Mastered</p>
+                  <p className="stats-value">{masteredWordsCount}</p>
+                </article>
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="penal" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Penal Codes Mastered</p>
+                  <p className="stats-value">{penalMasteredCount}</p>
+                </article>
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="flashcards" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Flashcards Reviewed</p>
+                  <p className="stats-value">{profileDetails.stats.flashcardsReviewed}</p>
+                </article>
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="scenarios" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Scenarios Completed</p>
+                  <p className="stats-value">{profileDetails.stats.scenariosReviewed}</p>
+                </article>
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="streak" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Best Quiz Streak</p>
+                  <p className="stats-value">{bestStreak}</p>
+                </article>
+              </div>
+              <div className="stats-highlight-row">
+                <article className="stats-highlight">
+                  <p className="stats-highlight-icon" aria-hidden>
+                    <StatsIcon name="game" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Most Played Game</p>
+                  <p className="stats-value">
+                    {mostPlayedGame && mostPlayedGame[1] > 0 ? `${mostPlayedGame[0] === 'speed' ? 'Speed Test' : 'Matching'} (${mostPlayedGame[1]} plays)` : 'No games yet'}
+                  </p>
+                </article>
+                <article className="stats-highlight">
+                  <p className="stats-highlight-icon" aria-hidden>
+                    <StatsIcon name="studyset" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Most Studied Set</p>
+                  <p className="stats-value">
+                    {mostStudiedMode && mostStudiedMode[1] > 0
+                      ? `${mostStudiedMode[0] === 'all' ? 'All' : codeSetLabel[mostStudiedMode[0] as CodeSet]} (${mostStudiedMode[1]} quiz answers)`
+                      : 'No study data yet'}
+                  </p>
+                </article>
+              </div>
+              <div className="card compact stats-focus-card">
+                <h4>Assisted Learning Insights</h4>
+                <p className="muted">
+                  Assisted Learning increases exposure to weaker codes and eases repetition on stabilized/mastered codes to keep you progressing across the full library.
+                </p>
+                <div className="stats-focus-list">
+                  <article className="stats-focus-item">
+                    <div>
+                      <p className="stats-focus-title">Codes tracked by algorithm</p>
+                      <p className="stats-focus-meta">Codes with at least one attempt</p>
+                    </div>
+                    <span className="badge">{algorithmInsights.trackedCodes}</span>
+                  </article>
+                  <article className="stats-focus-item">
+                    <div>
+                      <p className="stats-focus-title">Current average accuracy</p>
+                      <p className="stats-focus-meta">Across all tracked codes</p>
+                    </div>
+                    <span className="badge">{Math.round(algorithmInsights.averageAccuracy * 100)}%</span>
+                  </article>
+                  <article className="stats-focus-item">
+                    <div>
+                      <p className="stats-focus-title">Active focus codes</p>
+                      <p className="stats-focus-meta">High-priority “needs work” items</p>
+                    </div>
+                    <span className="badge badge-work">{algorithmInsights.needsMoreWorkCount}</span>
+                  </article>
+                  <article className="stats-focus-item">
+                    <div>
+                      <p className="stats-focus-title">Stabilized codes</p>
+                      <p className="stats-focus-meta">Strong accuracy or streak performance</p>
+                    </div>
+                    <span className="badge badge-mastered">{algorithmInsights.stabilizedCount}</span>
+                  </article>
+                  <article className="stats-focus-item">
+                    <div>
+                      <p className="stats-focus-title">Mastered codes</p>
+                      <p className="stats-focus-meta">20+ correct streak achieved</p>
+                    </div>
+                    <span className="badge badge-mastered">{algorithmInsights.masteredCount}</span>
+                  </article>
+                  <article className="stats-focus-item">
+                    <div>
+                      <p className="stats-focus-title">Focus load</p>
+                      <p className="stats-focus-meta">Share of attempts spent on weak codes</p>
+                    </div>
+                    <span className="badge">{Math.round(algorithmInsights.focusLoadPercent)}%</span>
+                  </article>
+                </div>
+                <p className="stats-focus-meta">
+                  Current top focus: {algorithmInsights.topFocusCodes.length > 0 ? algorithmInsights.topFocusCodes.join(', ') : 'No current weak-code targets'}
+                </p>
+              </div>
             </div>
           </section>
         ) : null}
 
         {isProfilePage && profile && (
           <section>
-            <div className="card profile-page-card">
-              <div className="avatar-frame">
-                <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
-              </div>
-              <label>
-                Username
-                <input value={profileUsername} onChange={(event) => setProfileUsername(event.target.value)} />
-              </label>
-              <label>
-                Profile picture
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => openAvatarCropper(event.target.files?.[0] || null)}
-                />
-              </label>
-              <label>
-                About me
-                <textarea
-                  rows={4}
-                  value={profileDetails.bio}
-                  onChange={(event) => setProfileDetails((previous) => ({ ...previous, bio: event.target.value }))}
-                />
-              </label>
-              <label>
-                Agency
-                <input
-                  value={profileDetails.agency}
-                  onChange={(event) => setProfileDetails((previous) => ({ ...previous, agency: event.target.value }))}
-                />
-              </label>
-              <h3>Name Customization</h3>
-              {canCustomizeName ? (
-                <div className="card compact">
-                  <label>Name color</label>
-                  <div className="name-color-controls">
+            <div className="card profile-page-shell">
+              <aside className="settings-sidebar">
+                <button className={settingsTab === 'profile' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('profile')}>
+                  Profile
+                </button>
+                <button className={settingsTab === 'customization' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('customization')}>
+                  Customization
+                </button>
+                {isOwner ? (
+                  <button className={settingsTab === 'editor' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('editor')}>
+                    Content Editor
+                  </button>
+                ) : null}
+                <button className={settingsTab === 'support' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('support')}>
+                  Support
+                </button>
+                <button className={settingsTab === 'security' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('security')}>
+                  Account Security
+                </button>
+              </aside>
+
+              <div className="settings-panel">
+              {settingsTab === 'profile' ? (
+                <div className="settings-section-card">
+                  <div className="settings-inline-head">
+                    <label className="assisted-learning-toggle">
+                      <input
+                        type="checkbox"
+                        checked={assistedLearningEnabled}
+                        onChange={(event) => setAssistedLearningEnabled(event.target.checked)}
+                      />
+                      Assisted Learning
+                    </label>
+                    <button
+                      className="icon-menu-button info-button"
+                      onClick={() => setShowAssistedLearningInfo(true)}
+                      aria-label="Assisted Learning info"
+                    >
+                      I
+                    </button>
+                  </div>
+                  <div className="avatar-frame">
+                    <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
+                  </div>
+                  {isOwner ? <p className="owner-pill">Owner</p> : null}
+                  <label>
+                    Username
+                    <input value={profileUsername} onChange={(event) => setProfileUsername(event.target.value)} />
+                  </label>
+                  <label>
+                    Profile picture
                     <input
-                      className="name-color-picker"
-                      type="color"
-                      value={profileDetails.nameStyle.color}
-                      onChange={(event) =>
-                        setProfileDetails((previous) => ({
-                          ...previous,
-                          nameStyle: { ...previous.nameStyle, color: event.target.value },
-                        }))
-                      }
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => openAvatarCropper(event.target.files?.[0] || null)}
                     />
-                    <div className="name-color-swatches">
-                      {nameColorPalette.map((color) => (
+                  </label>
+                  <label>
+                    About me
+                    <textarea
+                      rows={4}
+                      value={profileDetails.bio}
+                      onChange={(event) => setProfileDetails((previous) => ({ ...previous, bio: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Agency
+                    <input
+                      value={profileDetails.agency}
+                      onChange={(event) => setProfileDetails((previous) => ({ ...previous, agency: event.target.value }))}
+                    />
+                  </label>
+                  <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
+                    Save Profile Details
+                  </button>
+                  {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
+                  {authError ? <p className="bad">{authError}</p> : null}
+                </div>
+              ) : null}
+
+              {settingsTab === 'customization' ? (
+                <div className="settings-section-card">
+                  <h3>Name Customization</h3>
+                  {canCustomizeName ? (
+                    <div className="customization-grid">
+                      <div className="card compact customization-card">
+                        <p className="customization-card-title">Style</p>
+                        <label>
+                          Font
+                          <select
+                            value={profileDetails.nameStyle.fontFamily}
+                            onChange={(event) =>
+                              setProfileDetails((previous) => ({
+                                ...previous,
+                                nameStyle: { ...previous.nameStyle, fontFamily: event.target.value },
+                              }))
+                            }
+                          >
+                            {profileFontOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <div className="actions-row">
+                          <button
+                            className={profileDetails.nameStyle.fontWeight === 700 ? 'primary' : 'secondary'}
+                            onClick={() =>
+                              setProfileDetails((previous) => ({
+                                ...previous,
+                                nameStyle: { ...previous.nameStyle, fontWeight: previous.nameStyle.fontWeight === 700 ? 600 : 700 },
+                              }))
+                            }
+                          >
+                            Bold
+                          </button>
+                          <button
+                            className={profileDetails.nameStyle.fontStyle === 'italic' ? 'primary' : 'secondary'}
+                            onClick={() =>
+                              setProfileDetails((previous) => ({
+                                ...previous,
+                                nameStyle: { ...previous.nameStyle, fontStyle: previous.nameStyle.fontStyle === 'italic' ? 'normal' : 'italic' },
+                              }))
+                            }
+                          >
+                            Italic
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="card compact customization-card">
+                        <p className="customization-card-title">Color & Glow</p>
+                        <div className="name-color-controls">
+                          <input
+                            className="name-color-picker"
+                            type="color"
+                            value={profileDetails.nameStyle.color}
+                            onChange={(event) =>
+                              setProfileDetails((previous) => ({
+                                ...previous,
+                                nameStyle: { ...previous.nameStyle, color: event.target.value },
+                              }))
+                            }
+                          />
+                          <div className="name-color-swatches">
+                            {nameColorPalette.map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                className={profileDetails.nameStyle.color === color ? 'color-swatch active' : 'color-swatch'}
+                                style={{ background: color }}
+                                onClick={() =>
+                                  setProfileDetails((previous) => ({
+                                    ...previous,
+                                    nameStyle: { ...previous.nameStyle, color },
+                                  }))
+                                }
+                                aria-label={`Use ${color}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <label className="switch-row">
+                          <input
+                            type="checkbox"
+                            checked={profileDetails.nameStyle.glowEnabled}
+                            onChange={(event) =>
+                              setProfileDetails((previous) => ({
+                                ...previous,
+                                nameStyle: { ...previous.nameStyle, glowEnabled: event.target.checked },
+                              }))
+                            }
+                          />
+                          Glow enabled
+                        </label>
+                        <label>
+                          <div className="glow-control-row">
+                            <span>Glow Intensity</span>
+                            <span className="range-value-pill">{profileDetails.nameStyle.glowIntensity}%</span>
+                          </div>
+                          <input
+                            className="modern-range"
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={profileDetails.nameStyle.glowIntensity}
+                            onChange={(event) =>
+                              setProfileDetails((previous) => ({
+                                ...previous,
+                                nameStyle: { ...previous.nameStyle, glowIntensity: Number(event.target.value) },
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="muted">Name customization is unlocked for $10 Pro Supporter.</p>
+                  )}
+
+                  {canCustomizeName ? (
+                    <div className="card compact customization-card">
+                      <p className="customization-card-title">Presets</p>
+                      <label>
+                        Preset name
+                        <div className="preset-row">
+                          <input
+                            value={newPresetName}
+                            placeholder="Ex: Neon Blue"
+                            onChange={(event) => setNewPresetName(event.target.value)}
+                          />
+                          <button className="secondary" type="button" onClick={saveCurrentNamePreset} disabled={newPresetName.trim().length === 0}>
+                            Save Preset
+                          </button>
+                        </div>
+                      </label>
+                      {profileDetails.namePresets.length > 0 ? (
+                        <div className="preset-list">
+                          {profileDetails.namePresets.map((preset) => (
+                            <div key={preset.id} className="preset-pill">
+                              <button type="button" className="secondary" onClick={() => applyNamePreset(preset)}>
+                                {preset.name}
+                              </button>
+                              <button type="button" className="danger" onClick={() => deleteNamePreset(preset.id)}>
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      <p className="customization-preview">
+                        Preview:{' '}
+                        <span
+                          className="tier-name"
+                          style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}
+                        >
+                          {profileUsername.trim() || profile.username || 'Your Name'}
+                        </span>
+                      </p>
+                    </div>
+                  ) : (
+                    null
+                  )}
+                  <h3>Website Theme</h3>
+                  {canUseThemes ? (
+                    <div className="theme-grid">
+                      {appThemePresets.map((theme) => (
                         <button
-                          key={color}
+                          key={theme.id}
                           type="button"
-                          className={profileDetails.nameStyle.color === color ? 'color-swatch active' : 'color-swatch'}
-                          style={{ background: color }}
-                          onClick={() =>
-                            setProfileDetails((previous) => ({
-                              ...previous,
-                              nameStyle: { ...previous.nameStyle, color },
-                            }))
-                          }
-                          aria-label={`Use ${color}`}
-                        />
+                          className={profileDetails.themeId === theme.id ? 'theme-card active' : 'theme-card'}
+                          onClick={() => setProfileDetails((previous) => ({ ...previous, themeId: theme.id }))}
+                        >
+                          <span className="theme-swatch" style={{ background: theme.swatch }} />
+                          <span className="theme-name">{theme.name}</span>
+                        </button>
                       ))}
                     </div>
+                  ) : (
+                    <p className="muted">Themes are unlocked for $5 Supporter+ and above.</p>
+                  )}
+                  <p className="muted">Current theme: {selectedTheme.name}</p>
+                  <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
+                    Save Customization
+                  </button>
+                  {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
+                  {authError ? <p className="bad">{authError}</p> : null}
+                </div>
+              ) : null}
+
+              {settingsTab === 'editor' ? (
+                isOwner ? (
+                  <div className="settings-section-card">
+                    <h3>Content Editor</h3>
+                    <div className="card compact content-editor-card">
+                      <div className="content-editor-toolbar">
+                        <button className="secondary" type="button" onClick={() => startNewEditorItem(editorCategoryFilter)}>
+                          New Item
+                        </button>
+                        <button className="secondary" type="button" onClick={() => void loadOwnerEditorItems()} disabled={editorLoading || ownerLoading}>
+                          Refresh
+                        </button>
+                      </div>
+                      <div className="content-editor-filters">
+                        <label>
+                          Category
+                          <select value={editorCategoryFilter} onChange={(event) => setEditorCategoryFilter(event.target.value)}>
+                            <option value="all">All</option>
+                            {editorCategoryOptions.map((category) => (
+                              <option key={`editor-category-${category}`} value={category}>
+                                {category.toUpperCase()}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Type
+                          <select value={editorTypeFilter} onChange={(event) => setEditorTypeFilter(event.target.value as 'all' | 'code' | 'scenario' | 'question')}>
+                            <option value="all">All</option>
+                            <option value="code">Code</option>
+                            <option value="scenario">Scenario</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="content-editor-main">
+                        <div className="content-editor-list-wrap">
+                          <p className="content-editor-list-count">
+                            {filteredEditorItems.length} item{filteredEditorItems.length === 1 ? '' : 's'}
+                          </p>
+                          <div className="content-editor-list">
+                            {filteredEditorItems.length === 0 ? (
+                              <p className="muted">No content items found.</p>
+                            ) : (
+                              filteredEditorItems.map((item) => (
+                                <button
+                                  key={`editor-item-${item.id}`}
+                                  className={editorSelectedId === item.id ? 'secondary content-editor-list-item active' : 'secondary content-editor-list-item'}
+                                  type="button"
+                                  onClick={() => selectEditorItem(item)}
+                                >
+                                  <span className="content-editor-list-item-title">{item.title}</span>
+                                  <small>{item.category.toUpperCase()} • {item.type}</small>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        <div className="content-editor-form">
+                        <div className="content-editor-filters">
+                          <label>
+                            Category
+                            <select
+                              value={editorDraft.category}
+                              onChange={(event) => setEditorDraft((previous) => ({ ...previous, category: event.target.value }))}
+                            >
+                              <option value="pc">PC</option>
+                              <option value="hs">H&S</option>
+                              <option value="vc">VC</option>
+                              <option value="scenario">Scenario</option>
+                              {editorCategoryOptions
+                                .filter((category) => !['pc', 'hs', 'vc', 'scenario'].includes(category))
+                                .map((category) => (
+                                  <option key={`editor-category-extra-${category}`} value={category}>
+                                    {category.toUpperCase()}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                          <label>
+                            Kind
+                            <select
+                              value={editorDraft.type === 'scenario' ? 'scenario' : 'code'}
+                              onChange={(event) =>
+                                setEditorDraft((previous) => ({
+                                  ...previous,
+                                  type: event.target.value as 'code' | 'scenario',
+                                }))
+                              }
+                            >
+                              <option value="code">Code Item</option>
+                              <option value="scenario">Scenario</option>
+                            </select>
+                          </label>
+                        </div>
+                        {editorDraft.type === 'scenario' ? (
+                          <>
+                            <label>
+                              Scenario
+                              <textarea rows={4} value={editorDraft.scenario} onChange={(event) => setEditorDraft((previous) => ({ ...previous, scenario: event.target.value }))} />
+                            </label>
+                            <label>
+                              Scenario title (optional)
+                              <input value={editorDraft.title} onChange={(event) => setEditorDraft((previous) => ({ ...previous, title: event.target.value }))} />
+                            </label>
+                            <label>
+                              Answer mode
+                              <select value={scenarioAnswerMode} onChange={(event) => setScenarioAnswerMode(event.target.value as 'choices' | 'truefalse')}>
+                                <option value="choices">2-4 answer choices</option>
+                                <option value="truefalse">True / False</option>
+                              </select>
+                            </label>
+                            {scenarioAnswerMode === 'choices' ? (
+                              <div className="content-editor-filters">
+                                {[0, 1, 2, 3].map((index) => (
+                                  <label key={`scenario-option-${index}`}>
+                                    Choice {index + 1}{index < 2 ? ' *' : ' (optional)'}
+                                    <input
+                                      value={scenarioOptionInputs[index] || ''}
+                                      onChange={(event) =>
+                                        setScenarioOptionInputs((previous) => {
+                                          const next = [...previous]
+                                          next[index] = event.target.value
+                                          return next
+                                        })
+                                      }
+                                    />
+                                  </label>
+                                ))}
+                              </div>
+                            ) : null}
+                            <label>
+                              Correct answer
+                              <select value={scenarioCorrectChoice} onChange={(event) => setScenarioCorrectChoice(event.target.value)}>
+                                <option value="">Select correct answer</option>
+                                {(scenarioAnswerMode === 'truefalse'
+                                  ? ['True', 'False']
+                                  : scenarioOptionInputs.map((item) => item.trim()).filter(Boolean).slice(0, 4)
+                                ).map((choice) => (
+                                  <option key={`scenario-correct-${choice}`} value={choice}>
+                                    {choice}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label>
+                              Explanation (optional)
+                              <textarea rows={3} value={editorDraft.explanation} onChange={(event) => setEditorDraft((previous) => ({ ...previous, explanation: event.target.value }))} />
+                            </label>
+                          </>
+                        ) : (
+                          <>
+                            <label>
+                              Code section
+                              <input
+                                value={editorDraft.codeSection}
+                                placeholder={editorDraft.category === 'vc' ? 'VC 23152(a)' : editorDraft.category === 'hs' ? 'H&S 11350' : 'PC 148(a)(1)'}
+                                onChange={(event) => setEditorDraft((previous) => ({ ...previous, codeSection: event.target.value }))}
+                              />
+                            </label>
+                            <label>
+                              Name
+                              <input
+                                value={editorDraft.title}
+                                placeholder="Kidnapping"
+                                onChange={(event) => setEditorDraft((previous) => ({ ...previous, title: event.target.value }))}
+                              />
+                            </label>
+                            <label>
+                              Definition (Elements)
+                              <textarea rows={3} value={editorDraft.explanation} onChange={(event) => setEditorDraft((previous) => ({ ...previous, explanation: event.target.value }))} />
+                            </label>
+                          </>
+                        )}
+                        <label className="switch-row">
+                          <input
+                            type="checkbox"
+                            checked={editorDraft.isPublished}
+                            onChange={(event) => setEditorDraft((previous) => ({ ...previous, isPublished: event.target.checked }))}
+                          />
+                          Published
+                        </label>
+                        {editorError ? <p className="bad">{editorError}</p> : null}
+                        {editorSuccess ? <p className="good">{editorSuccess}</p> : null}
+                        <div className="actions-row">
+                          <button className="primary" type="button" onClick={saveEditorItem} disabled={editorLoading || ownerLoading}>
+                            {editorLoading ? 'Saving...' : 'Save Item'}
+                          </button>
+                          {editorSelectedId ? (
+                            <button className="danger" type="button" onClick={() => deleteEditorItem(editorSelectedId)} disabled={editorLoading || ownerLoading}>
+                              Delete Item
+                            </button>
+                          ) : null}
+                        </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <label>
-                    Font
-                    <select
-                      value={profileDetails.nameStyle.fontFamily}
-                      onChange={(event) =>
-                        setProfileDetails((previous) => ({
-                          ...previous,
-                          nameStyle: { ...previous.nameStyle, fontFamily: event.target.value },
-                        }))
-                      }
-                    >
-                      {profileFontOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="actions-row">
-                    <button
-                      className={profileDetails.nameStyle.fontWeight === 700 ? 'primary' : 'secondary'}
-                      onClick={() =>
-                        setProfileDetails((previous) => ({
-                          ...previous,
-                          nameStyle: { ...previous.nameStyle, fontWeight: previous.nameStyle.fontWeight === 700 ? 600 : 700 },
-                        }))
-                      }
-                    >
-                      Bold
-                    </button>
-                    <button
-                      className={profileDetails.nameStyle.fontStyle === 'italic' ? 'primary' : 'secondary'}
-                      onClick={() =>
-                        setProfileDetails((previous) => ({
-                          ...previous,
-                          nameStyle: { ...previous.nameStyle, fontStyle: previous.nameStyle.fontStyle === 'italic' ? 'normal' : 'italic' },
-                        }))
-                      }
-                    >
-                      Italic
-                    </button>
+                ) : (
+                  <div className="settings-section-card">
+                    <p className="muted">Content Editor is available to owner accounts only.</p>
                   </div>
-                  <label className="switch-row">
-                    <input
-                      type="checkbox"
-                      checked={profileDetails.nameStyle.glowEnabled}
-                      onChange={(event) =>
-                        setProfileDetails((previous) => ({
-                          ...previous,
-                          nameStyle: { ...previous.nameStyle, glowEnabled: event.target.checked },
-                        }))
-                      }
-                    />
-                    Glow enabled
-                  </label>
+                )
+              ) : null}
+
+              {settingsTab === 'support' ? (
+                <div className="settings-section-card">
+                  <h3>Support Tiers</h3>
+                  <p className="muted">Current tier: {tierLabel[profile.supporterTier]}</p>
+                  <div className="tier-upgrade-grid">
+                    {(['tier2', 'tier5', 'tier10'] as Exclude<SupporterTier, 'free'>[]).map((tier) => (
+                      <div
+                        key={tier}
+                        className={tierRank(profile.supporterTier) >= tierRank(tier) ? 'tier-upgrade-card tier-locked' : 'tier-upgrade-card'}
+                      >
+                        <p className="tier-upgrade-title">{tierLabel[tier]}</p>
+                        <ul className="muted support-benefits-list">
+                          {tier === 'tier2' ? (
+                            <>
+                              <li>Support the project and roadmap</li>
+                              <li>Supporter badge on your account</li>
+                            </>
+                          ) : null}
+                          {tier === 'tier5' ? (
+                            <>
+                              <li>Everything in $2 tier</li>
+                              <li>Priority access to upcoming features</li>
+                            </>
+                          ) : null}
+                          {tier === 'tier10' ? (
+                            <>
+                              <li>Everything in $2 and $5 tiers</li>
+                              <li>Name customization (font, glow, color)</li>
+                            </>
+                          ) : null}
+                        </ul>
+                        <button
+                          className="primary"
+                          onClick={() => startTierCheckout(tier)}
+                          disabled={tierRank(profile.supporterTier) >= tierRank(tier)}
+                        >
+                          {tierRank(profile.supporterTier) > tierRank(tier)
+                            ? 'Included'
+                            : tierRank(profile.supporterTier) === tierRank(tier)
+                              ? 'Current Tier'
+                              : 'Upgrade with Stripe'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {settingsTab === 'security' ? (
+                <div className="settings-section-card">
+                  <p className="muted">Email: {currentUserEmail || 'Unknown'}</p>
+                  <button className="secondary" onClick={linkGoogleAccount} disabled={authLoading || currentUserProvider.toLowerCase() === 'google'}>
+                    {currentUserProvider.toLowerCase() === 'google' ? 'Google Linked' : 'Link Google Account'}
+                  </button>
                   <label>
-                    Glow intensity: {profileDetails.nameStyle.glowIntensity}
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={profileDetails.nameStyle.glowIntensity}
-                      onChange={(event) =>
-                        setProfileDetails((previous) => ({
-                          ...previous,
-                          nameStyle: { ...previous.nameStyle, glowIntensity: Number(event.target.value) },
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    Preset name
-                    <div className="preset-row">
+                    New password
+                    <div className="password-row">
                       <input
-                        value={newPresetName}
-                        placeholder="Ex: Neon Blue"
-                        onChange={(event) => setNewPresetName(event.target.value)}
+                        type={showAccountPassword ? 'text' : 'password'}
+                        value={accountNewPassword}
+                        onChange={(event) => setAccountNewPassword(event.target.value)}
                       />
-                      <button className="secondary" type="button" onClick={saveCurrentNamePreset} disabled={newPresetName.trim().length === 0}>
-                        Save Preset
+                      <button type="button" className="password-eye" onClick={() => setShowAccountPassword((value) => !value)} aria-label="Toggle new password visibility">
+                        {showAccountPassword ? (
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M3 3l18 18" />
+                            <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
+                            <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
+                            <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </label>
-                  {profileDetails.namePresets.length > 0 ? (
-                    <div className="preset-list">
-                      {profileDetails.namePresets.map((preset) => (
-                        <div key={preset.id} className="preset-pill">
-                          <button type="button" className="secondary" onClick={() => applyNamePreset(preset)}>
-                            {preset.name}
-                          </button>
-                          <button type="button" className="danger" onClick={() => deleteNamePreset(preset.id)}>
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                  <p className="muted">
-                    Preview:{' '}
-                    <span
-                      className="tier-name"
-                      style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}
-                    >
-                      {profileUsername.trim() || profile.username || 'Your Name'}
-                    </span>
-                  </p>
-                </div>
-              ) : (
-                <p className="muted">Name customization is unlocked for $10 Pro Supporter.</p>
-              )}
-              {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
-              {authError ? <p className="bad">{authError}</p> : null}
-              <h3>Support Tier</h3>
-              <div className="tier-upgrade-grid">
-                {(['tier2', 'tier5', 'tier10'] as Exclude<SupporterTier, 'free'>[]).map((tier) => (
-                  <div
-                    key={tier}
-                    className={tierRank(profile.supporterTier) >= tierRank(tier) ? 'tier-upgrade-card tier-locked' : 'tier-upgrade-card'}
-                  >
-                    <p className="tier-upgrade-title">{tierLabel[tier]}</p>
-                    <button
-                      className="primary"
-                      onClick={() => startTierCheckout(tier)}
-                      disabled={tierRank(profile.supporterTier) >= tierRank(tier)}
-                    >
-                      {tierRank(profile.supporterTier) > tierRank(tier)
-                        ? 'Included'
-                        : tierRank(profile.supporterTier) === tierRank(tier)
-                          ? 'Current Tier'
-                          : 'Upgrade with Stripe'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <p className="muted">Current tier: {tierLabel[profile.supporterTier]}</p>
-              <p className="muted">Email: {currentUserEmail || 'Unknown'}</p>
-              <h3>Account Security</h3>
-              <button className="secondary" onClick={linkGoogleAccount} disabled={authLoading || currentUserProvider.toLowerCase() === 'google'}>
-                {currentUserProvider.toLowerCase() === 'google' ? 'Google Linked' : 'Link Google Account'}
-              </button>
-              <label>
-                New password
-                <div className="password-row">
-                  <input
-                    type={showAccountPassword ? 'text' : 'password'}
-                    value={accountNewPassword}
-                    onChange={(event) => setAccountNewPassword(event.target.value)}
-                  />
-                  <button type="button" className="password-eye" onClick={() => setShowAccountPassword((value) => !value)} aria-label="Toggle new password visibility">
-                    {showAccountPassword ? (
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M3 3l18 18" />
-                        <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
-                        <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
-                        <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    )}
+                  <label>
+                    Verify new password
+                    <input
+                      type={showAccountPassword ? 'text' : 'password'}
+                      value={accountConfirmPassword}
+                      onChange={(event) => setAccountConfirmPassword(event.target.value)}
+                    />
+                  </label>
+                  <button className="secondary" onClick={updateAccountPassword} disabled={authLoading || accountNewPassword.length === 0 || accountConfirmPassword.length === 0}>
+                    Change Password
                   </button>
+                  <button className="secondary" onClick={refreshSupporterTier}>
+                    Refresh Tier
+                  </button>
+                  <button className="secondary" onClick={signOut}>
+                    Sign Out
+                  </button>
+                  <button
+                    className="danger"
+                    onClick={() => {
+                      setResetConfirmText('')
+                      setShowResetConfirmModal(true)
+                    }}
+                  >
+                    Reset Progress and Data
+                  </button>
+                  {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
+                  {authError ? <p className="bad">{authError}</p> : null}
                 </div>
-              </label>
-              <label>
-                Verify new password
-                <input
-                  type={showAccountPassword ? 'text' : 'password'}
-                  value={accountConfirmPassword}
-                  onChange={(event) => setAccountConfirmPassword(event.target.value)}
-                />
-              </label>
-              <button className="secondary" onClick={updateAccountPassword} disabled={authLoading || accountNewPassword.length === 0 || accountConfirmPassword.length === 0}>
-                Change Password
-              </button>
-              <button className="secondary" onClick={refreshSupporterTier}>
-                Refresh Tier
-              </button>
-              <button className="secondary" onClick={signOut}>
-                Sign Out
-              </button>
-              <button className="danger" onClick={resetEverything}>
-                Reset Progress and Data
-              </button>
-              <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
-                Save All Changes
-              </button>
+              ) : null}
+              </div>
             </div>
           </section>
         )}
       </main>
+
+      {showResetConfirmModal ? (
+        <div
+          className="profile-modal-overlay"
+          onClick={() => {
+            if (authLoading) return
+            setShowResetConfirmModal(false)
+            setResetConfirmText('')
+          }}
+        >
+          <div className="card profile-modal-card" onClick={(event) => event.stopPropagation()}>
+            <h3>Confirm Reset</h3>
+            <p className="bad">
+              This will permanently delete your progress, mastered codes, study stats, streaks, and leaderboard scores.
+            </p>
+            <p className="muted">Type RESET to confirm.</p>
+            <input
+              value={resetConfirmText}
+              onChange={(event) => setResetConfirmText(event.target.value)}
+              placeholder="Type RESET"
+            />
+            <div className="actions-row">
+              <button
+                className="secondary"
+                onClick={() => {
+                  if (authLoading) return
+                  setShowResetConfirmModal(false)
+                  setResetConfirmText('')
+                }}
+                disabled={authLoading}
+              >
+                Cancel
+              </button>
+              <button
+                className="danger"
+                onClick={() => void resetEverything()}
+                disabled={authLoading || resetConfirmText.trim().toUpperCase() !== 'RESET'}
+              >
+                {authLoading ? 'Resetting...' : 'Yes, Reset Everything'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showAssistedLearningInfo ? (
+        <div className="profile-modal-overlay" onClick={() => setShowAssistedLearningInfo(false)}>
+          <div className="card profile-modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="quiz-top">
+              <h3>Assisted Learning</h3>
+              <button className="secondary" onClick={() => setShowAssistedLearningInfo(false)}>Close</button>
+            </div>
+            <p className="muted">
+              Assisted Learning adapts question frequency based on your performance.
+            </p>
+            <ul className="muted">
+              <li>Codes you miss more often appear more frequently.</li>
+              <li>Codes you consistently answer correctly appear less often.</li>
+              <li>Mastered codes are still included, but at lower frequency.</li>
+              <li>This applies to Quick Quiz and Flashcards.</li>
+            </ul>
+          </div>
+        </div>
+      ) : null}
 
       {selectedLeaderboardEntry ? (
         <div
@@ -3878,6 +5851,16 @@ function App() {
             </div>
             <p><strong>Agency:</strong> {selectedLeaderboardEntry.agency || 'Not provided'}</p>
             <p><strong>About Me:</strong> {selectedLeaderboardEntry.bio || 'Not provided'}</p>
+            <p><strong>Mastered codes:</strong> {selectedLeaderboardEntry.masteredCodes}</p>
+            <p><strong>Study time:</strong> {formatStudyTime(selectedLeaderboardEntry.studySeconds)}</p>
+            <p>
+              <strong>Most studied:</strong>{' '}
+              {selectedLeaderboardEntry.mostStudiedMode
+                ? selectedLeaderboardEntry.mostStudiedMode === 'all'
+                  ? 'All'
+                  : codeSetLabel[selectedLeaderboardEntry.mostStudiedMode]
+                : 'No study data yet'}
+            </p>
             <p className="muted">
               {selectedLeaderboardEntry.round > 0
                 ? `Best ${selectedLeaderboardEntry.game} score: ${selectedLeaderboardEntry.score} • Round ${selectedLeaderboardEntry.round}`
@@ -3932,6 +5915,113 @@ function App() {
             <div className="actions-row">
               <button className="secondary" onClick={cancelAvatarCrop}>Cancel</button>
               <button className="primary" onClick={applyAvatarCrop}>Use This Crop</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showStudyFlashSetupModal ? (
+        <div className="profile-modal-overlay" onClick={() => setShowStudyFlashSetupModal(false)}>
+          <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
+            <h3>Flashcards Setup</h3>
+            <label className="game-control">
+              Subject
+              <div className="segmented">
+                {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                  <button
+                    key={`study-flash-filter-${filter}`}
+                    className={studyFlashFilter === filter ? 'seg active' : 'seg'}
+                    onClick={() => setStudyFlashFilter(filter)}
+                  >
+                    {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <p className="muted">{studyFlashSelectionCount} cards available</p>
+            <div className="actions-row">
+              <button className="secondary" onClick={() => setShowStudyFlashSetupModal(false)}>Cancel</button>
+              <button className="primary" onClick={beginStudyFlashcards} disabled={studyFlashSelectionCount === 0}>Start Flashcards</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showStudyTestSetupModal ? (
+        <div className="profile-modal-overlay" onClick={() => setShowStudyTestSetupModal(false)}>
+          <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
+            <h3>Test Setup</h3>
+            <label className="game-control">
+              Subject
+              <div className="segmented">
+                {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                  <button
+                    key={`study-test-filter-${filter}`}
+                    className={studyTestFilter === filter ? 'seg active' : 'seg'}
+                    onClick={() => setStudyTestFilter(filter)}
+                  >
+                    {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label className="game-control">
+              Focus Level
+              <div className="segmented">
+                {(
+                  [
+                    { value: 'balanced', label: 'Balanced' },
+                    { value: 'needs_work', label: 'Needs Work' },
+                    { value: 'most_needs_work', label: 'Most Wrong' },
+                  ] as Array<{ value: StudyWrongness; label: string }>
+                ).map((option) => (
+                  <button
+                    key={`study-test-wrongness-${option.value}`}
+                    className={studyTestWrongness === option.value ? 'seg active' : 'seg'}
+                    onClick={() => setStudyTestWrongness(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label className="game-control">
+              Answer Type
+              <div className="segmented">
+                {(
+                  [
+                    { value: 'multiple', label: 'Multiple Choice' },
+                    { value: 'truefalse', label: 'True / False' },
+                  ] as Array<{ value: StudyAnswerMode; label: string }>
+                ).map((option) => (
+                  <button
+                    key={`study-test-answer-mode-${option.value}`}
+                    className={studyTestAnswerMode === option.value ? 'seg active' : 'seg'}
+                    onClick={() => setStudyTestAnswerMode(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label className="game-control">
+              Question Count
+              <div className="segmented">
+                {[20, 30, 50, 100].map((size) => (
+                  <button
+                    key={`study-test-count-${size}`}
+                    className={studyTestQuestionCount === size ? 'seg active' : 'seg'}
+                    onClick={() => setStudyTestQuestionCount(size)}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <p className="muted">{studyTestSelectionCount} source questions available</p>
+            <div className="actions-row">
+              <button className="secondary" onClick={() => setShowStudyTestSetupModal(false)}>Cancel</button>
+              <button className="primary" onClick={beginStudyTest} disabled={studyTestSelectionCount === 0}>Start Test</button>
             </div>
           </div>
         </div>

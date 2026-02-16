@@ -1,0 +1,542 @@
+[
+  {
+    "id": "vc-vc-2800-1-evade-peace-officer",
+    "category": "vc",
+    "title": "Evade peace officer",
+    "question": "Which section number matches: Evade peace officer?",
+    "answer": "VC 2800.1",
+    "tags": [
+      "evading"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 2800.1",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-2800-2-evade-peace-officer-with-reckless-dr",
+    "category": "vc",
+    "title": "Evade peace officer with reckless driving",
+    "question": "Which section number matches: Evade peace officer with reckless driving?",
+    "answer": "VC 2800.2(a)",
+    "tags": [
+      "evading",
+      "reckless"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 2800.2(a)",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-2800-3-evade-peace-officer-causing-serious",
+    "category": "vc",
+    "title": "Evade peace officer causing serious injury",
+    "question": "Which section number matches: Evade peace officer causing serious injury?",
+    "answer": "VC 2800.3(a)",
+    "tags": [
+      "evading",
+      "injury"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 2800.3(a)",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-2800-3-evade-peace-officer-causing-death",
+    "category": "vc",
+    "title": "Evade peace officer causing death",
+    "question": "Which section number matches: Evade peace officer causing death?",
+    "answer": "VC 2800.3(b)",
+    "tags": [
+      "evading",
+      "death"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 2800.3(b)",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-2800-4-evade-officer-driving-opposite-traff",
+    "category": "vc",
+    "title": "Evade officer driving opposite traffic flow",
+    "question": "Which section number matches: Evade officer driving opposite traffic flow?",
+    "answer": "VC 2800.4",
+    "tags": [
+      "evading"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 2800.4",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-2803-unsafe-load",
+    "category": "vc",
+    "title": "Unsafe load",
+    "question": "Which section number matches: Unsafe load?",
+    "answer": "VC 2803",
+    "tags": [
+      "equipment"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 2803",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-4000-unregistered-vehicle",
+    "category": "vc",
+    "title": "Unregistered vehicle",
+    "question": "Which section number matches: Unregistered vehicle?",
+    "answer": "VC 4000(a)(1)",
+    "tags": [
+      "registration"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 4000(a)(1)",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-4463-false-registration-license-plate-pla",
+    "category": "vc",
+    "title": "False registration, license plate, placard, or permits",
+    "question": "Which section number matches: False registration, license plate, placard, or permits?",
+    "answer": "VC 4463",
+    "tags": [
+      "fraud"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 4463",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-5201-1-obscure-license-plate",
+    "category": "vc",
+    "title": "Obscure license plate",
+    "question": "Which section number matches: Obscure license plate?",
+    "answer": "VC 5201.1",
+    "tags": [
+      "license plate"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 5201.1",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-10501-false-report-of-vehicle-theft",
+    "category": "vc",
+    "title": "False report of vehicle theft",
+    "question": "Which section number matches: False report of vehicle theft?",
+    "answer": "VC 10501",
+    "tags": [
+      "false report"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 10501",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-10851-vehicle-theft",
+    "category": "vc",
+    "title": "Vehicle theft",
+    "question": "Which section number matches: Vehicle theft?",
+    "answer": "VC 10851(a)",
+    "tags": [
+      "vehicle theft"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 10851(a)",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-10852-tamper-with-vehicle",
+    "category": "vc",
+    "title": "Tamper with vehicle",
+    "question": "Which section number matches: Tamper with vehicle?",
+    "answer": "VC 10852",
+    "tags": [
+      "tampering"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 10852",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-12500-unlicensed-driver",
+    "category": "vc",
+    "title": "Unlicensed driver",
+    "question": "Which section number matches: Unlicensed driver?",
+    "answer": "VC 12500",
+    "tags": [
+      "licensing"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 12500",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-12951-driver-s-license-not-in-possession",
+    "category": "vc",
+    "title": "Driver's license not in possession",
+    "question": "Which section number matches: Driver's license not in possession?",
+    "answer": "VC 12951",
+    "tags": [
+      "licensing"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 12951",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-14601-driving-privilege-suspended-or-revok",
+    "category": "vc",
+    "title": "Driving privilege suspended or revoked",
+    "question": "Which section number matches: Driving privilege suspended or revoked?",
+    "answer": "VC 14601",
+    "tags": [
+      "licensing"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 14601",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-14601-4-driving-privilege-suspended-or-revok",
+    "category": "vc",
+    "title": "Driving privilege suspended or revoked with bodily injury",
+    "question": "Which section number matches: Driving privilege suspended or revoked with bodily injury?",
+    "answer": "VC 14601.4",
+    "tags": [
+      "licensing",
+      "injury"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 14601.4",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-20001-hit-and-run-with-injury-or-death",
+    "category": "vc",
+    "title": "Hit and run with injury or death",
+    "question": "Which section number matches: Hit and run with injury or death?",
+    "answer": "VC 20001",
+    "tags": [
+      "hit and run"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 20001",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-20002-accident-with-vehicle-or-property-da",
+    "category": "vc",
+    "title": "Accident with vehicle or property damage",
+    "question": "Which section number matches: Accident with vehicle or property damage?",
+    "answer": "VC 20002",
+    "tags": [
+      "hit and run"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 20002",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-21202-bicyclist-on-roadway",
+    "category": "vc",
+    "title": "Bicyclist on roadway",
+    "question": "Which section number matches: Bicyclist on roadway?",
+    "answer": "VC 21202",
+    "tags": [
+      "bicycle"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 21202",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-21658-unsafe-lane-change",
+    "category": "vc",
+    "title": "Unsafe lane change",
+    "question": "Which section number matches: Unsafe lane change?",
+    "answer": "VC 21658",
+    "tags": [
+      "lane"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 21658",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-21701-interfere-with-driver-s-control-of-v",
+    "category": "vc",
+    "title": "Interfere with driver's control of vehicle",
+    "question": "Which section number matches: Interfere with driver's control of vehicle?",
+    "answer": "VC 21701",
+    "tags": [
+      "driver safety"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 21701",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-21703-following-too-closely",
+    "category": "vc",
+    "title": "Following too closely",
+    "question": "Which section number matches: Following too closely?",
+    "answer": "VC 21703",
+    "tags": [
+      "following"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 21703",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-21750-overtaking-and-passing",
+    "category": "vc",
+    "title": "Overtaking and passing",
+    "question": "Which section number matches: Overtaking and passing?",
+    "answer": "VC 21750(a)",
+    "tags": [
+      "passing"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 21750(a)",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-21955-jaywalking",
+    "category": "vc",
+    "title": "Jaywalking",
+    "question": "Which section number matches: Jaywalking?",
+    "answer": "VC 21955",
+    "tags": [
+      "pedestrian"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 21955",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-21957-hitchhiking-on-roadway",
+    "category": "vc",
+    "title": "Hitchhiking on roadway",
+    "question": "Which section number matches: Hitchhiking on roadway?",
+    "answer": "VC 21957",
+    "tags": [
+      "pedestrian"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 21957",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-22109-stopping-suddenly",
+    "category": "vc",
+    "title": "Stopping suddenly",
+    "question": "Which section number matches: Stopping suddenly?",
+    "answer": "VC 22109",
+    "tags": [
+      "stopping"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 22109",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-22348-excessive-speed",
+    "category": "vc",
+    "title": "Excessive speed",
+    "question": "Which section number matches: Excessive speed?",
+    "answer": "VC 22348",
+    "tags": [
+      "speed"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 22348",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-23103-reckless-driving",
+    "category": "vc",
+    "title": "Reckless driving",
+    "question": "Which section number matches: Reckless driving?",
+    "answer": "VC 23103",
+    "tags": [
+      "reckless"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 23103",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-23104-reckless-driving-and-bodily-injury",
+    "category": "vc",
+    "title": "Reckless driving and bodily injury",
+    "question": "Which section number matches: Reckless driving and bodily injury?",
+    "answer": "VC 23104",
+    "tags": [
+      "reckless",
+      "injury"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 23104",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-23110-throw-substance-at-vehicle",
+    "category": "vc",
+    "title": "Throw substance at vehicle",
+    "question": "Which section number matches: Throw substance at vehicle?",
+    "answer": "VC 23110",
+    "tags": [
+      "projectile"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 23110",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-23123-wireless-telephone-use-while-driving",
+    "category": "vc",
+    "title": "Wireless telephone use while driving",
+    "question": "Which section number matches: Wireless telephone use while driving?",
+    "answer": "VC 23123",
+    "tags": [
+      "distraction"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 23123",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-23152-dui",
+    "category": "vc",
+    "title": "DUI",
+    "question": "Which section number matches: DUI?",
+    "answer": "VC 23152(a)",
+    "tags": [
+      "dui"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 23152(a)",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-23152-dui-0-08-bac-or-more",
+    "category": "vc",
+    "title": "DUI 0.08% BAC or more",
+    "question": "Which section number matches: DUI 0.08% BAC or more?",
+    "answer": "VC 23152(b)",
+    "tags": [
+      "dui"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 23152(b)",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-23153-dui-with-injury",
+    "category": "vc",
+    "title": "DUI with injury",
+    "question": "Which section number matches: DUI with injury?",
+    "answer": "VC 23153",
+    "tags": [
+      "dui",
+      "injury"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 23153",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-23153-dui-0-08-bac-or-more-with-injury",
+    "category": "vc",
+    "title": "DUI 0.08% BAC or more with injury",
+    "question": "Which section number matches: DUI 0.08% BAC or more with injury?",
+    "answer": "VC 23153(b)",
+    "tags": [
+      "dui",
+      "injury"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 23153(b)",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-23222-open-container-or-cannabis",
+    "category": "vc",
+    "title": "Open container or cannabis",
+    "question": "Which section number matches: Open container or cannabis?",
+    "answer": "VC 23222",
+    "tags": [
+      "open container"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 23222",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-26708-material-obstructing-driver-s-view",
+    "category": "vc",
+    "title": "Material obstructing driver's view",
+    "question": "Which section number matches: Material obstructing driver's view?",
+    "answer": "VC 26708",
+    "tags": [
+      "equipment"
+    ],
+    "difficulty": "easy",
+    "codeSection": "VC 26708",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-27151-exhaust-system-modification",
+    "category": "vc",
+    "title": "Exhaust system modification",
+    "question": "Which section number matches: Exhaust system modification?",
+    "answer": "VC 27151",
+    "tags": [
+      "equipment"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 27151",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-27315-seat-belt-violation",
+    "category": "vc",
+    "title": "Seat belt violation",
+    "question": "Which section number matches: Seat belt violation?",
+    "answer": "VC 27315",
+    "tags": [
+      "safety"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 27315",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-27360-child-seat-restraint-under-age-8",
+    "category": "vc",
+    "title": "Child seat restraint under age 8",
+    "question": "Which section number matches: Child seat restraint under age 8?",
+    "answer": "VC 27360",
+    "tags": [
+      "child safety"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 27360",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  },
+  {
+    "id": "vc-vc-27360-5-child-seat-restraint-age-8-or-older",
+    "category": "vc",
+    "title": "Child seat restraint age 8 or older",
+    "question": "Which section number matches: Child seat restraint age 8 or older?",
+    "answer": "VC 27360.5",
+    "tags": [
+      "child safety"
+    ],
+    "difficulty": "medium",
+    "codeSection": "VC 27360.5",
+    "explanation": "Imported from provided study list. Replace with official statute text for production."
+  }
+]
