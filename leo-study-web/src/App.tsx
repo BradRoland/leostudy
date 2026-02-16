@@ -21,6 +21,7 @@ type HomeLeaderboardEntry = {
   playerName: string
   avatarUrl: string
   supporterTier: SupporterTier
+  themeId: string
   nameStyle: NameStyle
   bio: string
   agency: string
@@ -90,6 +91,7 @@ type LeaderboardEntry = {
   bio: string
   agency: string
   nameStyle: NameStyle
+  themeId: string
   isOwner: boolean
   matchDuration: number | null
   matchFilter: CodeFilter | null
@@ -1391,6 +1393,7 @@ function App() {
   const [scenarioDeck, setScenarioDeck] = useState<ScenarioQuestion[]>([])
   const [scenarioCurrentQuestion, setScenarioCurrentQuestion] = useState<ScenarioQuestion | null>(null)
   const [scenarioResult, setScenarioResult] = useState<string>('')
+  const [scenarioSelectedChoice, setScenarioSelectedChoice] = useState<number | null>(null)
   const [scenarioStreak, setScenarioStreak] = useState(0)
   const [gamesMode, setGamesMode] = useState<'matching' | 'speed'>('matching')
   const lastAppStateUpdateRef = useRef(0)
@@ -1404,6 +1407,7 @@ function App() {
   const quizFireHostRef = useRef<HTMLDivElement | null>(null)
   const scenarioFireHostRef = useRef<HTMLDivElement | null>(null)
   const scenarioNextRef = useRef<HTMLDivElement | null>(null)
+  const scenarioPromptRef = useRef<HTMLHeadingElement | null>(null)
   const quizNextRef = useRef<HTMLButtonElement | null>(null)
   const [quizFireWidth, setQuizFireWidth] = useState(0)
   const [scenarioFireWidth, setScenarioFireWidth] = useState(0)
@@ -1720,6 +1724,7 @@ function App() {
         bio: detailsByUserId[String(entry.user_id)]?.bio || '',
         agency: detailsByUserId[String(entry.user_id)]?.agency || '',
         nameStyle: detailsByUserId[String(entry.user_id)]?.nameStyle || { ...defaultNameStyle },
+        themeId: detailsByUserId[String(entry.user_id)]?.themeId || appThemePresets[0].id,
         isOwner: ownerUserIds.has(String(entry.user_id || '')),
         matchDuration: typeof entry.match_duration === 'number' ? entry.match_duration : null,
         matchFilter: (['all', 'penal', 'hs', 'vehicle'].includes(String(entry.match_filter))
@@ -1798,6 +1803,7 @@ function App() {
         playerName: profile.username,
         avatarUrl: profile.avatarUrl,
         supporterTier: profile.supporterTier,
+        themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
         nameStyle: parsed.profileDetails.nameStyle,
         bio: parsed.profileDetails.bio,
         agency: parsed.profileDetails.agency,
@@ -1812,6 +1818,7 @@ function App() {
         playerName: profile.username,
         avatarUrl: profile.avatarUrl,
         supporterTier: profile.supporterTier,
+        themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
         nameStyle: parsed.profileDetails.nameStyle,
         bio: parsed.profileDetails.bio,
         agency: parsed.profileDetails.agency,
@@ -2555,10 +2562,20 @@ function App() {
     setScenarioCurrentQuestion(next)
     setScenarioDeck(remaining)
     setScenarioResult('')
+    setScenarioSelectedChoice(null)
+    window.setTimeout(() => {
+      const promptEl = scenarioPromptRef.current
+      if (!promptEl) return
+      const rect = promptEl.getBoundingClientRect()
+      const topOffset = window.innerWidth < 768 ? 108 : 118
+      const targetTop = Math.max(0, rect.top + window.scrollY - topOffset)
+      window.scrollTo({ top: targetTop, behavior: 'smooth' })
+    }, 40)
   }
 
   const answerScenario = (choiceIndex: number) => {
     if (!scenarioCurrentQuestion) return
+    setScenarioSelectedChoice(choiceIndex)
     const isCorrect = choiceIndex === scenarioCurrentQuestion.correctIndex
     incrementUserStats((stats) => ({ ...stats, scenariosReviewed: stats.scenariosReviewed + 1 }))
     if (isCorrect) {
@@ -2575,7 +2592,16 @@ function App() {
   useEffect(() => {
     if (!scenarioResult) return
     const timeout = window.setTimeout(() => {
-      scenarioNextRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const nextWrap = scenarioNextRef.current
+      if (!nextWrap) return
+      const rect = nextWrap.getBoundingClientRect()
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+      const targetBottom = viewportHeight - (viewportHeight < 820 ? 168 : 130)
+      if (rect.bottom > targetBottom) {
+        const overflow = rect.bottom - targetBottom
+        const delta = Math.min(420, Math.max(48, overflow + 28))
+        window.scrollBy({ top: delta, behavior: 'smooth' })
+      }
     }, 120)
     return () => window.clearTimeout(timeout)
   }, [scenarioResult])
@@ -3171,6 +3197,21 @@ function App() {
   const activeProfileTier: SupporterTier = profile?.supporterTier || 'free'
   const activeProfileName = profile?.username || 'Officer'
   const showHomeButton = !isHomePage
+  const selectedLeaderboardTheme = selectedLeaderboardEntry
+    ? getThemePreset(selectedLeaderboardEntry.themeId)
+    : appThemePresets[0]
+  const selectedLeaderboardThemeClass =
+    selectedLeaderboardTheme.id === 'golden'
+      ? 'profile-modal-theme-gold'
+      : ['pure-white', 'pastel-sky', 'pastel-rose'].includes(selectedLeaderboardTheme.id)
+        ? 'profile-modal-theme-glass'
+        : 'profile-modal-theme-midnight'
+  const leaderboardProfileNameStyle: CSSProperties | undefined =
+    selectedLeaderboardThemeClass === 'profile-modal-theme-glass'
+      ? { color: '#10203f', WebkitTextFillColor: '#10203f', textShadow: 'none' }
+      : selectedLeaderboardThemeClass === 'profile-modal-theme-gold'
+        ? { color: '#f9ebca', WebkitTextFillColor: '#f9ebca', textShadow: 'none' }
+        : { color: '#f0f4ff', WebkitTextFillColor: '#f0f4ff', textShadow: 'none' }
   const incrementUserStats = (updater: (stats: UserStats) => UserStats) => {
     setProfileDetails((previous) => ({
       ...previous,
@@ -3633,6 +3674,7 @@ function App() {
       playerName: entry.playerName,
       avatarUrl: entry.avatarUrl,
       supporterTier: entry.supporterTier,
+      themeId: entry.themeId,
       bio: entry.bio,
       agency: entry.agency,
       nameStyle: entry.nameStyle,
@@ -4119,7 +4161,7 @@ function App() {
                     key={`home-hours-${entry.userId}-${index}`}
                     type="button"
                     className="leader-row leader-row-button"
-                    onClick={() => openHomeProfile(entry, 'Study Hours', index === 0)}
+                    onClick={() => openHomeProfile(entry, 'Study Time', index === 0)}
                   >
                     <span>#{index + 1}</span>
                     <span className="leader-player">
@@ -4327,6 +4369,7 @@ function App() {
                 <h3>$5 Supporter+</h3>
                 <ul>
                   <li>Everything in $2 tier</li>
+                  <li>Unlock all website themes</li>
                   <li>Priority access to upcoming features</li>
                   <li>More perks planned soon</li>
                 </ul>
@@ -4990,12 +5033,22 @@ function App() {
                     <div className="quiz-top">
                       <span>Scenario Streak: {scenarioStreak}</span>
                     </div>
-                    <h3>{scenarioCurrentQuestion.prompt}</h3>
+                    <h3 ref={scenarioPromptRef}>{scenarioCurrentQuestion.prompt}</h3>
                     <div className="scenario-actions">
                       {scenarioCurrentQuestion.choices.map((choice, index) => (
                         <button
                           key={`scenario-choice-${scenarioCurrentQuestion.id}-${index}`}
-                          className="scenario-answer-btn"
+                          className={`scenario-answer-btn ${
+                            scenarioResult
+                              ? index === scenarioCurrentQuestion.correctIndex
+                                ? 'scenario-correct'
+                                : scenarioSelectedChoice === index
+                                  ? 'scenario-wrong'
+                                  : ''
+                              : scenarioSelectedChoice === index
+                                ? 'scenario-selected'
+                                : ''
+                          }`}
                           onClick={() => answerScenario(index)}
                           disabled={Boolean(scenarioResult)}
                         >
@@ -5357,7 +5410,10 @@ function App() {
                       </div>
                     </div>
                   ) : (
-                    <p className="muted">Name customization is unlocked for $10 Pro Supporter.</p>
+                    <div className="locked-preview-card">
+                      <p className="locked-title">Locked • $10 Pro Supporter</p>
+                      <p className="muted">Name customization (font, color, glow, presets) unlocks with the $10 tier.</p>
+                    </div>
                   )}
 
                   {canCustomizeName ? (
@@ -5404,23 +5460,27 @@ function App() {
                     null
                   )}
                   <h3>Website Theme</h3>
-                  {canUseThemes ? (
+                  <div className={!canUseThemes ? 'locked-preview-card theme-paywall-wrap' : ''}>
+                    {!canUseThemes ? <p className="locked-title">Locked • $5 Supporter+</p> : null}
                     <div className="theme-grid">
                       {appThemePresets.map((theme) => (
                         <button
                           key={theme.id}
                           type="button"
-                          className={profileDetails.themeId === theme.id ? 'theme-card active' : 'theme-card'}
-                          onClick={() => setProfileDetails((previous) => ({ ...previous, themeId: theme.id }))}
+                          className={`${profileDetails.themeId === theme.id && canUseThemes ? 'theme-card active' : 'theme-card'} ${!canUseThemes ? 'locked' : ''}`}
+                          onClick={() => {
+                            if (!canUseThemes) return
+                            setProfileDetails((previous) => ({ ...previous, themeId: theme.id }))
+                          }}
+                          disabled={!canUseThemes}
                         >
                           <span className="theme-swatch" style={{ background: theme.swatch }} />
                           <span className="theme-name">{theme.name}</span>
                         </button>
                       ))}
                     </div>
-                  ) : (
-                    <p className="muted">Themes are unlocked for $5 Supporter+ and above.</p>
-                  )}
+                  </div>
+                  {!canUseThemes ? <p className="muted">Themes are preview-only. Upgrade to $5 Supporter+ to apply them.</p> : null}
                   <p className="muted">Current theme: {selectedTheme.name}</p>
                   <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
                     Save Customization
@@ -5655,6 +5715,7 @@ function App() {
                           {tier === 'tier5' ? (
                             <>
                               <li>Everything in $2 tier</li>
+                              <li>Unlock all website themes</li>
                               <li>Priority access to upcoming features</li>
                             </>
                           ) : null}
@@ -5758,7 +5819,7 @@ function App() {
             setResetConfirmText('')
           }}
         >
-          <div className="card profile-modal-card" onClick={(event) => event.stopPropagation()}>
+          <div className={`card profile-modal-card ${selectedLeaderboardThemeClass}`} onClick={(event) => event.stopPropagation()}>
             <h3>Confirm Reset</h3>
             <p className="bad">
               This will permanently delete your progress, mastered codes, study stats, streaks, and leaderboard scores.
@@ -5815,7 +5876,7 @@ function App() {
 
       {selectedLeaderboardEntry ? (
         <div
-          className="profile-modal-overlay"
+          className="profile-modal-overlay leaderboard-profile-overlay"
           onClick={() => {
             setSelectedLeaderboardEntry(null)
             setSelectedLeaderboardIsTop(false)
@@ -5842,7 +5903,7 @@ function App() {
                 </span>
               </span>
               <div>
-                <h3 className={displayNameClass(selectedLeaderboardEntry.supporterTier, true)} style={displayNameStyle(selectedLeaderboardEntry.nameStyle, selectedLeaderboardEntry.supporterTier)}>
+                <h3 className={displayNameClass(selectedLeaderboardEntry.supporterTier, true)} style={leaderboardProfileNameStyle}>
                   {selectedLeaderboardEntry.playerName}
                 </h3>
                 <p className="muted">Tier: {tierLabel[selectedLeaderboardEntry.supporterTier]}</p>
@@ -5864,7 +5925,7 @@ function App() {
             <p className="muted">
               {selectedLeaderboardEntry.round > 0
                 ? `Best ${selectedLeaderboardEntry.game} score: ${selectedLeaderboardEntry.score} • Round ${selectedLeaderboardEntry.round}`
-                : `${selectedLeaderboardEntry.game}: ${selectedLeaderboardEntry.game === 'Study Hours' ? formatStudyTime(selectedLeaderboardEntry.score) : selectedLeaderboardEntry.score}`}
+                : `${selectedLeaderboardEntry.game}: ${selectedLeaderboardEntry.game === 'Study Time' ? formatStudyTime(selectedLeaderboardEntry.score) : selectedLeaderboardEntry.score}`}
             </p>
           </div>
         </div>
@@ -5921,7 +5982,7 @@ function App() {
       ) : null}
 
       {showStudyFlashSetupModal ? (
-        <div className="profile-modal-overlay" onClick={() => setShowStudyFlashSetupModal(false)}>
+        <div className="profile-modal-overlay study-setup-overlay" onClick={() => setShowStudyFlashSetupModal(false)}>
           <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
             <h3>Flashcards Setup</h3>
             <label className="game-control">
@@ -5948,7 +6009,7 @@ function App() {
       ) : null}
 
       {showStudyTestSetupModal ? (
-        <div className="profile-modal-overlay" onClick={() => setShowStudyTestSetupModal(false)}>
+        <div className="profile-modal-overlay study-setup-overlay" onClick={() => setShowStudyTestSetupModal(false)}>
           <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
             <h3>Test Setup</h3>
             <label className="game-control">
@@ -6028,7 +6089,7 @@ function App() {
       ) : null}
 
       {showMatchSetupModal ? (
-        <div className="profile-modal-overlay" onClick={() => setShowMatchSetupModal(false)}>
+        <div className="profile-modal-overlay game-setup-overlay" onClick={() => setShowMatchSetupModal(false)}>
           <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
             <h3>Matching Settings</h3>
             <label className="game-control">
@@ -6060,7 +6121,7 @@ function App() {
       ) : null}
 
       {showSpeedSetupModal ? (
-        <div className="profile-modal-overlay" onClick={() => setShowSpeedSetupModal(false)}>
+        <div className="profile-modal-overlay game-setup-overlay" onClick={() => setShowSpeedSetupModal(false)}>
           <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
             <h3>Speed Test Settings</h3>
             <label className="game-control">
