@@ -3200,18 +3200,21 @@ function App() {
   const selectedLeaderboardTheme = selectedLeaderboardEntry
     ? getThemePreset(selectedLeaderboardEntry.themeId)
     : appThemePresets[0]
-  const selectedLeaderboardThemeClass =
+  const selectedLeaderboardThemeStyle = {
+    ['--leader-panel' as string]: selectedLeaderboardTheme.vars.panelStrong,
+    ['--leader-border' as string]: selectedLeaderboardTheme.vars.border,
+    ['--leader-text' as string]: selectedLeaderboardTheme.vars.text,
+    ['--leader-muted' as string]: selectedLeaderboardTheme.vars.muted,
+    ['--leader-accent' as string]: selectedLeaderboardTheme.vars.accent,
+    ['--leader-body-radial' as string]: selectedLeaderboardTheme.vars.bodyRadial,
+    ['--leader-body-base' as string]: selectedLeaderboardTheme.vars.bodyBase,
+  } as CSSProperties
+  const selectedLeaderboardThemeCardClass =
     selectedLeaderboardTheme.id === 'golden'
-      ? 'profile-modal-theme-gold'
-      : ['pure-white', 'pastel-sky', 'pastel-rose'].includes(selectedLeaderboardTheme.id)
-        ? 'profile-modal-theme-glass'
-        : 'profile-modal-theme-midnight'
+      ? 'profile-modal-theme-dynamic profile-modal-theme-dynamic-gold'
+      : 'profile-modal-theme-dynamic'
   const leaderboardProfileNameStyle: CSSProperties | undefined =
-    selectedLeaderboardThemeClass === 'profile-modal-theme-glass'
-      ? { color: '#10203f', WebkitTextFillColor: '#10203f', textShadow: 'none' }
-      : selectedLeaderboardThemeClass === 'profile-modal-theme-gold'
-        ? { color: '#f9ebca', WebkitTextFillColor: '#f9ebca', textShadow: 'none' }
-        : { color: '#f0f4ff', WebkitTextFillColor: '#f0f4ff', textShadow: 'none' }
+    { color: selectedLeaderboardTheme.vars.text, WebkitTextFillColor: selectedLeaderboardTheme.vars.text, textShadow: 'none' }
   const incrementUserStats = (updater: (stats: UserStats) => UserStats) => {
     setProfileDetails((previous) => ({
       ...previous,
@@ -5819,7 +5822,10 @@ function App() {
             setResetConfirmText('')
           }}
         >
-          <div className={`card profile-modal-card ${selectedLeaderboardThemeClass}`} onClick={(event) => event.stopPropagation()}>
+          <div
+            className="card profile-modal-card"
+            onClick={(event) => event.stopPropagation()}
+          >
             <h3>Confirm Reset</h3>
             <p className="bad">
               This will permanently delete your progress, mastered codes, study stats, streaks, and leaderboard scores.
@@ -5876,13 +5882,14 @@ function App() {
 
       {selectedLeaderboardEntry ? (
         <div
-          className="profile-modal-overlay leaderboard-profile-overlay"
+          className="profile-modal-overlay leaderboard-profile-overlay leaderboard-profile-overlay-themed"
+          style={selectedLeaderboardThemeStyle}
           onClick={() => {
             setSelectedLeaderboardEntry(null)
             setSelectedLeaderboardIsTop(false)
           }}
         >
-          <div className="card profile-modal-card" onClick={(event) => event.stopPropagation()}>
+          <div className={`card profile-modal-card ${selectedLeaderboardThemeCardClass}`} onClick={(event) => event.stopPropagation()}>
             <div className="quiz-top">
               <h3>Player Profile</h3>
               <button
@@ -5927,6 +5934,7 @@ function App() {
                 ? `Best ${selectedLeaderboardEntry.game} score: ${selectedLeaderboardEntry.score} • Round ${selectedLeaderboardEntry.round}`
                 : `${selectedLeaderboardEntry.game}: ${selectedLeaderboardEntry.game === 'Study Time' ? formatStudyTime(selectedLeaderboardEntry.score) : selectedLeaderboardEntry.score}`}
             </p>
+            <p className="leader-theme-pill">Theme: {selectedLeaderboardTheme.name}</p>
           </div>
         </div>
       ) : null}
