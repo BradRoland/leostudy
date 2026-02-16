@@ -1,0 +1,24 @@
+.DS_Store
+.codex/
+
+# Env / secrets
+**/.env
+**/.env.*
+!.env.example
+
+# Node
+**/node_modules/
+**/dist/
+**/.vite/
+**/.parcel-cache/
+**/coverage/
+**/.turbo/
+
+# Logs
+*.log
+
+# Xcode / macOS
+**/DerivedData/
+**/*.xcuserstate
+**/*.xcuserdata/
+**/*.moved-aside

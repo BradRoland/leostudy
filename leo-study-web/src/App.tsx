@@ -11,7 +11,7 @@ type CodeFilter = CodeSet | 'all'
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home'
 type DurationFilter = 15 | 30 | 60 | 'all'
-type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards'
+type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'warning'
 type StatsIconName = 'overview' | 'time' | 'words' | 'penal' | 'flashcards' | 'scenarios' | 'streak' | 'game' | 'studyset'
 type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
 type StudyAnswerMode = 'multiple' | 'truefalse'
@@ -1165,6 +1165,15 @@ function AppIcon({ name, className = '' }: { name: AppIconName; className?: stri
       </svg>
     )
   }
+  if (name === 'warning') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M12 3 1.8 20.5a1.4 1.4 0 0 0 1.2 2.1h18a1.4 1.4 0 0 0 1.2-2.1L12 3Z" />
+        <path d="M12 9v5" />
+        <path d="M12 17.3h.01" />
+      </svg>
+    )
+  }
   return (
     <svg {...commonProps} className={className} aria-hidden>
       <path d="M3 11.5 12 4l9 7.5" />
@@ -1347,6 +1356,7 @@ function App() {
   const [homeMasteredInfoOpen, setHomeMasteredInfoOpen] = useState(false)
   const [assistedLearningEnabled, setAssistedLearningEnabled] = useState(true)
   const [showAssistedLearningInfo, setShowAssistedLearningInfo] = useState(false)
+  const [showDevNotice, setShowDevNotice] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -2800,6 +2810,9 @@ function App() {
       return
     }
 
+    window.localStorage.setItem('pending_profile_setup', '1')
+    window.localStorage.setItem('pending_dev_notice', '1')
+    setForceProfileSetup(true)
     await supabase.auth.signOut()
     const normalizedEmail = authEmail.trim().toLowerCase()
     setAuthEmail(normalizedEmail)
@@ -2819,6 +2832,7 @@ function App() {
     setAuthError('')
     if (isSignUpPage) {
       window.localStorage.setItem('pending_profile_setup', '1')
+      window.localStorage.setItem('pending_dev_notice', '1')
     }
 
     const { error } = await supabase.auth.signInWithOAuth({
@@ -2840,6 +2854,34 @@ function App() {
     setAuthError('')
     setAuthSuccess('')
 
+    const usernameTakenMessage = 'Username already exists. Try another.'
+    const normalizedUsername = profileUsername.trim()
+    if (!normalizedUsername) {
+      setAuthError('Please enter a username.')
+      setAuthLoading(false)
+      return
+    }
+
+    try {
+      const { data: existingUsernameRow, error: existingUsernameError } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .ilike('username', normalizedUsername)
+        .neq('user_id', currentUserId)
+        .limit(1)
+        .maybeSingle()
+      if (existingUsernameError) {
+        console.warn('[profiles] username availability check failed:', existingUsernameError.message)
+      }
+      if (existingUsernameRow?.user_id) {
+        setAuthError(usernameTakenMessage)
+        setAuthLoading(false)
+        return
+      }
+    } catch (error) {
+      console.warn('[profiles] username availability check crashed:', error)
+    }
+
     let avatarPath = profile?.avatarPath || ''
 
     if (profileAvatar) {
@@ -2854,7 +2896,6 @@ function App() {
       avatarPath = fileName
     }
 
-    const normalizedUsername = profileUsername.trim()
     const { data: savedProfileRow, error } = await supabase
       .from('profiles')
       .upsert(
@@ -2873,7 +2914,18 @@ function App() {
       .single()
 
     if (error) {
-      setAuthError(error.message)
+      const typed = error as unknown as { message?: string; code?: string; details?: string }
+      const message = String(typed.message || 'Could not save profile.')
+      const code = String(typed.code || '')
+      const details = String(typed.details || '')
+      const isUsernameUniqueViolation =
+        code === '23505' ||
+        message.toLowerCase().includes('duplicate key') ||
+        message.toLowerCase().includes('unique constraint') ||
+        message.toLowerCase().includes('profiles_username_lower_unique') ||
+        details.toLowerCase().includes('profiles_username_lower_unique')
+
+      setAuthError(isUsernameUniqueViolation ? usernameTakenMessage : message)
       setAuthLoading(false)
       return
     }
@@ -2882,6 +2934,15 @@ function App() {
     setProfile(mapped)
     setProfileUsername(mapped.username)
     setForceProfileSetup(false)
+
+    const pendingDevNotice = window.localStorage.getItem('pending_dev_notice') === '1'
+    window.localStorage.removeItem('pending_dev_notice')
+    if (pendingDevNotice) {
+      const dismissedKey = `dev_notice_dismissed_${currentUserId}`
+      const dismissed = window.localStorage.getItem(dismissedKey) === '1'
+      if (!dismissed) setShowDevNotice(true)
+    }
+
     setProfileAvatar(null)
     if (profileAvatarPreviewUrl) URL.revokeObjectURL(profileAvatarPreviewUrl)
     setProfileAvatarPreviewUrl('')
@@ -3998,7 +4059,13 @@ function App() {
             <h1>Set up your profile</h1>
             <label>
               Username
-              <input value={profileUsername} onChange={(event) => setProfileUsername(event.target.value)} />
+              <input
+                value={profileUsername}
+                onChange={(event) => {
+                  setProfileUsername(event.target.value)
+                  if (authError.toLowerCase().includes('username already exists')) setAuthError('')
+                }}
+              />
             </label>
             <label>
               Profile picture
@@ -4309,8 +4376,8 @@ function App() {
               <div className="card">
                 <div className="card-menu-head">
                   <h3>Most Mastered Codes</h3>
-                  <button className="icon-menu-button info-button" onClick={() => setHomeMasteredInfoOpen((value) => !value)} aria-label="What is mastered code">
-                    i
+                  <button className="assisted-learning-info-button" onClick={() => setHomeMasteredInfoOpen((value) => !value)} aria-label="What is mastered code">
+                    ⓘ
                   </button>
                 </div>
                 {homeMasteredInfoOpen ? (
@@ -4436,24 +4503,6 @@ function App() {
 
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isStudyPage && (
           <section className="study-section study-hub">
-            <div className="assisted-learning-row">
-              <label className="assisted-learning-toggle">
-                <input
-                  type="checkbox"
-                  checked={assistedLearningEnabled}
-                  onChange={(event) => setAssistedLearningEnabled(event.target.checked)}
-                />
-                Assisted Learning
-              </label>
-              <button
-                className="icon-menu-button info-button"
-                onClick={() => setShowAssistedLearningInfo(true)}
-                aria-label="Assisted Learning info"
-              >
-                i
-              </button>
-            </div>
-
             <div className="study-actions-grid">
               <button className="card study-action-card" onClick={() => setShowStudyFlashSetupModal(true)}>
                 <div className="study-action-icon">
@@ -5239,30 +5288,19 @@ function App() {
               <div className="settings-panel">
               {settingsTab === 'profile' ? (
                 <div className="settings-section-card">
-                  <div className="settings-inline-head">
-                    <label className="assisted-learning-toggle">
-                      <input
-                        type="checkbox"
-                        checked={assistedLearningEnabled}
-                        onChange={(event) => setAssistedLearningEnabled(event.target.checked)}
-                      />
-                      Assisted Learning
-                    </label>
-                    <button
-                      className="icon-menu-button info-button"
-                      onClick={() => setShowAssistedLearningInfo(true)}
-                      aria-label="Assisted Learning info"
-                    >
-                      I
-                    </button>
-                  </div>
                   <div className="avatar-frame">
                     <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
                   </div>
                   {isOwner ? <p className="owner-pill">Owner</p> : null}
                   <label>
                     Username
-                    <input value={profileUsername} onChange={(event) => setProfileUsername(event.target.value)} />
+                    <input
+                      value={profileUsername}
+                      onChange={(event) => {
+                        setProfileUsername(event.target.value)
+                        if (authError.toLowerCase().includes('username already exists')) setAuthError('')
+                      }}
+                    />
                   </label>
                   <label>
                     Profile picture
@@ -5287,6 +5325,23 @@ function App() {
                       onChange={(event) => setProfileDetails((previous) => ({ ...previous, agency: event.target.value }))}
                     />
                   </label>
+                  <div className="assisted-learning-inline">
+                    <label className="assisted-learning-toggle">
+                      <input
+                        type="checkbox"
+                        checked={assistedLearningEnabled}
+                        onChange={(event) => setAssistedLearningEnabled(event.target.checked)}
+                      />
+                      Assisted Learning
+                    </label>
+                    <button
+                      className="assisted-learning-info-button"
+                      onClick={() => setShowAssistedLearningInfo(true)}
+                      aria-label="Assisted Learning info"
+                    >
+                      ⓘ
+                    </button>
+                  </div>
                   <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
                     Save Profile Details
                   </button>
@@ -5861,7 +5916,7 @@ function App() {
       ) : null}
 
       {showAssistedLearningInfo ? (
-        <div className="profile-modal-overlay" onClick={() => setShowAssistedLearningInfo(false)}>
+        <div className="profile-modal-overlay assisted-info-overlay" onClick={() => setShowAssistedLearningInfo(false)}>
           <div className="card profile-modal-card" onClick={(event) => event.stopPropagation()}>
             <div className="quiz-top">
               <h3>Assisted Learning</h3>
@@ -5876,6 +5931,46 @@ function App() {
               <li>Mastered codes are still included, but at lower frequency.</li>
               <li>This applies to Quick Quiz and Flashcards.</li>
             </ul>
+          </div>
+        </div>
+      ) : null}
+
+      {showDevNotice && currentUserId ? (
+        <div
+          className="profile-modal-overlay dev-notice-overlay"
+          onClick={() => {
+            window.localStorage.setItem(`dev_notice_dismissed_${currentUserId}`, '1')
+            setShowDevNotice(false)
+          }}
+        >
+          <div className="card profile-modal-card dev-notice-card" onClick={(event) => event.stopPropagation()}>
+            <div className="quiz-top">
+              <div className="dev-notice-heading">
+                <AppIcon name="warning" className="dev-notice-icon" />
+                <h3>Development Notice</h3>
+              </div>
+              <button
+                className="secondary"
+                onClick={() => {
+                  window.localStorage.setItem(`dev_notice_dismissed_${currentUserId}`, '1')
+                  setShowDevNotice(false)
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <p className="muted">
+              This website is still in development by Roland. Expect bugs. He will continue to develop this whenever he has a chance, such as never.
+            </p>
+            <button
+              className="primary"
+              onClick={() => {
+                window.localStorage.setItem(`dev_notice_dismissed_${currentUserId}`, '1')
+                setShowDevNotice(false)
+              }}
+            >
+              Got it
+            </button>
           </div>
         </div>
       ) : null}
