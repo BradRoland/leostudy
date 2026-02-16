@@ -918,9 +918,9 @@ button {
 }
 
 .match-done {
-  border-color: rgba(86, 220, 143, 0.95);
-  background: rgba(52, 191, 110, 0.36);
-  box-shadow: 0 0 0 1px rgba(116, 234, 163, 0.35), 0 0 18px rgba(57, 196, 114, 0.25);
+  border-color: rgba(107, 255, 170, 0.98);
+  background: linear-gradient(150deg, rgba(58, 233, 135, 0.7), rgba(38, 191, 104, 0.62));
+  box-shadow: 0 0 0 2px rgba(129, 255, 183, 0.62), 0 0 24px rgba(76, 255, 153, 0.45);
 }
 
 .match-done small,
@@ -965,9 +965,9 @@ button {
 .app-shell.theme-light .match-done,
 .app-shell.theme-glass .match-done,
 .app-shell.theme-gold .match-done {
-  border-color: rgba(39, 170, 94, 0.72);
-  background: rgba(75, 197, 126, 0.35);
-  box-shadow: 0 0 0 1px rgba(40, 173, 96, 0.3), 0 0 15px rgba(56, 177, 108, 0.2);
+  border-color: rgba(34, 173, 96, 0.95);
+  background: linear-gradient(145deg, rgba(88, 228, 147, 0.66), rgba(56, 194, 117, 0.56));
+  box-shadow: 0 0 0 2px rgba(52, 194, 113, 0.45), 0 0 20px rgba(44, 189, 109, 0.32);
 }
 
 .app-shell.theme-light .match-done small,
