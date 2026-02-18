@@ -3980,6 +3980,26 @@ function App() {
     return () => window.removeEventListener('keydown', handleAnswerKeyDown)
   }, [currentQuestion, selectedChoice, answerQuestion])
 
+  // Enter key to advance study test question
+  useEffect(() => {
+    if (!currentQuestion || selectedChoice === null || studyTestSessionDone) return
+
+    const handleEnterKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) {
+        return
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        advanceStudyTestQuestion()
+      }
+    }
+
+    window.addEventListener('keydown', handleEnterKey)
+    return () => window.removeEventListener('keydown', handleEnterKey)
+  }, [currentQuestion, selectedChoice, studyTestSessionDone, advanceStudyTestQuestion])
+
   // Keyboard shortcuts for speed test questions (1-4 keys)
   useEffect(() => {
     if (!speedCurrentQuestion || speedFeedback) return
@@ -4059,6 +4079,26 @@ function App() {
     window.addEventListener('keydown', handleScenarioAnswerKeyDown)
     return () => window.removeEventListener('keydown', handleScenarioAnswerKeyDown)
   }, [scenarioCurrentQuestion, scenarioSelectedChoice, scenarioResult, answerScenario])
+
+  // Enter key to advance scenario question
+  useEffect(() => {
+    if (!scenarioCurrentQuestion || !scenarioResult) return
+
+    const handleEnterKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) {
+        return
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        nextScenarioQuestion(undefined, scenarioCurrentQuestion.id)
+      }
+    }
+
+    window.addEventListener('keydown', handleEnterKey)
+    return () => window.removeEventListener('keydown', handleEnterKey)
+  }, [scenarioCurrentQuestion, scenarioResult, nextScenarioQuestion])
 
   useEffect(() => {
     if (!authReady || !currentUserId) return
