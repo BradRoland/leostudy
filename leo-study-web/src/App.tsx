@@ -2673,68 +2673,6 @@ function App() {
     setStudyFlashSessionOpen(true)
   }
 
-  // Flashcard keyboard controls: Space to flip, Arrow keys to navigate
-  useEffect(() => {
-    if (!isStudyPage || !studyFlashSessionOpen || orderedStudyFlashSessionCards.length === 0) return
-
-    const isEditableTarget = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) return false
-      return (
-        target.isContentEditable ||
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT'
-      )
-    }
-
-    const goToPreviousCard = () => {
-      setStudyFlashSessionFlipped(false)
-      setStudyFlashSessionIndex((current) => {
-        if (orderedStudyFlashSessionCards.length === 0) return 0
-        return current === 0 ? orderedStudyFlashSessionCards.length - 1 : current - 1
-      })
-      incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }), true)
-    }
-
-    const goToNextCard = () => {
-      setStudyFlashSessionFlipped(false)
-      setStudyFlashSessionIndex((current) => {
-        if (orderedStudyFlashSessionCards.length === 0) return 0
-        if (current < orderedStudyFlashSessionCards.length - 1) return current + 1
-        const lastCardId = orderedStudyFlashSessionCards[current]?.id
-        let reshuffled = shuffle(studyFlashSessionCards.map((card) => card.id))
-        if (reshuffled.length > 1 && reshuffled[0] === lastCardId) {
-          ;[reshuffled[0], reshuffled[1]] = [reshuffled[1], reshuffled[0]]
-        }
-        setStudyFlashSessionOrder(reshuffled)
-        return 0
-      })
-      incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }), true)
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target)) return
-
-      if (event.key === ' ' || event.code === 'Space') {
-        event.preventDefault()
-        setStudyFlashSessionFlipped((value) => !value)
-        return
-      }
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault()
-        goToPreviousCard()
-        return
-      }
-      if (event.key === 'ArrowRight') {
-        event.preventDefault()
-        goToNextCard()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isStudyPage, studyFlashSessionOpen, orderedStudyFlashSessionCards, studyFlashSessionCards])
-
   const beginStudyTest = () => {
     const deck = buildStudyTestDeck(studyTestFilter, studyTestWrongness, studyTestAnswerMode, studyTestQuestionCount)
     if (deck.length === 0) {
@@ -3886,6 +3824,68 @@ function App() {
     isProfilePage ||
     isStatsPage
   const needsProfileSetup = Boolean(authReady && currentUserId && profile && !profile.username && forceProfileSetup)
+
+  // Flashcard keyboard controls: Space to flip, Arrow keys to navigate
+  useEffect(() => {
+    if (!isStudyPage || !studyFlashSessionOpen || orderedStudyFlashSessionCards.length === 0) return
+
+    const isEditableTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false
+      return (
+        target.isContentEditable ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT'
+      )
+    }
+
+    const goToPreviousCard = () => {
+      setStudyFlashSessionFlipped(false)
+      setStudyFlashSessionIndex((current) => {
+        if (orderedStudyFlashSessionCards.length === 0) return 0
+        return current === 0 ? orderedStudyFlashSessionCards.length - 1 : current - 1
+      })
+      incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }), true)
+    }
+
+    const goToNextCard = () => {
+      setStudyFlashSessionFlipped(false)
+      setStudyFlashSessionIndex((current) => {
+        if (orderedStudyFlashSessionCards.length === 0) return 0
+        if (current < orderedStudyFlashSessionCards.length - 1) return current + 1
+        const lastCardId = orderedStudyFlashSessionCards[current]?.id
+        let reshuffled = shuffle(studyFlashSessionCards.map((card) => card.id))
+        if (reshuffled.length > 1 && reshuffled[0] === lastCardId) {
+          ;[reshuffled[0], reshuffled[1]] = [reshuffled[1], reshuffled[0]]
+        }
+        setStudyFlashSessionOrder(reshuffled)
+        return 0
+      })
+      incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }), true)
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) return
+
+      if (event.key === ' ' || event.code === 'Space') {
+        event.preventDefault()
+        setStudyFlashSessionFlipped((value) => !value)
+        return
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        goToPreviousCard()
+        return
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        goToNextCard()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isStudyPage, studyFlashSessionOpen, orderedStudyFlashSessionCards, studyFlashSessionCards])
 
   useEffect(() => {
     if (!authReady || !currentUserId) return
