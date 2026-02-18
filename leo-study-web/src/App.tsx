@@ -2842,39 +2842,36 @@ function App() {
 
           if (supabase && currentUserId) {
             void (async () => {
-              // Try upsert first (requires migration), fallback to insert
-              let insertError = null
-              try {
-                const { error } = await supabase.rpc('upsert_leaderboard', {
-                  p_user_id: currentUserId,
-                  p_game: 'Matching',
-                  p_match_duration: matchSessionDuration,
-                  p_match_filter: matchSessionFilter,
-                  p_score: finalMatchScore,
-                  p_round: finalMatchRound,
-                })
-                insertError = error
-              } catch {
-                // Fallback to direct insert if RPC doesn't exist
-                const { error } = await supabase
+              // Only save if it's a personal best for this category
+              const existingMatch = leaderboardRef.current.find(
+                (e) => e.userId === currentUserId && 
+                       e.game === 'Matching' && 
+                       e.matchDuration === matchSessionDuration && 
+                       e.matchFilter === matchSessionFilter
+              )
+              
+              if (existingMatch && existingMatch.score >= finalMatchScore) {
+                console.log('Matching score not high enough to save:', { new: finalMatchScore, existing: existingMatch.score })
+              } else {
+                const { error: insertError } = await supabase
                   .from('leaderboard')
-                  .insert({
+                  .upsert({
                     game: 'Matching',
                     score: finalMatchScore,
                     round: finalMatchRound,
                     user_id: currentUserId,
                     match_duration: matchSessionDuration,
                     match_filter: matchSessionFilter,
+                  }, {
+                    onConflict: 'user_id,game,match_duration,match_filter',
+                    ignoreDuplicates: false,
                   })
-                insertError = error
-              }
 
-              if (insertError) {
-                setLeaderboardError(
-                  `Could not save leaderboard score: ${insertError.message}. Run the latest /supabase/schema.sql migration.`,
-                )
-              } else {
-                setLeaderboardError('')
+                if (insertError) {
+                  console.error('Matching leaderboard save failed:', insertError)
+                } else {
+                  console.log('Matching high score saved!')
+                }
               }
 
               const refreshed = await refreshLeaderboard()
@@ -3326,47 +3323,36 @@ function App() {
 
           if (supabase && currentUserId) {
             void (async () => {
-              console.log('Saving score:', { score: finalSpeedScore, duration: speedSessionDuration, filter: speedSessionFilter, userId: currentUserId })
+              // Only save if it's a personal best for this category
+              const existing = leaderboardRef.current.find(
+                (e) => e.userId === currentUserId && 
+                       e.game === 'Speed Test' && 
+                       e.matchDuration === speedSessionDuration && 
+                       e.matchFilter === speedSessionFilter
+              )
               
-              let insertError = null
-
-              // Try upsert first (requires migration), fallback to insert
-              try {
-                const { error } = await supabase.rpc('upsert_leaderboard', {
-                  p_user_id: currentUserId,
-                  p_game: 'Speed Test',
-                  p_match_duration: speedSessionDuration,
-                  p_match_filter: speedSessionFilter,
-                  p_score: finalSpeedScore,
-                  p_round: finalAnswered,
-                })
-                insertError = error
-                if (error) console.log('Upsert error:', error)
-              } catch (e: unknown) {
-                console.log('RPC failed, trying insert fallback:', e)
-                // Fallback to direct insert if RPC doesn't exist
-                const { error } = await supabase
+              if (existing && existing.score >= finalSpeedScore) {
+                console.log('Score not high enough to save:', { new: finalSpeedScore, existing: existing.score })
+              } else {
+                const { error: insertError } = await supabase
                   .from('leaderboard')
-                  .insert({
+                  .upsert({
                     game: 'Speed Test',
                     score: finalSpeedScore,
                     round: finalAnswered,
                     user_id: currentUserId,
                     match_duration: speedSessionDuration,
                     match_filter: speedSessionFilter,
+                  }, {
+                    onConflict: 'user_id,game,match_duration,match_filter',
+                    ignoreDuplicates: false,
                   })
-                insertError = error
-                if (error) console.log('Insert error:', error)
-              }
 
-              if (insertError) {
-                setLeaderboardError(
-                  `Could not save leaderboard score: ${insertError.message}. Run the latest /supabase/schema.sql migration.`,
-                )
-                console.error('Leaderboard save failed:', insertError)
-              } else {
-                setLeaderboardError('')
-                console.log('Score saved successfully!')
+                if (insertError) {
+                  console.error('Leaderboard save failed:', insertError)
+                } else {
+                  console.log('High score saved!')
+                }
               }
 
               const refreshed = await refreshLeaderboard()
