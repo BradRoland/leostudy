@@ -3942,6 +3942,10 @@ function App() {
   useEffect(() => {
     if (!currentQuestion || selectedChoice !== null) return
 
+    // Spam detection: track recent keypresses
+    const lastKeyPress = { key: '', time: 0 }
+    const SPAM_THRESHOLD_MS = 250 // Same key within 250ms = spam
+
     const handleAnswerKeyDown = (event: KeyboardEvent) => {
       // Don't trigger when typing in input fields
       const target = event.target as HTMLElement
@@ -3952,6 +3956,18 @@ function App() {
       // Check for number keys 1-4
       const key = event.key
       if (key >= '1' && key <= '4') {
+        const now = Date.now()
+        
+        // Detect spam: same key pressed within threshold
+        if (key === lastKeyPress.key && now - lastKeyPress.time < SPAM_THRESHOLD_MS) {
+          // Penalty for spamming - ignore the input
+          console.log('Spam detected, key ignored')
+          return
+        }
+        
+        lastKeyPress.key = key
+        lastKeyPress.time = now
+
         const index = parseInt(key) - 1
         if (currentQuestion.choices && index < currentQuestion.choices.length) {
           event.preventDefault()
@@ -3968,6 +3984,10 @@ function App() {
   useEffect(() => {
     if (!speedCurrentQuestion || speedFeedback) return
 
+    // Spam detection: track recent keypresses
+    const lastKeyPress = { key: '', time: 0 }
+    const SPAM_THRESHOLD_MS = 250 // Same key within 250ms = spam
+
     const handleSpeedAnswerKeyDown = (event: KeyboardEvent) => {
       // Don't trigger when typing in input fields
       const target = event.target as HTMLElement
@@ -3978,6 +3998,18 @@ function App() {
       // Check for number keys 1-4
       const key = event.key
       if (key >= '1' && key <= '4') {
+        const now = Date.now()
+        
+        // Detect spam: same key pressed within threshold
+        if (key === lastKeyPress.key && now - lastKeyPress.time < SPAM_THRESHOLD_MS) {
+          // Penalty for spamming - ignore the input
+          console.log('Spam detected, key ignored')
+          return
+        }
+        
+        lastKeyPress.key = key
+        lastKeyPress.time = now
+
         const index = parseInt(key) - 1
         if (speedCurrentQuestion.choices && index < speedCurrentQuestion.choices.length) {
           event.preventDefault()
