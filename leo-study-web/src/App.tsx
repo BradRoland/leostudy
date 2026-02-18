@@ -2842,15 +2842,32 @@ function App() {
 
           if (supabase && currentUserId) {
             void (async () => {
-              // Use upsert to prevent duplicates - only keep highest score
-              const { error: insertError } = await supabase.rpc('upsert_leaderboard', {
-                p_user_id: currentUserId,
-                p_game: 'Matching',
-                p_match_duration: matchSessionDuration,
-                p_match_filter: matchSessionFilter,
-                p_score: finalMatchScore,
-                p_round: finalMatchRound,
-              })
+              // Try upsert first (requires migration), fallback to insert
+              let insertError = null
+              try {
+                const { error } = await supabase.rpc('upsert_leaderboard', {
+                  p_user_id: currentUserId,
+                  p_game: 'Matching',
+                  p_match_duration: matchSessionDuration,
+                  p_match_filter: matchSessionFilter,
+                  p_score: finalMatchScore,
+                  p_round: finalMatchRound,
+                })
+                insertError = error
+              } catch {
+                // Fallback to direct insert if RPC doesn't exist
+                const { error } = await supabase
+                  .from('leaderboard')
+                  .insert({
+                    game: 'Matching',
+                    score: finalMatchScore,
+                    round: finalMatchRound,
+                    user_id: currentUserId,
+                    match_duration: matchSessionDuration,
+                    match_filter: matchSessionFilter,
+                  })
+                insertError = error
+              }
 
               if (insertError) {
                 setLeaderboardError(
@@ -3309,15 +3326,33 @@ function App() {
 
           if (supabase && currentUserId) {
             void (async () => {
-              // Use upsert to prevent duplicates - only keep highest score
-              const { error: insertError } = await supabase.rpc('upsert_leaderboard', {
-                p_user_id: currentUserId,
-                p_game: 'Speed Test',
-                p_match_duration: speedSessionDuration,
-                p_match_filter: speedSessionFilter,
-                p_score: finalSpeedScore,
-                p_round: finalAnswered,
-              })
+              let insertError = null
+
+              // Try upsert first (requires migration), fallback to insert
+              try {
+                const { error } = await supabase.rpc('upsert_leaderboard', {
+                  p_user_id: currentUserId,
+                  p_game: 'Speed Test',
+                  p_match_duration: speedSessionDuration,
+                  p_match_filter: speedSessionFilter,
+                  p_score: finalSpeedScore,
+                  p_round: finalAnswered,
+                })
+                insertError = error
+              } catch {
+                // Fallback to direct insert if RPC doesn't exist
+                const { error } = await supabase
+                  .from('leaderboard')
+                  .insert({
+                    game: 'Speed Test',
+                    score: finalSpeedScore,
+                    round: finalAnswered,
+                    user_id: currentUserId,
+                    match_duration: speedSessionDuration,
+                    match_filter: speedSessionFilter,
+                  })
+                insertError = error
+              }
 
               if (insertError) {
                 setLeaderboardError(
