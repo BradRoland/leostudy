@@ -261,6 +261,44 @@ body {
   flex: 0 0 auto;
 }
 
+.home-online-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  margin: 12px auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+  max-width: fit-content;
+}
+
+.online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+  animation: pulse-online 2s ease-in-out infinite;
+}
+
+@keyframes pulse-online {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.9); }
+}
+
+.online-count {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.online-label {
+  font-weight: 500;
+}
+
 .home-leaderboard-grid {
   display: grid;
   gap: 10px;
@@ -447,13 +485,13 @@ button {
   will-change: transform;
 }
 
-button:hover:not(:disabled) {
+button:hover:not(:disabled):not(.study-session-flashcard) {
   transform: translateY(-1px);
   border-color: rgba(139, 174, 249, 0.58);
   box-shadow: 0 6px 14px rgba(6, 14, 32, 0.2);
 }
 
-button:active:not(:disabled) {
+button:active:not(:disabled):not(.study-session-flashcard) {
   transform: translateY(0);
 }
 

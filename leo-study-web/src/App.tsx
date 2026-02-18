@@ -11,6 +11,10 @@ type CodeFilter = CodeSet | 'all'
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home'
 type HomeDurationFilter = 15 | 30 | 60
+type GameModeSelection = {
+  duration: HomeDurationFilter
+  filter: CodeFilter
+}
 type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'warning'
 type StatsIconName = 'overview' | 'time' | 'words' | 'penal' | 'flashcards' | 'scenarios' | 'streak' | 'game' | 'studyset'
 type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
@@ -284,6 +288,28 @@ const homeLeaderboardRotationCodeSets: CodeFilter[] = ['all', 'penal', 'hs', 've
 const homeLeaderboardRotationSteps = homeLeaderboardRotationDurations.flatMap((duration) =>
   homeLeaderboardRotationCodeSets.map((codeSet) => ({ duration, codeSet })),
 )
+
+const defaultGamesModeSelection: GameModeSelection = { duration: 30, filter: 'all' }
+const gamesModeStorageKey = 'leo_study_games_mode_selection'
+
+function sanitizeGameModeSelection(input: unknown): GameModeSelection {
+  if (!input || typeof input !== 'object') return { ...defaultGamesModeSelection }
+  const value = input as Partial<GameModeSelection>
+  const duration = [15, 30, 60].includes(Number(value.duration)) ? (Number(value.duration) as HomeDurationFilter) : defaultGamesModeSelection.duration
+  const filter = (['all', 'penal', 'hs', 'vehicle'].includes(String(value.filter)) ? String(value.filter) : defaultGamesModeSelection.filter) as CodeFilter
+  return { duration, filter }
+}
+
+function loadStoredGameModeSelection(): GameModeSelection {
+  if (typeof window === 'undefined') return { ...defaultGamesModeSelection }
+  try {
+    const raw = window.localStorage.getItem(gamesModeStorageKey)
+    if (!raw) return { ...defaultGamesModeSelection }
+    return sanitizeGameModeSelection(JSON.parse(raw) as unknown)
+  } catch {
+    return { ...defaultGamesModeSelection }
+  }
+}
 
 const tierLabel: Record<SupporterTier, string> = {
   free: 'Free',
@@ -1554,6 +1580,7 @@ function App() {
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [scenarioItems, setScenarioItems] = useState<ScenarioBankItem[]>([])
   const [activeTab, setActiveTab] = useState<AppTab>('home')
+  const [onlineUsersCount, setOnlineUsersCount] = useState(0)
   const [showStudyFlashSetupModal, setShowStudyFlashSetupModal] = useState(false)
   const [showStudyTestSetupModal, setShowStudyTestSetupModal] = useState(false)
   const [studyFlashFilter, setStudyFlashFilter] = useState<CodeFilter>('all')
@@ -1600,6 +1627,35 @@ function App() {
   const [authSuccess, setAuthSuccess] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string>('')
+  
+  // Track online users - update last_active and fetch count
+  useEffect(() => {
+    const client = supabase
+    if (!client || !currentUserId) return
+    
+    const updateLastActive = async () => {
+      try {
+        await client.from('profiles').update({ last_active: new Date().toISOString() }).eq('user_id', currentUserId)
+      } catch (e) { /* ignore */ }
+    }
+
+    const fetchOnlineCount = async () => {
+      try {
+        const { data } = await client.rpc('get_online_users_count', { minutes_interval: 5 })
+        setOnlineUsersCount(data || 0)
+      } catch (e) { setOnlineUsersCount(0) }
+    }
+
+    updateLastActive()
+    const interval = setInterval(() => {
+      updateLastActive()
+      fetchOnlineCount()
+    }, 30000)
+    fetchOnlineCount()
+
+    return () => clearInterval(interval)
+  }, [supabase, currentUserId])
+
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -1661,8 +1717,7 @@ function App() {
   const [feedback, setFeedback] = useState('')
   const [streak, setStreak] = useState(0)
 
-  const [matchFilter, setMatchFilter] = useState<CodeFilter>('all')
-  const [matchDuration, setMatchDuration] = useState(30)
+  const [gamesSelection, setGamesSelection] = useState<GameModeSelection>(() => loadStoredGameModeSelection())
   const [matchRemaining, setMatchRemaining] = useState(30)
   const [matchRound, setMatchRound] = useState(1)
   const [matchScore, setMatchScore] = useState(0)
@@ -1679,11 +1734,7 @@ function App() {
   const [matchSessionDuration, setMatchSessionDuration] = useState(30)
   const [matchSessionFilter, setMatchSessionFilter] = useState<CodeFilter>('all')
   const [showMatchSetupModal, setShowMatchSetupModal] = useState(false)
-  const [leaderboardDurationFilter, setLeaderboardDurationFilter] = useState(30)
-  const [leaderboardCodeFilter, setLeaderboardCodeFilter] = useState<CodeFilter>('all')
 
-  const [speedFilter, setSpeedFilter] = useState<CodeFilter>('all')
-  const [speedDuration, setSpeedDuration] = useState(30)
   const [speedRemaining, setSpeedRemaining] = useState(30)
   const [speedRunning, setSpeedRunning] = useState(false)
   const [speedDone, setSpeedDone] = useState(false)
@@ -1699,8 +1750,6 @@ function App() {
   const [speedSessionFilter, setSpeedSessionFilter] = useState<CodeFilter>('all')
   const [showSpeedSetupModal, setShowSpeedSetupModal] = useState(false)
   const [speedFeedback, setSpeedFeedback] = useState('')
-  const [speedLeaderboardDurationFilter, setSpeedLeaderboardDurationFilter] = useState(30)
-  const [speedLeaderboardCodeFilter, setSpeedLeaderboardCodeFilter] = useState<CodeFilter>('all')
   const [scenarioDeck, setScenarioDeck] = useState<ScenarioQuestion[]>([])
   const [scenarioCurrentQuestion, setScenarioCurrentQuestion] = useState<ScenarioQuestion | null>(null)
   const [scenarioResult, setScenarioResult] = useState<string>('')
@@ -1749,6 +1798,14 @@ function App() {
   useEffect(() => {
     document.title = 'LEO Study'
   }, [])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(gamesModeStorageKey, JSON.stringify(gamesSelection))
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [gamesSelection])
 
   useEffect(() => {
     const nav = navigator as Navigator & { deviceMemory?: number }
@@ -2469,10 +2526,10 @@ function App() {
       topEntryPerUser(
         leaderboard
           .filter((entry) => entry.game === 'Matching')
-          .filter((entry) => entry.matchDuration === leaderboardDurationFilter && entry.matchFilter === leaderboardCodeFilter),
+          .filter((entry) => entry.matchDuration === gamesSelection.duration && entry.matchFilter === gamesSelection.filter),
       )
         .slice(0, 8),
-    [leaderboard, leaderboardDurationFilter, leaderboardCodeFilter],
+    [leaderboard, gamesSelection.duration, gamesSelection.filter],
   )
 
   const speedLeaderboard = useMemo(
@@ -2480,10 +2537,10 @@ function App() {
       topEntryPerUser(
         leaderboard
           .filter((entry) => entry.game === 'Speed Test')
-          .filter((entry) => entry.matchDuration === speedLeaderboardDurationFilter && entry.matchFilter === speedLeaderboardCodeFilter),
+          .filter((entry) => entry.matchDuration === gamesSelection.duration && entry.matchFilter === gamesSelection.filter),
       )
         .slice(0, 8),
-    [leaderboard, speedLeaderboardDurationFilter, speedLeaderboardCodeFilter],
+    [leaderboard, gamesSelection.duration, gamesSelection.filter],
   )
   const homeMatchingLeaders = useMemo(
     () =>
@@ -2538,8 +2595,8 @@ function App() {
 
   const speedQuestionBank = useMemo(() => {
     const base = questions.filter((question) => question.prompt.startsWith('Which section number matches:'))
-    return speedFilter === 'all' ? base : base.filter((question) => question.codeSet === speedFilter)
-  }, [questions, speedFilter])
+    return gamesSelection.filter === 'all' ? base : base.filter((question) => question.codeSet === gamesSelection.filter)
+  }, [questions, gamesSelection.filter])
   const scenarioQuestionBank = useMemo(() => buildScenarioQuestions(scenarioItems), [scenarioItems])
 
   const buildStudyTestDeck = (
@@ -2804,8 +2861,6 @@ function App() {
                 setLeaderboardError('')
               }
 
-              setLeaderboardDurationFilter(matchSessionDuration)
-              setLeaderboardCodeFilter(matchSessionFilter)
               const refreshed = await refreshLeaderboard()
               await refreshHomeLeaderboards()
 
@@ -2961,14 +3016,16 @@ function App() {
   }
 
   const startMatching = () => {
-    setMatchSessionDuration(matchDuration)
-    setMatchSessionFilter(matchFilter)
+    const selectedDuration = gamesSelection.duration
+    const selectedFilter = gamesSelection.filter
+    setMatchSessionDuration(selectedDuration)
+    setMatchSessionFilter(selectedFilter)
     setMatchDone(false)
     setMatchScore(0)
     setMatchRound(1)
     matchScoreRef.current = 0
     matchRoundRef.current = 1
-    setMatchRemaining(matchDuration)
+    setMatchRemaining(selectedDuration)
     setRecentMatchSections([])
     setMatchCorrectCount(0)
     setMatchIncorrectCount(0)
@@ -2976,7 +3033,7 @@ function App() {
     matchCorrectCountRef.current = 0
     matchIncorrectCountRef.current = 0
     setMatchRunning(true)
-    makeRoundCards(matchFilter)
+    makeRoundCards(selectedFilter)
     incrementUserStats((stats) => ({
       ...stats,
       gamePlays: {
@@ -3019,7 +3076,9 @@ function App() {
   }
 
   const startSpeedTest = () => {
-    const pool = speedQuestionBank.filter((question) => speedFilter === 'all' || question.codeSet === speedFilter)
+    const selectedDuration = gamesSelection.duration
+    const selectedFilter = gamesSelection.filter
+    const pool = speedQuestionBank.filter((question) => selectedFilter === 'all' || question.codeSet === selectedFilter)
     if (pool.length === 0) {
       setSpeedCurrentQuestion(null)
       setSpeedDeck([])
@@ -3029,9 +3088,9 @@ function App() {
       return
     }
     setSpeedSessionQuestions(pool)
-    setSpeedSessionDuration(speedDuration)
-    setSpeedSessionFilter(speedFilter)
-    setSpeedRemaining(speedDuration)
+    setSpeedSessionDuration(selectedDuration)
+    setSpeedSessionFilter(selectedFilter)
+    setSpeedRemaining(selectedDuration)
     setSpeedScore(0)
     setSpeedAnsweredCount(0)
     setSpeedCorrectCount(0)
@@ -3215,8 +3274,8 @@ function App() {
     if (matchedPairIds.length !== uniquePairs.size) return
     setMatchRound((round) => round + 1)
     setMatchScore((score) => score + 20)
-    makeRoundCards(matchFilter)
-  }, [matchedPairIds, matchCards, matchRunning, matchFilter])
+    makeRoundCards(matchSessionFilter)
+  }, [matchedPairIds, matchCards, matchRunning, matchSessionFilter])
 
   useEffect(() => {
     if (!speedRunning) return
@@ -3270,8 +3329,6 @@ function App() {
                 setLeaderboardError('')
               }
 
-              setSpeedLeaderboardDurationFilter(speedSessionDuration)
-              setSpeedLeaderboardCodeFilter(speedSessionFilter)
               const refreshed = await refreshLeaderboard()
               await refreshHomeLeaderboards()
 
@@ -3750,13 +3807,13 @@ function App() {
     setWrongCardIds([])
     setMatchedPairIds([])
     setRecentMatchSections([])
-    setMatchRemaining(matchDuration)
+    setMatchRemaining(gamesSelection.duration)
     setSpeedDone(false)
     setSpeedRunning(false)
     setSpeedDeck([])
     setSpeedSessionQuestions([])
     setSpeedCurrentQuestion(null)
-    setSpeedRemaining(speedDuration)
+    setSpeedRemaining(gamesSelection.duration)
     setSpeedFeedback('')
     setSpeedScore(0)
     setSpeedAnsweredCount(0)
@@ -3829,16 +3886,6 @@ function App() {
   useEffect(() => {
     if (!isStudyPage || !studyFlashSessionOpen || orderedStudyFlashSessionCards.length === 0) return
 
-    const isEditableTarget = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) return false
-      return (
-        target.isContentEditable ||
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT'
-      )
-    }
-
     const goToPreviousCard = () => {
       setStudyFlashSessionFlipped(false)
       setStudyFlashSessionIndex((current) => {
@@ -3865,7 +3912,11 @@ function App() {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target)) return
+      // Only handle keys when not in an input field
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) {
+        return
+      }
 
       if (event.key === ' ' || event.code === 'Space') {
         event.preventDefault()
@@ -5026,6 +5077,12 @@ function App() {
               </div>
             </div>
 
+            <div className="home-online-indicator">
+              <span className="online-dot"></span>
+              <span className="online-count">{onlineUsersCount}</span>
+              <span className="online-label">studying now</span>
+            </div>
+
             <div className="home-leaderboard-grid">
               <div className="card leaderboard-card">
                 <div className="leaderboard-card-head">
@@ -5451,8 +5508,12 @@ function App() {
               ) : (
                 <>
                   <button
+                    tabIndex={0}
                     className={studyFlashSessionFlipped ? 'study-session-flashcard flipped' : 'study-session-flashcard'}
-                    onClick={() => setStudyFlashSessionFlipped((value) => !value)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setStudyFlashSessionFlipped((value) => !value)
+                    }}
                   >
                     <div className="face front">{orderedStudyFlashSessionCards[studyFlashSessionIndex]?.front}</div>
                     <div className="face back">{orderedStudyFlashSessionCards[studyFlashSessionIndex]?.back}</div>
@@ -5730,8 +5791,8 @@ function App() {
                     {[15, 30, 60].map((duration) => (
                       <button
                         key={duration}
-                        className={leaderboardDurationFilter === duration ? 'seg active compact-seg' : 'seg compact-seg'}
-                        onClick={() => setLeaderboardDurationFilter(duration)}
+                        className={gamesSelection.duration === duration ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setGamesSelection((prev) => ({ ...prev, duration: duration as HomeDurationFilter }))}
                       >
                         {duration}s
                       </button>
@@ -5744,8 +5805,8 @@ function App() {
                     {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
                       <button
                         key={filter}
-                        className={leaderboardCodeFilter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
-                        onClick={() => setLeaderboardCodeFilter(filter)}
+                        className={gamesSelection.filter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}
                       >
                         {filter === 'all' ? 'All' : codeSetLabel[filter]}
                       </button>
@@ -5881,8 +5942,8 @@ function App() {
                     {[15, 30, 60].map((duration) => (
                       <button
                         key={`speed-leader-time-${duration}`}
-                        className={speedLeaderboardDurationFilter === duration ? 'seg active compact-seg' : 'seg compact-seg'}
-                        onClick={() => setSpeedLeaderboardDurationFilter(duration)}
+                        className={gamesSelection.duration === duration ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setGamesSelection((prev) => ({ ...prev, duration: duration as HomeDurationFilter }))}
                       >
                         {duration}s
                       </button>
@@ -5895,8 +5956,8 @@ function App() {
                     {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
                       <button
                         key={`speed-leader-filter-${filter}`}
-                        className={speedLeaderboardCodeFilter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
-                        onClick={() => setSpeedLeaderboardCodeFilter(filter)}
+                        className={gamesSelection.filter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}
                       >
                         {filter === 'all' ? 'All' : codeSetLabel[filter]}
                       </button>
@@ -7156,7 +7217,7 @@ function App() {
               Code Set
               <div className="segmented">
                 {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                  <button key={`match-setup-${filter}`} className={matchFilter === filter ? 'seg active' : 'seg'} onClick={() => setMatchFilter(filter)}>
+                  <button key={`match-setup-${filter}`} className={gamesSelection.filter === filter ? 'seg active' : 'seg'} onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}>
                     {filter === 'all' ? 'All' : codeSetLabel[filter]}
                   </button>
                 ))}
@@ -7166,7 +7227,7 @@ function App() {
               Time
               <div className="segmented">
                 {[15, 30, 60].map((time) => (
-                  <button key={`match-setup-time-${time}`} className={matchDuration === time ? 'seg active' : 'seg'} onClick={() => setMatchDuration(time)}>
+                  <button key={`match-setup-time-${time}`} className={gamesSelection.duration === time ? 'seg active' : 'seg'} onClick={() => setGamesSelection((prev) => ({ ...prev, duration: time as HomeDurationFilter }))}>
                     {time}s
                   </button>
                 ))}
@@ -7188,7 +7249,7 @@ function App() {
               Code Set
               <div className="segmented">
                 {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                  <button key={`speed-setup-${filter}`} className={speedFilter === filter ? 'seg active' : 'seg'} onClick={() => setSpeedFilter(filter)}>
+                  <button key={`speed-setup-${filter}`} className={gamesSelection.filter === filter ? 'seg active' : 'seg'} onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}>
                     {filter === 'all' ? 'All' : codeSetLabel[filter]}
                   </button>
                 ))}
@@ -7198,7 +7259,7 @@ function App() {
               Time
               <div className="segmented">
                 {[15, 30, 60].map((time) => (
-                  <button key={`speed-setup-time-${time}`} className={speedDuration === time ? 'seg active' : 'seg'} onClick={() => setSpeedDuration(time)}>
+                  <button key={`speed-setup-time-${time}`} className={gamesSelection.duration === time ? 'seg active' : 'seg'} onClick={() => setGamesSelection((prev) => ({ ...prev, duration: time as HomeDurationFilter }))}>
                     {time}s
                   </button>
                 ))}
