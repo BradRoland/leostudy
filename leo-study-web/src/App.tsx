@@ -4022,6 +4022,44 @@ function App() {
     return () => window.removeEventListener('keydown', handleSpeedAnswerKeyDown)
   }, [speedCurrentQuestion, speedFeedback, answerSpeedQuestion])
 
+  // Keyboard shortcuts for scenario questions (1-4 keys)
+  useEffect(() => {
+    if (!scenarioCurrentQuestion || scenarioSelectedChoice !== null || scenarioResult) return
+
+    // Spam detection
+    const lastKeyPress = { key: '', time: 0 }
+    const SPAM_THRESHOLD_MS = 250
+
+    const handleScenarioAnswerKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) {
+        return
+      }
+
+      const key = event.key
+      if (key >= '1' && key <= '4') {
+        const now = Date.now()
+        
+        // Detect spam
+        if (key === lastKeyPress.key && now - lastKeyPress.time < SPAM_THRESHOLD_MS) {
+          return
+        }
+        
+        lastKeyPress.key = key
+        lastKeyPress.time = now
+
+        const index = parseInt(key) - 1
+        if (scenarioCurrentQuestion.choices && index < scenarioCurrentQuestion.choices.length) {
+          event.preventDefault()
+          answerScenario(index)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleScenarioAnswerKeyDown)
+    return () => window.removeEventListener('keydown', handleScenarioAnswerKeyDown)
+  }, [scenarioCurrentQuestion, scenarioSelectedChoice, scenarioResult, answerScenario])
+
   useEffect(() => {
     if (!authReady || !currentUserId) return
     if (currentPath === '/') {
@@ -6141,6 +6179,7 @@ function App() {
                     </div>
                     <h3 ref={scenarioPromptRef}>{scenarioCurrentQuestion.prompt}</h3>
                     <div className="scenario-actions">
+                      <span className="choice-hint">Press 1–4 to answer</span>
                       {scenarioCurrentQuestion.choices.map((choice, index) => (
                         <button
                           key={`scenario-choice-${scenarioCurrentQuestion.id}-${index}`}
@@ -6158,6 +6197,7 @@ function App() {
                           onClick={() => answerScenario(index)}
                           disabled={Boolean(scenarioResult)}
                         >
+                          <span className="choice-key">{index + 1}</span>
                           {choice}
                         </button>
                       ))}
