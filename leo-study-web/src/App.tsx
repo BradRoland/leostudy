@@ -10,7 +10,7 @@ type CodeSet = 'penal' | 'hs' | 'vehicle'
 type CodeFilter = CodeSet | 'all'
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home'
-type DurationFilter = 15 | 30 | 60 | 'all'
+type HomeDurationFilter = 15 | 30 | 60
 type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'warning'
 type StatsIconName = 'overview' | 'time' | 'words' | 'penal' | 'flashcards' | 'scenarios' | 'streak' | 'game' | 'studyset'
 type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
@@ -29,6 +29,7 @@ type HomeLeaderboardEntry = {
   value: number
   masteredCodes: number
   studySeconds: number
+  studyDayStreak: number
   mostStudiedMode: CodeFilter | null
 }
 
@@ -100,6 +101,7 @@ type LeaderboardEntry = {
   createdAt: number
   masteredCodes: number
   studySeconds: number
+  studyDayStreak: number
   mostStudiedMode: CodeFilter | null
 }
 
@@ -146,6 +148,7 @@ type ContentEditorItem = {
 type ProfileDetails = {
   bio: string
   agency: string
+  homeLeaderboardRotationMs: number
   themeId: string
   nameStyle: NameStyle
   namePresets: NameStylePreset[]
@@ -170,13 +173,60 @@ type NameStylePreset = {
 
 type UserStats = {
   studySeconds: number
+  studyDayStreak: number
+  bestStudyDayStreak: number
+  lastStudyDay: string
   gamePlays: Record<'matching' | 'speed', number>
   flashcardsReviewed: number
   scenariosReviewed: number
   studyModeCounts: Record<CodeFilter, number>
+  sessionTracks: Record<string, SessionTrack>
+}
+
+type SessionMode = 'study_test' | 'matching' | 'speed'
+
+type SessionTrack = {
+  lastAttempt: SessionAttemptSnapshot | null
+  accuracyHistory: number[]
+}
+
+type SessionAttemptSnapshot = {
+  accuracy: number
+  score: number
+  correct: number
+  incorrect: number
+  rank: number | null
+  duration: number | null
+  filter: CodeFilter
+  at: number
+}
+
+type LeaderPreviewItem = {
+  rank: number
+  playerName: string
+  score: number
+  isCurrentUser: boolean
+}
+
+type SessionPerformanceReport = {
+  mode: SessionMode
+  title: string
+  contextLabel: string
+  accuracy: number
+  correct: number
+  incorrect: number
+  score: number
+  deltaAccuracy: number | null
+  trend: number[]
+  focusTips: string[]
+  leaderboardPreview: LeaderPreviewItem[]
+  currentRank: number | null
+  previousRank: number | null
 }
 
 type SettingsTab = 'profile' | 'customization' | 'support' | 'security' | 'editor'
+
+const defaultLeaderboardRotationMs = 3600
 
 type MasteryStatus = '' | 'Needs Work' | 'Getting There' | 'On Track' | 'Almost Mastered' | 'Mastered'
 
@@ -229,6 +279,12 @@ const codeSetLabel: Record<CodeSet, string> = {
   vehicle: 'Vehicle',
 }
 
+const homeLeaderboardRotationDurations: Array<15 | 30 | 60> = [15, 30, 60]
+const homeLeaderboardRotationCodeSets: CodeFilter[] = ['all', 'penal', 'hs', 'vehicle']
+const homeLeaderboardRotationSteps = homeLeaderboardRotationDurations.flatMap((duration) =>
+  homeLeaderboardRotationCodeSets.map((codeSet) => ({ duration, codeSet })),
+)
+
 const tierLabel: Record<SupporterTier, string> = {
   free: 'Free',
   tier2: '$2 Supporter',
@@ -242,6 +298,51 @@ const avatarOutputSize = 512
 
 function tierRank(tier: SupporterTier) {
   return supporterTierOrder.indexOf(tier)
+}
+
+function leaderboardCodeSetLabel(filter: CodeFilter | null | undefined) {
+  if (!filter || filter === 'all') return 'All'
+  return codeSetLabel[filter]
+}
+
+function sessionModeLabel(mode: SessionMode) {
+  if (mode === 'study_test') return 'Study Test'
+  if (mode === 'matching') return 'Matching'
+  return 'Speed Test'
+}
+
+function sessionTrackKey(options: { mode: SessionMode; filter: CodeFilter; duration?: number | null; answerMode?: StudyAnswerMode; wrongness?: StudyWrongness; questionCount?: number }) {
+  if (options.mode === 'study_test') {
+    return `study_test|${options.filter}|${options.answerMode || 'multiple'}|${options.wrongness || 'needs_work'}|${options.questionCount || 0}`
+  }
+  return `${options.mode}|${options.duration || 0}|${options.filter}`
+}
+
+function getSessionTrack(stats: UserStats, trackKey: string): SessionTrack {
+  return stats.sessionTracks[trackKey] || { lastAttempt: null, accuracyHistory: [] }
+}
+
+function getLeaderboardPreview(
+  entries: LeaderboardEntry[],
+  game: 'Matching' | 'Speed Test',
+  duration: number,
+  filter: CodeFilter,
+  currentUserId: string,
+) {
+  const scoped = entries
+    .filter((entry) => entry.game === game)
+    .filter((entry) => entry.matchDuration === duration && entry.matchFilter === filter)
+    .sort((left, right) => right.score - left.score || right.round - left.round)
+  const preview = scoped.slice(0, 5).map(
+    (entry, index): LeaderPreviewItem => ({
+      rank: index + 1,
+      playerName: entry.playerName,
+      score: entry.score,
+      isCurrentUser: entry.userId === currentUserId,
+    }),
+  )
+  const currentRank = scoped.findIndex((entry) => entry.userId === currentUserId)
+  return { preview, currentRank: currentRank >= 0 ? currentRank + 1 : null }
 }
 
 async function createCroppedAvatarFile(sourceUrl: string, zoom: number, offsetX: number, offsetY: number, sourceName: string) {
@@ -448,6 +549,9 @@ const appThemePresets: AppThemePreset[] = [
 
 const defaultUserStats: UserStats = {
   studySeconds: 0,
+  studyDayStreak: 0,
+  bestStudyDayStreak: 0,
+  lastStudyDay: '',
   gamePlays: {
     matching: 0,
     speed: 0,
@@ -460,6 +564,7 @@ const defaultUserStats: UserStats = {
     hs: 0,
     vehicle: 0,
   },
+  sessionTracks: {},
 }
 
 const stripeTierLinks: Partial<Record<Exclude<SupporterTier, 'free'>, string>> = {
@@ -503,6 +608,30 @@ function formatStudyTime(seconds: number) {
   if (hours === 0) return `${minutes}m`
   if (minutes === 0) return `${hours}h`
   return `${hours}h ${minutes}m`
+}
+
+function dayKeyUtc(date = new Date()) {
+  return date.toISOString().slice(0, 10)
+}
+
+function previousDayKeyUtc(dayKey: string) {
+  const parsed = new Date(`${dayKey}T00:00:00.000Z`)
+  if (Number.isNaN(parsed.getTime())) return ''
+  parsed.setUTCDate(parsed.getUTCDate() - 1)
+  return dayKeyUtc(parsed)
+}
+
+function applyStudyDayActivity(stats: UserStats) {
+  const today = dayKeyUtc()
+  if (stats.lastStudyDay === today) return stats
+  const continuesStreak = stats.lastStudyDay && previousDayKeyUtc(today) === stats.lastStudyDay
+  const nextStreak = continuesStreak ? Math.max(1, stats.studyDayStreak) + 1 : 1
+  return {
+    ...stats,
+    lastStudyDay: today,
+    studyDayStreak: nextStreak,
+    bestStudyDayStreak: Math.max(stats.bestStudyDayStreak, nextStreak),
+  }
 }
 
 function dedupeSections(sections: CodeSection[]) {
@@ -866,13 +995,70 @@ function sanitizeNamePresets(input: unknown): NameStylePreset[] {
     .slice(0, 8)
 }
 
+function sanitizeLeaderboardRotationMs(input: unknown) {
+  if (typeof input !== 'number' || Number.isNaN(input)) return defaultLeaderboardRotationMs
+  return Math.max(2000, Math.min(12000, Math.round(input)))
+}
+
 function sanitizeUserStats(input: unknown): UserStats {
   if (!input || typeof input !== 'object') return { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } }
   const value = input as Partial<UserStats>
   const gamePlays = value.gamePlays && typeof value.gamePlays === 'object' ? value.gamePlays : {}
   const studyModeCounts = value.studyModeCounts && typeof value.studyModeCounts === 'object' ? value.studyModeCounts : {}
+  const legacyLastAttempts = (value as { lastAttempts?: unknown }).lastAttempts
+  const legacyAccuracyHistory = (value as { accuracyHistory?: unknown }).accuracyHistory
+  const sessionTracks = value.sessionTracks && typeof value.sessionTracks === 'object' ? value.sessionTracks : {}
+  const sanitizeAttempt = (entry: unknown): SessionAttemptSnapshot | null => {
+    if (!entry || typeof entry !== 'object') return null
+    const value = entry as Partial<SessionAttemptSnapshot>
+    const filter = (['all', 'penal', 'hs', 'vehicle'].includes(String(value.filter)) ? String(value.filter) : 'all') as CodeFilter
+    return {
+      accuracy: typeof value.accuracy === 'number' ? Math.max(0, Math.min(100, Math.round(value.accuracy))) : 0,
+      score: typeof value.score === 'number' ? Math.max(0, Math.round(value.score)) : 0,
+      correct: typeof value.correct === 'number' ? Math.max(0, Math.round(value.correct)) : 0,
+      incorrect: typeof value.incorrect === 'number' ? Math.max(0, Math.round(value.incorrect)) : 0,
+      rank: typeof value.rank === 'number' && value.rank > 0 ? Math.round(value.rank) : null,
+      duration: typeof value.duration === 'number' && value.duration > 0 ? Math.round(value.duration) : null,
+      filter,
+      at: typeof value.at === 'number' ? value.at : Date.now(),
+    }
+  }
+  const sanitizeHistory = (entry: unknown) =>
+    Array.isArray(entry)
+      ? entry
+          .map((value) => (typeof value === 'number' ? Math.max(0, Math.min(100, Math.round(value))) : null))
+          .filter((value): value is number => value !== null)
+          .slice(-12)
+      : []
+  const sanitizeTrack = (entry: unknown): SessionTrack => {
+    if (!entry || typeof entry !== 'object') return { lastAttempt: null, accuracyHistory: [] }
+    const value = entry as { lastAttempt?: unknown; accuracyHistory?: unknown }
+    return {
+      lastAttempt: sanitizeAttempt(value.lastAttempt),
+      accuracyHistory: sanitizeHistory(value.accuracyHistory),
+    }
+  }
+  const normalizedTracks = Object.entries(sessionTracks as Record<string, unknown>).reduce<Record<string, SessionTrack>>((accumulator, [key, value]) => {
+    if (!key.trim()) return accumulator
+    accumulator[key] = sanitizeTrack(value)
+    return accumulator
+  }, {})
+  if (Object.keys(normalizedTracks).length === 0) {
+    const legacyAttemptsMap = legacyLastAttempts && typeof legacyLastAttempts === 'object' ? legacyLastAttempts as Record<string, unknown> : {}
+    const legacyHistoryMap = legacyAccuracyHistory && typeof legacyAccuracyHistory === 'object' ? legacyAccuracyHistory as Record<string, unknown> : {}
+    const legacyModes: SessionMode[] = ['study_test', 'matching', 'speed']
+    for (const mode of legacyModes) {
+      normalizedTracks[sessionTrackKey({ mode, filter: 'all', duration: mode === 'study_test' ? null : 0 })] = {
+        lastAttempt: sanitizeAttempt(legacyAttemptsMap[mode]),
+        accuracyHistory: sanitizeHistory(legacyHistoryMap[mode]),
+      }
+    }
+  }
   return {
     studySeconds: typeof value.studySeconds === 'number' ? Math.max(0, Math.floor(value.studySeconds)) : 0,
+    studyDayStreak: typeof value.studyDayStreak === 'number' ? Math.max(0, Math.floor(value.studyDayStreak)) : 0,
+    bestStudyDayStreak: typeof value.bestStudyDayStreak === 'number' ? Math.max(0, Math.floor(value.bestStudyDayStreak)) : 0,
+    lastStudyDay: typeof value.lastStudyDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.lastStudyDay) ? value.lastStudyDay : '',
     gamePlays: {
       matching: typeof (gamePlays as Record<string, unknown>).matching === 'number' ? Math.max(0, Math.floor((gamePlays as Record<string, number>).matching)) : 0,
       speed: typeof (gamePlays as Record<string, unknown>).speed === 'number' ? Math.max(0, Math.floor((gamePlays as Record<string, number>).speed)) : 0,
@@ -885,6 +1071,7 @@ function sanitizeUserStats(input: unknown): UserStats {
       hs: typeof (studyModeCounts as Record<string, unknown>).hs === 'number' ? Math.max(0, Math.floor((studyModeCounts as Record<string, number>).hs)) : 0,
       vehicle: typeof (studyModeCounts as Record<string, unknown>).vehicle === 'number' ? Math.max(0, Math.floor((studyModeCounts as Record<string, number>).vehicle)) : 0,
     },
+    sessionTracks: normalizedTracks,
   }
 }
 
@@ -939,6 +1126,7 @@ function sanitizeState(input: unknown): PersistedState {
     profileDetails: {
       bio: '',
       agency: '',
+      homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
@@ -963,6 +1151,7 @@ function sanitizeState(input: unknown): PersistedState {
         ? {
             bio: String((state.profileDetails as Partial<ProfileDetails>).bio || ''),
             agency: String((state.profileDetails as Partial<ProfileDetails>).agency || ''),
+            homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs((state.profileDetails as Partial<ProfileDetails>).homeLeaderboardRotationMs),
             themeId: getThemePreset(String((state.profileDetails as Partial<ProfileDetails>).themeId || appThemePresets[0].id)).id,
             nameStyle: sanitizeNameStyle((state.profileDetails as Partial<ProfileDetails>).nameStyle),
             namePresets: sanitizeNamePresets((state.profileDetails as Partial<ProfileDetails>).namePresets),
@@ -976,6 +1165,7 @@ function sanitizeState(input: unknown): PersistedState {
         : {
             bio: '',
             agency: '',
+            homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
             themeId: appThemePresets[0].id,
             nameStyle: { ...defaultNameStyle },
             namePresets: [],
@@ -1256,6 +1446,106 @@ function StatsIcon({ name, className = '' }: { name: StatsIconName; className?: 
   return <AppIcon name="study" className={className} />
 }
 
+function buildTrendPath(points: number[]) {
+  const width = 320
+  const height = 116
+  const paddingX = 14
+  const paddingY = 12
+  const usableWidth = width - paddingX * 2
+  const usableHeight = height - paddingY * 2
+  const safePoints = points.length > 1 ? points : [points[0] ?? 0, points[0] ?? 0]
+  const stepX = safePoints.length > 1 ? usableWidth / (safePoints.length - 1) : 0
+  const coords = safePoints.map((value, index) => {
+    const clamped = Math.max(0, Math.min(100, value))
+    const x = paddingX + index * stepX
+    const y = paddingY + ((100 - clamped) / 100) * usableHeight
+    return { x, y }
+  })
+  return {
+    width,
+    height,
+    coords,
+    path: coords.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' '),
+  }
+}
+
+function SessionPerformanceReportCard({ report }: { report: SessionPerformanceReport }) {
+  const trendValues = report.trend.length > 0 ? report.trend : [report.accuracy]
+  const trend = buildTrendPath(trendValues)
+  const lastPoint = trend.coords[trend.coords.length - 1]
+  const improvedRank = report.currentRank !== null && report.previousRank !== null && report.currentRank < report.previousRank
+  const movedCount =
+    report.currentRank !== null && report.previousRank !== null && report.currentRank < report.previousRank
+      ? report.previousRank - report.currentRank
+      : 0
+
+  return (
+    <div className="card session-report-card">
+      <div className="session-report-head">
+        <div>
+          <h3>{sessionModeLabel(report.mode)} Performance</h3>
+          <p className="muted">{report.contextLabel} • Accuracy: {report.accuracy}%</p>
+        </div>
+      </div>
+
+      <div className="session-trend-wrap">
+        <svg viewBox={`0 0 ${trend.width} ${trend.height}`} className="session-trend-chart" role="img" aria-label="Accuracy trend">
+          <path d={trend.path} className="session-trend-glow" />
+          <path d={trend.path} className="session-trend-line" />
+          <circle cx={lastPoint.x} cy={lastPoint.y} r="4.5" className="session-trend-dot" />
+        </svg>
+      </div>
+
+      <div className="session-metrics-grid">
+        <div>
+          <small>Correct</small>
+          <strong>{report.correct}</strong>
+        </div>
+        <div>
+          <small>Incorrect</small>
+          <strong>{report.incorrect}</strong>
+        </div>
+        <div>
+          <small>Score</small>
+          <strong>{report.score}</strong>
+        </div>
+      </div>
+
+      <p className="session-summary-line">
+        {report.deltaAccuracy === null
+          ? 'First tracked attempt for this mode. Keep building consistency.'
+          : report.deltaAccuracy >= 0
+            ? `You improved ${report.deltaAccuracy}% since your last attempt.`
+            : `You are down ${Math.abs(report.deltaAccuracy)}% from your last attempt. Bounce back next run.`}
+      </p>
+      {report.focusTips.length > 0 ? (
+        <p className="session-focus-line">
+          Focus next: {report.focusTips.join(' • ')}
+        </p>
+      ) : null}
+
+      {report.leaderboardPreview.length > 0 ? (
+        <div className="session-leader-preview">
+          <p className="session-leader-title">Leaderboard Preview</p>
+          {report.leaderboardPreview.map((entry) => (
+            <div key={`${report.mode}-leader-${entry.rank}-${entry.playerName}`} className={`session-leader-row ${entry.isCurrentUser ? 'is-you' : ''}`}>
+              <span>#{entry.rank}</span>
+              <span>{entry.playerName}</span>
+              <strong>{entry.score}</strong>
+            </div>
+          ))}
+          {report.currentRank ? (
+            <p className={`session-rank-note ${improvedRank ? 'rank-up' : ''}`}>
+              You are #{report.currentRank}
+              {improvedRank ? ` and jumped up ${movedCount} spot${movedCount > 1 ? 's' : ''}.` : '.'}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function App() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -1282,6 +1572,7 @@ function App() {
   const [studyTestSessionTotal, setStudyTestSessionTotal] = useState(0)
   const [studyTestSessionAnswered, setStudyTestSessionAnswered] = useState(0)
   const [studyTestSessionCorrect, setStudyTestSessionCorrect] = useState(0)
+  const [studyTestReport, setStudyTestReport] = useState<SessionPerformanceReport | null>(null)
   const [libraryFilter, setLibraryFilter] = useState<CodeSet>('penal')
 
   const [authReady, setAuthReady] = useState(false)
@@ -1317,11 +1608,13 @@ function App() {
   const [profileDetails, setProfileDetails] = useState<ProfileDetails>({
     bio: '',
     agency: '',
+    homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
     themeId: appThemePresets[0].id,
     nameStyle: { ...defaultNameStyle },
     namePresets: [],
     stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
   })
+  const [leaderboardRotateMs, setLeaderboardRotateMs] = useState(defaultLeaderboardRotationMs)
   const [newPresetName, setNewPresetName] = useState('')
   const [editorItems, setEditorItems] = useState<ContentEditorItem[]>([])
   const [editorLoading, setEditorLoading] = useState(false)
@@ -1346,10 +1639,11 @@ function App() {
   const [stateHydrated, setStateHydrated] = useState(false)
   const [celebration, setCelebration] = useState<{ title: string; subtitle: string; burst: number } | null>(null)
   const [homeStudyTimeLeaders, setHomeStudyTimeLeaders] = useState<HomeLeaderboardEntry[]>([])
+  const [homeStudyStreakLeaders, setHomeStudyStreakLeaders] = useState<HomeLeaderboardEntry[]>([])
   const [homeMostMasteredLeaders, setHomeMostMasteredLeaders] = useState<HomeLeaderboardEntry[]>([])
-  const [homeMatchingDurationFilter, setHomeMatchingDurationFilter] = useState<DurationFilter>('all')
+  const [homeMatchingDurationFilter, setHomeMatchingDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeMatchingCodeFilter, setHomeMatchingCodeFilter] = useState<CodeFilter>('all')
-  const [homeSpeedDurationFilter, setHomeSpeedDurationFilter] = useState<DurationFilter>('all')
+  const [homeSpeedDurationFilter, setHomeSpeedDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeSpeedCodeFilter, setHomeSpeedCodeFilter] = useState<CodeFilter>('all')
   const [homeMatchingConfigOpen, setHomeMatchingConfigOpen] = useState(false)
   const [homeSpeedConfigOpen, setHomeSpeedConfigOpen] = useState(false)
@@ -1357,6 +1651,7 @@ function App() {
   const [assistedLearningEnabled, setAssistedLearningEnabled] = useState(true)
   const [showAssistedLearningInfo, setShowAssistedLearningInfo] = useState(false)
   const [showDevNotice, setShowDevNotice] = useState(false)
+  const [reduceVisualEffects, setReduceVisualEffects] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -1378,6 +1673,9 @@ function App() {
   const [matchedPairIds, setMatchedPairIds] = useState<string[]>([])
   const [recentMatchSections, setRecentMatchSections] = useState<string[]>([])
   const [matchDone, setMatchDone] = useState(false)
+  const [matchCorrectCount, setMatchCorrectCount] = useState(0)
+  const [matchIncorrectCount, setMatchIncorrectCount] = useState(0)
+  const [matchingReport, setMatchingReport] = useState<SessionPerformanceReport | null>(null)
   const [matchSessionDuration, setMatchSessionDuration] = useState(30)
   const [matchSessionFilter, setMatchSessionFilter] = useState<CodeFilter>('all')
   const [showMatchSetupModal, setShowMatchSetupModal] = useState(false)
@@ -1391,6 +1689,9 @@ function App() {
   const [speedDone, setSpeedDone] = useState(false)
   const [speedScore, setSpeedScore] = useState(0)
   const [speedAnsweredCount, setSpeedAnsweredCount] = useState(0)
+  const [speedCorrectCount, setSpeedCorrectCount] = useState(0)
+  const [speedIncorrectCount, setSpeedIncorrectCount] = useState(0)
+  const [speedReport, setSpeedReport] = useState<SessionPerformanceReport | null>(null)
   const [speedCurrentQuestion, setSpeedCurrentQuestion] = useState<QuizQuestion | null>(null)
   const [speedDeck, setSpeedDeck] = useState<QuizQuestion[]>([])
   const [speedSessionQuestions, setSpeedSessionQuestions] = useState<QuizQuestion[]>([])
@@ -1406,6 +1707,8 @@ function App() {
   const [scenarioSelectedChoice, setScenarioSelectedChoice] = useState<number | null>(null)
   const [scenarioStreak, setScenarioStreak] = useState(0)
   const [gamesMode, setGamesMode] = useState<'matching' | 'speed'>('matching')
+  const homeMatchingRotationIndexRef = useRef(0)
+  const homeSpeedRotationIndexRef = useRef(0)
   const lastAppStateUpdateRef = useRef(0)
   const highScoresRef = useRef(gameHighScoreSeed)
   const leaderboardRef = useRef<LeaderboardEntry[]>([])
@@ -1413,6 +1716,10 @@ function App() {
   const matchRoundRef = useRef(1)
   const speedScoreRef = useRef(0)
   const speedAnsweredCountRef = useRef(0)
+  const matchCorrectCountRef = useRef(0)
+  const matchIncorrectCountRef = useRef(0)
+  const speedCorrectCountRef = useRef(0)
+  const speedIncorrectCountRef = useRef(0)
   const recentSpeedSectionsRef = useRef<string[]>([])
   const quizFireHostRef = useRef<HTMLDivElement | null>(null)
   const scenarioFireHostRef = useRef<HTMLDivElement | null>(null)
@@ -1441,6 +1748,28 @@ function App() {
 
   useEffect(() => {
     document.title = 'LEO Study'
+  }, [])
+
+  useEffect(() => {
+    const nav = navigator as Navigator & { deviceMemory?: number }
+    const lowCpu = typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency > 0 && nav.hardwareConcurrency <= 4
+    const lowMemory = typeof nav.deviceMemory === 'number' && nav.deviceMemory > 0 && nav.deviceMemory <= 4
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let intelGpu = false
+    try {
+      const canvas = document.createElement('canvas')
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+      if (gl) {
+        const debugInfo = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info')
+        if (debugInfo) {
+          const renderer = (gl as WebGLRenderingContext).getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+          intelGpu = typeof renderer === 'string' && renderer.toLowerCase().includes('intel')
+        }
+      }
+    } catch {
+      intelGpu = false
+    }
+    setReduceVisualEffects(lowCpu || lowMemory || prefersReducedMotion || intelGpu)
   }, [])
 
   useEffect(() => {
@@ -1632,8 +1961,24 @@ function App() {
     speedAnsweredCountRef.current = speedAnsweredCount
   }, [speedAnsweredCount])
 
+  useEffect(() => {
+    matchCorrectCountRef.current = matchCorrectCount
+  }, [matchCorrectCount])
+
+  useEffect(() => {
+    matchIncorrectCountRef.current = matchIncorrectCount
+  }, [matchIncorrectCount])
+
+  useEffect(() => {
+    speedCorrectCountRef.current = speedCorrectCount
+  }, [speedCorrectCount])
+
+  useEffect(() => {
+    speedIncorrectCountRef.current = speedIncorrectCount
+  }, [speedIncorrectCount])
+
   const refreshLeaderboard = async () => {
-    if (!supabase) return
+    if (!supabase) return []
 
     const { data: rows, error } = await supabase
       .from('leaderboard')
@@ -1643,7 +1988,7 @@ function App() {
 
     if (error || !rows) {
       setLeaderboardError(error?.message || 'Could not load leaderboard.')
-      return
+      return []
     }
     setLeaderboardError('')
 
@@ -1652,6 +1997,7 @@ function App() {
     let detailsByUserId: Record<string, ProfileDetails> = {}
     let masteredCodesByUserId: Record<string, number> = {}
     let studySecondsByUserId: Record<string, number> = {}
+    let studyDayStreakByUserId: Record<string, number> = {}
     let mostStudiedModeByUserId: Record<string, CodeFilter | null> = {}
     let ownerUserIds = new Set<string>()
 
@@ -1677,6 +2023,7 @@ function App() {
         accumulator[String(entry.user_id)] = {
           bio: String(entry.bio || ''),
           agency: String(entry.agency || ''),
+          homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
           themeId: appThemePresets[0].id,
           nameStyle: { ...defaultNameStyle },
           namePresets: [],
@@ -1697,6 +2044,7 @@ function App() {
         const existing = detailsByUserId[userId] ?? {
           bio: '',
           agency: '',
+          homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
           themeId: appThemePresets[0].id,
           nameStyle: { ...defaultNameStyle },
           namePresets: [],
@@ -1705,6 +2053,7 @@ function App() {
         detailsByUserId[userId] = {
           bio: existing.bio || details.bio,
           agency: existing.agency || details.agency,
+          homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs(details.homeLeaderboardRotationMs || existing.homeLeaderboardRotationMs),
           themeId: details.themeId || existing.themeId,
           nameStyle: details.nameStyle,
           namePresets: details.namePresets,
@@ -1712,6 +2061,7 @@ function App() {
         }
         masteredCodesByUserId[userId] = Object.values(parsed.performance).filter((item) => mastery(item) === 'Mastered').length
         studySecondsByUserId[userId] = details.stats.studySeconds
+        studyDayStreakByUserId[userId] = details.stats.studyDayStreak
         mostStudiedModeByUserId[userId] = mostStudiedModeFromStats(details.stats)
       }
 
@@ -1745,6 +2095,7 @@ function App() {
         createdAt: Date.parse(String(entry.created_at || '')) || Date.now(),
         masteredCodes: masteredCodesByUserId[String(entry.user_id)] || 0,
         studySeconds: studySecondsByUserId[String(entry.user_id)] || 0,
+        studyDayStreak: studyDayStreakByUserId[String(entry.user_id)] || 0,
         mostStudiedMode: mostStudiedModeByUserId[String(entry.user_id)] || null,
       }),
     )
@@ -1763,6 +2114,8 @@ function App() {
     ).sort((left, right) => right.score - left.score || right.round - left.round)
 
     setLeaderboard(deduped)
+    leaderboardRef.current = deduped
+    return deduped
   }
 
   const refreshHomeLeaderboards = async () => {
@@ -1799,14 +2152,20 @@ function App() {
     }
 
     const studyRows: HomeLeaderboardEntry[] = []
+    const studyStreakRows: HomeLeaderboardEntry[] = []
     const masteredRows: HomeLeaderboardEntry[] = []
+    let ownerRotationMs: number | null = null
     for (const row of states) {
       const userId = String(row.user_id || '')
       if (!userId) continue
       const parsed = sanitizeState({ profileDetails: row.profile_details, performance: row.performance })
+      if (ownerRotationMs === null && ownerUserIds.has(userId)) {
+        ownerRotationMs = sanitizeLeaderboardRotationMs(parsed.profileDetails.homeLeaderboardRotationMs)
+      }
       const profile = profileMap[userId] || { username: 'Player', avatarUrl: defaultAvatarUrl, supporterTier: 'free' as SupporterTier }
       const masteredCount = Object.values(parsed.performance).filter((item) => mastery(item) === 'Mastered').length
       const studySeconds = parsed.profileDetails.stats.studySeconds
+      const studyDayStreak = parsed.profileDetails.stats.studyDayStreak
       const mostStudiedMode = mostStudiedModeFromStats(parsed.profileDetails.stats)
       studyRows.push({
         userId,
@@ -1821,6 +2180,23 @@ function App() {
         value: studySeconds,
         masteredCodes: masteredCount,
         studySeconds,
+        studyDayStreak,
+        mostStudiedMode,
+      })
+      studyStreakRows.push({
+        userId,
+        playerName: profile.username,
+        avatarUrl: profile.avatarUrl,
+        supporterTier: profile.supporterTier,
+        themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
+        nameStyle: parsed.profileDetails.nameStyle,
+        bio: parsed.profileDetails.bio,
+        agency: parsed.profileDetails.agency,
+        isOwner: ownerUserIds.has(userId),
+        value: studyDayStreak,
+        masteredCodes: masteredCount,
+        studySeconds,
+        studyDayStreak,
         mostStudiedMode,
       })
       masteredRows.push({
@@ -1836,12 +2212,17 @@ function App() {
         value: masteredCount,
         masteredCodes: masteredCount,
         studySeconds,
+        studyDayStreak,
         mostStudiedMode,
       })
     }
 
     setHomeStudyTimeLeaders(studyRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
+    setHomeStudyStreakLeaders(studyStreakRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
     setHomeMostMasteredLeaders(masteredRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
+    if (ownerRotationMs !== null) {
+      setLeaderboardRotateMs(ownerRotationMs)
+    }
   }
 
   useEffect(() => {
@@ -1937,6 +2318,7 @@ function App() {
       setProfileDetails({
         bio: profileBio || nextState.profileDetails.bio,
         agency: profileAgency || nextState.profileDetails.agency,
+        homeLeaderboardRotationMs: nextState.profileDetails.homeLeaderboardRotationMs,
         themeId: nextState.profileDetails.themeId,
         nameStyle: nextState.profileDetails.nameStyle,
         namePresets: nextState.profileDetails.namePresets,
@@ -2023,6 +2405,7 @@ function App() {
           setProfileDetails((previous) => ({
             bio: String(row.bio || ''),
             agency: String(row.agency || ''),
+            homeLeaderboardRotationMs: previous.homeLeaderboardRotationMs,
             themeId: previous.themeId,
             nameStyle: previous.nameStyle,
             namePresets: previous.namePresets,
@@ -2108,8 +2491,8 @@ function App() {
         leaderboard
           .filter((entry) => entry.game === 'Matching')
           .filter((entry) => entry.score > 0)
-          .filter((entry) => (homeMatchingDurationFilter === 'all' ? true : entry.matchDuration === homeMatchingDurationFilter))
-          .filter((entry) => (homeMatchingCodeFilter === 'all' ? true : entry.matchFilter === homeMatchingCodeFilter)),
+          .filter((entry) => entry.matchDuration === homeMatchingDurationFilter)
+          .filter((entry) => entry.matchFilter === homeMatchingCodeFilter),
       )
         .slice(0, 5),
     [leaderboard, homeMatchingDurationFilter, homeMatchingCodeFilter],
@@ -2120,11 +2503,37 @@ function App() {
         leaderboard
           .filter((entry) => entry.game === 'Speed Test')
           .filter((entry) => entry.score > 0)
-          .filter((entry) => (homeSpeedDurationFilter === 'all' ? true : entry.matchDuration === homeSpeedDurationFilter))
-          .filter((entry) => (homeSpeedCodeFilter === 'all' ? true : entry.matchFilter === homeSpeedCodeFilter)),
+          .filter((entry) => entry.matchDuration === homeSpeedDurationFilter)
+          .filter((entry) => entry.matchFilter === homeSpeedCodeFilter),
       )
         .slice(0, 5),
     [leaderboard, homeSpeedDurationFilter, homeSpeedCodeFilter],
+  )
+  const homeMatchingRotationSteps = useMemo(
+    () =>
+      homeLeaderboardRotationSteps.filter((step) =>
+        leaderboard.some(
+          (entry) =>
+            entry.game === 'Matching' &&
+            entry.score > 0 &&
+            entry.matchDuration === step.duration &&
+            entry.matchFilter === step.codeSet,
+        ),
+      ),
+    [leaderboard],
+  )
+  const homeSpeedRotationSteps = useMemo(
+    () =>
+      homeLeaderboardRotationSteps.filter((step) =>
+        leaderboard.some(
+          (entry) =>
+            entry.game === 'Speed Test' &&
+            entry.score > 0 &&
+            entry.matchDuration === step.duration &&
+            entry.matchFilter === step.codeSet,
+        ),
+      ),
+    [leaderboard],
   )
 
   const speedQuestionBank = useMemo(() => {
@@ -2277,6 +2686,7 @@ function App() {
     setStudyTestSessionAnswered(0)
     setStudyTestSessionCorrect(0)
     setStudyTestSessionDone(false)
+    setStudyTestReport(null)
     setShowStudyTestSetupModal(false)
     setStudyTestSessionOpen(true)
     setQuizDeck(remaining)
@@ -2291,6 +2701,47 @@ function App() {
     if (quizDeck.length === 0) {
       setStudyTestSessionDone(true)
       setCurrentQuestion(null)
+      const total = studyTestSessionAnswered
+      const correct = studyTestSessionCorrect
+      const incorrect = Math.max(0, total - correct)
+      const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0
+      const trackKey = sessionTrackKey({
+        mode: 'study_test',
+        filter: studyTestSessionFilter,
+        answerMode: studyTestAnswerMode,
+        wrongness: studyTestWrongness,
+        questionCount: studyTestQuestionCount,
+      })
+      const track = getSessionTrack(profileDetails.stats, trackKey)
+      const previous = track.lastAttempt
+      const trend = [...track.accuracyHistory, accuracy].slice(-8)
+      const delta = previous ? accuracy - previous.accuracy : null
+      const focusTips = getFocusTips(studyTestSessionFilter, 'study_test')
+      setStudyTestReport({
+        mode: 'study_test',
+        title: 'Study Test',
+        contextLabel: `${studyTestSessionFilter === 'all' ? 'All' : codeSetLabel[studyTestSessionFilter]} • ${studyTestAnswerMode === 'multiple' ? 'Multiple Choice' : 'True/False'}`,
+        accuracy,
+        correct,
+        incorrect,
+        score: correct,
+        deltaAccuracy: delta,
+        trend,
+        focusTips,
+        leaderboardPreview: [],
+        currentRank: null,
+        previousRank: previous?.rank ?? null,
+      })
+      saveSessionAttempt(trackKey, {
+        accuracy,
+        score: correct,
+        correct,
+        incorrect,
+        rank: null,
+        duration: null,
+        filter: studyTestSessionFilter,
+        at: Date.now(),
+      })
       return
     }
     const [next, ...remaining] = quizDeck
@@ -2310,6 +2761,15 @@ function App() {
           setMatchDone(true)
           const finalMatchScore = matchScoreRef.current
           const finalMatchRound = matchRoundRef.current
+          const finalCorrect = matchCorrectCountRef.current
+          const finalIncorrect = matchIncorrectCountRef.current
+          const finalAttempts = finalCorrect + finalIncorrect
+          const finalAccuracy = finalAttempts > 0 ? Math.round((finalCorrect / finalAttempts) * 100) : 0
+          const trackKey = sessionTrackKey({ mode: 'matching', duration: matchSessionDuration, filter: matchSessionFilter })
+          const track = getSessionTrack(profileDetails.stats, trackKey)
+          const previousAttempt = track.lastAttempt
+          const trend = [...track.accuracyHistory, finalAccuracy].slice(-8)
+          const focusTips = getFocusTips(matchSessionFilter, 'matching')
           const previousBest = highScoresRef.current.matching
           const globalBest = leaderboardRef.current
             .filter((entry) => entry.game === 'Matching')
@@ -2346,9 +2806,68 @@ function App() {
 
               setLeaderboardDurationFilter(matchSessionDuration)
               setLeaderboardCodeFilter(matchSessionFilter)
-              await refreshLeaderboard()
+              const refreshed = await refreshLeaderboard()
               await refreshHomeLeaderboards()
+
+              const { preview, currentRank } = getLeaderboardPreview(
+                refreshed.length > 0 ? refreshed : leaderboardRef.current,
+                'Matching',
+                matchSessionDuration,
+                matchSessionFilter,
+                currentUserId,
+              )
+              setMatchingReport({
+                mode: 'matching',
+                title: 'Matching',
+                contextLabel: `${matchSessionDuration}s • ${leaderboardCodeSetLabel(matchSessionFilter)}`,
+                accuracy: finalAccuracy,
+                correct: finalCorrect,
+                incorrect: finalIncorrect,
+                score: finalMatchScore,
+                deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+                trend,
+                focusTips,
+                leaderboardPreview: preview,
+                currentRank,
+                previousRank: previousAttempt?.rank ?? null,
+              })
+              saveSessionAttempt(trackKey, {
+                accuracy: finalAccuracy,
+                score: finalMatchScore,
+                correct: finalCorrect,
+                incorrect: finalIncorrect,
+                rank: currentRank,
+                duration: matchSessionDuration,
+                filter: matchSessionFilter,
+                at: Date.now(),
+              })
             })()
+          } else {
+            setMatchingReport({
+              mode: 'matching',
+              title: 'Matching',
+              contextLabel: `${matchSessionDuration}s • ${leaderboardCodeSetLabel(matchSessionFilter)}`,
+              accuracy: finalAccuracy,
+              correct: finalCorrect,
+              incorrect: finalIncorrect,
+              score: finalMatchScore,
+              deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+              trend,
+              focusTips,
+              leaderboardPreview: [],
+              currentRank: null,
+              previousRank: previousAttempt?.rank ?? null,
+            })
+            saveSessionAttempt(trackKey, {
+              accuracy: finalAccuracy,
+              score: finalMatchScore,
+              correct: finalCorrect,
+              incorrect: finalIncorrect,
+              rank: null,
+              duration: matchSessionDuration,
+              filter: matchSessionFilter,
+              at: Date.now(),
+            })
           }
 
           return 0
@@ -2359,7 +2878,7 @@ function App() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [matchRunning, currentUserId, matchSessionDuration, matchSessionFilter])
+  }, [matchRunning, currentUserId, matchSessionDuration, matchSessionFilter, profileDetails.stats.sessionTracks, sections, performance])
 
   const markPerformance = (codeSet: CodeSet, sectionNumber: string, correct: boolean) => {
     const key = performanceKey(codeSet, sectionNumber)
@@ -2384,7 +2903,7 @@ function App() {
         ...stats.studyModeCounts,
         [studyTestSessionFilter]: stats.studyModeCounts[studyTestSessionFilter] + 1,
       },
-    }))
+    }), true)
 
     const isCorrect = index === currentQuestion.correctIndex
     const stageUpdate = markPerformance(currentQuestion.codeSet, currentQuestion.linkedSectionNumber, isCorrect)
@@ -2451,6 +2970,11 @@ function App() {
     matchRoundRef.current = 1
     setMatchRemaining(matchDuration)
     setRecentMatchSections([])
+    setMatchCorrectCount(0)
+    setMatchIncorrectCount(0)
+    setMatchingReport(null)
+    matchCorrectCountRef.current = 0
+    matchIncorrectCountRef.current = 0
     setMatchRunning(true)
     makeRoundCards(matchFilter)
     incrementUserStats((stats) => ({
@@ -2510,8 +3034,13 @@ function App() {
     setSpeedRemaining(speedDuration)
     setSpeedScore(0)
     setSpeedAnsweredCount(0)
+    setSpeedCorrectCount(0)
+    setSpeedIncorrectCount(0)
+    setSpeedReport(null)
     speedScoreRef.current = 0
     speedAnsweredCountRef.current = 0
+    speedCorrectCountRef.current = 0
+    speedIncorrectCountRef.current = 0
     setSpeedFeedback('')
     setSpeedDone(false)
     setSpeedRunning(true)
@@ -2542,9 +3071,19 @@ function App() {
     const isCorrect = choiceIndex === speedCurrentQuestion.correctIndex
     setSpeedAnsweredCount((count) => count + 1)
     if (isCorrect) {
+      setSpeedCorrectCount((count) => {
+        const next = count + 1
+        speedCorrectCountRef.current = next
+        return next
+      })
       setSpeedScore((score) => score + 10)
       setSpeedFeedback('Correct')
     } else {
+      setSpeedIncorrectCount((count) => {
+        const next = count + 1
+        speedIncorrectCountRef.current = next
+        return next
+      })
       setSpeedScore((score) => Math.max(0, score - 5))
       setSpeedFeedback('Incorrect')
     }
@@ -2587,7 +3126,7 @@ function App() {
     if (!scenarioCurrentQuestion) return
     setScenarioSelectedChoice(choiceIndex)
     const isCorrect = choiceIndex === scenarioCurrentQuestion.correctIndex
-    incrementUserStats((stats) => ({ ...stats, scenariosReviewed: stats.scenariosReviewed + 1 }))
+    incrementUserStats((stats) => ({ ...stats, scenariosReviewed: stats.scenariosReviewed + 1 }), true)
     if (isCorrect) {
       setScenarioStreak((current) => current + 1)
     } else {
@@ -2642,12 +3181,22 @@ function App() {
     if (isMatch) {
       setMatchedPairIds((previous) => [...previous, selected[0].pairId])
       setMatchScore((score) => score + 10)
+      setMatchCorrectCount((count) => {
+        const next = count + 1
+        matchCorrectCountRef.current = next
+        return next
+      })
       setWrongCardIds([])
       markPerformance(selected[0].codeSet, selected[0].sectionNumber, true)
       setSelectedCards([])
       return
     } else {
       setMatchScore((score) => Math.max(0, score - 5))
+      setMatchIncorrectCount((count) => {
+        const next = count + 1
+        matchIncorrectCountRef.current = next
+        return next
+      })
       setWrongCardIds(selected.map((card) => card.id))
       markPerformance(selected[0].codeSet, selected[0].sectionNumber, false)
       markPerformance(selected[1].codeSet, selected[1].sectionNumber, false)
@@ -2679,6 +3228,14 @@ function App() {
           setSpeedDone(true)
           const finalSpeedScore = speedScoreRef.current
           const finalAnswered = speedAnsweredCountRef.current
+          const finalCorrect = speedCorrectCountRef.current
+          const finalIncorrect = speedIncorrectCountRef.current
+          const finalAccuracy = finalAnswered > 0 ? Math.round((finalCorrect / finalAnswered) * 100) : 0
+          const trackKey = sessionTrackKey({ mode: 'speed', duration: speedSessionDuration, filter: speedSessionFilter })
+          const track = getSessionTrack(profileDetails.stats, trackKey)
+          const previousAttempt = track.lastAttempt
+          const trend = [...track.accuracyHistory, finalAccuracy].slice(-8)
+          const focusTips = getFocusTips(speedSessionFilter, 'speed')
           const previousBest = highScoresRef.current.rapidFire
           const globalBest = leaderboardRef.current
             .filter((entry) => entry.game === 'Speed Test')
@@ -2715,9 +3272,68 @@ function App() {
 
               setSpeedLeaderboardDurationFilter(speedSessionDuration)
               setSpeedLeaderboardCodeFilter(speedSessionFilter)
-              await refreshLeaderboard()
+              const refreshed = await refreshLeaderboard()
               await refreshHomeLeaderboards()
+
+              const { preview, currentRank } = getLeaderboardPreview(
+                refreshed.length > 0 ? refreshed : leaderboardRef.current,
+                'Speed Test',
+                speedSessionDuration,
+                speedSessionFilter,
+                currentUserId,
+              )
+              setSpeedReport({
+                mode: 'speed',
+                title: 'Speed Test',
+                contextLabel: `${speedSessionDuration}s • ${leaderboardCodeSetLabel(speedSessionFilter)}`,
+                accuracy: finalAccuracy,
+                correct: finalCorrect,
+                incorrect: finalIncorrect,
+                score: finalSpeedScore,
+                deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+                trend,
+                focusTips,
+                leaderboardPreview: preview,
+                currentRank,
+                previousRank: previousAttempt?.rank ?? null,
+              })
+              saveSessionAttempt(trackKey, {
+                accuracy: finalAccuracy,
+                score: finalSpeedScore,
+                correct: finalCorrect,
+                incorrect: finalIncorrect,
+                rank: currentRank,
+                duration: speedSessionDuration,
+                filter: speedSessionFilter,
+                at: Date.now(),
+              })
             })()
+          } else {
+            setSpeedReport({
+              mode: 'speed',
+              title: 'Speed Test',
+              contextLabel: `${speedSessionDuration}s • ${leaderboardCodeSetLabel(speedSessionFilter)}`,
+              accuracy: finalAccuracy,
+              correct: finalCorrect,
+              incorrect: finalIncorrect,
+              score: finalSpeedScore,
+              deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+              trend,
+              focusTips,
+              leaderboardPreview: [],
+              currentRank: null,
+              previousRank: previousAttempt?.rank ?? null,
+            })
+            saveSessionAttempt(trackKey, {
+              accuracy: finalAccuracy,
+              score: finalSpeedScore,
+              correct: finalCorrect,
+              incorrect: finalIncorrect,
+              rank: null,
+              duration: speedSessionDuration,
+              filter: speedSessionFilter,
+              at: Date.now(),
+            })
           }
           return 0
         }
@@ -2726,7 +3342,7 @@ function App() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [speedRunning, speedSessionDuration, speedSessionFilter, currentUserId])
+  }, [speedRunning, speedSessionDuration, speedSessionFilter, currentUserId, profileDetails.stats.sessionTracks, sections, performance])
 
   useEffect(() => {
     setScenarioDeck([])
@@ -3079,6 +3695,7 @@ function App() {
     setProfileDetails({
       bio: '',
       agency: '',
+      homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
@@ -3238,6 +3855,68 @@ function App() {
     }
   }, [isHomePage, isStudyPage, isGamesPage, isScenariosPage, isLibraryPage])
 
+  useEffect(() => {
+    if (homeMatchingRotationSteps.length === 0) return
+    const hasCurrent = homeMatchingRotationSteps.some(
+      (step) => step.duration === homeMatchingDurationFilter && step.codeSet === homeMatchingCodeFilter,
+    )
+    if (hasCurrent) return
+    const first = homeMatchingRotationSteps[0]
+    homeMatchingRotationIndexRef.current = 0
+    setHomeMatchingDurationFilter(first.duration)
+    setHomeMatchingCodeFilter(first.codeSet)
+  }, [homeMatchingRotationSteps, homeMatchingDurationFilter, homeMatchingCodeFilter])
+
+  useEffect(() => {
+    if (homeSpeedRotationSteps.length === 0) return
+    const hasCurrent = homeSpeedRotationSteps.some(
+      (step) => step.duration === homeSpeedDurationFilter && step.codeSet === homeSpeedCodeFilter,
+    )
+    if (hasCurrent) return
+    const first = homeSpeedRotationSteps[0]
+    homeSpeedRotationIndexRef.current = 0
+    setHomeSpeedDurationFilter(first.duration)
+    setHomeSpeedCodeFilter(first.codeSet)
+  }, [homeSpeedRotationSteps, homeSpeedDurationFilter, homeSpeedCodeFilter])
+
+  useEffect(() => {
+    if (!isHomePage || homeMatchingConfigOpen || homeMatchingRotationSteps.length === 0) return
+
+    const currentIndex = homeMatchingRotationSteps.findIndex(
+      (step) => step.duration === homeMatchingDurationFilter && step.codeSet === homeMatchingCodeFilter,
+    )
+    if (currentIndex >= 0) homeMatchingRotationIndexRef.current = currentIndex
+
+    const timer = window.setInterval(() => {
+      const nextIndex = (homeMatchingRotationIndexRef.current + 1) % homeMatchingRotationSteps.length
+      homeMatchingRotationIndexRef.current = nextIndex
+      const nextStep = homeMatchingRotationSteps[nextIndex]
+      setHomeMatchingDurationFilter(nextStep.duration)
+      setHomeMatchingCodeFilter(nextStep.codeSet)
+    }, leaderboardRotateMs)
+
+    return () => window.clearInterval(timer)
+  }, [isHomePage, homeMatchingConfigOpen, homeMatchingDurationFilter, homeMatchingCodeFilter, homeMatchingRotationSteps, leaderboardRotateMs])
+
+  useEffect(() => {
+    if (!isHomePage || homeSpeedConfigOpen || homeSpeedRotationSteps.length === 0) return
+
+    const currentIndex = homeSpeedRotationSteps.findIndex(
+      (step) => step.duration === homeSpeedDurationFilter && step.codeSet === homeSpeedCodeFilter,
+    )
+    if (currentIndex >= 0) homeSpeedRotationIndexRef.current = currentIndex
+
+    const timer = window.setInterval(() => {
+      const nextIndex = (homeSpeedRotationIndexRef.current + 1) % homeSpeedRotationSteps.length
+      homeSpeedRotationIndexRef.current = nextIndex
+      const nextStep = homeSpeedRotationSteps[nextIndex]
+      setHomeSpeedDurationFilter(nextStep.duration)
+      setHomeSpeedCodeFilter(nextStep.codeSet)
+    }, leaderboardRotateMs)
+
+    return () => window.clearInterval(timer)
+  }, [isHomePage, homeSpeedConfigOpen, homeSpeedDurationFilter, homeSpeedCodeFilter, homeSpeedRotationSteps, leaderboardRotateMs])
+
   const refreshSupporterTier = async () => {
     if (!supabase || !currentUserId || !profile) return
     const { data: profileRow } = await supabase
@@ -3274,12 +3953,17 @@ function App() {
     selectedLeaderboardTheme.id === 'golden'
       ? 'profile-modal-theme-dynamic profile-modal-theme-dynamic-gold'
       : 'profile-modal-theme-dynamic'
-  const leaderboardProfileNameStyle: CSSProperties | undefined =
-    { color: selectedLeaderboardTheme.vars.text, WebkitTextFillColor: selectedLeaderboardTheme.vars.text, textShadow: 'none' }
-  const incrementUserStats = (updater: (stats: UserStats) => UserStats) => {
+  const leaderboardProfileNameStyle: CSSProperties | undefined = selectedLeaderboardEntry
+    ? displayNameStyle(selectedLeaderboardEntry.nameStyle, selectedLeaderboardEntry.supporterTier) ?? {
+      color: selectedLeaderboardTheme.vars.text,
+      WebkitTextFillColor: selectedLeaderboardTheme.vars.text,
+      textShadow: 'none',
+    }
+    : undefined
+  const incrementUserStats = (updater: (stats: UserStats) => UserStats, trackStudyDay = false) => {
     setProfileDetails((previous) => ({
       ...previous,
-      stats: updater(previous.stats),
+      stats: trackStudyDay ? applyStudyDayActivity(updater(previous.stats)) : updater(previous.stats),
     }))
   }
   const triggerCelebration = (title: string, subtitle: string) => {
@@ -3321,6 +4005,11 @@ function App() {
     root.style.setProperty('--body-radial', vars.bodyRadial)
     root.style.setProperty('--body-base', vars.bodyBase)
   }, [selectedTheme])
+
+  useEffect(() => {
+    if (!isOwner) return
+    setLeaderboardRotateMs(sanitizeLeaderboardRotationMs(profileDetails.homeLeaderboardRotationMs))
+  }, [isOwner, profileDetails.homeLeaderboardRotationMs])
   const loadOwnerEditorItems = async () => {
     if (!currentUserId || !isOwner) return
     setEditorLoading(true)
@@ -3750,6 +4439,7 @@ function App() {
       createdAt: Date.now(),
       masteredCodes: entry.masteredCodes,
       studySeconds: entry.studySeconds,
+      studyDayStreak: entry.studyDayStreak,
       mostStudiedMode: entry.mostStudiedMode,
     })
     setSelectedLeaderboardIsTop(isTop)
@@ -3761,7 +4451,7 @@ function App() {
     if (isProfilePage || isStatsPage || isHomePage) return
     const interval = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
-      incrementUserStats((stats) => ({ ...stats, studySeconds: stats.studySeconds + 5 }))
+      incrementUserStats((stats) => ({ ...stats, studySeconds: stats.studySeconds + 5 }), true)
     }, 5000)
     return () => window.clearInterval(interval)
   }, [currentUserId, activeTab, isProfilePage, isStatsPage, isHomePage])
@@ -3886,8 +4576,54 @@ function App() {
     }
   }, [sections, performance])
 
+  const getFocusTips = (filter: CodeFilter, mode: SessionMode) => {
+    const prioritized = sections
+      .filter((section) => filter === 'all' || section.codeSet === filter)
+      .map((section) => {
+        const stats = performance[performanceKey(section.codeSet, section.sectionNumber)]
+        const weight = performanceNeedWorkWeight(stats)
+        const attempts = (stats?.correctCount ?? 0) + (stats?.incorrectCount ?? 0)
+        return { section, weight, attempts }
+      })
+      .filter((item) => item.attempts > 0 && item.weight >= 2)
+      .sort((left, right) => right.weight - left.weight)
+      .slice(0, 2)
+
+    return prioritized.map((item) => {
+      if (item.section.codeSet === 'penal') {
+        return `${item.section.sectionNumber} scenarios`
+      }
+      if (item.section.codeSet === 'vehicle') {
+        return `${item.section.sectionNumber} definitions`
+      }
+      return `${item.section.sectionNumber} elements`
+    }).map((value) => (mode === 'speed' ? value : value))
+  }
+
+  const saveSessionAttempt = (trackKey: string, snapshot: SessionAttemptSnapshot) => {
+    setProfileDetails((previous) => {
+      const currentTrack = previous.stats.sessionTracks[trackKey] || { lastAttempt: null, accuracyHistory: [] }
+      const nextHistory = [...currentTrack.accuracyHistory, snapshot.accuracy].slice(-12)
+      return {
+        ...previous,
+        stats: {
+          ...previous.stats,
+          sessionTracks: {
+            ...previous.stats.sessionTracks,
+            [trackKey]: {
+              lastAttempt: snapshot,
+              accuracyHistory: nextHistory,
+            },
+          },
+        },
+      }
+    })
+  }
+
   return (
-    <div className={`app-shell ${isHomePage ? 'home-page' : ''} ${isLightTheme ? 'theme-light theme-glass' : ''} ${selectedTheme.id === 'golden' ? 'theme-gold' : ''}`}>
+    <div
+      className={`app-shell ${isHomePage ? 'home-page' : ''} ${isLightTheme ? 'theme-light theme-glass' : ''} ${selectedTheme.id === 'golden' ? 'theme-gold' : ''} ${reduceVisualEffects ? 'reduced-effects' : ''}`}
+    >
       {!isSupabaseConfigured ? (
         <div className="onboarding-overlay">
           <div className="onboarding-card">
@@ -4169,6 +4905,11 @@ function App() {
                     {activeProfileName}
                   </h2>
                   <p className="muted">Pick your focus and keep building momentum.</p>
+                  <div className={profileDetails.stats.studyDayStreak >= 7 ? 'day-streak-chip day-streak-chip-fire' : 'day-streak-chip'}>
+                    <span className="day-streak-label">Study Streak</span>
+                    <strong>{profileDetails.stats.studyDayStreak} day{profileDetails.stats.studyDayStreak === 1 ? '' : 's'}</strong>
+                    {profileDetails.stats.studyDayStreak >= 7 ? <span className="day-streak-fire" aria-hidden>🔥</span> : null}
+                  </div>
                 </div>
                 {profile ? (
                   <div className="profile-shortcut-wrap home-hero-profile" ref={profileMenuRef}>
@@ -4224,49 +4965,98 @@ function App() {
             </div>
 
             <div className="home-leaderboard-grid">
-              <div className="card">
-                <h3>Most Study Time</h3>
-                {homeStudyTimeLeaders.length === 0 ? <p className="muted">No data yet.</p> : homeStudyTimeLeaders.map((entry, index) => (
-                  <button
-                    key={`home-hours-${entry.userId}-${index}`}
-                    type="button"
-                    className="leader-row leader-row-button"
-                    onClick={() => openHomeProfile(entry, 'Study Time', index === 0)}
-                  >
-                    <span>#{index + 1}</span>
-                    <span className="leader-player">
-                      <span className="leader-avatar-wrap">
-                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                        <span className="leader-avatar-frame">
-                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+              <div className="card leaderboard-card">
+                <div className="leaderboard-card-head">
+                  <h3>Most Study Time</h3>
+                  <p className="leaderboard-card-subtitle">Top total study minutes</p>
+                </div>
+                {homeStudyTimeLeaders.length === 0 ? <p className="muted">No data yet.</p> : (
+                  <div className="leaderboard-list">
+                    {homeStudyTimeLeaders.map((entry, index) => (
+                      <button
+                        key={`home-hours-${entry.userId}-${index}`}
+                        type="button"
+                        className="leader-row leader-row-button leader-row-rich"
+                        onClick={() => openHomeProfile(entry, 'Study Time', index === 0)}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className="leader-avatar-frame">
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
+                            {entry.playerName}
+                          </span>
                         </span>
-                      </span>
-                      <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                        {entry.playerName}
-                      </span>
-                    </span>
-                    <span>Study</span>
-                    <span>{formatStudyTime(entry.value)}</span>
-                  </button>
-                ))}
+                        <span className="leader-result">
+                          <small>Study Time</small>
+                          <strong>{formatStudyTime(entry.value)}</strong>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="card">
+              <div className="card leaderboard-card">
+                <div className="leaderboard-card-head">
+                  <h3>Best Study Streak</h3>
+                  <p className="leaderboard-card-subtitle">Most days in a row</p>
+                </div>
+                {homeStudyStreakLeaders.length === 0 ? <p className="muted">No streak data yet.</p> : (
+                  <div className="leaderboard-list">
+                    {homeStudyStreakLeaders.map((entry, index) => (
+                      <button
+                        key={`home-streak-${entry.userId}-${index}`}
+                        type="button"
+                        className="leader-row leader-row-button leader-row-rich"
+                        onClick={() => openHomeProfile(entry, 'Study Streak', index === 0)}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className="leader-avatar-frame">
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
+                            {entry.playerName}
+                          </span>
+                        </span>
+                        <span className="leader-result">
+                          <small>Day Streak</small>
+                          <strong>{entry.value} day{entry.value === 1 ? '' : 's'}</strong>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {homeMatchingRotationSteps.length > 0 ? (
+              <div className="card leaderboard-card">
                 <div className="card-menu-head">
-                  <h3>Best Matching Score</h3>
+                  <div className="leaderboard-card-head">
+                    <h3>Best Matching Score</h3>
+                    <p className="leaderboard-card-subtitle">Top score by player</p>
+                  </div>
                   <button className="icon-menu-button" onClick={() => setHomeMatchingConfigOpen((value) => !value)} aria-label="Configure matching leaderboard">⋯</button>
                 </div>
                 {homeMatchingConfigOpen ? (
                   <div className="home-score-config">
                     <label>Time</label>
                     <div className="mini-chip-row">
-                      {(['all', 15, 30, 60] as DurationFilter[]).map((value) => (
+                      {([15, 30, 60] as HomeDurationFilter[]).map((value) => (
                         <button
                           key={`home-match-time-${value}`}
                           className={homeMatchingDurationFilter === value ? 'chip chip-active' : 'chip'}
                           onClick={() => setHomeMatchingDurationFilter(value)}
                         >
-                          {value === 'all' ? 'All' : `${value}s`}
+                          {`${value}s`}
                         </button>
                       ))}
                     </div>
@@ -4284,50 +5074,64 @@ function App() {
                     </div>
                   </div>
                 ) : null}
-                {homeMatchingLeaders.length === 0 ? <p className="muted">No scores yet.</p> : homeMatchingLeaders.map((entry, index) => (
-                  <button
-                    key={`home-match-${entry.id}`}
-                    type="button"
-                    className="leader-row leader-row-button"
-                    onClick={() => {
-                      setSelectedLeaderboardEntry(entry)
-                      setSelectedLeaderboardIsTop(index === 0)
-                    }}
+                {homeMatchingLeaders.length === 0 ? <p className="muted">No scores yet.</p> : (
+                  <div
+                    key={`home-match-rotation-${homeMatchingDurationFilter}-${homeMatchingCodeFilter}`}
+                    className="leaderboard-list leaderboard-rotate-list"
                   >
-                    <span>#{index + 1}</span>
-                    <span className="leader-player">
-                      <span className="leader-avatar-wrap">
-                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                        <span className="leader-avatar-frame">
-                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                    {homeMatchingLeaders.map((entry, index) => (
+                      <button
+                        key={`home-match-${entry.id}`}
+                        type="button"
+                        className="leader-row leader-row-button leader-row-rich"
+                        onClick={() => {
+                          setSelectedLeaderboardEntry(entry)
+                          setSelectedLeaderboardIsTop(index === 0)
+                        }}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className="leader-avatar-frame">
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
+                            {entry.playerName}
+                          </span>
                         </span>
-                      </span>
-                      <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                        {entry.playerName}
-                      </span>
-                    </span>
-                    <span>Matching</span>
-                    <span>{entry.score}</span>
-                  </button>
-                ))}
+                        <span className="leader-result">
+                          <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                          <strong>{entry.score} pts</strong>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+              ) : null}
 
-              <div className="card">
+              {homeSpeedRotationSteps.length > 0 ? (
+              <div className="card leaderboard-card">
                 <div className="card-menu-head">
-                  <h3>Best Speed Test Score</h3>
+                  <div className="leaderboard-card-head">
+                    <h3>Best Speed Test Score</h3>
+                    <p className="leaderboard-card-subtitle">Top score by player</p>
+                  </div>
                   <button className="icon-menu-button" onClick={() => setHomeSpeedConfigOpen((value) => !value)} aria-label="Configure speed leaderboard">⋯</button>
                 </div>
                 {homeSpeedConfigOpen ? (
                   <div className="home-score-config">
                     <label>Time</label>
                     <div className="mini-chip-row">
-                      {(['all', 15, 30, 60] as DurationFilter[]).map((value) => (
+                      {([15, 30, 60] as HomeDurationFilter[]).map((value) => (
                         <button
                           key={`home-speed-time-${value}`}
                           className={homeSpeedDurationFilter === value ? 'chip chip-active' : 'chip'}
                           onClick={() => setHomeSpeedDurationFilter(value)}
                         >
-                          {value === 'all' ? 'All' : `${value}s`}
+                          {`${value}s`}
                         </button>
                       ))}
                     </div>
@@ -4345,37 +5149,50 @@ function App() {
                     </div>
                   </div>
                 ) : null}
-                {homeSpeedLeaders.length === 0 ? <p className="muted">No scores yet.</p> : homeSpeedLeaders.map((entry, index) => (
-                  <button
-                    key={`home-speed-${entry.id}`}
-                    type="button"
-                    className="leader-row leader-row-button"
-                    onClick={() => {
-                      setSelectedLeaderboardEntry(entry)
-                      setSelectedLeaderboardIsTop(index === 0)
-                    }}
+                {homeSpeedLeaders.length === 0 ? <p className="muted">No scores yet.</p> : (
+                  <div
+                    key={`home-speed-rotation-${homeSpeedDurationFilter}-${homeSpeedCodeFilter}`}
+                    className="leaderboard-list leaderboard-rotate-list"
                   >
-                    <span>#{index + 1}</span>
-                    <span className="leader-player">
-                      <span className="leader-avatar-wrap">
-                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                        <span className="leader-avatar-frame">
-                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                    {homeSpeedLeaders.map((entry, index) => (
+                      <button
+                        key={`home-speed-${entry.id}`}
+                        type="button"
+                        className="leader-row leader-row-button leader-row-rich"
+                        onClick={() => {
+                          setSelectedLeaderboardEntry(entry)
+                          setSelectedLeaderboardIsTop(index === 0)
+                        }}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className="leader-avatar-frame">
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
+                            {entry.playerName}
+                          </span>
                         </span>
-                      </span>
-                      <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                        {entry.playerName}
-                      </span>
-                    </span>
-                    <span>Speed</span>
-                    <span>{entry.score}</span>
-                  </button>
-                ))}
+                        <span className="leader-result">
+                          <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                          <strong>{entry.score} pts</strong>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+              ) : null}
 
-              <div className="card">
+              <div className="card leaderboard-card">
                 <div className="card-menu-head">
-                  <h3>Most Mastered Codes</h3>
+                  <div className="leaderboard-card-head">
+                    <h3>Most Mastered Codes</h3>
+                    <p className="leaderboard-card-subtitle">Most 20-streak code masters</p>
+                  </div>
                   <button className="assisted-learning-info-button" onClick={() => setHomeMasteredInfoOpen((value) => !value)} aria-label="What is mastered code">
                     ⓘ
                   </button>
@@ -4385,29 +5202,35 @@ function App() {
                     A code is mastered only after you answer it correctly 20 times in a row. One wrong answer resets that code’s streak to zero.
                   </div>
                 ) : null}
-                {homeMostMasteredLeaders.length === 0 ? <p className="muted">Be the first to master a code.</p> : homeMostMasteredLeaders.map((entry, index) => (
-                  <button
-                    key={`home-mastered-${entry.userId}-${index}`}
-                    type="button"
-                    className="leader-row leader-row-button"
-                    onClick={() => openHomeProfile(entry, 'Mastered Codes', index === 0)}
-                  >
-                    <span>#{index + 1}</span>
-                    <span className="leader-player">
-                      <span className="leader-avatar-wrap">
-                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                        <span className="leader-avatar-frame">
-                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                {homeMostMasteredLeaders.length === 0 ? <p className="muted">Be the first to master a code.</p> : (
+                  <div className="leaderboard-list">
+                    {homeMostMasteredLeaders.map((entry, index) => (
+                      <button
+                        key={`home-mastered-${entry.userId}-${index}`}
+                        type="button"
+                        className="leader-row leader-row-button leader-row-rich"
+                        onClick={() => openHomeProfile(entry, 'Mastered Codes', index === 0)}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className="leader-avatar-frame">
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
+                            {entry.playerName}
+                          </span>
                         </span>
-                      </span>
-                      <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                        {entry.playerName}
-                      </span>
-                    </span>
-                    <span>Codes</span>
-                    <span>{entry.value}</span>
-                  </button>
-                ))}
+                        <span className="leader-result">
+                          <small>Mastered Codes</small>
+                          <strong>{entry.value}</strong>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -4581,7 +5404,7 @@ function App() {
                           if (orderedStudyFlashSessionCards.length === 0) return 0
                           return current === 0 ? orderedStudyFlashSessionCards.length - 1 : current - 1
                         })
-                        incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }))
+                        incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }), true)
                       }}
                     >
                       Previous
@@ -4604,7 +5427,7 @@ function App() {
                           setStudyFlashSessionOrder(reshuffled)
                           return 0
                         })
-                        incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }))
+                        incrementUserStats((stats) => ({ ...stats, flashcardsReviewed: stats.flashcardsReviewed + 1 }), true)
                       }}
                     >
                       Next
@@ -4713,9 +5536,11 @@ function App() {
               {studyTestSessionDone ? (
                 <div className="card study-test-complete">
                   <h3>Test Complete</h3>
-                  <p className="muted">
-                    Score: {studyTestSessionCorrect}/{studyTestSessionTotal} ({studyTestSessionTotal > 0 ? Math.round((studyTestSessionCorrect / studyTestSessionTotal) * 100) : 0}%)
-                  </p>
+                  {studyTestReport ? <SessionPerformanceReportCard report={studyTestReport} /> : (
+                    <p className="muted">
+                      Score: {studyTestSessionCorrect}/{studyTestSessionTotal} ({studyTestSessionTotal > 0 ? Math.round((studyTestSessionCorrect / studyTestSessionTotal) * 100) : 0}%)
+                    </p>
+                  )}
                   <div className="actions-row">
                     <button className="secondary" onClick={() => setStudyTestSessionOpen(false)}>Exit</button>
                     <button className="primary" onClick={beginStudyTest}>Retake Test</button>
@@ -4810,9 +5635,13 @@ function App() {
                         <span>Round: {matchRound}</span>
                         <span>Score: {matchScore}</span>
                       </div>
-                      <p>Your score: {matchScore}</p>
-                      <p>High score: {Math.max(highScores.matching, matchScore)}</p>
-                      <p>Round reached: {matchRound}</p>
+                      {matchingReport ? <SessionPerformanceReportCard report={matchingReport} /> : (
+                        <>
+                          <p>Your score: {matchScore}</p>
+                          <p>High score: {Math.max(highScores.matching, matchScore)}</p>
+                          <p>Round reached: {matchRound}</p>
+                        </>
+                      )}
                       <div className="actions-row">
                         <button className="primary" onClick={startMatching}>
                           Retry
@@ -4830,36 +5659,38 @@ function App() {
             {!matchRunning && !matchDone ? (
             <>
             <h2>Matching Leaderboard</h2>
-            <div className="card">
+            <div className="card leaderboard-card">
               {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
-              <label>
-                Time
-                <div className="segmented">
-                  {[15, 30, 60].map((duration) => (
-                    <button
-                      key={duration}
-                      className={leaderboardDurationFilter === duration ? 'seg active' : 'seg'}
-                      onClick={() => setLeaderboardDurationFilter(duration)}
-                    >
-                      {duration}s
-                    </button>
-                  ))}
+              <div className="game-leaderboard-filters">
+                <div className="game-filter-group">
+                  <span className="game-filter-label">Time</span>
+                  <div className="segmented compact-segmented">
+                    {[15, 30, 60].map((duration) => (
+                      <button
+                        key={duration}
+                        className={leaderboardDurationFilter === duration ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setLeaderboardDurationFilter(duration)}
+                      >
+                        {duration}s
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </label>
-              <label>
-                Code Set
-                <div className="segmented">
-                  {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                    <button
-                      key={filter}
-                      className={leaderboardCodeFilter === filter ? 'seg active' : 'seg'}
-                      onClick={() => setLeaderboardCodeFilter(filter)}
-                    >
-                      {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                    </button>
-                  ))}
+                <div className="game-filter-group">
+                  <span className="game-filter-label">Code Set</span>
+                  <div className="segmented compact-segmented">
+                    {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                      <button
+                        key={filter}
+                        className={leaderboardCodeFilter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setLeaderboardCodeFilter(filter)}
+                      >
+                        {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </label>
+              </div>
               {matchingLeaderboard.length === 0 ? (
                 <p className="muted">No scores submitted yet.</p>
               ) : (
@@ -4867,13 +5698,13 @@ function App() {
                   <button
                     key={entry.id}
                     type="button"
-                    className="leader-row leader-row-button game-leader-row"
+                    className="leader-row leader-row-button game-leader-row leader-row-rich"
                     onClick={() => {
                       setSelectedLeaderboardEntry(entry)
                       setSelectedLeaderboardIsTop(index === 0)
                     }}
                   >
-                    <span>#{index + 1}</span>
+                    <span className="leader-rank">#{index + 1}</span>
                     <span className="leader-player">
                       <span className="leader-avatar-wrap">
                         {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
@@ -4885,7 +5716,10 @@ function App() {
                         {entry.playerName}
                       </span>
                     </span>
-                    <span>{entry.score}</span>
+                    <span className="leader-result">
+                      <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                      <strong>{entry.score} pts</strong>
+                    </span>
                   </button>
                 ))
               )}
@@ -4957,8 +5791,12 @@ function App() {
                         <span>Score: {speedScore}</span>
                         <span>Answered: {speedAnsweredCount}</span>
                       </div>
-                      <p>Your score: {speedScore}</p>
-                      <p>Questions answered: {speedAnsweredCount}</p>
+                      {speedReport ? <SessionPerformanceReportCard report={speedReport} /> : (
+                        <>
+                          <p>Your score: {speedScore}</p>
+                          <p>Questions answered: {speedAnsweredCount}</p>
+                        </>
+                      )}
                       <div className="actions-row">
                         <button className="primary" onClick={startSpeedTest}>Replay</button>
                         <button className="secondary" onClick={exitSpeedSession}>Exit</button>
@@ -4972,36 +5810,38 @@ function App() {
             {!speedRunning && !speedDone ? (
             <>
             <h2>Speed Test Leaderboard</h2>
-            <div className="card">
+            <div className="card leaderboard-card">
               {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
-              <label>
-                Time
-                <div className="segmented">
-                  {[15, 30, 60].map((duration) => (
-                    <button
-                      key={`speed-leader-time-${duration}`}
-                      className={speedLeaderboardDurationFilter === duration ? 'seg active' : 'seg'}
-                      onClick={() => setSpeedLeaderboardDurationFilter(duration)}
-                    >
-                      {duration}s
-                    </button>
-                  ))}
+              <div className="game-leaderboard-filters">
+                <div className="game-filter-group">
+                  <span className="game-filter-label">Time</span>
+                  <div className="segmented compact-segmented">
+                    {[15, 30, 60].map((duration) => (
+                      <button
+                        key={`speed-leader-time-${duration}`}
+                        className={speedLeaderboardDurationFilter === duration ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setSpeedLeaderboardDurationFilter(duration)}
+                      >
+                        {duration}s
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </label>
-              <label>
-                Code Set
-                <div className="segmented">
-                  {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                    <button
-                      key={`speed-leader-filter-${filter}`}
-                      className={speedLeaderboardCodeFilter === filter ? 'seg active' : 'seg'}
-                      onClick={() => setSpeedLeaderboardCodeFilter(filter)}
-                    >
-                      {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                    </button>
-                  ))}
+                <div className="game-filter-group">
+                  <span className="game-filter-label">Code Set</span>
+                  <div className="segmented compact-segmented">
+                    {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                      <button
+                        key={`speed-leader-filter-${filter}`}
+                        className={speedLeaderboardCodeFilter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setSpeedLeaderboardCodeFilter(filter)}
+                      >
+                        {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </label>
+              </div>
               {speedLeaderboard.length === 0 ? (
                 <p className="muted">No speed test scores submitted yet.</p>
               ) : (
@@ -5009,13 +5849,13 @@ function App() {
                   <button
                     key={`speed-${entry.id}`}
                     type="button"
-                    className="leader-row leader-row-button game-leader-row"
+                    className="leader-row leader-row-button game-leader-row leader-row-rich"
                     onClick={() => {
                       setSelectedLeaderboardEntry(entry)
                       setSelectedLeaderboardIsTop(index === 0)
                     }}
                   >
-                    <span>#{index + 1}</span>
+                    <span className="leader-rank">#{index + 1}</span>
                     <span className="leader-player">
                       <span className="leader-avatar-wrap">
                         {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
@@ -5027,7 +5867,10 @@ function App() {
                         {entry.playerName}
                       </span>
                     </span>
-                    <span>{entry.score}</span>
+                    <span className="leader-result">
+                      <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                      <strong>{entry.score} pts</strong>
+                    </span>
                   </button>
                 ))
               )}
@@ -5342,6 +6185,28 @@ function App() {
                       ⓘ
                     </button>
                   </div>
+                  {isOwner ? (
+                    <div className="owner-rotation-control">
+                      <div className="glow-control-row">
+                        <p className="tiny">Leaderboard rotate interval</p>
+                        <span className="range-value-pill">{(sanitizeLeaderboardRotationMs(profileDetails.homeLeaderboardRotationMs) / 1000).toFixed(1)}s</span>
+                      </div>
+                      <input
+                        className="modern-range"
+                        type="range"
+                        min={2}
+                        max={12}
+                        step={0.5}
+                        value={sanitizeLeaderboardRotationMs(profileDetails.homeLeaderboardRotationMs) / 1000}
+                        onChange={(event) => {
+                          const seconds = Number(event.target.value)
+                          const ms = sanitizeLeaderboardRotationMs(seconds * 1000)
+                          setProfileDetails((previous) => ({ ...previous, homeLeaderboardRotationMs: ms }))
+                        }}
+                      />
+                      <p className="tiny">Controls how long each rotating leaderboard view stays visible.</p>
+                    </div>
+                  ) : null}
                   <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
                     Save Profile Details
                   </button>
@@ -6004,32 +6869,62 @@ function App() {
                   <img src={avatarFor(selectedLeaderboardEntry.avatarUrl)} alt={selectedLeaderboardEntry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                 </span>
               </span>
-              <div>
-                <h3 className={displayNameClass(selectedLeaderboardEntry.supporterTier, true)} style={leaderboardProfileNameStyle}>
+              <div className="leader-profile-head">
+                <h3 className={`leader-profile-name ${displayNameClass(selectedLeaderboardEntry.supporterTier, true)}`} style={leaderboardProfileNameStyle}>
                   {selectedLeaderboardEntry.playerName}
                 </h3>
-                <p className="muted">Tier: {tierLabel[selectedLeaderboardEntry.supporterTier]}</p>
-                {selectedLeaderboardEntry.isOwner ? <p className="owner-pill">Owner</p> : null}
+                <div className="leader-profile-pills">
+                  <p className="leader-theme-pill">Tier: {tierLabel[selectedLeaderboardEntry.supporterTier]}</p>
+                  {selectedLeaderboardEntry.isOwner ? <p className="owner-pill owner-pill-inline">Owner</p> : null}
+                </div>
               </div>
             </div>
-            <p><strong>Agency:</strong> {selectedLeaderboardEntry.agency || 'Not provided'}</p>
-            <p><strong>About Me:</strong> {selectedLeaderboardEntry.bio || 'Not provided'}</p>
-            <p><strong>Mastered codes:</strong> {selectedLeaderboardEntry.masteredCodes}</p>
-            <p><strong>Study time:</strong> {formatStudyTime(selectedLeaderboardEntry.studySeconds)}</p>
-            <p>
-              <strong>Most studied:</strong>{' '}
-              {selectedLeaderboardEntry.mostStudiedMode
-                ? selectedLeaderboardEntry.mostStudiedMode === 'all'
-                  ? 'All'
-                  : codeSetLabel[selectedLeaderboardEntry.mostStudiedMode]
-                : 'No study data yet'}
-            </p>
-            <p className="muted">
-              {selectedLeaderboardEntry.round > 0
-                ? `Best ${selectedLeaderboardEntry.game} score: ${selectedLeaderboardEntry.score} • Round ${selectedLeaderboardEntry.round}`
-                : `${selectedLeaderboardEntry.game}: ${selectedLeaderboardEntry.game === 'Study Time' ? formatStudyTime(selectedLeaderboardEntry.score) : selectedLeaderboardEntry.score}`}
-            </p>
-            <p className="leader-theme-pill">Theme: {selectedLeaderboardTheme.name}</p>
+            <div className="leader-profile-grid">
+              <div className="leader-profile-item">
+                <p className="leader-profile-label">Agency</p>
+                <p>{selectedLeaderboardEntry.agency || 'Not provided'}</p>
+              </div>
+              <div className="leader-profile-item">
+                <p className="leader-profile-label">Most Studied</p>
+                <p>
+                  {selectedLeaderboardEntry.mostStudiedMode
+                    ? selectedLeaderboardEntry.mostStudiedMode === 'all'
+                      ? 'All'
+                      : codeSetLabel[selectedLeaderboardEntry.mostStudiedMode]
+                    : 'No study data yet'}
+                </p>
+              </div>
+              <div className="leader-profile-item leader-profile-item-wide">
+                <p className="leader-profile-label">About Me</p>
+                <p>{selectedLeaderboardEntry.bio || 'Not provided'}</p>
+              </div>
+            </div>
+            <div className="leader-profile-stats">
+              <div className="leader-profile-stat">
+                <p className="leader-profile-label">Mastered</p>
+                <strong>{selectedLeaderboardEntry.masteredCodes}</strong>
+              </div>
+              <div className="leader-profile-stat">
+                <p className="leader-profile-label">Study Time</p>
+                <strong>{formatStudyTime(selectedLeaderboardEntry.studySeconds)}</strong>
+              </div>
+              <div className="leader-profile-stat">
+                <p className="leader-profile-label">Day Streak</p>
+                <strong>{selectedLeaderboardEntry.studyDayStreak} day{selectedLeaderboardEntry.studyDayStreak === 1 ? '' : 's'}{selectedLeaderboardEntry.studyDayStreak >= 7 ? ' 🔥' : ''}</strong>
+              </div>
+            </div>
+            <div className="leader-profile-footer">
+              <p className="muted">
+                {selectedLeaderboardEntry.round > 0
+                  ? `Best ${selectedLeaderboardEntry.game} score: ${selectedLeaderboardEntry.score} • Round ${selectedLeaderboardEntry.round}`
+                  : `${selectedLeaderboardEntry.game}: ${selectedLeaderboardEntry.game === 'Study Time'
+                    ? formatStudyTime(selectedLeaderboardEntry.score)
+                    : selectedLeaderboardEntry.game === 'Study Streak'
+                      ? `${selectedLeaderboardEntry.score} day${selectedLeaderboardEntry.score === 1 ? '' : 's'}`
+                      : selectedLeaderboardEntry.score}`}
+              </p>
+              <p className="leader-theme-pill">Theme: {selectedLeaderboardTheme.name}</p>
+            </div>
           </div>
         </div>
       ) : null}
