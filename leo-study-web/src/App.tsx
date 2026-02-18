@@ -3326,6 +3326,8 @@ function App() {
 
           if (supabase && currentUserId) {
             void (async () => {
+              console.log('Saving score:', { score: finalSpeedScore, duration: speedSessionDuration, filter: speedSessionFilter, userId: currentUserId })
+              
               let insertError = null
 
               // Try upsert first (requires migration), fallback to insert
@@ -3339,7 +3341,9 @@ function App() {
                   p_round: finalAnswered,
                 })
                 insertError = error
-              } catch {
+                if (error) console.log('Upsert error:', error)
+              } catch (e: unknown) {
+                console.log('RPC failed, trying insert fallback:', e)
                 // Fallback to direct insert if RPC doesn't exist
                 const { error } = await supabase
                   .from('leaderboard')
@@ -3352,14 +3356,17 @@ function App() {
                     match_filter: speedSessionFilter,
                   })
                 insertError = error
+                if (error) console.log('Insert error:', error)
               }
 
               if (insertError) {
                 setLeaderboardError(
                   `Could not save leaderboard score: ${insertError.message}. Run the latest /supabase/schema.sql migration.`,
                 )
+                console.error('Leaderboard save failed:', insertError)
               } else {
                 setLeaderboardError('')
+                console.log('Score saved successfully!')
               }
 
               const refreshed = await refreshLeaderboard()
