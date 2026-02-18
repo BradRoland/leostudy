@@ -3938,6 +3938,58 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isStudyPage, studyFlashSessionOpen, orderedStudyFlashSessionCards, studyFlashSessionCards])
 
+  // Keyboard shortcuts for answering multiple-choice questions (1-4 keys)
+  useEffect(() => {
+    if (!currentQuestion || selectedChoice !== null) return
+
+    const handleAnswerKeyDown = (event: KeyboardEvent) => {
+      // Don't trigger when typing in input fields
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) {
+        return
+      }
+
+      // Check for number keys 1-4
+      const key = event.key
+      if (key >= '1' && key <= '4') {
+        const index = parseInt(key) - 1
+        if (currentQuestion.choices && index < currentQuestion.choices.length) {
+          event.preventDefault()
+          answerQuestion(index)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleAnswerKeyDown)
+    return () => window.removeEventListener('keydown', handleAnswerKeyDown)
+  }, [currentQuestion, selectedChoice, answerQuestion])
+
+  // Keyboard shortcuts for speed test questions (1-4 keys)
+  useEffect(() => {
+    if (!speedCurrentQuestion || speedFeedback) return
+
+    const handleSpeedAnswerKeyDown = (event: KeyboardEvent) => {
+      // Don't trigger when typing in input fields
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) {
+        return
+      }
+
+      // Check for number keys 1-4
+      const key = event.key
+      if (key >= '1' && key <= '4') {
+        const index = parseInt(key) - 1
+        if (speedCurrentQuestion.choices && index < speedCurrentQuestion.choices.length) {
+          event.preventDefault()
+          answerSpeedQuestion(index)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleSpeedAnswerKeyDown)
+    return () => window.removeEventListener('keydown', handleSpeedAnswerKeyDown)
+  }, [speedCurrentQuestion, speedFeedback, answerSpeedQuestion])
+
   useEffect(() => {
     if (!authReady || !currentUserId) return
     if (currentPath === '/') {
@@ -5629,6 +5681,7 @@ function App() {
                     </div>
                     <h3>{currentQuestion.prompt}</h3>
                     <div className="choices">
+                      <span className="choice-hint">Press 1–4 to answer</span>
                       {currentQuestion.choices.map((choice, index) => {
                         const chosen = selectedChoice === index
                         const correct = selectedChoice !== null && index === currentQuestion.correctIndex
@@ -5638,6 +5691,7 @@ function App() {
                             className={`choice ${chosen ? 'choice-selected' : ''} ${correct ? 'choice-correct' : ''}`}
                             onClick={() => answerQuestion(index)}
                           >
+                            <span className="choice-key">{index + 1}</span>
                             {choice}
                           </button>
                         )
@@ -5892,12 +5946,14 @@ function App() {
                     <div className="card quiz-card speed-session-card" data-remaining-questions={speedDeck.length}>
                       <h3>{speedCurrentQuestion.prompt}</h3>
                       <div className="choices">
+                        <span className="choice-hint">Press 1–4 to answer</span>
                         {speedCurrentQuestion.choices.map((choice, index) => (
                           <button
                             key={`speed-choice-${speedCurrentQuestion.id}-${index}`}
                             className="choice"
                             onClick={() => answerSpeedQuestion(index)}
                           >
+                            <span className="choice-key">{index + 1}</span>
                             {choice}
                           </button>
                         ))}
