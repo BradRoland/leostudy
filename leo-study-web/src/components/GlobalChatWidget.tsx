@@ -40,6 +40,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   const containerRef = useRef<HTMLDivElement>(null)
   const lastSentRef = useRef(0)
   const isNearBottomRef = useRef(true)
+  const subscribedRef = useRef(false)
   const supabaseClient = supabase
 
   const isAuthenticated = Boolean(currentUserId && supabaseClient)
@@ -89,7 +90,8 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
 
   // Subscribe to realtime messages
   useEffect(() => {
-    if (!supabaseClient) return
+    if (!supabaseClient || subscribedRef.current) return
+    subscribedRef.current = true
 
     const channel = supabaseClient
       .channel('public_chat')
