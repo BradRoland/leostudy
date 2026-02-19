@@ -17,6 +17,7 @@ type DuelRoomRow = {
   status: DuelRoomStatus
   current_round: number
   winner_user_id: string | null
+  rematch_room_id: string | null
   created_at: string
   started_at: string | null
 }
@@ -29,6 +30,7 @@ type DuelRoomPlayerRow = {
   is_ready: boolean
   score: number
   total_time_ms: number
+  fastest_round_ms: number
   current_round: number
   last_seen: string
 }
@@ -316,8 +318,8 @@ function isMatchingRound(value: unknown): value is MatchingRoundPayload {
   return typeof row.round === 'number' && Array.isArray(row.pairs)
 }
 
-export function OneVsOnePanel(props: { currentUserId: string; currentUsername: string }) {
-  const { currentUserId, currentUsername } = props
+export function OneVsOnePanel(props: { currentUserId: string; currentUsername: string; isOwner?: boolean }) {
+  const { currentUserId, currentUsername, isOwner = false } = props
 
   const [selectedGameType, setSelectedGameType] = useState<DuelGameType>('quiz')
   const [selectedCategory, setSelectedCategory] = useState<DuelCategory>('all')
@@ -346,6 +348,9 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null)
+  const [rematchLoading, setRematchLoading] = useState(false)
+  const [rematchCategory, setRematchCategory] = useState<DuelCategory>('all')
 
   const [roundStartedAt, setRoundStartedAt] = useState<number>(0)
   const [hudNow, setHudNow] = useState<number>(() => Date.now())
@@ -363,6 +368,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const previousPlayersRef = useRef<DuelRoomPlayerRow[]>([])
   const previousRoomStatusRef = useRef<DuelRoomStatus | null>(null)
   const activityBootstrappedRef = useRef(false)
+  const initializedRoundKeyRef = useRef('')
 
   const isSignedIn = currentUserId.trim().length > 0
 
@@ -622,6 +628,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       status: String((roomRow as Record<string, unknown>).status || 'waiting') as DuelRoomStatus,
       current_round: Number((roomRow as Record<string, unknown>).current_round || 1),
       winner_user_id: (roomRow as Record<string, unknown>).winner_user_id ? String((roomRow as Record<string, unknown>).winner_user_id) : null,
+      rematch_room_id: (roomRow as Record<string, unknown>).rematch_room_id ? String((roomRow as Record<string, unknown>).rematch_room_id) : null,
       created_at: String((roomRow as Record<string, unknown>).created_at || ''),
       started_at: (roomRow as Record<string, unknown>).started_at ? String((roomRow as Record<string, unknown>).started_at) : null,
     }
@@ -634,6 +641,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       is_ready: Boolean((row as Record<string, unknown>).is_ready),
       score: Number((row as Record<string, unknown>).score || 0),
       total_time_ms: Number((row as Record<string, unknown>).total_time_ms || 0),
+      fastest_round_ms: Number((row as Record<string, unknown>).fastest_round_ms || 0),
       current_round: Number((row as Record<string, unknown>).current_round || 1),
       last_seen: String((row as Record<string, unknown>).last_seen || ''),
     }))
@@ -768,11 +776,43 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
   const roundIndex = Math.max(0, currentRoundNumber - 1)
   const currentRound = roundList[roundIndex]
+  const currentRoundPayloadNumber = isQuizRound(currentRound) || isMatchingRound(currentRound)
+    ? currentRound.round
+    : currentRoundNumber
+  const initializedRoundKey = room && myPlayer
+    ? `${room.id}:${room.game_type}:${room.status}:${room.started_at || ''}:${myPlayer.current_round}:${currentRoundPayloadNumber}`
+    : ''
+  const countdownSeconds = 3
+  const hasCountdownAnchor = useMemo(() => {
+    if (!room || room.status !== 'in_progress') return false
+    if (!room.started_at) return false
+    return Number.isFinite(Date.parse(room.started_at))
+  }, [room])
+  const countdownRemaining = useMemo(() => {
+    if (!room || room.status !== 'in_progress') return 0
+    const startedAtMs = room.started_at ? Date.parse(room.started_at) : NaN
+    if (!Number.isFinite(startedAtMs)) return countdownSeconds
+    const remainingMs = countdownSeconds * 1000 - Math.max(0, hudNow - startedAtMs)
+    if (remainingMs <= 0) return 0
+    return Math.ceil(remainingMs / 1000)
+  }, [hudNow, room])
+  const countdownActive = countdownRemaining > 0
 
-  const canStartRound = Boolean(room && myPlayer && room.status === 'in_progress' && myPlayer.current_round <= room.rounds)
+  const canStartRound = Boolean(
+    room
+    && myPlayer
+    && room.status === 'in_progress'
+    && myPlayer.current_round <= room.rounds
+    && hasCountdownAnchor
+    && !countdownActive,
+  )
 
   useEffect(() => {
     if (!room || !myPlayer || !canStartRound) return
+    if (!initializedRoundKey) return
+    if (initializedRoundKeyRef.current === initializedRoundKey) return
+    initializedRoundKeyRef.current = initializedRoundKey
+
     setRoundStartedAt(Date.now())
     setQuizChoice(null)
     setQuizLocked(false)
@@ -802,7 +842,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       const deterministicCards = seededShuffle(cards, `${room.id}-${currentRound.round}`)
       setMatchingCards(deterministicCards)
     }
-  }, [canStartRound, currentRound, myPlayer, room])
+  }, [canStartRound, currentRound, initializedRoundKey, myPlayer, room])
 
   const createRoom = async () => {
     if (!supabase || !isSignedIn) return
@@ -955,6 +995,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }, [currentRound, matchedPairIds.length, matchingRoundPoints, matchingSubmitted, room, roundStartedAt, submitRound, submittingRound])
 
   const leaveRoom = () => {
+    initializedRoundKeyRef.current = ''
     setRoomId(null)
     setRoom(null)
     setPlayers([])
@@ -994,6 +1035,78 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     leaveRoom()
   }
 
+  const leaveCurrentRoom = async () => {
+    if (!room || !roomId) {
+      leaveRoom()
+      return
+    }
+
+    if (room.status === 'in_progress') {
+      await confirmLeaveMatch()
+      return
+    }
+
+    if (supabase) {
+      const { error: rpcError } = await supabase.rpc('leave_1v1_room', { p_room_id: roomId })
+      if (rpcError) {
+        setError(rpcError.message || 'Could not leave room.')
+        return
+      }
+    }
+
+    leaveRoom()
+    await loadPublicRooms()
+    setNotice('Left room.')
+  }
+
+  const deleteRoomById = async (targetRoomId: string) => {
+    if (!supabase || !targetRoomId) return
+    const confirmed = window.confirm('Delete this room? This cannot be undone.')
+    if (!confirmed) return
+
+    setDeletingRoomId(targetRoomId)
+    setError('')
+    const { error: rpcError } = await supabase.rpc('delete_1v1_room', { p_room_id: targetRoomId })
+    setDeletingRoomId(null)
+
+    if (rpcError) {
+      setError(rpcError.message || 'Could not delete room.')
+      return
+    }
+
+    if (roomId === targetRoomId) {
+      leaveRoom()
+    }
+
+    await loadPublicRooms()
+    setNotice('Room deleted.')
+  }
+
+  const startRematch = async () => {
+    if (!supabase || !room) return
+    setRematchLoading(true)
+    setError('')
+    const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
+      p_room_id: room.id,
+      p_category: rematchCategory,
+    })
+    setRematchLoading(false)
+    if (rpcError) {
+      setError(rpcError.message || 'Could not create rematch.')
+      return
+    }
+
+    const nextRoomId = String(data || '')
+    if (!nextRoomId) {
+      setError('Rematch room id was not returned.')
+      return
+    }
+
+    leaveRoom()
+    setRoomId(nextRoomId)
+    setNotice('Rematch ready. Both players must hit Ready.')
+  }
+
   const roomPlayerRowsSorted = useMemo(() => {
     if (results.length > 0) {
       return [...results].sort((left, right) => left.placement - right.placement)
@@ -1015,7 +1128,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     ? `Waiting for ${2 - waitingPlayersCount} more player${2 - waitingPlayersCount === 1 ? '' : 's'} to join.`
     : lobbyReadyCount < 2
       ? 'Both players joined. Waiting for both players to ready up.'
-      : 'Both players are ready. Match starting now.'
+      : 'Both players are ready. Match countdown starting…'
 
   const matchingPairCount = room?.game_type === 'matching' && isMatchingRound(currentRound) ? currentRound.pairs.length : 0
   const matchingProgressText = matchingPairCount > 0 ? `${matchedPairIds.length}/${matchingPairCount} pairs` : '0/0 pairs'
@@ -1059,6 +1172,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       || (room.host_user_id === currentUserId ? (currentUsername || 'Host') : `User ${room.host_user_id.slice(0, 8)}`)
     : 'Host'
   const roomDisplayName = formatRoomName(roomHostDisplayName)
+  const canDeleteCurrentRoom = Boolean(room && (room.host_user_id === currentUserId || isOwner))
   const topCurrentStreakUserId = streakLeaderboard.length > 0 ? streakLeaderboard[0].user_id : null
   const topCurrentStreakValue = streakLeaderboard.length > 0 ? streakLeaderboard[0].current_win_streak : 0
   const selectedDuelProfile = selectedDuelProfileUserId ? duelProfileByUserId[selectedDuelProfileUserId] || null : null
@@ -1083,6 +1197,61 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     const raw = (row?.current_round ?? 1) - 1
     return Math.max(0, Math.min(room.rounds, raw))
   }, [currentUserId, players, room])
+
+  const opponentProgressPercent = useMemo(() => {
+    if (!room || room.rounds <= 0) return 0
+    const ratio = Math.max(0, Math.min(1, opponentRoundsCompleted / room.rounds))
+    return Math.round(ratio * 100)
+  }, [opponentRoundsCompleted, room])
+
+  const opponentRoundStatus = useMemo(() => {
+    if (!room || !opponentPlayer) return 'Waiting for opponent'
+    if (opponentRoundsCompleted >= room.rounds) return 'Answered'
+    if (opponentRoundsCompleted > myRoundsCompleted) return 'Answered'
+    if (opponentRoundHud > myRoundHud) return 'Answered'
+    return 'Not answered'
+  }, [myRoundHud, myRoundsCompleted, opponentPlayer, opponentRoundHud, opponentRoundsCompleted, room])
+
+  const playerByUserId = useMemo(() => {
+    const map = new Map<string, DuelRoomPlayerRow>()
+    players.forEach((player) => map.set(player.user_id, player))
+    return map
+  }, [players])
+
+  const tieBreakerDecision = useMemo(() => {
+    if (!myResultRow || !opponentResultRow) return null
+    if (myResultRow.score !== opponentResultRow.score) {
+      return {
+        rule: 'Score',
+        summary: myResultRow.score > opponentResultRow.score ? 'You win by score.' : 'Opponent wins by score.',
+      }
+    }
+    if (myResultRow.total_time_ms !== opponentResultRow.total_time_ms) {
+      return {
+        rule: 'Total Time',
+        summary: myResultRow.total_time_ms < opponentResultRow.total_time_ms ? 'You win on lower total time.' : 'Opponent wins on lower total time.',
+      }
+    }
+
+    const myFastest = playerByUserId.get(myResultRow.user_id)?.fastest_round_ms || 0
+    const opponentFastest = playerByUserId.get(opponentResultRow.user_id)?.fastest_round_ms || 0
+    const normalizedMine = myFastest > 0 ? myFastest : Number.MAX_SAFE_INTEGER
+    const normalizedOpponent = opponentFastest > 0 ? opponentFastest : Number.MAX_SAFE_INTEGER
+    if (normalizedMine !== normalizedOpponent) {
+      return {
+        rule: 'Fastest Single Round',
+        summary: normalizedMine < normalizedOpponent ? 'You win on fastest single round.' : 'Opponent wins on fastest single round.',
+      }
+    }
+
+    return {
+      rule: 'Draw',
+      summary: 'Draw after all tie-breakers.',
+    }
+  }, [myResultRow, opponentResultRow, playerByUserId])
+
+  const myFastestRoundMs = myResultRow ? playerByUserId.get(myResultRow.user_id)?.fastest_round_ms || 0 : 0
+  const opponentFastestRoundMs = opponentResultRow ? playerByUserId.get(opponentResultRow.user_id)?.fastest_round_ms || 0 : 0
 
   useEffect(() => {
     if (!inRoom || !room) {
@@ -1153,6 +1322,15 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }, [loadDuelLeaderboards, loadPublicRooms, room])
 
   useEffect(() => {
+    if (!room || room.status !== 'completed') return
+    if (room.game_type === 'matching' && room.category === 'scenarios') {
+      setRematchCategory('all')
+      return
+    }
+    setRematchCategory(room.category)
+  }, [room])
+
+  useEffect(() => {
     if (!selectedDuelProfileUserId) return
     if (duelProfileByUserId[selectedDuelProfileUserId]) return
     setSelectedDuelProfileUserId(null)
@@ -1216,11 +1394,19 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                         >
                           <span className="onevone-rail-rank">#{index + 1}</span>
                           <img src={entry.avatarUrl} alt={entry.username} className="onevone-rail-avatar" onError={handleAvatarImageError} />
-                          <span
-                            className={`onevone-rail-name ${displayNameClass(entry.supporterTier, true)}`}
-                            style={displayNameStyle(entry.nameStyle, entry.supporterTier)}
-                          >
-                            {entry.username}
+                          <span className="onevone-rail-name-wrap">
+                            <span
+                              className={`onevone-rail-name ${displayNameClass(entry.supporterTier, true)}`}
+                              style={displayNameStyle(entry.nameStyle, entry.supporterTier)}
+                            >
+                              {entry.username}
+                            </span>
+                            {entry.current_win_streak > 0 ? (
+                              <span className="onevone-inline-streak" aria-label={`Current win streak ${entry.current_win_streak}`}>
+                                <span className="onevone-streak-fire" aria-hidden>🔥</span>
+                                {entry.current_win_streak}
+                              </span>
+                            ) : null}
                           </span>
                           <strong>{entry.wins}</strong>
                         </button>
@@ -1243,11 +1429,13 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                         >
                           <span className="onevone-rail-rank">#{index + 1}</span>
                           <img src={entry.avatarUrl} alt={entry.username} className="onevone-rail-avatar" onError={handleAvatarImageError} />
-                          <span
-                            className={`onevone-rail-name ${displayNameClass(entry.supporterTier, true)}`}
-                            style={displayNameStyle(entry.nameStyle, entry.supporterTier)}
-                          >
-                            {entry.username}
+                          <span className="onevone-rail-name-wrap">
+                            <span
+                              className={`onevone-rail-name ${displayNameClass(entry.supporterTier, true)}`}
+                              style={displayNameStyle(entry.nameStyle, entry.supporterTier)}
+                            >
+                              {entry.username}
+                            </span>
                           </span>
                           <span className="onevone-streak-chip">
                             <span className="onevone-streak-fire" aria-hidden>🔥</span>
@@ -1321,6 +1509,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     const hostName = publicRoomHostNames[item.host_user_id]
                       || (item.host_user_id === currentUserId ? (currentUsername || 'Host') : `User ${item.host_user_id.slice(0, 8)}`)
                     const roomName = formatRoomName(hostName)
+                    const canDeleteRoom = item.host_user_id === currentUserId || isOwner
                     return (
                       <div key={item.id} className="onevone-public-item">
                         <div>
@@ -1329,9 +1518,20 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                             {item.game_type === 'quiz' ? '1v1 Quiz' : '1v1 Matching'} • Category: {item.category.toUpperCase()} • Players: {item.player_count}/2 • Questions: {item.rounds}
                           </p>
                         </div>
-                        <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading || item.player_count >= 2}>
-                          Join
-                        </button>
+                        <div className="onevone-public-actions">
+                          <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading || item.player_count >= 2}>
+                            Join
+                          </button>
+                          {canDeleteRoom ? (
+                            <button
+                              className="secondary"
+                              onClick={() => void deleteRoomById(item.id)}
+                              disabled={loading || deletingRoomId === item.id}
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                     )
                   })}
@@ -1494,7 +1694,16 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <button className="secondary" onClick={() => void setReady(false)} disabled={!myPlayer}>
                   Unready
                 </button>
-                <button className="secondary" onClick={leaveRoom}>Leave</button>
+                <button className="secondary" onClick={() => void leaveCurrentRoom()}>Leave</button>
+                {canDeleteCurrentRoom ? (
+                  <button
+                    className="secondary"
+                    onClick={() => void deleteRoomById(room.id)}
+                    disabled={loading || deletingRoomId === room.id}
+                  >
+                    Delete Room
+                  </button>
+                ) : null}
               </div>
               <p className="muted tiny">{waitingStatusMessage}</p>
             </div>
@@ -1521,9 +1730,27 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     <small className="muted">Elapsed</small>
                     <strong>{formatClock(elapsedMs)}</strong>
                   </div>
+                  <div className="onevone-hud-chip">
+                    <small className="muted">Opponent Progress</small>
+                    <div className="onevone-progress-row">
+                      <strong>{opponentRoundsCompleted}/{room.rounds}</strong>
+                      <span className="muted tiny">{opponentRoundStatus}</span>
+                    </div>
+                    <div className="onevone-progress-track" aria-hidden>
+                      <span style={{ width: `${opponentProgressPercent}%` }} />
+                    </div>
+                  </div>
                 </div>
 
-                {!canStartRound ? (
+                {countdownActive ? (
+                  <div className="onevone-countdown">
+                    <small className="muted">Both players ready</small>
+                    <strong>{countdownRemaining}</strong>
+                    <p className="muted tiny">Match starts in…</p>
+                  </div>
+                ) : null}
+
+                {!countdownActive && !canStartRound ? (
                   <p className="muted">Waiting for round sync...</p>
                 ) : null}
 
@@ -1570,12 +1797,29 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     <small className="muted">Elapsed</small>
                     <strong>{formatClock(elapsedMs)}</strong>
                   </div>
+                  <div className="onevone-hud-chip">
+                    <small className="muted">Opponent Progress</small>
+                    <div className="onevone-progress-row">
+                      <strong>{opponentRoundsCompleted}/{room.rounds}</strong>
+                      <span className="muted tiny">{opponentRoundStatus}</span>
+                    </div>
+                    <div className="onevone-progress-track" aria-hidden>
+                      <span style={{ width: `${opponentProgressPercent}%` }} />
+                    </div>
+                  </div>
                 </div>
                 <div className="match-session-controls onevone-session-controls onevone-match-controls">
                   <button className="secondary match-exit-button onevone-leave-button" onClick={() => void confirmLeaveMatch()}>
                     Leave Match
                   </button>
                 </div>
+                {countdownActive ? (
+                  <div className="onevone-countdown">
+                    <small className="muted">Both players ready</small>
+                    <strong>{countdownRemaining}</strong>
+                    <p className="muted tiny">Match starts in…</p>
+                  </div>
+                ) : null}
                 {canStartRound && isMatchingRound(currentRound) ? (
                   <div className="onevone-round">
                     <div className="onevone-match-meta">
@@ -1607,7 +1851,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     <p className="muted tiny">{matchingStatusText}</p>
                   </div>
                 ) : (
-                  <p className="muted">Waiting for round sync...</p>
+                  <p className="muted">{countdownActive ? 'Countdown in progress…' : 'Waiting for round sync...'}</p>
                 )}
               </div>
             </div>
@@ -1617,15 +1861,53 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
             <div className="onevone-result-overlay">
               <div className="card onevone-card onevone-result-shell">
                 <h3>Match Results</h3>
-                <p className="muted">
-                  {room.game_type === 'matching'
-                    ? 'First to complete all 5 sets wins (fastest total time decides ties).'
-                    : 'Winner is determined by highest score, then fastest total time.'}
+                <p className="muted tiny onevone-tiebreak-order">
+                  Tie-break order: <strong>Score</strong> → <strong>Total time</strong> → <strong>Fastest single round</strong> → <strong>Draw</strong>
                 </p>
-                <div className={room.winner_user_id === currentUserId ? 'onevone-winner-banner good' : 'onevone-winner-banner'}>
-                  {room.winner_user_id === currentUserId
-                    ? `Winner: ${myDisplayName}`
-                    : `Winner: ${usernameByUserId[room.winner_user_id || ''] || opponentDisplayName}`}
+                <div
+                  className={
+                    room.winner_user_id
+                      ? (room.winner_user_id === currentUserId ? 'onevone-winner-banner good' : 'onevone-winner-banner')
+                      : 'onevone-winner-banner onevone-winner-banner-draw'
+                  }
+                >
+                  {room.winner_user_id
+                    ? room.winner_user_id === currentUserId
+                      ? `Winner: ${myDisplayName}`
+                      : `Winner: ${usernameByUserId[room.winner_user_id] || opponentDisplayName}`
+                    : 'Result: Draw'}
+                </div>
+                {tieBreakerDecision ? (
+                  <p className="muted tiny onevone-tiebreak-note">
+                    Decision: {tieBreakerDecision.rule} • {tieBreakerDecision.summary}
+                  </p>
+                ) : null}
+
+                <div className="onevone-rematch-panel">
+                  <div className="onevone-rematch-head">
+                    <p className="muted tiny">Rematch</p>
+                    <p className="muted tiny">Keeps same players. Pick a category first.</p>
+                  </div>
+                  <div className="segmented compact-segmented onevone-rematch-cats">
+                    {duelCategoryOptions
+                      .filter((option) => !(room.game_type === 'matching' && option.quizOnly))
+                      .map((option) => (
+                        <button
+                          key={`rematch-cat-${option.value}`}
+                          type="button"
+                          className={rematchCategory === option.value ? 'seg active compact-seg' : 'seg compact-seg'}
+                          onClick={() => setRematchCategory(option.value)}
+                          disabled={rematchLoading}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                  </div>
+                  <div className="actions-row">
+                    <button className="primary" onClick={() => void startRematch()} disabled={rematchLoading}>
+                      {rematchLoading ? 'Starting...' : room.rematch_room_id ? 'Join Rematch' : 'Rematch'}
+                    </button>
+                  </div>
                 </div>
                 <div className="onevone-results-list">
                   {roomPlayerRowsSorted.map((entry) => {
@@ -1676,6 +1958,16 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                           : `${formatClock(myResultRow.total_time_ms - opponentResultRow.total_time_ms)} slower`}
                       </p>
                     </article>
+                    <article className="onevone-compare-card">
+                      <p className="muted tiny">Your Fastest Round</p>
+                      <strong>{myFastestRoundMs > 0 ? formatClock(myFastestRoundMs) : '—'}</strong>
+                      <p className="muted tiny">Lowest single-round time</p>
+                    </article>
+                    <article className="onevone-compare-card">
+                      <p className="muted tiny">Opponent Fastest Round</p>
+                      <strong>{opponentFastestRoundMs > 0 ? formatClock(opponentFastestRoundMs) : '—'}</strong>
+                      <p className="muted tiny">Lowest single-round time</p>
+                    </article>
                   </div>
                 ) : null}
                 {myDuelStats ? (
@@ -1698,7 +1990,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                   </div>
                 ) : null}
                 <div className="actions-row">
-                  <button className="primary" onClick={leaveRoom}>Back to 1v1 Lobby</button>
+                  <button className="primary" onClick={() => void leaveCurrentRoom()}>Back to 1v1 Lobby</button>
                 </div>
               </div>
             </div>
@@ -1747,13 +2039,15 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <p className="leader-profile-label">Agency</p>
                 <p>{selectedDuelProfile.agency || 'Not provided'}</p>
               </div>
-              <div className="leader-profile-item">
-                <p className="leader-profile-label">Current Win Streak</p>
-                <p>
-                  {selectedDuelProfile.all.currentStreak}
-                  {selectedDuelProfile.all.currentStreak > 1 ? <span className="onevone-streak-fire" aria-hidden> 🔥</span> : null}
-                </p>
-              </div>
+              {selectedDuelProfile.all.currentStreak > 0 ? (
+                <div className="leader-profile-item">
+                  <p className="leader-profile-label">Current Win Streak</p>
+                  <p>
+                    {selectedDuelProfile.all.currentStreak}
+                    <span className="onevone-streak-fire" aria-hidden> 🔥</span>
+                  </p>
+                </div>
+              ) : null}
               <div className="leader-profile-item leader-profile-item-wide">
                 <p className="leader-profile-label">About Me</p>
                 <p>{selectedDuelProfile.bio || 'Not provided'}</p>
