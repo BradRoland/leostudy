@@ -915,6 +915,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }
 
   const joinPublicRoom = async (targetRoomId: string, asSpectator: boolean = false) => {
+    console.log('joinPublicRoom called:', targetRoomId, 'spectator:', asSpectator)
     if (!supabase || !isSignedIn) return
     
     // For spectators, just enter the room directly without joining as a player
@@ -1666,9 +1667,11 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <div className="onevone-public-list">
                   {publicRooms.map((item) => {
                     const isActive = item.status === 'in_progress'
+                    const hasPlayers = item.player_count > 0
                     const playersList = item.players || []
                     const canDeleteRoom = item.host_user_id === currentUserId || isOwner
                     const canJoin = item.player_count < 2 && !isActive
+                    const canSpectate = hasPlayers && isActive
 
                     // Build player display
                     const playerDisplay = playersList.map(p => p.display_name).join(' vs ') || 'Waiting for players'
@@ -1683,8 +1686,8 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                           </p>
                         </div>
                         <div className="onevone-public-actions">
-                          {isActive ? (
-                            <button className="primary" onClick={() => void joinPublicRoom(item.id, true)} disabled={loading}>
+                          {canSpectate ? (
+                            <button className="primary" onClick={() => { console.log('Spectate clicked:', item.id); void joinPublicRoom(item.id, true) }} disabled={loading}>
                               Spectate
                             </button>
                           ) : (
