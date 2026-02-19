@@ -19,7 +19,7 @@ create table if not exists public.rooms (
   category text not null check (category in ('all', 'pc', 'vc', 'hs', 'scenarios')),
   is_public boolean not null default true,
   join_code text unique,
-  rounds integer not null default 5 check (rounds = 5),
+  rounds integer not null default 5 check (rounds between 5 and 50),
   question_set jsonb not null default '[]'::jsonb,
   status text not null default 'waiting' check (status in ('waiting', 'in_progress', 'completed', 'cancelled')),
   current_round integer not null default 1,
@@ -85,6 +85,25 @@ create trigger trg_room_players_updated_at
 before update on public.room_players
 for each row
 execute function public.set_timestamp_updated_at();
+
+create or replace function public.is_room_participant(
+  p_room_id uuid,
+  p_user_id uuid default auth.uid()
+)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.room_players rp
+    where rp.room_id = p_room_id
+      and rp.user_id = coalesce(p_user_id, auth.uid())
+  );
+$$;
+
+grant execute on function public.is_room_participant(uuid, uuid) to authenticated;
 
 -- Rooms: only participants can read room details.
 do $$
@@ -158,7 +177,7 @@ begin
     create policy room_players_select_room_participants
     on public.room_players
     for select
-    using (user_id = auth.uid());
+    using (public.is_room_participant(room_id, auth.uid()));
   end if;
 end $$;
 
@@ -243,6 +262,7 @@ returns table (
   id uuid,
   game_type text,
   category text,
+  rounds integer,
   created_at timestamptz,
   host_user_id uuid,
   player_count integer
@@ -255,6 +275,7 @@ as $$
     r.id,
     r.game_type,
     r.category,
+    r.rounds,
     r.created_at,
     r.host_user_id,
     count(rp.id)::int as player_count
@@ -273,7 +294,8 @@ grant execute on function public.list_public_1v1_rooms() to authenticated;
 create or replace function public.create_1v1_room(
   p_game_type text,
   p_category text,
-  p_is_public boolean default true
+  p_is_public boolean default true,
+  p_rounds integer default 10
 )
 returns uuid
 language plpgsql
@@ -298,6 +320,7 @@ declare
   v_idx integer;
   v_left text;
   v_right text;
+  v_rounds integer := greatest(5, least(coalesce(p_rounds, 10), 50));
   v_category text := lower(trim(p_category));
   v_game_type text := lower(trim(p_game_type));
 begin
@@ -317,6 +340,10 @@ begin
     raise exception 'Matching does not support SCENARIOS';
   end if;
 
+  if v_game_type = 'matching' then
+    v_rounds := 5;
+  end if;
+
   if v_game_type = 'quiz' then
     if v_category = 'scenarios' then
       with base as (
@@ -331,7 +358,7 @@ begin
           and c.type = 'scenario'
           and nullif(trim(coalesce(c.scenario, c.title)), '') is not null
         order by random()
-        limit 40
+        limit 120
       )
       select coalesce(jsonb_agg(to_jsonb(base)), '[]'::jsonb), count(*)::int
       into v_pool, v_pool_count
@@ -353,20 +380,20 @@ begin
             or (v_category = 'pc' and lower(c.category) in ('pc', 'penal', 'penal code'))
             or (v_category = 'vc' and lower(c.category) in ('vc', 'vehicle', 'vehicle code'))
             or (v_category = 'hs' and lower(c.category) in ('hs', 'h&s', 'health', 'health & safety', 'health and safety'))
-          )
+        )
         order by random()
-        limit 120
+        limit 220
       )
       select coalesce(jsonb_agg(to_jsonb(base)), '[]'::jsonb), count(*)::int
       into v_pool, v_pool_count
       from base;
     end if;
 
-    if v_pool_count < 5 then
-      raise exception 'Not enough content to generate 5 quiz rounds';
+    if v_pool_count < v_rounds then
+      raise exception 'Not enough content to generate % quiz rounds', v_rounds;
     end if;
 
-    for v_round in 1..5 loop
+    for v_round in 1..v_rounds loop
       v_item := v_pool -> ((v_round - 1) % v_pool_count);
 
       if v_category = 'scenarios' then
@@ -485,7 +512,7 @@ begin
           or (v_category = 'hs' and lower(c.category) in ('hs', 'h&s', 'health', 'health & safety', 'health and safety'))
         )
       order by random()
-      limit 120
+      limit 180
     )
     select coalesce(jsonb_agg(to_jsonb(base)), '[]'::jsonb), count(*)::int
     into v_pool, v_pool_count
@@ -496,7 +523,7 @@ begin
     end if;
 
     v_records := '[]'::jsonb;
-    for v_round in 1..5 loop
+    for v_round in 1..v_rounds loop
       v_round_pairs := '[]'::jsonb;
       for v_idx in 0..2 loop
         v_item := v_pool -> ((v_round * 3 + v_idx - 1) % v_pool_count);
@@ -538,7 +565,7 @@ begin
     v_category,
     p_is_public,
     v_join_code,
-    5,
+    v_rounds,
     v_question_set,
     'waiting',
     1
@@ -550,6 +577,21 @@ begin
 
   return v_room_id;
 end;
+$$;
+
+grant execute on function public.create_1v1_room(text, text, boolean, integer) to authenticated;
+
+create or replace function public.create_1v1_room(
+  p_game_type text,
+  p_category text,
+  p_is_public boolean default true
+)
+returns uuid
+language sql
+security definer
+set search_path = public
+as $$
+  select public.create_1v1_room(p_game_type, p_category, p_is_public, 10);
 $$;
 
 grant execute on function public.create_1v1_room(text, text, boolean) to authenticated;
@@ -718,14 +760,14 @@ begin
   if v_room.game_type = 'quiz' then
     v_points := case when p_correct then 100 else 0 end;
   else
-    v_points := greatest(0, least(coalesce(p_points, 0), 100));
+    v_points := case when p_correct then 100 else 0 end;
   end if;
 
   update public.room_players
   set
     score = score + v_points,
     total_time_ms = total_time_ms + v_elapsed,
-    current_round = greatest(current_round, least(v_round + 1, v_rounds + 1)),
+    current_round = greatest(current_round, least(p_round + 1, v_rounds + 1)),
     last_seen = now()
   where room_id = p_room_id
     and user_id = v_uid
@@ -805,6 +847,136 @@ end;
 $$;
 
 grant execute on function public.submit_1v1_round(uuid, integer, boolean, integer, integer) to authenticated;
+
+create or replace function public.forfeit_1v1_match(
+  p_room_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_room public.rooms%rowtype;
+  v_self public.room_players%rowtype;
+  v_opponent public.room_players%rowtype;
+  v_remaining_players integer := 0;
+begin
+  if v_uid is null then
+    raise exception 'Authentication required';
+  end if;
+
+  select * into v_room
+  from public.rooms
+  where id = p_room_id;
+
+  if v_room.id is null then
+    raise exception 'Room not found';
+  end if;
+
+  select * into v_self
+  from public.room_players
+  where room_id = p_room_id
+    and user_id = v_uid;
+
+  if v_self.id is null then
+    raise exception 'Not in room';
+  end if;
+
+  if v_room.status = 'waiting' then
+    delete from public.room_players
+    where room_id = p_room_id
+      and user_id = v_uid;
+
+    select count(*)::int
+    into v_remaining_players
+    from public.room_players
+    where room_id = p_room_id;
+
+    if v_remaining_players = 0 then
+      update public.rooms
+      set status = 'cancelled',
+          ended_at = now()
+      where id = p_room_id;
+    end if;
+
+    return jsonb_build_object(
+      'room_id', p_room_id,
+      'status', (select status from public.rooms where id = p_room_id),
+      'winner_user_id', null
+    );
+  end if;
+
+  if v_room.status <> 'in_progress' then
+    return jsonb_build_object(
+      'room_id', p_room_id,
+      'status', v_room.status,
+      'winner_user_id', v_room.winner_user_id
+    );
+  end if;
+
+  select * into v_opponent
+  from public.room_players
+  where room_id = p_room_id
+    and user_id <> v_uid
+  order by slot_no
+  limit 1;
+
+  update public.room_players
+  set current_round = greatest(current_round, v_room.rounds + 1),
+      last_seen = now()
+  where id = v_self.id;
+
+  if v_opponent.id is not null then
+    update public.room_players
+    set current_round = greatest(current_round, v_room.rounds + 1),
+        last_seen = now()
+    where id = v_opponent.id;
+
+    insert into public.room_results (room_id, user_id, score, total_time_ms, placement, is_winner)
+    values (p_room_id, v_opponent.user_id, v_opponent.score, v_opponent.total_time_ms, 1, true)
+    on conflict (room_id, user_id)
+    do update set
+      score = excluded.score,
+      total_time_ms = excluded.total_time_ms,
+      placement = excluded.placement,
+      is_winner = excluded.is_winner,
+      finished_at = now();
+
+    insert into public.room_results (room_id, user_id, score, total_time_ms, placement, is_winner)
+    values (p_room_id, v_self.user_id, v_self.score, v_self.total_time_ms, 2, false)
+    on conflict (room_id, user_id)
+    do update set
+      score = excluded.score,
+      total_time_ms = excluded.total_time_ms,
+      placement = excluded.placement,
+      is_winner = excluded.is_winner,
+      finished_at = now();
+
+    update public.rooms
+    set status = 'completed',
+        winner_user_id = v_opponent.user_id,
+        ended_at = now(),
+        current_round = v_room.rounds
+    where id = p_room_id;
+  else
+    update public.rooms
+    set status = 'cancelled',
+        ended_at = now(),
+        current_round = v_room.rounds
+    where id = p_room_id;
+  end if;
+
+  return jsonb_build_object(
+    'room_id', p_room_id,
+    'status', (select status from public.rooms where id = p_room_id),
+    'winner_user_id', (select winner_user_id from public.rooms where id = p_room_id)
+  );
+end;
+$$;
+
+grant execute on function public.forfeit_1v1_match(uuid) to authenticated;
 
 -- Realtime publication (safe idempotent blocks)
 do $$ begin
