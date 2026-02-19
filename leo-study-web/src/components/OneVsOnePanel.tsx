@@ -1109,6 +1109,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     
     const me = players.find((player) => player.user_id === currentUserId)
     const currentlyReady = me?.is_ready || false
+    console.log('Toggle rematch vote:', { currentlyReady, players: players.map(p => ({ user_id: p.user_id, is_ready: p.is_ready })) })
     
     // Toggle the vote
     const { error: rpcError } = await supabase.rpc('set_1v1_ready', {
@@ -1124,7 +1125,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       return
     }
     
-    // Note: startRematch will be triggered by the useEffect when both are ready
+    console.log('Rematch vote toggled, waiting for opponent...')
   }
 
   const startRematch = useCallback(async () => {
@@ -1178,6 +1179,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const lobbyReadyCount = players.filter((player) => player.is_ready).length
   const rematchReadyCount = room?.status === 'completed' ? players.filter((player) => player.is_ready).length : 0
   const myRematchRequested = room?.status === 'completed' ? Boolean(myPlayer?.is_ready) : false
+  console.log('Rematch state:', { rematchReadyCount, myRematchRequested, players: players.map(p => ({ user_id: p.user_id?.slice(0,8), is_ready: p.is_ready })), status: room?.status })
   const inRoom = Boolean(room && roomId)
   const waitingPlayersCount = players.length
   const waitingStatusMessage = waitingPlayersCount < 2
