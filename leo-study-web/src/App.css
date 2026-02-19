@@ -3437,7 +3437,7 @@ textarea {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--bg-primary);
+  background: var(--bg);
   z-index: 1000;
   overflow-y: auto;
   display: flex;
