@@ -117,13 +117,28 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         .order('created_at', { ascending: false })
         .limit(MAX_MESSAGES)
       if (data) {
-        setMessages(data.reverse())
+        const latestMessages = data.reverse()
+        const existingIds = new Set(messages.map((m) => m.id))
+        const newMessageDetected = latestMessages.some((m) => !existingIds.has(m.id))
+        
+        setMessages(latestMessages)
+        
+        // Update unread indicator from polling too
+        if (newMessageDetected) {
+          if (isOpenRef.current && isNearBottomRef.current) {
+            setHasNewMessages(false)
+          } else if (!isOpenRef.current) {
+            setUnreadCount((c) => c + 1)
+          } else {
+            setHasNewMessages(true)
+          }
+        }
       }
     }
 
     const interval = setInterval(pollMessages, 5000)
     return () => clearInterval(interval)
-  }, [supabaseClient])
+  }, [supabaseClient, messages])
 
   // Persist open state
   useEffect(() => {
