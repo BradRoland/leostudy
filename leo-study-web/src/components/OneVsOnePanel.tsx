@@ -1109,17 +1109,29 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       p_category: rematchCategory,
     })
     
-    setRematchLoading(false)
-    
     if (rpcError) {
       console.error('Rematch error:', rpcError)
+      setRematchLoading(false)
       setError(rpcError.message || 'Could not start rematch.')
       return
     }
     
+    // Clear local game state to ensure fresh start
+    setResults([])
+    setMatchingCards([])
+    setSelectedMatchingCards([])
+    setMatchedPairIds([])
+    setMatchingMistakes(0)
+    setMatchingRoundPoints(0)
+    setMatchingSubmitted(false)
+    setQuizChoice(null)
+    setQuizLocked(false)
+    
     // Refresh room state to get new questions
-    void refreshRoomSnapshot()
-    setNotice('Rematch started with new questions!')
+    await refreshRoomSnapshot()
+    
+    setRematchLoading(false)
+    setNotice('Rematch started!')
   }
 
   const startRematch = useCallback(async () => {
