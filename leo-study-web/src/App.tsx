@@ -6,6 +6,8 @@ import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem } f
 import { useOwner } from './hooks/useOwner'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { OneVsOnePanel } from './components/OneVsOnePanel'
+import { GlobalChatWidget } from './components/GlobalChatWidget'
+import './components/GlobalChatWidget.css'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
 type CodeFilter = CodeSet | 'all'
@@ -7876,6 +7878,15 @@ function App() {
         ))}
       </nav>
         </>
+      ) : null}
+
+      {authReady && currentUserId ? (
+        <GlobalChatWidget
+          currentUserId={currentUserId}
+          currentUsername={profileUsername}
+          userAgency={profileDetails?.agency}
+          isOwner={isOwner}
+        />
       ) : null}
     </div>
   )
