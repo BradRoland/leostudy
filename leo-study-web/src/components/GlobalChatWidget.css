@@ -51,7 +51,7 @@
   width: 360px;
   height: 500px;
   max-height: calc(100vh - 100px);
-  background: var(--panel, rgba(35, 51, 84, 0.95));
+  background: #1a2744;
   border: 1px solid var(--border, rgba(158, 180, 228, 0.22));
   border-radius: 16px;
   display: flex;
