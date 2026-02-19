@@ -784,11 +784,19 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
   const myPlayer = useMemo(() => players.find((player) => player.user_id === currentUserId) || null, [players, currentUserId])
   const opponentPlayer = useMemo(() => players.find((player) => player.user_id !== currentUserId) || null, [players, currentUserId])
+  const isSpectator = useMemo(() => !myPlayer && players.length > 0 && room?.status === 'in_progress', [myPlayer, players, room])
+
+  // Helper to get player name from usernameByUserId lookup
+  const getPlayerName = (userId: string, fallback: string) => usernameByUserId[userId] || fallback
 
   const currentRoundNumber = useMemo(() => {
-    if (!room || !myPlayer) return 1
-    return Math.max(1, Math.min(room.rounds, myPlayer.current_round))
-  }, [myPlayer, room])
+    if (!room) return 1
+    // For spectators, show the current round based on the room's current_round
+    if (isSpectator) {
+      return Math.max(1, Math.min(room.rounds, room.current_round))
+    }
+    return Math.max(1, Math.min(room.rounds, (myPlayer?.current_round || 1)))
+  }, [isSpectator, myPlayer, room])
 
   const roundIndex = Math.max(0, currentRoundNumber - 1)
   const currentRound = roundList[roundIndex]
@@ -1867,24 +1875,40 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
           {room.status === 'in_progress' && room.game_type === 'quiz' ? (
             <div className="speed-session-overlay onevone-quiz-overlay">
               <div className="speed-session-shell onevone-quiz-shell">
+                {isSpectator && (
+                  <div className="onevone-spectator-banner">
+                    <span>👁️ You are spectating</span>
+                    <span className="muted tiny">{players[0] ? usernameByUserId[players[0].user_id] || 'Player 1' : 'Player 1'} vs {players[1] ? usernameByUserId[players[1].user_id] || 'Player 2' : 'Player 2'}</span>
+                  </div>
+                )}
                 <div className="speed-session-controls onevone-session-controls">
                   <button className="secondary speed-exit-button onevone-leave-button" onClick={() => void confirmLeaveMatch()}>
-                    Leave Match
+                    {isSpectator ? 'Stop Spectating' : 'Leave Match'}
                   </button>
                 </div>
                 <div className="onevone-hud-grid">
                   <div className="onevone-hud-chip">
-                    <small className="muted">Rounds</small>
-                    <strong>You {myRoundHud}/{room.rounds} • Opponent {opponentRoundHud}/{room.rounds}</strong>
+                    <small className="muted">Round</small>
+                    <strong>{isSpectator ? `Round ${room.current_round}` : `${myRoundHud}/${room.rounds}`} / {room.rounds}</strong>
                   </div>
                   <div className="onevone-hud-chip">
-                    <small className="muted">Score</small>
-                    <strong>{myDisplayName}: {myPlayer?.score ?? 0} • {opponentDisplayName}: {opponentPlayer?.score ?? 0}</strong>
+                    <small className="muted">Scores</small>
+                    <strong>{getPlayerName(players[0]?.user_id, 'P1')}: {players[0]?.score ?? 0} • {getPlayerName(players[1]?.user_id, 'P2')}: {players[1]?.score ?? 0}</strong>
                   </div>
                   <div className="onevone-hud-chip">
                     <small className="muted">Elapsed</small>
                     <strong>{formatClock(elapsedMs)}</strong>
                   </div>
+                  {isSpectator ? (
+                    <div className="onevone-hud-chip">
+                      <small className="muted">Progress</small>
+                      <div className="onevone-progress-row">
+                        <strong>{players[0]?.current_round || 1}/{room.rounds}</strong>
+                        <span className="muted tiny">vs</span>
+                        <strong>{players[1]?.current_round || 1}/{room.rounds}</strong>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="onevone-hud-chip">
                     <small className="muted">Opponent Progress</small>
                     <div className="onevone-progress-row">
@@ -1895,6 +1919,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                       <span style={{ width: `${opponentProgressPercent}%` }} />
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {countdownActive ? (
@@ -1910,6 +1935,20 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 ) : null}
 
                 {canStartRound && isQuizRound(currentRound) ? (
+                  isSpectator ? (
+                    <div className="card quiz-card speed-session-card onevone-quiz-card spectating-card">
+                      <h3>{currentRound.prompt}</h3>
+                      {currentRound.sourceLabel ? <p className="muted tiny">{currentRound.sourceLabel}</p> : null}
+                      <div className="choices spectating-choices">
+                        {currentRound.choices.map((choice, index) => (
+                          <div key={`spectate-choice-${currentRound.round}-${index}`} className="choice spectating-choice">
+                            <span className="choice-key">{index + 1}</span> {choice}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="muted tiny" style={{ marginTop: '12px' }}>👁️ Watching {getPlayerName(players[0]?.user_id, 'Player')} and {getPlayerName(players[1]?.user_id, 'Player')} compete</p>
+                    </div>
+                  ) : (
                   <div className="card quiz-card speed-session-card onevone-quiz-card">
                     <h3>{currentRound.prompt}</h3>
                     {currentRound.sourceLabel ? <p className="muted tiny">{currentRound.sourceLabel}</p> : null}
@@ -1932,6 +1971,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                       ))}
                     </div>
                   </div>
+                  )
                 ) : null}
               </div>
             </div>
@@ -1940,19 +1980,35 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
           {room.status === 'in_progress' && room.game_type === 'matching' ? (
             <div className="match-session-overlay onevone-match-overlay">
               <div className="match-session-shell onevone-match-shell">
+                {isSpectator && (
+                  <div className="onevone-spectator-banner">
+                    <span>👁️ You are spectating</span>
+                    <span className="muted tiny">{players[0] ? usernameByUserId[players[0].user_id] || 'Player 1' : 'Player 1'} vs {players[1] ? usernameByUserId[players[1].user_id] || 'Player 2' : 'Player 2'}</span>
+                  </div>
+                )}
                 <div className="onevone-hud-grid">
                   <div className="onevone-hud-chip">
-                    <small className="muted">Rounds</small>
-                    <strong>You {myRoundHud}/{room.rounds} • Opponent {opponentRoundHud}/{room.rounds}</strong>
+                    <small className="muted">Round</small>
+                    <strong>{isSpectator ? `Round ${room.current_round}` : `${myRoundHud}/${room.rounds}`} / {room.rounds}</strong>
                   </div>
                   <div className="onevone-hud-chip">
-                    <small className="muted">Score</small>
-                    <strong>{myDisplayName}: {myPlayer?.score ?? 0} • {opponentDisplayName}: {opponentPlayer?.score ?? 0}</strong>
+                    <small className="muted">Scores</small>
+                    <strong>{getPlayerName(players[0]?.user_id, 'P1')}: {players[0]?.score ?? 0} • {getPlayerName(players[1]?.user_id, 'P2')}: {players[1]?.score ?? 0}</strong>
                   </div>
                   <div className="onevone-hud-chip">
                     <small className="muted">Elapsed</small>
                     <strong>{formatClock(elapsedMs)}</strong>
                   </div>
+                  {isSpectator ? (
+                    <div className="onevone-hud-chip">
+                      <small className="muted">Progress</small>
+                      <div className="onevone-progress-row">
+                        <strong>{players[0]?.current_round || 1}/{room.rounds}</strong>
+                        <span className="muted tiny">vs</span>
+                        <strong>{players[1]?.current_round || 1}/{room.rounds}</strong>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="onevone-hud-chip">
                     <small className="muted">Opponent Progress</small>
                     <div className="onevone-progress-row">
@@ -1963,10 +2019,11 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                       <span style={{ width: `${opponentProgressPercent}%` }} />
                     </div>
                   </div>
+                  )}
                 </div>
                 <div className="match-session-controls onevone-session-controls onevone-match-controls">
                   <button className="secondary match-exit-button onevone-leave-button" onClick={() => void confirmLeaveMatch()}>
-                    Leave Match
+                    {isSpectator ? 'Stop Spectating' : 'Leave Match'}
                   </button>
                 </div>
                 {countdownActive ? (
@@ -1979,13 +2036,33 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 {canStartRound && isMatchingRound(currentRound) ? (
                   <div className="onevone-round">
                     <div className="onevone-match-meta">
-                      <p className="muted">Both players get the exact same 6 tiles each set. First to complete all 5 sets wins.</p>
+                      <p className="muted">{isSpectator ? 'Watching both players compete on the same tiles' : 'Both players get the exact same 6 tiles each set. First to complete all 5 sets wins.'}</p>
+                      {isSpectator ? (
+                        <div className="onevone-hud">
+                          <span>{getPlayerName(players[0]?.user_id, 'P1')}: {players[0]?.score ?? 0} pts</span>
+                          <span>{getPlayerName(players[1]?.user_id, 'P2')}: {players[1]?.score ?? 0} pts</span>
+                        </div>
+                      ) : (
                       <div className="onevone-hud">
                         <span>Matched: {matchingProgressText}</span>
                         <span>Mistakes: {matchingMistakes}</span>
                         <span>Round Points: {matchingRoundPoints}</span>
                       </div>
+                      )}
                     </div>
+                    {isSpectator ? (
+                      <div className="match-grid match-grid-session">
+                        {matchingCards.map((card) => (
+                          <div
+                            key={`spectate-match-card-${currentRound.round}-${card.id}`}
+                            className={`match-card match-spectating`}
+                          >
+                            <small>{card.kind === 'code' ? 'Code section' : 'Definition'}</small>
+                            <strong>{card.text}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
                     <div className="match-grid match-grid-session">
                       {matchingCards.map((card) => {
                         const selected = selectedMatchingCards.includes(card.id)
@@ -2004,7 +2081,8 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                         )
                       })}
                     </div>
-                    <p className="muted tiny">{matchingStatusText}</p>
+                    )}
+                    <p className="muted tiny">{isSpectator ? '👁️ Spectating both players' : matchingStatusText}</p>
                   </div>
                 ) : (
                   <p className="muted">{countdownActive ? 'Countdown in progress…' : 'Waiting for round sync...'}</p>
