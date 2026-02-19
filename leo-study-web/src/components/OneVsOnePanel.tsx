@@ -915,6 +915,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }
 
   const joinPublicRoom = async (targetRoomId: string, asSpectator: boolean = false) => {
+    alert('Spectate function called! room: ' + targetRoomId + ' spectator: ' + asSpectator)
     console.log('joinPublicRoom called:', targetRoomId, 'spectator:', asSpectator)
     if (!supabase || !isSignedIn) return
     
@@ -1687,7 +1688,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                         </div>
                         <div className="onevone-public-actions">
                           {canSpectate ? (
-                            <button className="primary" onClick={() => { console.log('Spectate clicked:', item.id); void joinPublicRoom(item.id, true) }} disabled={loading}>
+                            <button className="primary" onClick={() => { alert('Button clicked! canSpectate=' + canSpectate + ' room=' + item.id); void joinPublicRoom(item.id, true) }} disabled={loading}>
                               Spectate
                             </button>
                           ) : (
