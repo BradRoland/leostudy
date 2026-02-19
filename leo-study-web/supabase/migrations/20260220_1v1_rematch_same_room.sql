@@ -1,6 +1,4 @@
--- Fixed rematch function: properly generates NEW matching pairs and quiz questions
--- Run this in Supabase SQL editor
-
+-- Fixed rematch function: generates NEW questions and resets state
 DROP FUNCTION IF EXISTS public.rematch_1v1_room(uuid, text);
 
 CREATE OR REPLACE FUNCTION public.rematch_1v1_room(
@@ -20,24 +18,16 @@ DECLARE
   v_question_set jsonb := '[]'::jsonb;
   v_player_one uuid;
   v_player_two uuid;
-  v_is_participant boolean := FALSE;
-  
-  -- For matching
   v_pool jsonb;
   v_pool_count int;
   v_round int;
   v_item jsonb;
   v_round_pairs jsonb;
   v_idx int;
-  v_left text;
-  v_right text;
-  
-  -- For quiz
   v_choices text[];
   v_choice text;
   v_choice_json jsonb;
   v_correct_index int;
-  
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
@@ -49,12 +39,7 @@ BEGIN
     RAISE EXCEPTION 'Room not found';
   END IF;
 
-  SELECT EXISTS (
-    SELECT 1 FROM public.room_players rp
-    WHERE rp.room_id = p_room_id AND rp.user_id = v_uid
-  ) INTO v_is_participant;
-
-  IF NOT v_is_participant THEN
+  IF NOT EXISTS (SELECT 1 FROM public.room_players rp WHERE rp.room_id = p_room_id AND rp.user_id = v_uid) THEN
     RAISE EXCEPTION 'Only room participants can request a rematch';
   END IF;
 
@@ -77,8 +62,12 @@ BEGIN
     RAISE EXCEPTION 'Rematch requires exactly two players';
   END IF;
 
-  -- Validate and set category
-  v_category := lower(trim(coalesce(NULLIF(p_category, ''), v_room.category)));
+  -- Set category
+  v_category := COALESCE(NULLIF(LOWER(TRIM(p_category)), '');
+  IF v_category = '' THEN
+    v_category := LOWER(v_room.category);
+  END IF;
+  
   IF v_category NOT IN ('all', 'pc', 'vc', 'hs', 'scenarios') THEN
     v_category := 'all';
   END IF;
@@ -90,230 +79,97 @@ BEGIN
   -- Set rounds
   v_rounds := CASE
     WHEN v_room.game_type = 'matching' THEN 5
-    ELSE greatest(5, least(coalesce(v_room.rounds, 10), 50))
+    ELSE GREATEST(5, LEAST(COALESCE(v_room.rounds, 10), 50))
   END;
 
-  -- Generate NEW question set based on game type
+  -- Generate NEW question set
   IF v_room.game_type = 'matching' THEN
     -- Generate matching pairs
     WITH base AS (
-      SELECT
-        c.id,
-        TRIM(c.code_section) AS code_section,
-        TRIM(c.title) AS title
+      SELECT c.id, TRIM(c.code_section) AS code_section, TRIM(c.title) AS title
       FROM public.content_items c
       WHERE c.is_published = TRUE
         AND c.type IN ('code', 'question')
         AND NULLIF(TRIM(c.title), '') IS NOT NULL
         AND NULLIF(TRIM(c.code_section), '') IS NOT NULL
-        AND (
-          v_category = 'all'
-          OR (v_category = 'pc' AND lower(c.category) IN ('pc', 'penal', 'penal code'))
-          OR (v_category = 'vc' AND lower(c.category) IN ('vc', 'vehicle', 'vehicle code'))
-          OR (v_category = 'hs' AND lower(c.category) IN ('hs', 'h&s', 'health', 'health & safety', 'health and safety'))
-        )
-      ORDER BY random()
-      LIMIT 180
+      ORDER BY random() LIMIT 180
     )
     SELECT COALESCE(jsonb_agg(to_jsonb(base)), '[]'::jsonb), count(*)::int
-    INTO v_pool, v_pool_count
-    FROM base;
+    INTO v_pool, v_pool_count FROM base;
 
     IF v_pool_count < 3 THEN
-      RAISE EXCEPTION 'Not enough content to generate matching rounds';
+      RAISE EXCEPTION 'Not enough content for matching';
     END IF;
 
-    -- Build matching pairs
     FOR v_round IN 1..v_rounds LOOP
       v_round_pairs := '[]'::jsonb;
       FOR v_idx IN 0..2 LOOP
         v_item := v_pool -> ((v_round * 3 + v_idx - 1) % v_pool_count);
-        v_left := v_item->>'code_section';
-        v_right := v_item->>'title';
         v_round_pairs := v_round_pairs || jsonb_build_array(
-          jsonb_build_object(
-            'left', v_left,
-            'right', v_right,
-            'leftKind', 'code',
-            'rightKind', 'title'
-          )
+          jsonb_build_object('left', v_item->>'code_section', 'right', v_item->>'title', 'leftKind', 'code', 'rightKind', 'title')
         );
       END LOOP;
-      v_question_set := v_question_set || jsonb_build_array(
-        jsonb_build_object(
-          'round', v_round,
-          'pairs', v_round_pairs
-        )
-      );
+      v_question_set := v_question_set || jsonb_build_array(jsonb_build_object('round', v_round, 'pairs', v_round_pairs));
     END LOOP;
-    
   ELSE
     -- Generate quiz questions
-    IF v_category = 'scenarios' THEN
-      WITH base AS (
-        SELECT
-          c.id,
-          COALESCE(NULLIF(TRIM(c.scenario), ''), TRIM(c.title)) AS prompt,
-          COALESCE(NULLIF(TRIM(c.answer), ''), 'Use the most lawful option based on facts.') AS correct_answer,
-          COALESCE(c.scenario_questions, '[]'::jsonb) AS scenario_questions,
-          COALESCE(NULLIF(TRIM(c.explanation), ''), 'Use lawful authority and articulable facts.') AS explanation
-        FROM public.content_items c
-        WHERE c.is_published = TRUE
-          AND c.type = 'scenario'
-          AND NULLIF(TRIM(COALESCE(c.scenario, c.title)), '') IS NOT NULL
-        ORDER BY random()
-        LIMIT 120
-      )
-      SELECT COALESCE(jsonb_agg(to_jsonb(base)), '[]'::jsonb), count(*)::int
-      INTO v_pool, v_pool_count
-      FROM base;
-    ELSE
-      WITH base AS (
-        SELECT
-          c.id,
-          TRIM(c.title) AS title,
-          TRIM(c.code_section) AS code_section,
-          COALESCE(NULLIF(TRIM(c.explanation), ''), TRIM(c.question), TRIM(c.answer), '') AS explanation
-        FROM public.content_items c
-        WHERE c.is_published = TRUE
-          AND c.type IN ('code', 'question')
-          AND NULLIF(TRIM(c.title), '') IS NOT NULL
-          AND NULLIF(TRIM(c.code_section), '') IS NOT NULL
-          AND (
-            v_category = 'all'
-            OR (v_category = 'pc' AND lower(c.category) IN ('pc', 'penal', 'penal code'))
-            OR (v_category = 'vc' AND lower(c.category) IN ('vc', 'vehicle', 'vehicle code'))
-            OR (v_category = 'hs' AND lower(c.category) IN ('hs', 'h&s', 'health', 'health & safety', 'health and safety'))
-          )
-        ORDER BY random()
-        LIMIT 220
-      )
-      SELECT COALESCE(jsonb_agg(to_jsonb(base)), '[]'::jsonb), count(*)::int
-      INTO v_pool, v_pool_count
-      FROM base;
-    END IF;
+    WITH base AS (
+      SELECT c.id, TRIM(c.title) AS title, TRIM(c.code_section) AS code_section,
+             COALESCE(NULLIF(TRIM(c.explanation), ''), TRIM(c.question), TRIM(c.answer), '') AS explanation
+      FROM public.content_items c
+      WHERE c.is_published = TRUE
+        AND c.type IN ('code', 'question')
+        AND NULLIF(TRIM(c.title), '') IS NOT NULL
+        AND NULLIF(TRIM(c.code_section), '') IS NOT NULL
+      ORDER BY random() LIMIT 220
+    )
+    SELECT COALESCE(jsonb_agg(to_jsonb(base)), '[]'::jsonb), count(*)::int
+    INTO v_pool, v_pool_count FROM base;
 
     IF v_pool_count < v_rounds THEN
-      RAISE EXCEPTION 'Not enough content to generate % quiz rounds', v_rounds;
+      RAISE EXCEPTION 'Not enough content for % rounds', v_rounds;
     END IF;
 
-    -- Build quiz questions
     FOR v_round IN 1..v_rounds LOOP
       v_item := v_pool -> ((v_round - 1) % v_pool_count);
+      v_choices := ARRAY[(v_item->>'title')];
+      
+      FOR v_choice IN
+        SELECT elem->>'title' FROM jsonb_array_elements(v_pool) AS elem
+        WHERE (elem->>'id') <> (v_item->>'id') ORDER BY random() LIMIT 3
+      LOOP
+        v_choices := array_append(v_choices, v_choice);
+      END LOOP;
 
-      IF v_category = 'scenarios' THEN
-        v_choices := array[]::text[];
-        FOR v_choice IN
-          SELECT value::text
-          FROM jsonb_array_elements_text(COALESCE(v_item->'scenario_questions', '[]'::jsonb))
-        LOOP
-          IF LENGTH(TRIM(v_choice)) > 0 THEN
-            v_choices := array_append(v_choices, TRIM(v_choice));
-          END IF;
-        END LOOP;
-
-        IF COALESCE(array_length(v_choices, 1), 0) < 2 THEN
-          v_choices := ARRAY[
-            (v_item->>'correct_answer'),
-            'Document observations and seek corroborating evidence.',
-            'Delay enforcement action until legal elements are established.',
-            'Prioritize scene safety and gather witness statements.'
-          ];
+      v_choice_json := (SELECT jsonb_agg(value) FROM (SELECT value FROM unnest(v_choices) AS value ORDER BY random()) s);
+      v_correct_index := 0;
+      FOR v_idx IN 0..jsonb_array_length(v_choice_json) - 1 LOOP
+        IF (v_choice_json ->> v_idx) = (v_item->>'title') THEN
+          v_correct_index := v_idx;
+          EXIT;
         END IF;
+      END LOOP;
 
-        IF NOT ((v_item->>'correct_answer') = ANY(v_choices)) THEN
-          v_choices := array_append(v_choices, (v_item->>'correct_answer'));
-        END IF;
-
-        v_choices := (SELECT array_agg(value) FROM (SELECT DISTINCT unnest(v_choices) AS value) t WHERE LENGTH(TRIM(value)) > 0);
-        
-        v_choice_json := (
-          SELECT COALESCE(jsonb_agg(value), '[]'::jsonb)
-          FROM (SELECT value FROM unnest(v_choices) AS value ORDER BY random() LIMIT 4) s
-        );
-
-        IF jsonb_array_length(v_choice_json) < 2 THEN
-          RAISE EXCEPTION 'Unable to generate scenario choices';
-        END IF;
-
-        v_correct_index := 0;
-        FOR v_idx IN 0..jsonb_array_length(v_choice_json) - 1 LOOP
-          IF (v_choice_json ->> v_idx) = (v_item->>'correct_answer') THEN
-            v_correct_index := v_idx;
-            EXIT;
-          END IF;
-        END LOOP;
-
-        v_question_set := v_question_set || jsonb_build_array(
-          jsonb_build_object(
-            'round', v_round,
-            'prompt', v_item->>'prompt',
-            'choices', v_choice_json,
-            'correctIndex', v_correct_index,
-            'explanation', v_item->>'explanation'
-          )
-        );
-      ELSE
-        v_choices := ARRAY[(v_item->>'title')];
-
-        FOR v_choice IN
-          SELECT elem->>'title'
-          FROM jsonb_array_elements(v_pool) AS elem
-          WHERE (elem->>'id') <> (v_item->>'id')
-          ORDER BY random()
-          LIMIT 3
-        LOOP
-          v_choices := array_append(v_choices, v_choice);
-        END LOOP;
-
-        v_choice_json := (
-          SELECT jsonb_agg(value)
-          FROM (SELECT value FROM unnest(v_choices) AS value ORDER BY random()) s
-        );
-
-        v_correct_index := 0;
-        FOR v_idx IN 0..jsonb_array_length(v_choice_json) - 1 LOOP
-          IF (v_choice_json ->> v_idx) = (v_item->>'title') THEN
-            v_correct_index := v_idx;
-            EXIT;
-          END IF;
-        END LOOP;
-
-        v_question_set := v_question_set || jsonb_build_array(
-          jsonb_build_object(
-            'round', v_round,
-            'code', v_item->>'code_section',
-            'prompt', v_item->>'title',
-            'choices', v_choice_json,
-            'correctIndex', v_correct_index,
-            'explanation', v_item->>'explanation'
-          )
-        );
-      END IF;
+      v_question_set := v_question_set || jsonb_build_array(
+        jsonb_build_object('round', v_round, 'code', v_item->>'code_section', 'prompt', v_item->>'title',
+                          'choices', v_choice_json, 'correctIndex', v_correct_index, 'explanation', v_item->>'explanation')
+      );
     END LOOP;
   END IF;
 
-  -- Reset ALL player state for fresh match
+  -- DELETE old results
+  DELETE FROM public.room_results WHERE room_id = p_room_id;
+
+  -- Reset ALL player state
   UPDATE public.room_players
-  SET is_ready = FALSE,
-      score = 0,
-      total_time_ms = 0,
-      fastest_round_ms = 0,
-      current_round = 1,
-      last_seen = now()
+  SET is_ready = FALSE, score = 0, total_time_ms = 0, fastest_round_ms = 0, current_round = 1, last_seen = NOW()
   WHERE room_id = p_room_id;
 
-  -- Update room with NEW question set and reset to waiting
+  -- Reset room to waiting
   UPDATE public.rooms
-  SET question_set = v_question_set,
-      category = v_category,
-      rounds = v_rounds,
-      status = 'waiting',
-      current_round = 1,
-      winner_user_id = NULL,
-      started_at = NULL,
-      ended_at = NULL,
-      rematch_room_id = NULL
+  SET question_set = v_question_set, category = v_category, rounds = v_rounds, 
+      status = 'waiting', current_round = 1, winner_user_id = NULL, 
+      started_at = NULL, ended_at = NULL, rematch_room_id = NULL
   WHERE id = p_room_id;
 
   RETURN p_room_id;
