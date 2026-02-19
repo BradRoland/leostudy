@@ -50,7 +50,7 @@ CREATE POLICY "public_message_reports_insert_authenticated" ON public.public_mes
 
 DROP POLICY IF EXISTS "public_message_reports_select_admin_only" ON public.public_message_reports;
 CREATE POLICY "public_message_reports_select_admin_only" ON public.public_message_reports FOR SELECT USING (
-  EXISTS (SELECT 1 FROM user_id = auth public.user_roles WHERE.uid() AND role = 'owner')
+  EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'owner')
 );
 
 -- Grant execute to authenticated users
@@ -59,6 +59,5 @@ GRANT INSERT ON public.public_messages TO authenticated;
 GRANT UPDATE ON public.public_messages TO authenticated;
 GRANT SELECT, INSERT ON public.public_message_reports TO authenticated;
 
--- Enable realtime for public_messages
-DROP PUBLICATION IF EXISTS supabase_realtime;
-CREATE PUBLICATION supabase_realtime FOR TABLE public.public_messages;
+-- Enable realtime for public_messages (add to existing publication)
+ALTER PUBLICATION supabase_realtime ADD TABLE public.public_messages;

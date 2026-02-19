@@ -49,12 +49,14 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     if (!supabaseClient) return
 
     const loadMessages = async () => {
-      const { data } = await supabaseClient
+      console.log('Loading messages...')
+      const { data, error } = await supabaseClient
         .from('public_messages')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(MAX_MESSAGES)
       
+      console.log('Loaded messages:', data, error)
       if (data) {
         setMessages(data.reverse())
       }
@@ -62,6 +64,9 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
 
     loadMessages()
   }, [supabaseClient])
+
+  const isOpenRef = useRef(isOpen)
+  isOpenRef.current = isOpen
 
   // Subscribe to realtime messages
   useEffect(() => {
@@ -73,17 +78,18 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'public_messages' },
         (payload) => {
+          console.log('New message received:', payload)
           const newMessage = payload.new as PublicMessage
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMessage.id)) return prev
             return [...prev, newMessage].slice(-MAX_MESSAGES)
           })
 
-          if (isOpen && isNearBottomRef.current) {
+          if (isOpenRef.current && isNearBottomRef.current) {
             setTimeout(() => {
               messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
             }, 50)
-          } else if (!isOpen) {
+          } else if (!isOpenRef.current) {
             setUnreadCount((c) => c + 1)
           } else {
             setShowNewMessagesIndicator(true)
@@ -95,7 +101,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     return () => {
       supabaseClient.removeChannel(channel)
     }
-  }, [supabaseClient, isOpen])
+  }, [supabaseClient])
 
   // Persist open state
   useEffect(() => {
