@@ -63,8 +63,9 @@ BEGIN
   END IF;
 
   -- Set category
-  v_category := COALESCE(NULLIF(LOWER(TRIM(p_category)), '');
-  IF v_category = '' THEN
+  IF p_category IS NOT NULL AND LENGTH(TRIM(p_category)) > 0 THEN
+    v_category := LOWER(TRIM(p_category));
+  ELSE
     v_category := LOWER(v_room.category);
   END IF;
   
