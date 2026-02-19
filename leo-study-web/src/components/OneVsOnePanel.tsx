@@ -1727,6 +1727,15 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
       {inRoom && room ? (
         <>
+          <div className="onevone-exit-bar">
+            <button 
+              className="secondary" 
+              onClick={() => void leaveCurrentRoom()}
+              title="Exit Room"
+            >
+              ← Exit
+            </button>
+          </div>
           {room.status !== 'completed' ? (
             <>
               <h2>{roomDisplayName} · {room.game_type === 'quiz' ? '1v1 Quiz' : '1v1 Matching'}</h2>
