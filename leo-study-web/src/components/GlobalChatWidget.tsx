@@ -134,6 +134,10 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     if (isOpen) {
       setUnreadCount(0)
       setShowNewMessagesIndicator(false)
+      // Scroll to bottom when opening
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+      }, 100)
     }
   }, [isOpen])
 
