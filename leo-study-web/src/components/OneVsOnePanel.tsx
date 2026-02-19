@@ -678,7 +678,6 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       })
       setUsernameByUserId(nameMap)
     }
-    alert('Room loaded! status=' + mappedRoom.status + ' players=' + mappedPlayers.length)
   }, [currentUserId, isSignedIn, roomId, supabase])
 
   useEffect(() => {
@@ -693,8 +692,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   // Debug: log room status changes
   useEffect(() => {
     if (room) {
-      console.log('Room status:', room.status, 'current_round:', room.current_round, 'winner:', room.winner_user_id)
-    }
+          }
   }, [room?.status, room?.current_round, room?.winner_user_id])
 
   useEffect(() => {
@@ -707,13 +705,10 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }, [isSignedIn, loadDuelLeaderboards])
 
   useEffect(() => {
-    alert('useEffect triggered! roomId=' + roomId + ' isSignedIn=' + isSignedIn)
     const client = supabase
     if (!client || !roomId || !isSignedIn) {
-      alert('useEffect returning early - client:' + !!client + ' roomId:' + !!roomId + ' isSignedIn:' + isSignedIn)
-      return
+        return
     }
-    alert('Calling refreshRoomSnapshot')
     void refreshRoomSnapshot()
 
     const channel = client
@@ -914,19 +909,12 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }
 
   const joinPublicRoom = async (targetRoomId: string, asSpectator: boolean = false) => {
-    alert('1. Starting joinPublicRoom')
-    console.log('joinPublicRoom called:', targetRoomId, 'spectator:', asSpectator)
-    if (!supabase || !isSignedIn) {
-      alert('2. Not signed in or no supabase')
-      return
-    }
+    if (!supabase || !isSignedIn) return
     
     // For spectators, just enter the room directly without joining as a player
     if (asSpectator) {
-      alert('3. Setting roomId for spectator: ' + targetRoomId)
       setRoomId(targetRoomId)
       setNotice('Spectating room.')
-      alert('4. About to return')
       return
     }
     
@@ -1692,7 +1680,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                         </div>
                         <div className="onevone-public-actions">
                           {canSpectate ? (
-                            <button className="primary" onClick={() => { alert('Button clicked! canSpectate=' + canSpectate + ' room=' + item.id); void joinPublicRoom(item.id, true) }} disabled={loading}>
+                            <button className="primary" onClick={() => void joinPublicRoom(item.id, true)} disabled={loading}>
                               Spectate
                             </button>
                           ) : (
