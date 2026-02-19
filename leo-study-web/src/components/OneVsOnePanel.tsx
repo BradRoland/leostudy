@@ -915,14 +915,19 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }
 
   const joinPublicRoom = async (targetRoomId: string, asSpectator: boolean = false) => {
-    alert('Spectate function called! room: ' + targetRoomId + ' spectator: ' + asSpectator)
+    alert('1. Starting joinPublicRoom')
     console.log('joinPublicRoom called:', targetRoomId, 'spectator:', asSpectator)
-    if (!supabase || !isSignedIn) return
+    if (!supabase || !isSignedIn) {
+      alert('2. Not signed in or no supabase')
+      return
+    }
     
     // For spectators, just enter the room directly without joining as a player
     if (asSpectator) {
+      alert('3. Setting roomId for spectator: ' + targetRoomId)
       setRoomId(targetRoomId)
       setNotice('Spectating room.')
+      alert('4. About to return')
       return
     }
     
