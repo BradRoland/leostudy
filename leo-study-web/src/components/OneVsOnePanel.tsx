@@ -1096,23 +1096,35 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     }
   }, [leaveRoom, loadPublicRooms, roomId, supabase])
 
-  const requestRematch = async () => {
+  const toggleRematchVote = async () => {
     if (!supabase || !room || room.status !== 'completed') return
-    setRematchLoading(true)
-    setError('')
-    // Toggle: if already ready, set to false; otherwise set to true
-    const me = players.find((player) => player.user_id === currentUserId)
-    const newReadyState = !me?.is_ready
-    const { error: rpcError } = await supabase.rpc('set_1v1_ready', {
-      p_room_id: room.id,
-      p_ready: newReadyState,
-    })
-    setRematchLoading(false)
-    if (rpcError) {
-      setError(rpcError.message || 'Could not request rematch.')
+    if (room.rematch_room_id) {
+      // Rematch already in progress, just join
+      void startRematch()
       return
     }
-    setNotice('Rematch requested. Waiting for opponent.')
+    
+    setRematchLoading(true)
+    setError('')
+    
+    const me = players.find((player) => player.user_id === currentUserId)
+    const currentlyReady = me?.is_ready || false
+    
+    // Toggle the vote
+    const { error: rpcError } = await supabase.rpc('set_1v1_ready', {
+      p_room_id: room.id,
+      p_ready: !currentlyReady,
+    })
+    
+    setRematchLoading(false)
+    
+    if (rpcError) {
+      console.error('Rematch vote error:', rpcError)
+      setError(rpcError.message || 'Could not vote for rematch.')
+      return
+    }
+    
+    // Note: startRematch will be triggered by the useEffect when both are ready
   }
 
   const startRematch = useCallback(async () => {
@@ -1948,7 +1960,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <div className="onevone-rematch-panel">
                   <div className="onevone-rematch-head">
                     <p className="muted tiny">Rematch</p>
-                    <p className="muted tiny">Keeps same players. Click Rematch to vote. Starts automatically with a 3-second countdown at 2 out of 2.</p>
+                    <p className="muted tiny">Keeps same players. Starts automatically when both players click Rematch.</p>
                   </div>
                   <div className="segmented compact-segmented onevone-rematch-cats">
                     {duelCategoryOptions
@@ -1959,17 +1971,17 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                           type="button"
                           className={rematchCategory === option.value ? 'seg active compact-seg' : 'seg compact-seg'}
                           onClick={() => setRematchCategory(option.value)}
-                          disabled={rematchLoading || rematchReadyCount >= 2 || Boolean(room.rematch_room_id)}
+                          disabled={rematchLoading || Boolean(room.rematch_room_id)}
                         >
                           {option.label}
                         </button>
                       ))}
                   </div>
-                  <p className="muted tiny">Rematch votes: {Math.min(2, rematchReadyCount)} out of 2</p>
+                  <p className="muted tiny">{myRematchRequested ? '✓ You voted' : 'Both must vote to start'}</p>
                   <div className="actions-row">
                     <button
                       className="primary"
-                      onClick={() => void requestRematch()}
+                      onClick={() => void toggleRematchVote()}
                       disabled={rematchLoading || Boolean(room.rematch_room_id)}
                     >
                       {room.rematch_room_id
