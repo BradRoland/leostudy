@@ -1736,7 +1736,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
               ← Exit
             </button>
           </div>
-          {room.status !== 'completed' ? (
+          {room.status !== 'completed' && room.status !== 'waiting' ? (
             <>
               <h2>{roomDisplayName} · {room.game_type === 'quiz' ? '1v1 Quiz' : '1v1 Matching'}</h2>
               {activityLog.length > 0 ? (
