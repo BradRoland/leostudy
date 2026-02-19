@@ -3509,6 +3509,33 @@ textarea {
   margin-top: 2px;
 }
 
+.agency-settings-add {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.agency-settings-list {
+  display: grid;
+  gap: 8px;
+}
+
+.agency-settings-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(56, 76, 121, 0.24);
+}
+
+.agency-settings-row p {
+  margin: 0;
+  font-weight: 600;
+}
+
 .assisted-learning-info-button {
   width: 28px;
   height: 28px;

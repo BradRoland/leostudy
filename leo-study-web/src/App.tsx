@@ -228,12 +228,13 @@ type SessionPerformanceReport = {
   previousRank: number | null
 }
 
-type SettingsTab = 'profile' | 'customization' | 'support' | 'security' | 'editor'
+type SettingsTab = 'profile' | 'customization' | 'support' | 'security' | 'editor' | 'agencies'
 
 const defaultLeaderboardRotationMs = 3600
 
 const defaultAgency = 'Unaffiliated'
-const agencyOptions = [
+const appSettingsRowId = 'global'
+const fallbackAgencyOptions = [
   'Fresno Police Department',
   'Fresno Sheriffs Office',
   'Madera Police Department',
@@ -246,21 +247,36 @@ const agencyOptions = [
   'Mariposa Sheriffs Office',
 ] as const
 
-function normalizeAgency(value: unknown): (typeof agencyOptions)[number] {
+function sanitizeAgencyOptions(value: unknown): string[] {
+  const candidates = Array.isArray(value) ? value : fallbackAgencyOptions
+  const normalized = candidates
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean)
+
+  const deduped = normalized.filter((entry, index, list) => list.findIndex((candidate) => candidate.toLowerCase() === entry.toLowerCase()) === index)
+  if (!deduped.some((entry) => entry.toLowerCase() === defaultAgency.toLowerCase())) {
+    deduped.push(defaultAgency)
+  }
+
+  return deduped.length > 0 ? deduped : [defaultAgency]
+}
+
+function normalizeAgency(value: unknown, options: string[]): string {
+  const safeOptions = sanitizeAgencyOptions(options)
   const raw = String(value || '').trim().toLowerCase()
-  if (!raw) return defaultAgency
-  const exact = agencyOptions.find((a) => a.toLowerCase() === raw)
+  if (!raw) return safeOptions.find((agency) => agency.toLowerCase() === defaultAgency.toLowerCase()) || safeOptions[0] || defaultAgency
+  const exact = safeOptions.find((a) => a.toLowerCase() === raw)
   if (exact) return exact
-  if (raw.includes('fresno') && raw.includes('sheriff')) return 'Fresno Sheriffs Office'
-  if (raw.includes('fresno')) return 'Fresno Police Department'
-  if (raw.includes('madera') && raw.includes('sheriff')) return 'Madera Sheriffs Office'
-  if (raw.includes('madera')) return 'Madera Police Department'
-  if (raw.includes('los banos')) return 'Los Banos Police Department'
-  if (raw.includes('department of insurance') || raw === 'doi') return 'Department of Insurance'
-  if (raw.includes('dmv') || raw.includes('motor vehicle')) return 'DMV'
-  if (raw.includes('clovis')) return 'Clovis PD'
-  if (raw.includes('mariposa') && raw.includes('sheriff')) return 'Mariposa Sheriffs Office'
-  return defaultAgency
+  if (raw.includes('fresno') && raw.includes('sheriff')) return safeOptions.find((a) => a.toLowerCase() === 'fresno sheriffs office') || safeOptions[0]
+  if (raw.includes('fresno')) return safeOptions.find((a) => a.toLowerCase() === 'fresno police department') || safeOptions[0]
+  if (raw.includes('madera') && raw.includes('sheriff')) return safeOptions.find((a) => a.toLowerCase() === 'madera sheriffs office') || safeOptions[0]
+  if (raw.includes('madera')) return safeOptions.find((a) => a.toLowerCase() === 'madera police department') || safeOptions[0]
+  if (raw.includes('los banos')) return safeOptions.find((a) => a.toLowerCase() === 'los banos police department') || safeOptions[0]
+  if (raw.includes('department of insurance') || raw === 'doi') return safeOptions.find((a) => a.toLowerCase() === 'department of insurance') || safeOptions[0]
+  if (raw.includes('dmv') || raw.includes('motor vehicle')) return safeOptions.find((a) => a.toLowerCase() === 'dmv') || safeOptions[0]
+  if (raw.includes('clovis')) return safeOptions.find((a) => a.toLowerCase() === 'clovis pd') || safeOptions[0]
+  if (raw.includes('mariposa') && raw.includes('sheriff')) return safeOptions.find((a) => a.toLowerCase() === 'mariposa sheriffs office') || safeOptions[0]
+  return safeOptions.find((agency) => agency.toLowerCase() === defaultAgency.toLowerCase()) || safeOptions[0] || defaultAgency
 }
 
 type MasteryStatus = '' | 'Needs Work' | 'Getting There' | 'On Track' | 'Almost Mastered' | 'Mastered'
@@ -1691,6 +1707,14 @@ function App() {
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile')
+  const [agencyOptions, setAgencyOptions] = useState<string[]>(() => sanitizeAgencyOptions(fallbackAgencyOptions))
+  const [agencySettingsId, setAgencySettingsId] = useState(appSettingsRowId)
+  const [agencyNewName, setAgencyNewName] = useState('')
+  const [agencyEditingOriginal, setAgencyEditingOriginal] = useState<string | null>(null)
+  const [agencyEditingValue, setAgencyEditingValue] = useState('')
+  const [agencySaving, setAgencySaving] = useState(false)
+  const [agencyError, setAgencyError] = useState('')
+  const [agencySuccess, setAgencySuccess] = useState('')
   const [forceProfileSetup, setForceProfileSetup] = useState(false)
   const [profileDetails, setProfileDetails] = useState<ProfileDetails>({
     bio: '',
@@ -1810,6 +1834,112 @@ function App() {
   const [scenarioFireWidth, setScenarioFireWidth] = useState(0)
   const { isOwner, loading: ownerLoading } = useOwner(currentUserId || null)
 
+  const persistAgencyOptions = async (nextOptions: string[]) => {
+    if (!supabase || !isOwner) return false
+    setAgencySaving(true)
+    setAgencyError('')
+    setAgencySuccess('')
+    const sanitized = sanitizeAgencyOptions(nextOptions)
+    const { data, error } = await supabase
+      .from('app_settings')
+      .upsert(
+        {
+          id: agencySettingsId || appSettingsRowId,
+          agencies: sanitized,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+      .select('id')
+      .single()
+
+    if (error) {
+      const message = String(error.message || 'Could not save agencies.')
+      const migrationHint = message.toLowerCase().includes('app_settings')
+        ? ' Run /supabase/migrations/20260219_app_settings.sql first.'
+        : ''
+      setAgencyError(`${message}${migrationHint}`)
+      setAgencySaving(false)
+      return false
+    }
+
+    setAgencyOptions(sanitized)
+    setAgencySettingsId(String(data?.id || appSettingsRowId))
+    setAgencySaving(false)
+    setAgencySuccess('Agencies saved.')
+    return true
+  }
+
+  const addAgencyOption = async () => {
+    const nextName = agencyNewName.trim()
+    if (!nextName) {
+      setAgencyError('Enter an agency name.')
+      setAgencySuccess('')
+      return
+    }
+    if (agencyOptions.some((agency) => agency.toLowerCase() === nextName.toLowerCase())) {
+      setAgencyError('Agency already exists.')
+      setAgencySuccess('')
+      return
+    }
+    const saved = await persistAgencyOptions([...agencyOptions, nextName])
+    if (saved) setAgencyNewName('')
+  }
+
+  const beginEditAgencyOption = (agency: string) => {
+    if (agency === defaultAgency) return
+    setAgencyError('')
+    setAgencySuccess('')
+    setAgencyEditingOriginal(agency)
+    setAgencyEditingValue(agency)
+  }
+
+  const saveEditedAgencyOption = async () => {
+    if (!agencyEditingOriginal) return
+    const nextName = agencyEditingValue.trim()
+    if (!nextName) {
+      setAgencyError('Agency name cannot be empty.')
+      setAgencySuccess('')
+      return
+    }
+    const duplicate = agencyOptions.some(
+      (agency) => agency.toLowerCase() === nextName.toLowerCase() && agency.toLowerCase() !== agencyEditingOriginal.toLowerCase(),
+    )
+    if (duplicate) {
+      setAgencyError('Agency already exists.')
+      setAgencySuccess('')
+      return
+    }
+    const updated = agencyOptions.map((agency) => (agency === agencyEditingOriginal ? nextName : agency))
+    const saved = await persistAgencyOptions(updated)
+    if (saved) {
+      setAgencyEditingOriginal(null)
+      setAgencyEditingValue('')
+    }
+  }
+
+  const cancelEditAgencyOption = () => {
+    setAgencyEditingOriginal(null)
+    setAgencyEditingValue('')
+    setAgencyError('')
+    setAgencySuccess('')
+  }
+
+  const deleteAgencyOption = async (agency: string) => {
+    if (agency === defaultAgency) {
+      setAgencyError(`"${defaultAgency}" cannot be deleted.`)
+      setAgencySuccess('')
+      return
+    }
+    if (!window.confirm(`Delete "${agency}"?`)) return
+    const filtered = agencyOptions.filter((entry) => entry !== agency)
+    const saved = await persistAgencyOptions(filtered)
+    if (saved && agencyEditingOriginal === agency) {
+      setAgencyEditingOriginal(null)
+      setAgencyEditingValue('')
+    }
+  }
+
   const applyLoadedContentToRuntime = (codeItems: ContentBankItem[], scenarios: ScenarioBankItem[]) => {
     const sectionsFromItems = codeItems
       .map((item) => {
@@ -1829,6 +1959,44 @@ function App() {
   useEffect(() => {
     document.title = 'LEO Study'
   }, [])
+
+  useEffect(() => {
+    if (!supabase || !currentUserId) return
+    const client = supabase
+    let cancelled = false
+    const loadAppSettings = async () => {
+      const { data, error } = await client.from('app_settings').select('id,agencies').eq('id', appSettingsRowId).maybeSingle()
+      if (cancelled) return
+      if (error) {
+        console.warn('[app_settings] failed loading agency settings:', error.message)
+        return
+      }
+      const savedAgencies = sanitizeAgencyOptions(data?.agencies)
+      setAgencyOptions(savedAgencies)
+      setAgencySettingsId(String(data?.id || appSettingsRowId))
+    }
+    loadAppSettings().catch((error) => {
+      console.warn('[app_settings] load crashed:', error)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [currentUserId])
+
+  useEffect(() => {
+    setProfileDetails((previous) => {
+      const normalized = normalizeAgency(previous.agency, agencyOptions)
+      if (normalized === previous.agency) return previous
+      return { ...previous, agency: normalized }
+    })
+  }, [agencyOptions])
+
+  useEffect(() => {
+    if (isOwner) return
+    if (settingsTab === 'editor' || settingsTab === 'agencies') {
+      setSettingsTab('profile')
+    }
+  }, [isOwner, settingsTab])
 
   useEffect(() => {
     try {
@@ -3637,7 +3805,7 @@ function App() {
           avatar_path: avatarPath,
           supporter_tier: profile?.supporterTier || 'free',
           bio: profileDetails.bio,
-          agency: normalizeAgency(profileDetails.agency),
+          agency: normalizeAgency(profileDetails.agency, agencyOptions),
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' },
@@ -6477,6 +6645,11 @@ function App() {
                     Content Editor
                   </button>
                 ) : null}
+                {isOwner ? (
+                  <button className={settingsTab === 'agencies' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('agencies')}>
+                    Agencies
+                  </button>
+                ) : null}
                 <button className={settingsTab === 'support' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('support')}>
                   Support
                 </button>
@@ -6976,6 +7149,71 @@ function App() {
                 ) : (
                   <div className="settings-section-card">
                     <p className="muted">Content Editor is available to owner accounts only.</p>
+                  </div>
+                )
+              ) : null}
+
+              {settingsTab === 'agencies' ? (
+                isOwner ? (
+                  <div className="settings-section-card">
+                    <h3>Agencies</h3>
+                    <p className="muted tiny">Manage the agency list shown in profile settings.</p>
+                    <div className="agency-settings-add">
+                      <input
+                        value={agencyNewName}
+                        placeholder="Add agency name"
+                        onChange={(event) => setAgencyNewName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            void addAgencyOption()
+                          }
+                        }}
+                      />
+                      <button className="primary" type="button" onClick={() => void addAgencyOption()} disabled={agencySaving}>
+                        {agencySaving ? 'Saving...' : 'Add'}
+                      </button>
+                    </div>
+                    <div className="agency-settings-list">
+                      {agencyOptions.map((agency) => (
+                        <div key={`agency-option-${agency}`} className="agency-settings-row">
+                          {agencyEditingOriginal === agency ? (
+                            <input value={agencyEditingValue} onChange={(event) => setAgencyEditingValue(event.target.value)} />
+                          ) : (
+                            <p>{agency}</p>
+                          )}
+                          <div className="actions-row">
+                            {agency === defaultAgency ? (
+                              <span className="tiny muted">Required</span>
+                            ) : agencyEditingOriginal === agency ? (
+                              <>
+                                <button className="primary" type="button" onClick={() => void saveEditedAgencyOption()} disabled={agencySaving}>
+                                  Save
+                                </button>
+                                <button className="secondary" type="button" onClick={cancelEditAgencyOption} disabled={agencySaving}>
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button className="secondary" type="button" onClick={() => beginEditAgencyOption(agency)} disabled={agencySaving}>
+                                  Edit
+                                </button>
+                                <button className="danger" type="button" onClick={() => void deleteAgencyOption(agency)} disabled={agencySaving}>
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {agencyError ? <p className="bad">{agencyError}</p> : null}
+                    {agencySuccess ? <p className="saved-pill">{agencySuccess}</p> : null}
+                  </div>
+                ) : (
+                  <div className="settings-section-card">
+                    <p className="muted">Agency settings are available to owner accounts only.</p>
                   </div>
                 )
               ) : null}
