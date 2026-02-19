@@ -4189,6 +4189,20 @@ textarea {
   margin: 0;
 }
 
+.onevone-rematch-status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.onevone-rematch-status .good {
+  color: var(--good, #22c55e);
+  font-weight: 600;
+}
+
 .onevone-rematch-cats {
   grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
 }

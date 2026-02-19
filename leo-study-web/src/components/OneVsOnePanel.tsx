@@ -1099,88 +1099,52 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
   const toggleRematchVote = async () => {
     if (!supabase || !room || room.status !== 'completed') return
-    if (room.rematch_room_id) {
-      // Rematch already in progress, just join
-      void startRematch()
-      return
-    }
     
     setRematchLoading(true)
     setError('')
     
-    console.log('Creating rematch for room:', room.id, 'category:', rematchCategory)
-    
-    // Leave the current room first (this marks the player as left in DB)
-    const oldRoomId = room.id
-    if (supabase) {
-      await supabase.rpc('leave_1v1_room', { p_room_id: oldRoomId })
-    }
-    
-    // Now create the rematch
-    const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
-      p_room_id: oldRoomId,
-      p_category: rematchCategory,
+    // Toggle rematch ready status (reuse is_ready field)
+    const currentlyReady = myPlayer?.is_ready || false
+    const { error: rpcError } = await supabase.rpc('set_1v1_ready', {
+      p_room_id: room.id,
+      p_ready: !currentlyReady,
     })
-    
-    console.log('Rematch result:', { data, error: rpcError })
     
     setRematchLoading(false)
     
     if (rpcError) {
-      console.error('Rematch error:', rpcError)
-      setError(rpcError.message || 'Could not create rematch.')
+      console.error('Rematch vote error:', rpcError)
+      setError(rpcError.message || 'Could not vote for rematch.')
       return
     }
     
-    const nextRoomId = String(data || '')
-    if (!nextRoomId) {
-      setError('Rematch room id was not returned.')
-      return
-    }
-    
-    // Clear local state and join the rematch room
-    leaveRoom()
-    setRoomId(nextRoomId)
-    setNotice('Rematch starting...')
+    // If we just set to ready (voting yes), the useEffect will detect when both are ready and start rematch
   }
 
   const startRematch = useCallback(async () => {
     if (!supabase || !room || room.status !== 'completed') return
-    if (room.rematch_room_id) {
-      const nextRoomId = room.rematch_room_id
-      // Leave current room first
-      if (supabase && roomId) {
-        await supabase.rpc('leave_1v1_room', { p_room_id: roomId })
-      }
-      leaveRoom()
-      setRoomId(nextRoomId)
-      setNotice('Rematch ready. Match starts in 3 seconds.')
-      return
-    }
+    
     setRematchLoading(true)
     setError('')
+    
+    // Call rematch to reset the room with new questions
     const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
       p_room_id: room.id,
       p_category: rematchCategory,
     })
+    
     setRematchLoading(false)
+    
     if (rpcError) {
       rematchStartLockRef.current = ''
-      setError(rpcError.message || 'Could not create rematch.')
+      setError(rpcError.message || 'Could not start rematch.')
       return
     }
-
-    const nextRoomId = String(data || '')
-    if (!nextRoomId) {
-      rematchStartLockRef.current = ''
-      setError('Rematch room id was not returned.')
-      return
-    }
-
-    leaveRoom()
-    setRoomId(nextRoomId)
-    setNotice('Rematch ready. Match starts in 3 seconds.')
-  }, [leaveRoom, rematchCategory, room, supabase])
+    
+    // Refresh room state - don't change roomId, just refresh data
+    void refreshRoomSnapshot()
+    setNotice('Rematch starting...')
+  }, [room, rematchCategory, supabase, refreshRoomSnapshot])
 
   const roomPlayerRowsSorted = useMemo(() => {
     if (results.length > 0) {
@@ -1993,35 +1957,27 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <div className="onevone-rematch-panel">
                   <div className="onevone-rematch-head">
                     <p className="muted tiny">Rematch</p>
-                    <p className="muted tiny">Keeps same players. Starts automatically when both players click Rematch.</p>
+                    <p className="muted tiny">Click to vote for rematch. Both must vote to start.</p>
                   </div>
-                  <div className="segmented compact-segmented onevone-rematch-cats">
-                    {duelCategoryOptions
-                      .filter((option) => !(room.game_type === 'matching' && option.quizOnly))
-                      .map((option) => (
-                        <button
-                          key={`rematch-cat-${option.value}`}
-                          type="button"
-                          className={rematchCategory === option.value ? 'seg active compact-seg' : 'seg compact-seg'}
-                          onClick={() => setRematchCategory(option.value)}
-                          disabled={rematchLoading || Boolean(room.rematch_room_id)}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
+                  <div className="onevone-rematch-status">
+                    <span className={myRematchRequested ? 'good' : ''}>
+                      You: {myRematchRequested ? '✓ Ready' : 'Not ready'}
+                    </span>
+                    <span className={rematchReadyCount >= 2 ? 'good' : ''}>
+                      Opponent: {rematchReadyCount >= 2 ? '✓ Ready' : 'Not ready'}
+                    </span>
                   </div>
-                  <p className="muted tiny">Click Rematch to start a new match with the same opponent</p>
                   <div className="actions-row">
                     <button
-                      className="primary"
+                      className={`primary ${myRematchRequested ? 'ready' : ''}`}
                       onClick={() => void toggleRematchVote()}
-                      disabled={rematchLoading || Boolean(room.rematch_room_id)}
+                      disabled={rematchLoading}
                     >
-                      {room.rematch_room_id
-                        ? 'Starting...'
-                        : rematchLoading
-                          ? 'Creating...'
-                          : 'Rematch'}
+                      {rematchLoading
+                        ? 'Updating...'
+                        : myRematchRequested
+                          ? 'Ready ✓ (click to cancel)'
+                          : 'Vote Rematch'}
                     </button>
                   </div>
                 </div>
