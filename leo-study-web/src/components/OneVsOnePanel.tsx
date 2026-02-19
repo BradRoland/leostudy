@@ -608,7 +608,9 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     // If room not found via direct query, try RPC (for spectators)
     if (!roomRow) {
       const { data: roomData, error: rpcError } = await supabase.rpc('get_1v1_room_details', { p_room_id: roomId })
-      if (rpcError || !roomData || !roomData.room) {
+      // RPC returns an array, get first element
+      const rpcResult = Array.isArray(roomData) ? roomData[0] : roomData
+      if (rpcError || !rpcResult || !rpcResult.room) {
         setError('Could not load room.')
         setRoomId(null)
         setRoom(null)
@@ -617,7 +619,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
         return
       }
       // Use RPC data
-      const r = roomData.room
+      const r = rpcResult.room
       const mappedRoom: DuelRoomRow = {
         id: String(r.id || ''),
         host_user_id: String(r.host_user_id || ''),
@@ -634,7 +636,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
         created_at: String(r.created_at || ''),
         started_at: r.started_at ? String(r.started_at) : null,
       }
-      const mappedPlayers: DuelRoomPlayerRow[] = (roomData.players || []).map((row: Record<string, unknown>) => ({
+      const mappedPlayers: DuelRoomPlayerRow[] = (rpcResult.players || []).map((row: Record<string, unknown>) => ({
         id: String(row.id || ''),
         room_id: String(row.room_id || ''),
         user_id: String(row.user_id || ''),
@@ -646,7 +648,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
         current_round: Number(row.current_round || 1),
         last_seen: String(row.last_seen || ''),
       }))
-      const mappedResults: DuelRoomResultRow[] = (roomData.results || []).map((row: Record<string, unknown>) => ({
+      const mappedResults: DuelRoomResultRow[] = (rpcResult.results || []).map((row: Record<string, unknown>) => ({
         id: String(row.id || ''),
         room_id: String(row.room_id || ''),
         user_id: String(row.user_id || ''),
