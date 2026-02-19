@@ -188,6 +188,10 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         .limit(MAX_MESSAGES)
       if (data) {
         setMessages(data.reverse())
+        // Scroll to bottom after sending
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        }, 100)
       }
     } catch (err) {
       console.error('Failed to send message:', err)
