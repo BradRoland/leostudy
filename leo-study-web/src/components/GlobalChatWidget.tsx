@@ -50,14 +50,14 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     if (!supabaseClient) return
 
     const loadMessages = async () => {
-      console.log('Loading messages...')
+      
       const { data, error } = await supabaseClient
         .from('public_messages')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(MAX_MESSAGES)
       
-      console.log('Loaded messages:', data, error)
+      
       if (data) {
         setMessages(data.reverse())
       }
@@ -69,7 +69,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   const isOpenRef = useRef(isOpen)
   isOpenRef.current = isOpen
 
-  // Fallback: poll for new messages every 5 seconds
+  // Fallback: poll for new messages every 30 seconds (reduced to prevent excessive re-renders)
   useEffect(() => {
     if (!supabaseClient) return
 
@@ -84,7 +84,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
       }
     }
 
-    const interval = setInterval(pollMessages, 5000)
+    const interval = setInterval(pollMessages, 30000)
     return () => clearInterval(interval)
   }, [supabaseClient])
 
@@ -99,7 +99,6 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'public_messages' },
         (payload) => {
-          console.log('New message received:', payload)
           const newMessage = payload.new as PublicMessage
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMessage.id)) return prev
@@ -117,12 +116,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
           }
         }
       )
-      .subscribe((status, err) => {
-        console.log('Chat subscription status:', status, err)
-        if (err) {
-          console.error('Subscription error:', err)
-        }
-      })
+      .subscribe(() => {})
 
     return () => {
       supabaseClient.removeChannel(channel)
