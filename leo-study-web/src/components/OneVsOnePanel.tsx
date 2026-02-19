@@ -960,6 +960,33 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     })
   }
 
+  // Keyboard shortcuts for 1v1 quiz (1-4 keys to answer)
+  useEffect(() => {
+    if (!room || room.status !== 'in_progress' || room.game_type !== 'quiz') return
+    if (!canStartRound || !isQuizRound(currentRound) || quizLocked || submittingRound) return
+
+    const handleQuizKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+
+      const key = event.key
+      if (key >= '1' && key <= '4') {
+        const index = parseInt(key) - 1
+        if (currentRound.choices && index < currentRound.choices.length) {
+          event.preventDefault()
+          // Auto-submit on key press
+          const correct = index === currentRound.correctIndex
+          setQuizLocked(true)
+          const elapsedMs = Math.max(0, Date.now() - roundStartedAt)
+          void submitRound({ round: currentRound.round, correct, elapsedMs })
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleQuizKeyDown)
+    return () => window.removeEventListener('keydown', handleQuizKeyDown)
+  }, [room, currentRound, canStartRound, quizLocked, submittingRound, roundStartedAt, submitRound])
+
   useEffect(() => {
     if (selectedMatchingCards.length !== 2 || matchingSubmitted) return
     const selected = matchingCards.filter((card) => selectedMatchingCards.includes(card.id))
@@ -1827,17 +1854,18 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                         <button
                           key={`duel-quiz-choice-${currentRound.round}-${index}`}
                           className={quizChoice === index ? 'choice active' : 'choice'}
-                          onClick={() => setQuizChoice(index)}
+                          onClick={() => {
+                            if (quizLocked || submittingRound) return
+                            const correct = index === currentRound.correctIndex
+                            setQuizLocked(true)
+                            const elapsedMs = Math.max(0, Date.now() - roundStartedAt)
+                            void submitRound({ round: currentRound.round, correct, elapsedMs })
+                          }}
                           disabled={quizLocked || submittingRound}
                         >
-                          {choice}
+                          <span className="choice-key">{index + 1}</span> {choice}
                         </button>
                       ))}
-                    </div>
-                    <div className="actions-row">
-                      <button className="primary" onClick={() => void submitQuizRound()} disabled={quizChoice === null || quizLocked || submittingRound}>
-                        Submit Round
-                      </button>
                     </div>
                   </div>
                 ) : null}
