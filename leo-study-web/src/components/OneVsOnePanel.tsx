@@ -343,6 +343,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const [results, setResults] = useState<DuelRoomResultRow[]>([])
   const [usernameByUserId, setUsernameByUserId] = useState<Record<string, string>>({})
   const [presenceUserIds, setPresenceUserIds] = useState<string[]>([])
+  void setPresenceUserIds
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -722,7 +723,8 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState()
         const ids = Object.keys(state)
-        setPresenceUserIds(ids)
+        // Presence tracking - available for future online status indicators
+        void ids
       })
 
     channel.subscribe((status) => {
@@ -736,7 +738,6 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
     return () => {
       void client.removeChannel(channel)
-      setPresenceUserIds([])
     }
   }, [currentUserId, isSignedIn, refreshRoomSnapshot, roomId])
 
@@ -1200,12 +1201,12 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const myRematchRequested = room?.status === 'completed' ? Boolean(myPlayer?.is_ready) : false
   console.log('Rematch state:', { rematchReadyCount, myRematchRequested, players: players.map(p => ({ user_id: p.user_id?.slice(0,8), is_ready: p.is_ready })), status: room?.status })
   const inRoom = Boolean(room && roomId)
-  const waitingPlayersCount = players.length
-  const waitingStatusMessage = waitingPlayersCount < 2
-    ? `Waiting for ${2 - waitingPlayersCount} more player${2 - waitingPlayersCount === 1 ? '' : 's'} to join.`
-    : lobbyReadyCount < 2
-      ? 'Both players joined. Waiting for both players to ready up.'
-      : 'Both players are ready. Match countdown starting…'
+  // const waitingPlayersCount = players.length
+  // const waitingStatusMessage = waitingPlayersCount < 2
+  //   ? `Waiting for ${2 - waitingPlayersCount} more player${2 - waitingPlayersCount === 1 ? '' : 's'} to join.`
+  //   : lobbyReadyCount < 2
+  //     ? 'Both players joined. Waiting for both players to ready up.'
+  //     : 'Both players are ready. Match countdown starting…'
 
   const matchingPairCount = room?.game_type === 'matching' && isMatchingRound(currentRound) ? currentRound.pairs.length : 0
   const matchingProgressText = matchingPairCount > 0 ? `${matchedPairIds.length}/${matchingPairCount} pairs` : '0/0 pairs'
@@ -1249,7 +1250,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       || (room.host_user_id === currentUserId ? (currentUsername || 'Host') : `User ${room.host_user_id.slice(0, 8)}`)
     : 'Host'
   const roomDisplayName = formatRoomName(roomHostDisplayName)
-  const canDeleteCurrentRoom = Boolean(room && (room.host_user_id === currentUserId || isOwner))
+  // const canDeleteCurrentRoom = Boolean(room && (room.host_user_id === currentUserId || isOwner))
   const topCurrentStreakUserId = streakLeaderboard.length > 0 ? streakLeaderboard[0].user_id : null
   const topCurrentStreakValue = streakLeaderboard.length > 0 ? streakLeaderboard[0].current_win_streak : 0
   const selectedDuelProfile = selectedDuelProfileUserId ? duelProfileByUserId[selectedDuelProfileUserId] || null : null
@@ -1757,91 +1758,60 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
           {room.status === 'waiting' ? (
             <div className="onevone-waiting-room">
-              <div className="onevone-waiting-header">
-                <div className="onevone-waiting-room-info">
-                  <h2>{roomDisplayName}</h2>
-                  <p className="muted">
-                    {room.game_type === 'quiz' ? '1v1 Quiz' : '1v1 Matching'} · {room.rounds} rounds · {room.category.toUpperCase()}
-                  </p>
-                </div>
-                {room.is_public ? (
-                  <div className="onevone-room-code-badge">
-                    <span className="muted tiny">Public Room</span>
-                  </div>
-                ) : (
-                  <div className="onevone-room-code-badge">
-                    <span className="muted tiny">Code</span>
-                    <strong>{room.join_code}</strong>
-                  </div>
-                )}
+              <div className="onevone-waiting-title">
+                <h2>{room.game_type === 'quiz' ? '1v1 Quiz' : '1v1 Matching'}</h2>
+                <p className="muted">{room.rounds} rounds · {room.category.toUpperCase()}</p>
               </div>
 
               <div className="onevone-waiting-players">
-                {[1, 2].map((slot) => {
-                  const player = players.find((entry) => entry.slot_no === slot)
-                  const isOnline = player ? presenceUserIds.includes(player.user_id) : false
-                  const isMe = player?.user_id === currentUserId
-                  const name = player ? usernameByUserId[player.user_id] || `User ${player.user_id.slice(0, 8)}` : null
-                  const avatarUrl = player ? (duelProfileByUserId[player.user_id]?.avatarUrl || defaultAvatarUrl) : null
-                  
-                  return (
-                    <div key={`duel-slot-${slot}`} className={`onevone-player-card ${player ? 'filled' : 'empty'} ${isMe ? 'me' : ''}`}>
-                      <div className="onevone-player-card-avatar">
-                        {avatarUrl ? (
-                          <img src={avatarUrl} alt={name || 'Player'} onError={handleAvatarImageError} />
-                        ) : (
-                          <div className="onevone-player-card-avatar-placeholder">?</div>
-                        )}
-                        {player && <div className={`onevone-player-status-dot ${isOnline ? 'online' : 'offline'}`} />}
-                      </div>
-                      <div className="onevone-player-card-info">
-                        {player ? (
-                          <>
-                            <strong className="onevone-player-card-name">{name}</strong>
-                            {isMe && <span className="onevone-player-card-you">You</span>}
-                            <div className={`onevone-player-card-ready ${player.is_ready ? 'ready' : ''}`}>
-                              {player.is_ready ? '✓ Ready' : 'Waiting...'}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <strong className="onevone-player-card-empty">Waiting for player...</strong>
-                            <span className="muted tiny">Slot {slot}</span>
-                          </>
-                        )}
-                      </div>
-                      {slot === 1 && !player && (
-                        <div className="onevone-player-card-vs">VS</div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="onevone-waiting-actions">
-                <p className="onevone-waiting-status">{waitingStatusMessage}</p>
-                <div className="onevone-waiting-buttons">
+                <div className={`onevone-player-slot ${myPlayer ? 'filled' : ''}`}>
+                  <span className="onevone-player-slot-label">You</span>
                   {myPlayer ? (
                     <>
-                      <button 
-                        className={`primary ${myPlayer.is_ready ? 'ready' : ''}`} 
-                        onClick={() => void setReady(!myPlayer.is_ready)}
-                      >
-                        {myPlayer.is_ready ? 'Ready!' : 'Ready Up'}
-                      </button>
+                      <span className="onevone-player-slot-name">{currentUsername}</span>
+                      <span className={`onevone-player-slot-status ${myPlayer.is_ready ? 'ready' : ''}`}>
+                        {myPlayer.is_ready ? 'Ready' : 'Waiting'}
+                      </span>
                     </>
-                  ) : null}
+                  ) : (
+                    <span className="onevone-player-slot-empty">Waiting...</span>
+                  )}
+                </div>
+
+                <div className="onevone-waiting-vs">VS</div>
+
+                <div className={`onevone-player-slot ${opponentPlayer ? 'filled' : ''}`}>
+                  <span className="onevone-player-slot-label">Opponent</span>
+                  {opponentPlayer ? (
+                    <>
+                      <span className="onevone-player-slot-name">
+                        {usernameByUserId[opponentPlayer.user_id] || 'Player'}
+                      </span>
+                      <span className={`onevone-player-slot-status ${opponentPlayer.is_ready ? 'ready' : ''}`}>
+                        {opponentPlayer.is_ready ? 'Ready' : 'Waiting'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="onevone-player-slot-empty">Waiting...</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="onevone-waiting-footer">
+                {lobbyReadyCount < 2 ? (
+                  <p className="muted">Waiting for both players to ready up...</p>
+                ) : (
+                  <p className="good">Match starting soon!</p>
+                )}
+                <div className="onevone-waiting-buttons">
+                  <button 
+                    className={`primary ${myPlayer?.is_ready ? 'ready' : ''}`}
+                    onClick={() => void setReady(!myPlayer?.is_ready)}
+                  >
+                    {myPlayer?.is_ready ? 'Ready!' : 'Ready Up'}
+                  </button>
                   <button className="secondary" onClick={() => void leaveCurrentRoom()}>Leave</button>
                 </div>
-                {canDeleteCurrentRoom && (
-                  <button
-                    className="secondary danger"
-                    onClick={() => void deleteRoomById(room.id)}
-                    disabled={loading || deletingRoomId === room.id}
-                  >
-                    Delete Room
-                  </button>
-                )}
               </div>
             </div>
           ) : null}
