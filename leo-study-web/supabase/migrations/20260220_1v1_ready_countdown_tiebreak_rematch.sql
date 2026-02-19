@@ -343,7 +343,29 @@ begin
     from public.rooms
     where id = v_source.rematch_room_id;
 
-    if v_existing.id is not null and v_existing.status = 'in_progress' then
+    -- If room exists and is in_progress, reset it to fresh state
+    if v_existing.id is not null then
+      -- Reset all player scores and state
+      update public.room_players
+      set is_ready = true,
+          score = 0,
+          total_time_ms = 0,
+          fastest_round_ms = 0,
+          current_round = 1,
+          last_seen = now()
+      where room_id = v_existing.id
+        and user_id in (v_player_one, v_player_two);
+      
+      -- Reset room state
+      update public.rooms
+      set status = 'waiting',
+          current_round = 1,
+          winner_user_id = null,
+          started_at = null,
+          ended_at = null
+      where id = v_existing.id;
+      
+      -- Return the fresh room (will trigger countdown on frontend)
       return v_existing.id;
     end if;
 
