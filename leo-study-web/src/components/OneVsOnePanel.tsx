@@ -1103,22 +1103,23 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setRematchLoading(true)
     setError('')
     
-    // Toggle rematch ready status (reuse is_ready field)
-    const currentlyReady = myPlayer?.is_ready || false
-    const { error: rpcError } = await supabase.rpc('set_1v1_ready', {
+    // Directly call rematch to reset room with new questions
+    const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
       p_room_id: room.id,
-      p_ready: !currentlyReady,
+      p_category: rematchCategory,
     })
     
     setRematchLoading(false)
     
     if (rpcError) {
-      console.error('Rematch vote error:', rpcError)
-      setError(rpcError.message || 'Could not vote for rematch.')
+      console.error('Rematch error:', rpcError)
+      setError(rpcError.message || 'Could not start rematch.')
       return
     }
     
-    // If we just set to ready (voting yes), the useEffect will detect when both are ready and start rematch
+    // Refresh room state to get new questions
+    void refreshRoomSnapshot()
+    setNotice('Rematch started with new questions!')
   }
 
   const startRematch = useCallback(async () => {
@@ -1371,24 +1372,6 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     }
     setRematchCategory(room.category)
   }, [room])
-
-  useEffect(() => {
-    if (!room || room.status !== 'completed') return
-    if (room.host_user_id !== currentUserId) return
-    if (room.rematch_room_id) return
-    if (rematchReadyCount < 2) return
-    const lockKey = `${room.id}:rematch-start`
-    if (rematchStartLockRef.current === lockKey) return
-    rematchStartLockRef.current = lockKey
-    void startRematch()
-  }, [currentUserId, rematchReadyCount, room, startRematch])
-
-  useEffect(() => {
-    if (!room || room.status !== 'completed') return
-    if (!room.rematch_room_id) return
-    if (roomId === room.rematch_room_id) return
-    void startRematch()
-  }, [room, roomId, startRematch])
 
   useEffect(() => {
     if (!selectedDuelProfileUserId) return
@@ -1957,27 +1940,15 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <div className="onevone-rematch-panel">
                   <div className="onevone-rematch-head">
                     <p className="muted tiny">Rematch</p>
-                    <p className="muted tiny">Click to vote for rematch. Both must vote to start.</p>
-                  </div>
-                  <div className="onevone-rematch-status">
-                    <span className={myRematchRequested ? 'good' : ''}>
-                      You: {myRematchRequested ? '✓ Ready' : 'Not ready'}
-                    </span>
-                    <span className={rematchReadyCount >= 2 ? 'good' : ''}>
-                      Opponent: {rematchReadyCount >= 2 ? '✓ Ready' : 'Not ready'}
-                    </span>
+                    <p className="muted tiny">Start a new match with new questions.</p>
                   </div>
                   <div className="actions-row">
                     <button
-                      className={`primary ${myRematchRequested ? 'ready' : ''}`}
+                      className="primary"
                       onClick={() => void toggleRematchVote()}
                       disabled={rematchLoading}
                     >
-                      {rematchLoading
-                        ? 'Updating...'
-                        : myRematchRequested
-                          ? 'Ready ✓ (click to cancel)'
-                          : 'Vote Rematch'}
+                      {rematchLoading ? 'Starting...' : 'Rematch'}
                     </button>
                   </div>
                 </div>
