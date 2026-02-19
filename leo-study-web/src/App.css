@@ -117,6 +117,14 @@ body {
   padding: 2px 4px;
 }
 
+.agency-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(83, 104, 150, 0.28);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .profile-menu {
   position: absolute;
   top: calc(100% + 6px);

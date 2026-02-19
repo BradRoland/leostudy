@@ -232,6 +232,37 @@ type SettingsTab = 'profile' | 'customization' | 'support' | 'security' | 'edito
 
 const defaultLeaderboardRotationMs = 3600
 
+const defaultAgency = 'Unaffiliated'
+const agencyOptions = [
+  'Fresno Police Department',
+  'Fresno Sheriffs Office',
+  'Madera Police Department',
+  'Madera Sheriffs Office',
+  'Los Banos Police Department',
+  'DMV',
+  'Department of Insurance',
+  'Clovis PD',
+  'Unaffiliated',
+  'Mariposa Sheriffs Office',
+] as const
+
+function normalizeAgency(value: unknown): (typeof agencyOptions)[number] {
+  const raw = String(value || '').trim().toLowerCase()
+  if (!raw) return defaultAgency
+  const exact = agencyOptions.find((a) => a.toLowerCase() === raw)
+  if (exact) return exact
+  if (raw.includes('fresno') && raw.includes('sheriff')) return 'Fresno Sheriffs Office'
+  if (raw.includes('fresno')) return 'Fresno Police Department'
+  if (raw.includes('madera') && raw.includes('sheriff')) return 'Madera Sheriffs Office'
+  if (raw.includes('madera')) return 'Madera Police Department'
+  if (raw.includes('los banos')) return 'Los Banos Police Department'
+  if (raw.includes('department of insurance') || raw === 'doi') return 'Department of Insurance'
+  if (raw.includes('dmv') || raw.includes('motor vehicle')) return 'DMV'
+  if (raw.includes('clovis')) return 'Clovis PD'
+  if (raw.includes('mariposa') && raw.includes('sheriff')) return 'Mariposa Sheriffs Office'
+  return defaultAgency
+}
+
 type MasteryStatus = '' | 'Needs Work' | 'Getting There' | 'On Track' | 'Almost Mastered' | 'Mastered'
 
 type PersistedAlgorithmStat = {
@@ -1151,7 +1182,7 @@ function sanitizeState(input: unknown): PersistedState {
     bestStreak: 0,
     profileDetails: {
       bio: '',
-      agency: '',
+      agency: defaultAgency,
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
@@ -1190,7 +1221,7 @@ function sanitizeState(input: unknown): PersistedState {
           }
         : {
             bio: '',
-            agency: '',
+            agency: defaultAgency,
             homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
             themeId: appThemePresets[0].id,
             nameStyle: { ...defaultNameStyle },
@@ -1663,7 +1694,7 @@ function App() {
   const [forceProfileSetup, setForceProfileSetup] = useState(false)
   const [profileDetails, setProfileDetails] = useState<ProfileDetails>({
     bio: '',
-    agency: '',
+    agency: defaultAgency,
     homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
     themeId: appThemePresets[0].id,
     nameStyle: { ...defaultNameStyle },
@@ -2079,7 +2110,7 @@ function App() {
       detailsByUserId = (profiles || []).reduce<Record<string, ProfileDetails>>((accumulator, entry) => {
         accumulator[String(entry.user_id)] = {
           bio: String(entry.bio || ''),
-          agency: String(entry.agency || ''),
+          agency: String(entry.agency || defaultAgency),
           homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
           themeId: appThemePresets[0].id,
           nameStyle: { ...defaultNameStyle },
@@ -2100,7 +2131,7 @@ function App() {
         const details = parsed.profileDetails
         const existing = detailsByUserId[userId] ?? {
           bio: '',
-          agency: '',
+          agency: defaultAgency,
           homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
           themeId: appThemePresets[0].id,
           nameStyle: { ...defaultNameStyle },
@@ -3606,7 +3637,7 @@ function App() {
           avatar_path: avatarPath,
           supporter_tier: profile?.supporterTier || 'free',
           bio: profileDetails.bio,
-          agency: profileDetails.agency,
+          agency: normalizeAgency(profileDetails.agency),
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' },
@@ -3779,7 +3810,7 @@ function App() {
     setProfileUsername('')
     setProfileDetails({
       bio: '',
-      agency: '',
+      agency: defaultAgency,
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
@@ -5116,10 +5147,16 @@ function App() {
             </label>
             <label>
               Agency (Optional)
-              <input
+              <select
                 value={profileDetails.agency}
                 onChange={(event) => setProfileDetails((previous) => ({ ...previous, agency: event.target.value }))}
-              />
+              >
+                {agencyOptions.map((agency) => (
+                  <option key={agency} value={agency}>
+                    {agency}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               About Me (Optional)
@@ -5166,6 +5203,7 @@ function App() {
             <span className={`profile-shortcut-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
               {profile.username || 'Profile'}
             </span>
+            <span className="agency-pill">{profileDetails.agency}</span>
             {profileMenuOpen ? (
               <div className="profile-menu">
                 <button
@@ -6482,10 +6520,16 @@ function App() {
                   </label>
                   <label>
                     Agency
-                    <input
+                    <select
                       value={profileDetails.agency}
                       onChange={(event) => setProfileDetails((previous) => ({ ...previous, agency: event.target.value }))}
-                    />
+                    >
+                      {agencyOptions.map((agency) => (
+                        <option key={agency} value={agency}>
+                          {agency}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <div className="assisted-learning-inline">
                     <label className="assisted-learning-toggle">
