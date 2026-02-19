@@ -1756,60 +1756,93 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
           ) : null}
 
           {room.status === 'waiting' ? (
-            <div className="card onevone-card">
-              <div className="onevone-lobby-head">
-                <div>
-                  <p className="muted tiny">Room Name</p>
-                  <strong>{roomDisplayName}</strong>
-                  <p className="muted tiny">ID: {room.id.slice(0, 8)}</p>
+            <div className="onevone-waiting-room">
+              <div className="onevone-waiting-header">
+                <div className="onevone-waiting-room-info">
+                  <h2>{roomDisplayName}</h2>
+                  <p className="muted">
+                    {room.game_type === 'quiz' ? '1v1 Quiz' : '1v1 Matching'} · {room.rounds} rounds · {room.category.toUpperCase()}
+                  </p>
                 </div>
-                {!room.is_public ? (
-                  <div>
-                    <p className="muted tiny">Private Code</p>
-                    <strong>{room.join_code || '------'}</strong>
+                {room.is_public ? (
+                  <div className="onevone-room-code-badge">
+                    <span className="muted tiny">Public Room</span>
                   </div>
-                ) : null}
-                <div>
-                  <p className="muted tiny">Ready</p>
-                  <strong>{lobbyReadyCount}/2</strong>
-                </div>
+                ) : (
+                  <div className="onevone-room-code-badge">
+                    <span className="muted tiny">Code</span>
+                    <strong>{room.join_code}</strong>
+                  </div>
+                )}
               </div>
 
-              <div className="onevone-slots">
+              <div className="onevone-waiting-players">
                 {[1, 2].map((slot) => {
                   const player = players.find((entry) => entry.slot_no === slot)
                   const isOnline = player ? presenceUserIds.includes(player.user_id) : false
-                  const name = player ? usernameByUserId[player.user_id] || `User ${player.user_id.slice(0, 8)}` : 'Waiting...'
+                  const isMe = player?.user_id === currentUserId
+                  const name = player ? usernameByUserId[player.user_id] || `User ${player.user_id.slice(0, 8)}` : null
+                  const avatarUrl = player ? (duelProfileByUserId[player.user_id]?.avatarUrl || defaultAvatarUrl) : null
+                  
                   return (
-                    <article key={`duel-slot-${slot}`} className="onevone-slot">
-                      <p className="muted tiny">Player {slot}</p>
-                      <strong>{name}</strong>
-                      {player ? <p className={player.is_ready ? 'good' : 'muted'}>{player.is_ready ? 'Ready' : 'Not ready'}</p> : null}
-                      {player ? <p className="muted tiny">{isOnline ? 'Online' : 'Offline'}</p> : null}
-                    </article>
+                    <div key={`duel-slot-${slot}`} className={`onevone-player-card ${player ? 'filled' : 'empty'} ${isMe ? 'me' : ''}`}>
+                      <div className="onevone-player-card-avatar">
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt={name || 'Player'} onError={handleAvatarImageError} />
+                        ) : (
+                          <div className="onevone-player-card-avatar-placeholder">?</div>
+                        )}
+                        {player && <div className={`onevone-player-status-dot ${isOnline ? 'online' : 'offline'}`} />}
+                      </div>
+                      <div className="onevone-player-card-info">
+                        {player ? (
+                          <>
+                            <strong className="onevone-player-card-name">{name}</strong>
+                            {isMe && <span className="onevone-player-card-you">You</span>}
+                            <div className={`onevone-player-card-ready ${player.is_ready ? 'ready' : ''}`}>
+                              {player.is_ready ? '✓ Ready' : 'Waiting...'}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <strong className="onevone-player-card-empty">Waiting for player...</strong>
+                            <span className="muted tiny">Slot {slot}</span>
+                          </>
+                        )}
+                      </div>
+                      {slot === 1 && !player && (
+                        <div className="onevone-player-card-vs">VS</div>
+                      )}
+                    </div>
                   )
                 })}
               </div>
 
-              <div className="actions-row">
-                <button className="primary" onClick={() => void setReady(true)} disabled={!myPlayer}>
-                  Ready
-                </button>
-                <button className="secondary" onClick={() => void setReady(false)} disabled={!myPlayer}>
-                  Unready
-                </button>
-                <button className="secondary" onClick={() => void leaveCurrentRoom()}>Leave</button>
-                {canDeleteCurrentRoom ? (
+              <div className="onevone-waiting-actions">
+                <p className="onevone-waiting-status">{waitingStatusMessage}</p>
+                <div className="onevone-waiting-buttons">
+                  {myPlayer ? (
+                    <>
+                      <button 
+                        className={`primary ${myPlayer.is_ready ? 'ready' : ''}`} 
+                        onClick={() => void setReady(!myPlayer.is_ready)}
+                      >
+                        {myPlayer.is_ready ? 'Ready!' : 'Ready Up'}
+                      </button>
+                    </>
+                  ) : null}
+                  <button className="secondary" onClick={() => void leaveCurrentRoom()}>Leave</button>
+                </div>
+                {canDeleteCurrentRoom && (
                   <button
-                    className="secondary"
+                    className="secondary danger"
                     onClick={() => void deleteRoomById(room.id)}
                     disabled={loading || deletingRoomId === room.id}
                   >
                     Delete Room
                   </button>
-                ) : null}
+                )}
               </div>
-              <p className="muted tiny">{waitingStatusMessage}</p>
             </div>
           ) : null}
 
