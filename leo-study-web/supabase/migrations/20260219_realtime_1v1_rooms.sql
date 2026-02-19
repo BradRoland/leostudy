@@ -158,14 +158,7 @@ begin
     create policy room_players_select_room_participants
     on public.room_players
     for select
-    using (
-      exists (
-        select 1
-        from public.room_players mine
-        where mine.room_id = room_players.room_id
-          and mine.user_id = auth.uid()
-      )
-    );
+    using (user_id = auth.uid());
   end if;
 end $$;
 
