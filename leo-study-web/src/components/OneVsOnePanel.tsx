@@ -159,8 +159,6 @@ const supporterTierLabel: Record<SupporterTier, string> = {
 }
 
 const duelQuizRoundOptions = [5, 10, 20, 30]
-const completedRoomAutoDismissMs = 12000
-
 const duelCategoryOptions: Array<{ value: DuelCategory; label: string; quizOnly?: boolean }> = [
   { value: 'all', label: 'ALL' },
   { value: 'pc', label: 'PC' },
@@ -1122,7 +1120,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       const nextRoomId = room.rematch_room_id
       leaveRoom()
       setRoomId(nextRoomId)
-      setNotice('Rematch ready. Both players must hit Ready.')
+      setNotice('Rematch ready. Match starts in 3 seconds.')
       return
     }
     setRematchLoading(true)
@@ -1147,7 +1145,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
     leaveRoom()
     setRoomId(nextRoomId)
-    setNotice('Rematch ready. Both players must hit Ready.')
+    setNotice('Rematch ready. Match starts in 3 seconds.')
   }, [leaveRoom, rematchCategory, room, supabase])
 
   const roomPlayerRowsSorted = useMemo(() => {
@@ -1392,17 +1390,6 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     if (roomId === room.rematch_room_id) return
     void startRematch()
   }, [room, roomId, startRematch])
-
-  useEffect(() => {
-    if (!room || room.status !== 'completed') return
-    if (room.rematch_room_id) return
-    if (myRematchRequested) return
-    const targetRoomId = room.id
-    const timeout = window.setTimeout(() => {
-      void deleteRoomById(targetRoomId, { skipConfirm: true, quiet: true })
-    }, completedRoomAutoDismissMs)
-    return () => window.clearTimeout(timeout)
-  }, [deleteRoomById, myRematchRequested, room?.id, room?.rematch_room_id, room?.status])
 
   useEffect(() => {
     if (!selectedDuelProfileUserId) return
@@ -1960,7 +1947,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <div className="onevone-rematch-panel">
                   <div className="onevone-rematch-head">
                     <p className="muted tiny">Rematch</p>
-                    <p className="muted tiny">Keeps same players. Click Rematch to vote. Starts automatically at 2 out of 2.</p>
+                    <p className="muted tiny">Keeps same players. Click Rematch to vote. Starts automatically with a 3-second countdown at 2 out of 2.</p>
                   </div>
                   <div className="segmented compact-segmented onevone-rematch-cats">
                     {duelCategoryOptions
@@ -1978,14 +1965,11 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                       ))}
                   </div>
                   <p className="muted tiny">Rematch votes: {Math.min(2, rematchReadyCount)} out of 2</p>
-                  {!myRematchRequested && !room.rematch_room_id ? (
-                    <p className="muted tiny">This room auto-closes in {Math.round(completedRoomAutoDismissMs / 1000)}s unless you click Rematch.</p>
-                  ) : null}
                   <div className="actions-row">
                     <button
                       className="primary"
                       onClick={() => void requestRematch()}
-                      disabled={rematchLoading || myRematchRequested || Boolean(room.rematch_room_id) || players.length < 2}
+                      disabled={rematchLoading || myRematchRequested || Boolean(room.rematch_room_id)}
                     >
                       {room.rematch_room_id
                         ? 'Starting...'
