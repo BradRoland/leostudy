@@ -5371,7 +5371,6 @@ function App() {
             <span className={`profile-shortcut-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
               {profile.username || 'Profile'}
             </span>
-            <span className="agency-pill">{profileDetails.agency}</span>
             {profileMenuOpen ? (
               <div className="profile-menu">
                 <button
