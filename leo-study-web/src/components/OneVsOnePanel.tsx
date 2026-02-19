@@ -1154,6 +1154,8 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     }
     
     // Force complete local state reset
+    initializedRoundKeyRef.current = ''
+    rematchStartLockRef.current = ''
     setResults([])
     setMatchingCards([])
     setSelectedMatchingCards([])

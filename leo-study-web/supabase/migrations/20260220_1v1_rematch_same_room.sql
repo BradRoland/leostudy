@@ -107,7 +107,7 @@ BEGIN
       FOR v_idx IN 0..2 LOOP
         v_item := v_pool -> ((v_round * 3 + v_idx - 1) % v_pool_count);
         v_round_pairs := v_round_pairs || jsonb_build_array(
-          jsonb_build_object('left', v_item->>'code_section', 'right', v_item->>'title', 'leftKind', 'code', 'rightKind', 'title')
+          jsonb_build_object('pairId', gen_random_uuid(), 'left', v_item->>'code_section', 'right', v_item->>'title', 'leftKind', 'code', 'rightKind', 'title')
         );
       END LOOP;
       v_question_set := v_question_set || jsonb_build_array(jsonb_build_object('round', v_round, 'pairs', v_round_pairs));
