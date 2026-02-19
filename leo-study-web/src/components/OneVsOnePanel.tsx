@@ -452,7 +452,12 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
           score: p.score
         }))
       }
-    }).filter(row => row.id && row.player_count > 0)
+    }).filter(row => {
+      // Show if has players and either in_progress OR waiting with room for more
+      if (!row.id || row.player_count === 0) return false
+      if (row.status === 'in_progress') return true
+      return row.status === 'waiting' && row.player_count < 2
+    })
 
     setPublicRooms(mapped)
 
