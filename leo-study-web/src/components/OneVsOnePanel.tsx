@@ -618,6 +618,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     }
 
     if (!roomRow) {
+      alert('Room not found!')
       setRoomId(null)
       setRoom(null)
       setPlayers([])
@@ -685,7 +686,8 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       })
       setUsernameByUserId(nameMap)
     }
-  }, [isSignedIn, roomId])
+    alert('Room loaded! status=' + mappedRoom.status + ' players=' + mappedPlayers.length)
+  }, [currentUserId, isSignedIn, roomId, supabase])
 
   useEffect(() => {
     if (!isSignedIn) return
@@ -713,8 +715,13 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }, [isSignedIn, loadDuelLeaderboards])
 
   useEffect(() => {
+    alert('useEffect triggered! roomId=' + roomId + ' isSignedIn=' + isSignedIn)
     const client = supabase
-    if (!client || !roomId || !isSignedIn) return
+    if (!client || !roomId || !isSignedIn) {
+      alert('useEffect returning early - client:' + !!client + ' roomId:' + !!roomId + ' isSignedIn:' + isSignedIn)
+      return
+    }
+    alert('Calling refreshRoomSnapshot')
     void refreshRoomSnapshot()
 
     const channel = client
