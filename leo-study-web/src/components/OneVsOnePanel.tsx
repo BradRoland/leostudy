@@ -689,6 +689,13 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     return () => window.clearInterval(timer)
   }, [isSignedIn, loadPublicRooms])
 
+  // Debug: log room status changes
+  useEffect(() => {
+    if (room) {
+      console.log('Room status:', room.status, 'current_round:', room.current_round, 'winner:', room.winner_user_id)
+    }
+  }, [room?.status, room?.current_round, room?.winner_user_id])
+
   useEffect(() => {
     if (!isSignedIn) return
     void loadDuelLeaderboards()
@@ -1103,7 +1110,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setRematchLoading(true)
     setError('')
     
-    // Directly call rematch to reset room with new questions
+    // Call rematch to reset room with new questions
     const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
       p_room_id: room.id,
       p_category: rematchCategory,
@@ -1116,7 +1123,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       return
     }
     
-    // Clear local game state to ensure fresh start
+    // Force complete local state reset
     setResults([])
     setMatchingCards([])
     setSelectedMatchingCards([])
@@ -1127,11 +1134,11 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setQuizChoice(null)
     setQuizLocked(false)
     
-    // Refresh room state to get new questions
+    // Refresh room - this should show status: 'waiting'
     await refreshRoomSnapshot()
     
     setRematchLoading(false)
-    setNotice('Rematch started!')
+    setNotice('Rematch ready! Click Ready to start.')
   }
 
   const startRematch = useCallback(async () => {
