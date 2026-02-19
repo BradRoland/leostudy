@@ -1107,25 +1107,34 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setRematchLoading(true)
     setError('')
     
-    const me = players.find((player) => player.user_id === currentUserId)
-    const currentlyReady = me?.is_ready || false
-    console.log('Toggle rematch vote:', { currentlyReady, players: players.map(p => ({ user_id: p.user_id, is_ready: p.is_ready })) })
+    console.log('Creating rematch for room:', room.id, 'category:', rematchCategory)
     
-    // Toggle the vote
-    const { error: rpcError } = await supabase.rpc('set_1v1_ready', {
+    // Directly call rematch_1v1_room to create the rematch
+    const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
       p_room_id: room.id,
-      p_ready: !currentlyReady,
+      p_category: rematchCategory,
     })
+    
+    console.log('Rematch result:', { data, error: rpcError })
     
     setRematchLoading(false)
     
     if (rpcError) {
-      console.error('Rematch vote error:', rpcError)
-      setError(rpcError.message || 'Could not vote for rematch.')
+      console.error('Rematch error:', rpcError)
+      setError(rpcError.message || 'Could not create rematch.')
       return
     }
     
-    console.log('Rematch vote toggled, waiting for opponent...')
+    const nextRoomId = String(data || '')
+    if (!nextRoomId) {
+      setError('Rematch room id was not returned.')
+      return
+    }
+    
+    // Leave current room and join the rematch room
+    leaveRoom()
+    setRoomId(nextRoomId)
+    setNotice('Rematch starting...')
   }
 
   const startRematch = useCallback(async () => {
@@ -1979,7 +1988,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                         </button>
                       ))}
                   </div>
-                  <p className="muted tiny">{myRematchRequested ? '✓ You voted' : 'Both must vote to start'}</p>
+                  <p className="muted tiny">Click Rematch to start a new match with the same opponent</p>
                   <div className="actions-row">
                     <button
                       className="primary"
@@ -1989,10 +1998,8 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                       {room.rematch_room_id
                         ? 'Starting...'
                         : rematchLoading
-                          ? 'Submitting...'
-                          : myRematchRequested
-                            ? 'Voted ✓ (click to undo)'
-                            : 'Rematch'}
+                          ? 'Creating...'
+                          : 'Rematch'}
                     </button>
                   </div>
                 </div>
