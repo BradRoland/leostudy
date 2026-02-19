@@ -1098,13 +1098,14 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
   const requestRematch = async () => {
     if (!supabase || !room || room.status !== 'completed') return
-    const me = players.find((player) => player.user_id === currentUserId)
-    if (me?.is_ready) return
     setRematchLoading(true)
     setError('')
+    // Toggle: if already ready, set to false; otherwise set to true
+    const me = players.find((player) => player.user_id === currentUserId)
+    const newReadyState = !me?.is_ready
     const { error: rpcError } = await supabase.rpc('set_1v1_ready', {
       p_room_id: room.id,
-      p_ready: true,
+      p_ready: newReadyState,
     })
     setRematchLoading(false)
     if (rpcError) {
@@ -1958,7 +1959,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                           type="button"
                           className={rematchCategory === option.value ? 'seg active compact-seg' : 'seg compact-seg'}
                           onClick={() => setRematchCategory(option.value)}
-                          disabled={rematchLoading || myRematchRequested || rematchReadyCount >= 2 || Boolean(room.rematch_room_id)}
+                          disabled={rematchLoading || rematchReadyCount >= 2 || Boolean(room.rematch_room_id)}
                         >
                           {option.label}
                         </button>
@@ -1969,14 +1970,14 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     <button
                       className="primary"
                       onClick={() => void requestRematch()}
-                      disabled={rematchLoading || myRematchRequested || Boolean(room.rematch_room_id)}
+                      disabled={rematchLoading || Boolean(room.rematch_room_id)}
                     >
                       {room.rematch_room_id
                         ? 'Starting...'
                         : rematchLoading
                           ? 'Submitting...'
                           : myRematchRequested
-                            ? 'Waiting for opponent...'
+                            ? 'Voted ✓ (click to undo)'
                             : 'Rematch'}
                     </button>
                   </div>
