@@ -1109,9 +1109,15 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     
     console.log('Creating rematch for room:', room.id, 'category:', rematchCategory)
     
-    // Directly call rematch_1v1_room to create the rematch
+    // Leave the current room first (this marks the player as left in DB)
+    const oldRoomId = room.id
+    if (supabase) {
+      await supabase.rpc('leave_1v1_room', { p_room_id: oldRoomId })
+    }
+    
+    // Now create the rematch
     const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
-      p_room_id: room.id,
+      p_room_id: oldRoomId,
       p_category: rematchCategory,
     })
     
@@ -1131,7 +1137,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       return
     }
     
-    // Leave current room and join the rematch room
+    // Clear local state and join the rematch room
     leaveRoom()
     setRoomId(nextRoomId)
     setNotice('Rematch starting...')
@@ -1141,6 +1147,10 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     if (!supabase || !room || room.status !== 'completed') return
     if (room.rematch_room_id) {
       const nextRoomId = room.rematch_room_id
+      // Leave current room first
+      if (supabase && roomId) {
+        await supabase.rpc('leave_1v1_room', { p_room_id: roomId })
+      }
       leaveRoom()
       setRoomId(nextRoomId)
       setNotice('Rematch ready. Match starts in 3 seconds.')
