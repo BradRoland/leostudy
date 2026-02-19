@@ -32,7 +32,8 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   const [inputValue, setInputValue] = useState('')
   const [sending, setSending] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [showNewMessagesIndicator, setShowNewMessagesIndicator] = useState(false)
+  // Track if user has seen latest message
+  const [hasNewMessages, setHasNewMessages] = useState(false)
   const [reportModalOpen, setReportModalOpen] = useState<string | null>(null)
   const [reportReason, setReportReason] = useState('')
   
@@ -87,13 +88,14 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
           })
 
           if (isOpenRef.current && isNearBottomRef.current) {
+            setHasNewMessages(false)
             setTimeout(() => {
               messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
             }, 50)
           } else if (!isOpenRef.current) {
             setUnreadCount((c) => c + 1)
           } else {
-            setShowNewMessagesIndicator(true)
+            setHasNewMessages(true)
           }
         }
       )
@@ -129,7 +131,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     localStorage.setItem('globalChatOpen', String(isOpen))
     if (isOpen) {
       setUnreadCount(0)
-      setShowNewMessagesIndicator(false)
+      setHasNewMessages(false)
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
       }, 100)
@@ -144,14 +146,14 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     isNearBottomRef.current = distanceFromBottom < 100
     
     if (isNearBottomRef.current) {
-      setShowNewMessagesIndicator(false)
+      setHasNewMessages(false)
     }
   }, [])
 
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    setShowNewMessagesIndicator(false)
+    setHasNewMessages(false)
     isNearBottomRef.current = true
   }, [])
 
@@ -245,7 +247,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
-          {unreadCount > 0 && <span className="global-chat-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+          {(unreadCount > 0 || hasNewMessages) && <span className="global-chat-badge">{unreadCount > 9 ? '9+' : (unreadCount || '•')}</span>}
         </button>
       )}
 
@@ -296,7 +298,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
             <div ref={messagesEndRef} />
           </div>
 
-          {showNewMessagesIndicator && (
+          {hasNewMessages && (
             <button className="global-chat-new-indicator" onClick={scrollToBottom}>
               New messages ↓
             </button>
