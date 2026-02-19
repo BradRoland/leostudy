@@ -1452,7 +1452,9 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     if (!room || room.status !== 'completed') return
     void loadDuelLeaderboards()
     void loadPublicRooms()
-  }, [loadDuelLeaderboards, loadPublicRooms, room])
+    // Refresh room to get updated player states (is_ready reset after game ends)
+    void refreshRoomSnapshot()
+  }, [loadDuelLeaderboards, loadPublicRooms, room, refreshRoomSnapshot])
 
   useEffect(() => {
     if (!room || room.status !== 'completed') return
