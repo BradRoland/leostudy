@@ -4813,6 +4813,9 @@ function App() {
     }
 
     setEditorSuccess('Content item saved.')
+    // Reload page so Library tab shows new content
+    setTimeout(() => window.location.reload(), 1000)
+
     const updatedItem: ContentEditorItem = {
       ...editorDraft,
       id,
@@ -4900,6 +4903,9 @@ function App() {
     setEditorItems(remaining)
     if (editorSelectedId === id) startNewEditorItem(editorCategoryFilter)
     setEditorSuccess('Content item deleted.')
+    // Reload page so Library tab updates
+    setTimeout(() => window.location.reload(), 1000)
+
     if (appContentSource === 'supabase') {
       const nextCodeItems = remaining
         .filter((item) => item.isPublished && item.type !== 'scenario')
