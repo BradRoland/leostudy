@@ -96,7 +96,12 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
           }
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        console.log('Chat subscription status:', status, err)
+        if (err) {
+          console.error('Subscription error:', err)
+        }
+      })
 
     return () => {
       supabaseClient.removeChannel(channel)
@@ -155,6 +160,15 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         agency: userAgency || null,
         message: trimmed,
       })
+      // Reload messages to see the new one
+      const { data } = await supabaseClient
+        .from('public_messages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(MAX_MESSAGES)
+      if (data) {
+        setMessages(data.reverse())
+      }
     } catch (err) {
       console.error('Failed to send message:', err)
     } finally {
