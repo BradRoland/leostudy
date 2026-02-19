@@ -110,12 +110,20 @@ begin
         ended_at = now(),
         current_round = v_room.rounds
     where id = p_room_id;
+
+    update public.room_players
+    set is_ready = false
+    where room_id = p_room_id;
   else
     update public.rooms
     set status = 'cancelled',
         ended_at = now(),
         current_round = v_room.rounds
     where id = p_room_id;
+
+    update public.room_players
+    set is_ready = false
+    where room_id = p_room_id;
   end if;
 
   return jsonb_build_object(

@@ -159,6 +159,7 @@ const supporterTierLabel: Record<SupporterTier, string> = {
 }
 
 const duelQuizRoundOptions = [5, 10, 20, 30]
+const completedRoomAutoDismissMs = 12000
 
 const duelCategoryOptions: Array<{ value: DuelCategory; label: string; quizOnly?: boolean }> = [
   { value: 'all', label: 'ALL' },
@@ -369,6 +370,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const previousRoomStatusRef = useRef<DuelRoomStatus | null>(null)
   const activityBootstrappedRef = useRef(false)
   const initializedRoundKeyRef = useRef('')
+  const rematchStartLockRef = useRef('')
 
   const isSignedIn = currentUserId.trim().length > 0
 
@@ -610,6 +612,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     }
 
     if (!roomRow) {
+      setRoomId(null)
       setRoom(null)
       setPlayers([])
       setResults([])
@@ -994,8 +997,9 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     })
   }, [currentRound, matchedPairIds.length, matchingRoundPoints, matchingSubmitted, room, roundStartedAt, submitRound, submittingRound])
 
-  const leaveRoom = () => {
+  const leaveRoom = useCallback(() => {
     initializedRoundKeyRef.current = ''
+    rematchStartLockRef.current = ''
     setRoomId(null)
     setRoom(null)
     setPlayers([])
@@ -1011,13 +1015,14 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setMatchingMistakes(0)
     setMatchingRoundPoints(0)
     setMatchingSubmitted(false)
+    setRematchLoading(false)
     setActivityLog([])
     previousPlayersRef.current = []
     previousRoomStatusRef.current = null
     activityBootstrappedRef.current = false
     setError('')
     setNotice('')
-  }
+  }, [])
 
   const confirmLeaveMatch = async () => {
     if (!room || room.status !== 'in_progress') {
@@ -1059,10 +1064,12 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setNotice('Left room.')
   }
 
-  const deleteRoomById = async (targetRoomId: string) => {
+  const deleteRoomById = useCallback(async (targetRoomId: string, options?: { skipConfirm?: boolean; quiet?: boolean }) => {
     if (!supabase || !targetRoomId) return
-    const confirmed = window.confirm('Delete this room? This cannot be undone.')
-    if (!confirmed) return
+    if (!options?.skipConfirm) {
+      const confirmed = window.confirm('Delete this room? This cannot be undone.')
+      if (!confirmed) return
+    }
 
     setDeletingRoomId(targetRoomId)
     setError('')
@@ -1070,6 +1077,13 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setDeletingRoomId(null)
 
     if (rpcError) {
+      const normalizedMessage = String(rpcError.message || '').toLowerCase()
+      if (options?.quiet && normalizedMessage.includes('room not found')) {
+        if (roomId === targetRoomId) {
+          leaveRoom()
+        }
+        return
+      }
       setError(rpcError.message || 'Could not delete room.')
       return
     }
@@ -1079,11 +1093,38 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     }
 
     await loadPublicRooms()
-    setNotice('Room deleted.')
+    if (!options?.quiet) {
+      setNotice('Room deleted.')
+    }
+  }, [leaveRoom, loadPublicRooms, roomId, supabase])
+
+  const requestRematch = async () => {
+    if (!supabase || !room || room.status !== 'completed') return
+    const me = players.find((player) => player.user_id === currentUserId)
+    if (me?.is_ready) return
+    setRematchLoading(true)
+    setError('')
+    const { error: rpcError } = await supabase.rpc('set_1v1_ready', {
+      p_room_id: room.id,
+      p_ready: true,
+    })
+    setRematchLoading(false)
+    if (rpcError) {
+      setError(rpcError.message || 'Could not request rematch.')
+      return
+    }
+    setNotice('Rematch requested. Waiting for opponent.')
   }
 
-  const startRematch = async () => {
-    if (!supabase || !room) return
+  const startRematch = useCallback(async () => {
+    if (!supabase || !room || room.status !== 'completed') return
+    if (room.rematch_room_id) {
+      const nextRoomId = room.rematch_room_id
+      leaveRoom()
+      setRoomId(nextRoomId)
+      setNotice('Rematch ready. Both players must hit Ready.')
+      return
+    }
     setRematchLoading(true)
     setError('')
     const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
@@ -1092,12 +1133,14 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     })
     setRematchLoading(false)
     if (rpcError) {
+      rematchStartLockRef.current = ''
       setError(rpcError.message || 'Could not create rematch.')
       return
     }
 
     const nextRoomId = String(data || '')
     if (!nextRoomId) {
+      rematchStartLockRef.current = ''
       setError('Rematch room id was not returned.')
       return
     }
@@ -1105,7 +1148,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     leaveRoom()
     setRoomId(nextRoomId)
     setNotice('Rematch ready. Both players must hit Ready.')
-  }
+  }, [leaveRoom, rematchCategory, room, supabase])
 
   const roomPlayerRowsSorted = useMemo(() => {
     if (results.length > 0) {
@@ -1122,6 +1165,8 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const opponentResultRow = useMemo(() => roomPlayerRowsSorted.find((entry) => entry.user_id !== currentUserId) || null, [currentUserId, roomPlayerRowsSorted])
 
   const lobbyReadyCount = players.filter((player) => player.is_ready).length
+  const rematchReadyCount = room?.status === 'completed' ? players.filter((player) => player.is_ready).length : 0
+  const myRematchRequested = room?.status === 'completed' ? Boolean(myPlayer?.is_ready) : false
   const inRoom = Boolean(room && roomId)
   const waitingPlayersCount = players.length
   const waitingStatusMessage = waitingPlayersCount < 2
@@ -1329,6 +1374,35 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     }
     setRematchCategory(room.category)
   }, [room])
+
+  useEffect(() => {
+    if (!room || room.status !== 'completed') return
+    if (room.host_user_id !== currentUserId) return
+    if (room.rematch_room_id) return
+    if (rematchReadyCount < 2) return
+    const lockKey = `${room.id}:rematch-start`
+    if (rematchStartLockRef.current === lockKey) return
+    rematchStartLockRef.current = lockKey
+    void startRematch()
+  }, [currentUserId, rematchReadyCount, room, startRematch])
+
+  useEffect(() => {
+    if (!room || room.status !== 'completed') return
+    if (!room.rematch_room_id) return
+    if (roomId === room.rematch_room_id) return
+    void startRematch()
+  }, [room, roomId, startRematch])
+
+  useEffect(() => {
+    if (!room || room.status !== 'completed') return
+    if (room.rematch_room_id) return
+    if (myRematchRequested) return
+    const targetRoomId = room.id
+    const timeout = window.setTimeout(() => {
+      void deleteRoomById(targetRoomId, { skipConfirm: true, quiet: true })
+    }, completedRoomAutoDismissMs)
+    return () => window.clearTimeout(timeout)
+  }, [deleteRoomById, myRematchRequested, room?.id, room?.rematch_room_id, room?.status])
 
   useEffect(() => {
     if (!selectedDuelProfileUserId) return
@@ -1886,7 +1960,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <div className="onevone-rematch-panel">
                   <div className="onevone-rematch-head">
                     <p className="muted tiny">Rematch</p>
-                    <p className="muted tiny">Keeps same players. Pick a category first.</p>
+                    <p className="muted tiny">Keeps same players. Click Rematch to vote. Starts automatically at 2 out of 2.</p>
                   </div>
                   <div className="segmented compact-segmented onevone-rematch-cats">
                     {duelCategoryOptions
@@ -1897,15 +1971,29 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                           type="button"
                           className={rematchCategory === option.value ? 'seg active compact-seg' : 'seg compact-seg'}
                           onClick={() => setRematchCategory(option.value)}
-                          disabled={rematchLoading}
+                          disabled={rematchLoading || myRematchRequested || rematchReadyCount >= 2 || Boolean(room.rematch_room_id)}
                         >
                           {option.label}
                         </button>
                       ))}
                   </div>
+                  <p className="muted tiny">Rematch votes: {Math.min(2, rematchReadyCount)} out of 2</p>
+                  {!myRematchRequested && !room.rematch_room_id ? (
+                    <p className="muted tiny">This room auto-closes in {Math.round(completedRoomAutoDismissMs / 1000)}s unless you click Rematch.</p>
+                  ) : null}
                   <div className="actions-row">
-                    <button className="primary" onClick={() => void startRematch()} disabled={rematchLoading}>
-                      {rematchLoading ? 'Starting...' : room.rematch_room_id ? 'Join Rematch' : 'Rematch'}
+                    <button
+                      className="primary"
+                      onClick={() => void requestRematch()}
+                      disabled={rematchLoading || myRematchRequested || Boolean(room.rematch_room_id) || players.length < 2}
+                    >
+                      {room.rematch_room_id
+                        ? 'Starting...'
+                        : rematchLoading
+                          ? 'Submitting...'
+                          : myRematchRequested
+                            ? 'Waiting for opponent...'
+                            : 'Rematch'}
                     </button>
                   </div>
                 </div>
