@@ -2307,12 +2307,14 @@ function App() {
 
     const {
       data: { subscription },
-    } = client.auth.onAuthStateChange((_event, session) => {
+    } = client.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state change:', event, session ? 'session exists' : 'no session')
       if (session?.user) {
         setCurrentUserId(session.user.id)
         setCurrentUserEmail(session.user.email || '')
         setCurrentUserProvider(String(session.user.app_metadata?.provider || 'email'))
       } else {
+        console.log('No session - clearing user')
         setCurrentUserId('')
         setCurrentUserEmail('')
         setCurrentUserProvider('email')
