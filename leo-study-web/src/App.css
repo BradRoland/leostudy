@@ -1416,6 +1416,55 @@ button:active:not(:disabled):not(.study-session-flashcard) {
   padding: 2px 4px 2px 2px;
 }
 
+.leader-player-name-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.leader-player-name-block > .tier-name,
+.leader-player-name-block > .tier-name-red,
+.leader-player-name-block > .tier-name-green,
+.leader-player-name-block > .tier-name-gold {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leader-win-streak-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 171, 58, 0.32);
+  background: rgba(133, 68, 18, 0.2);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.leader-win-streak-icon {
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.leader-record-streak-inline {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .leader-rank {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -3457,6 +3506,29 @@ textarea {
   text-overflow: ellipsis;
 }
 
+.onevone-rail-name-wrap {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.onevone-inline-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 178, 74, 0.34);
+  background: rgba(140, 72, 21, 0.26);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 .onevone-streak-chip {
   display: inline-flex;
   align-items: center;
@@ -3643,6 +3715,12 @@ textarea {
   font-size: 0.98rem;
 }
 
+.onevone-public-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .onevone-lobby-head {
   display: grid;
   gap: 8px;
@@ -3675,7 +3753,7 @@ textarea {
 .onevone-hud-grid {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .onevone-hud-chip {
@@ -3689,6 +3767,45 @@ textarea {
 
 .onevone-hud-chip strong {
   font-size: 0.92rem;
+}
+
+.onevone-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.onevone-progress-track {
+  margin-top: 2px;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-soft) 56%, transparent);
+  overflow: hidden;
+}
+
+.onevone-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(92, 170, 255, 0.72), rgba(124, 225, 255, 0.84));
+  transition: width 0.18s ease;
+}
+
+.onevone-countdown {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--panel-soft) 82%, transparent);
+  text-align: center;
+  display: grid;
+  gap: 2px;
+}
+
+.onevone-countdown strong {
+  font-size: 2rem;
+  line-height: 1;
 }
 
 .onevone-round {
@@ -3897,6 +4014,38 @@ textarea {
 .onevone-winner-banner.good {
   border-color: rgba(109, 233, 154, 0.7);
   background: rgba(22, 75, 46, 0.4);
+}
+
+.onevone-winner-banner-draw {
+  border-color: rgba(147, 170, 214, 0.62);
+  background: rgba(45, 61, 98, 0.32);
+}
+
+.onevone-tiebreak-order,
+.onevone-tiebreak-note {
+  margin: 0;
+}
+
+.onevone-rematch-panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--panel-soft) 80%, transparent);
+  display: grid;
+  gap: 8px;
+}
+
+.onevone-rematch-head {
+  display: grid;
+  gap: 2px;
+}
+
+.onevone-rematch-head p {
+  margin: 0;
+}
+
+.onevone-rematch-cats {
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
 }
 
 .onevone-compare-grid {

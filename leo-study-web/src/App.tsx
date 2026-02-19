@@ -36,6 +36,9 @@ type HomeLeaderboardEntry = {
   studySeconds: number
   studyDayStreak: number
   mostStudiedMode: CodeFilter | null
+  duelWins: number
+  duelLosses: number
+  duelCurrentWinStreak: number
 }
 
 type CodeSection = {
@@ -108,7 +111,12 @@ type LeaderboardEntry = {
   studySeconds: number
   studyDayStreak: number
   mostStudiedMode: CodeFilter | null
+  duelWins: number
+  duelLosses: number
+  duelCurrentWinStreak: number
 }
+
+type LeaderNameEntry = Pick<LeaderboardEntry, 'playerName' | 'supporterTier' | 'nameStyle' | 'duelCurrentWinStreak'>
 
 type PersistedState = {
   performance: Record<string, CodePerformance>
@@ -1386,6 +1394,23 @@ function displayNameClass(tier: SupporterTier, hasStyle: boolean) {
   return tierNameClass(tier)
 }
 
+function LeaderboardPlayerName({ entry }: { entry: LeaderNameEntry }) {
+  const streak = Math.max(0, Math.floor(entry.duelCurrentWinStreak || 0))
+  return (
+    <span className="leader-player-name-block">
+      <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
+        {entry.playerName}
+      </span>
+      {streak > 0 ? (
+        <span className="leader-win-streak-inline" aria-label={`Current 1v1 win streak: ${streak}`}>
+          <span className="leader-win-streak-icon" aria-hidden>🔥</span>
+          <span>{streak}</span>
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
 function AppIcon({ name, className = '' }: { name: AppIconName; className?: string }) {
   const commonProps = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
   if (name === 'study') {
@@ -2256,6 +2281,7 @@ function App() {
     let studySecondsByUserId: Record<string, number> = {}
     let studyDayStreakByUserId: Record<string, number> = {}
     let mostStudiedModeByUserId: Record<string, CodeFilter | null> = {}
+    let duelStatsByUserId: Record<string, { wins: number; losses: number; currentWinStreak: number }> = {}
     let ownerUserIds = new Set<string>()
 
     if (userIds.length > 0) {
@@ -2328,6 +2354,24 @@ function App() {
         .eq('role', 'owner')
         .in('user_id', userIds)
       ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
+
+      const { data: duelRows, error: duelError } = await supabase
+        .from('duel_player_stats')
+        .select('user_id,wins,losses,current_win_streak')
+        .eq('game_type', 'all')
+        .in('user_id', userIds)
+      if (!duelError) {
+        duelStatsByUserId = (duelRows || []).reduce<Record<string, { wins: number; losses: number; currentWinStreak: number }>>((accumulator, entry) => {
+          const userId = String(entry.user_id || '')
+          if (!userId) return accumulator
+          accumulator[userId] = {
+            wins: Number(entry.wins || 0),
+            losses: Number(entry.losses || 0),
+            currentWinStreak: Number(entry.current_win_streak || 0),
+          }
+          return accumulator
+        }, {})
+      }
     }
 
     const mapped = rows.map(
@@ -2354,6 +2398,9 @@ function App() {
         studySeconds: studySecondsByUserId[String(entry.user_id)] || 0,
         studyDayStreak: studyDayStreakByUserId[String(entry.user_id)] || 0,
         mostStudiedMode: mostStudiedModeByUserId[String(entry.user_id)] || null,
+        duelWins: duelStatsByUserId[String(entry.user_id)]?.wins || 0,
+        duelLosses: duelStatsByUserId[String(entry.user_id)]?.losses || 0,
+        duelCurrentWinStreak: duelStatsByUserId[String(entry.user_id)]?.currentWinStreak || 0,
       }),
     )
 
@@ -2385,6 +2432,7 @@ function App() {
 
     const userIds = [...new Set(states.map((entry) => String(entry.user_id || '')))].filter(Boolean)
     let profileMap: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
+    let duelStatsByUserId: Record<string, { wins: number; losses: number; currentWinStreak: number }> = {}
     let ownerUserIds = new Set<string>()
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
@@ -2406,6 +2454,24 @@ function App() {
         .eq('role', 'owner')
         .in('user_id', userIds)
       ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
+
+      const { data: duelRows, error: duelError } = await supabase
+        .from('duel_player_stats')
+        .select('user_id,wins,losses,current_win_streak')
+        .eq('game_type', 'all')
+        .in('user_id', userIds)
+      if (!duelError) {
+        duelStatsByUserId = (duelRows || []).reduce<Record<string, { wins: number; losses: number; currentWinStreak: number }>>((accumulator, entry) => {
+          const userId = String(entry.user_id || '')
+          if (!userId) return accumulator
+          accumulator[userId] = {
+            wins: Number(entry.wins || 0),
+            losses: Number(entry.losses || 0),
+            currentWinStreak: Number(entry.current_win_streak || 0),
+          }
+          return accumulator
+        }, {})
+      }
     }
 
     const studyRows: HomeLeaderboardEntry[] = []
@@ -2424,6 +2490,7 @@ function App() {
       const studySeconds = parsed.profileDetails.stats.studySeconds
       const studyDayStreak = parsed.profileDetails.stats.studyDayStreak
       const mostStudiedMode = mostStudiedModeFromStats(parsed.profileDetails.stats)
+      const duelStats = duelStatsByUserId[userId] || { wins: 0, losses: 0, currentWinStreak: 0 }
       studyRows.push({
         userId,
         playerName: profile.username,
@@ -2439,6 +2506,9 @@ function App() {
         studySeconds,
         studyDayStreak,
         mostStudiedMode,
+        duelWins: duelStats.wins,
+        duelLosses: duelStats.losses,
+        duelCurrentWinStreak: duelStats.currentWinStreak,
       })
       studyStreakRows.push({
         userId,
@@ -2455,6 +2525,9 @@ function App() {
         studySeconds,
         studyDayStreak,
         mostStudiedMode,
+        duelWins: duelStats.wins,
+        duelLosses: duelStats.losses,
+        duelCurrentWinStreak: duelStats.currentWinStreak,
       })
       masteredRows.push({
         userId,
@@ -2471,6 +2544,9 @@ function App() {
         studySeconds,
         studyDayStreak,
         mostStudiedMode,
+        duelWins: duelStats.wins,
+        duelLosses: duelStats.losses,
+        duelCurrentWinStreak: duelStats.currentWinStreak,
       })
     }
 
@@ -4944,6 +5020,9 @@ function App() {
       studySeconds: entry.studySeconds,
       studyDayStreak: entry.studyDayStreak,
       mostStudiedMode: entry.mostStudiedMode,
+      duelWins: entry.duelWins,
+      duelLosses: entry.duelLosses,
+      duelCurrentWinStreak: entry.duelCurrentWinStreak,
     })
     setSelectedLeaderboardIsTop(isTop)
   }
@@ -5502,9 +5581,7 @@ function App() {
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
-                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                            {entry.playerName}
-                          </span>
+                          <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
                           <small>Study Time</small>
@@ -5538,9 +5615,7 @@ function App() {
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
-                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                            {entry.playerName}
-                          </span>
+                          <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
                           <small>Day Streak</small>
@@ -5612,9 +5687,7 @@ function App() {
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
-                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                            {entry.playerName}
-                          </span>
+                          <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
                           <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
@@ -5687,9 +5760,7 @@ function App() {
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
-                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                            {entry.playerName}
-                          </span>
+                          <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
                           <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
@@ -5734,9 +5805,7 @@ function App() {
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
-                          <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                            {entry.playerName}
-                          </span>
+                          <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
                           <small>Mastered Codes</small>
@@ -6241,9 +6310,7 @@ function App() {
                           <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                         </span>
                       </span>
-                      <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                        {entry.playerName}
-                      </span>
+                      <LeaderboardPlayerName entry={entry} />
                     </span>
                     <span className="leader-result">
                       <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
@@ -6394,9 +6461,7 @@ function App() {
                           <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                         </span>
                       </span>
-                      <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
-                        {entry.playerName}
-                      </span>
+                      <LeaderboardPlayerName entry={entry} />
                     </span>
                     <span className="leader-result">
                       <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
@@ -6412,7 +6477,11 @@ function App() {
             ) : null}
 
             {gamesMode === 'duel' ? (
-              <OneVsOnePanel currentUserId={currentUserId} currentUsername={profile?.username || currentUserEmail || 'You'} />
+              <OneVsOnePanel
+                currentUserId={currentUserId}
+                currentUsername={profile?.username || currentUserEmail || 'You'}
+                isOwner={isOwner}
+              />
             ) : null}
           </section>
         )}
@@ -7524,6 +7593,18 @@ function App() {
               <div className="leader-profile-stat">
                 <p className="leader-profile-label">Day Streak</p>
                 <strong>{selectedLeaderboardEntry.studyDayStreak} day{selectedLeaderboardEntry.studyDayStreak === 1 ? '' : 's'}{selectedLeaderboardEntry.studyDayStreak >= 7 ? ' 🔥' : ''}</strong>
+              </div>
+              <div className="leader-profile-stat">
+                <p className="leader-profile-label">1v1 Record</p>
+                <strong>
+                  {selectedLeaderboardEntry.duelWins}-{selectedLeaderboardEntry.duelLosses}
+                  {selectedLeaderboardEntry.duelCurrentWinStreak > 0 ? (
+                    <span className="leader-record-streak-inline">
+                      <span className="leader-win-streak-icon" aria-hidden>🔥</span>
+                      {selectedLeaderboardEntry.duelCurrentWinStreak}
+                    </span>
+                  ) : null}
+                </strong>
               </div>
             </div>
             <div className="leader-profile-footer">
