@@ -598,33 +598,25 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const refreshRoomSnapshot = useCallback(async () => {
     if (!supabase || !roomId || !isSignedIn) return
 
-    const [{ data: roomRow, error: roomError }, { data: playerRows, error: playersError }, { data: resultRows, error: resultsError }] = await Promise.all([
-      supabase.from('rooms').select('*').eq('id', roomId).maybeSingle(),
-      supabase.from('room_players').select('*').eq('room_id', roomId).order('slot_no', { ascending: true }),
-      supabase.from('room_results').select('*').eq('room_id', roomId).order('placement', { ascending: true }),
-    ])
-
-    if (roomError) {
-      setError(roomError.message || 'Could not load room.')
+    // Use RPC function that bypasses RLS for spectators
+    const { data: roomData, error: rpcError } = await supabase.rpc('get_1v1_room_details', { p_room_id: roomId })
+    
+    if (rpcError) {
+      setError(rpcError.message || 'Could not load room.')
       return
     }
-    if (playersError) {
-      setError(playersError.message || 'Could not load players.')
-      return
-    }
-    if (resultsError) {
-      setError(resultsError.message || 'Could not load results.')
-      return
-    }
-
-    if (!roomRow) {
-      alert('Room not found!')
+    
+    if (!roomData || !roomData.room) {
       setRoomId(null)
       setRoom(null)
       setPlayers([])
       setResults([])
       return
     }
+
+    const roomRow = roomData.room
+    const playerRows = roomData.players || []
+    const resultRows = roomData.results || []
 
     const mappedRoom: DuelRoomRow = {
       id: String((roomRow as Record<string, unknown>).id || ''),
