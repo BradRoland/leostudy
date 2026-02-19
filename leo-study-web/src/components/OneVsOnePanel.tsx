@@ -2187,10 +2187,18 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
           {room.status === 'completed' ? (
             <div className="onevone-result-overlay">
               <div className="card onevone-card onevone-result-shell">
-                <h3>Match Results</h3>
+                {isSpectator && (
+                  <div className="onevone-spectator-banner spectator-results">
+                    <span>👁️ Match Complete</span>
+                    <span className="muted tiny">You were spectating</span>
+                  </div>
+                )}
+                <h3>{isSpectator ? 'Match Results' : 'Match Results'}</h3>
+                {!isSpectator && (
                 <p className="muted tiny onevone-tiebreak-order">
                   Tie-break order: <strong>Score</strong> → <strong>Total time</strong> → <strong>Fastest single round</strong> → <strong>Draw</strong>
                 </p>
+                )}
                 <div
                   className={
                     room.winner_user_id
@@ -2199,17 +2207,20 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                   }
                 >
                   {room.winner_user_id
-                    ? room.winner_user_id === currentUserId
+                    ? isSpectator 
+                      ? `Winner: ${usernameByUserId[room.winner_user_id] || 'Player'}`
+                      : room.winner_user_id === currentUserId
                       ? `Winner: ${myDisplayName}`
                       : `Winner: ${usernameByUserId[room.winner_user_id] || opponentDisplayName}`
                     : 'Result: Draw'}
                 </div>
-                {tieBreakerDecision ? (
+                {tieBreakerDecision && !isSpectator ? (
                   <p className="muted tiny onevone-tiebreak-note">
                     Decision: {tieBreakerDecision.rule} • {tieBreakerDecision.summary}
                   </p>
                 ) : null}
 
+                {!isSpectator && (
                 <div className="onevone-rematch-panel">
                   <div className="onevone-rematch-head">
                     <p className="muted tiny">Rematch</p>
@@ -2225,6 +2236,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     </button>
                   </div>
                 </div>
+                )}
                 <div className="onevone-results-list">
                   {roomPlayerRowsSorted.map((entry) => {
                     const userId = entry.user_id
@@ -2245,15 +2257,17 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 {myResultRow && opponentResultRow ? (
                   <div className="onevone-compare-grid">
                     <article className="onevone-compare-card">
-                      <p className="muted tiny">Your Score</p>
+                      <p className="muted tiny">{isSpectator ? 'Player 1' : 'Your Score'}</p>
                       <strong>{myResultRow.score} pts</strong>
-                      <p className="muted tiny">Rounds completed: {myRoundsCompleted}/{room.rounds}</p>
+                      <p className="muted tiny">{isSpectator ? getPlayerName(players[0]?.user_id, 'Player') : `Rounds: ${myRoundsCompleted}/${room.rounds}`}</p>
                     </article>
                     <article className="onevone-compare-card">
-                      <p className="muted tiny">Opponent Score</p>
+                      <p className="muted tiny">{isSpectator ? 'Player 2' : 'Opponent Score'}</p>
                       <strong>{opponentResultRow.score} pts</strong>
-                      <p className="muted tiny">Rounds completed: {opponentRoundsCompleted}/{room.rounds}</p>
+                      <p className="muted tiny">{isSpectator ? getPlayerName(players[1]?.user_id, 'Player') : `Rounds: ${opponentRoundsCompleted}/${room.rounds}`}</p>
                     </article>
+                    {!isSpectator && (
+                    <>
                     <article className="onevone-compare-card">
                       <p className="muted tiny">Your Total Time</p>
                       <strong>{formatClock(myResultRow.total_time_ms)}</strong>
@@ -2284,9 +2298,11 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                       <strong>{opponentFastestRoundMs > 0 ? formatClock(opponentFastestRoundMs) : '—'}</strong>
                       <p className="muted tiny">Lowest single-round time</p>
                     </article>
+                    </>
+                    )}
                   </div>
                 ) : null}
-                {myDuelStats ? (
+                {!isSpectator && myDuelStats ? (
                   <div className="onevone-result-summary">
                     <article className="onevone-result-summary-chip">
                       <small className="muted">Total Wins</small>

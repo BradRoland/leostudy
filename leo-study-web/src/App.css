@@ -3954,10 +3954,20 @@ textarea {
   gap: 4px;
 }
 
+.onevone-spectator-banner.spectator-results {
+  background: linear-gradient(135deg, rgba(75, 164, 255, 0.2), rgba(75, 164, 255, 0.1));
+  border-color: rgba(75, 164, 255, 0.5);
+  margin-top: -8px;
+}
+
 .onevone-spectator-banner span:first-child {
   font-weight: 600;
   color: #4ba4ff;
   font-size: 1.1rem;
+}
+
+.onevone-spectator-banner.spectator-results span:first-child {
+  font-size: 1.3rem;
 }
 
 .spectating-card {
