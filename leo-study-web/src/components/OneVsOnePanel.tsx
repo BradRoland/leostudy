@@ -1140,38 +1140,63 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setRematchLoading(true)
     setError('')
     
-    // Call rematch to reset room with new questions
-    const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
+    // Toggle my ready status (don't start rematch yet)
+    const newReadyState = !myPlayer?.is_ready
+    const { error: readyError } = await supabase.rpc('set_1v1_ready', {
       p_room_id: room.id,
-      p_category: rematchCategory,
+      p_ready: newReadyState,
     })
     
-    if (rpcError) {
-      console.error('Rematch error:', rpcError)
+    if (readyError) {
+      console.error('Rematch ready error:', readyError)
       setRematchLoading(false)
-      setError(rpcError.message || 'Could not start rematch.')
+      setError(readyError.message || 'Could not set ready status.')
       return
     }
     
-    // Force complete local state reset
-    initializedRoundKeyRef.current = ''
-    rematchStartLockRef.current = ''
-    setResults([])
-    setMatchingCards([])
-    setSelectedMatchingCards([])
-    setWrongMatchingCardIds([])
-    setMatchedPairIds([])
-    setMatchingMistakes(0)
-    setMatchingRoundPoints(0)
-    setMatchingSubmitted(false)
-    setQuizChoice(null)
-    setQuizLocked(false)
-    
-    // Refresh room - this should show status: 'waiting'
+    // Refresh to get updated ready states
     await refreshRoomSnapshot()
     
     setRematchLoading(false)
-    setNotice('Rematch ready! Click Ready to start.')
+    
+    // Check if both players are ready - if so, start the rematch
+    const bothReady = players.filter(p => p.is_ready).length === 2
+    if (bothReady) {
+      setError('')
+      setRematchLoading(true)
+      
+      // Call rematch to reset room with new questions
+      const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
+        p_room_id: room.id,
+        p_category: rematchCategory,
+      })
+      
+      if (rpcError) {
+        console.error('Rematch error:', rpcError)
+        setRematchLoading(false)
+        setError(rpcError.message || 'Could not start rematch.')
+        return
+      }
+      
+      // Force complete local state reset
+      initializedRoundKeyRef.current = ''
+      rematchStartLockRef.current = ''
+      setResults([])
+      setMatchingCards([])
+      setSelectedMatchingCards([])
+      setWrongMatchingCardIds([])
+      setMatchedPairIds([])
+      setMatchingMistakes(0)
+      setMatchingRoundPoints(0)
+      setMatchingSubmitted(false)
+      setQuizChoice(null)
+      setQuizLocked(false)
+      
+      // Refresh room - this should show status: 'waiting'
+      await refreshRoomSnapshot()
+      
+      setRematchLoading(false)
+    }
   }
 
   const startRematch = useCallback(async () => {
@@ -1984,15 +2009,15 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <div className="onevone-rematch-panel">
                   <div className="onevone-rematch-head">
                     <p className="muted tiny">Rematch</p>
-                    <p className="muted tiny">Start a new match with new questions.</p>
+                    <p className="muted tiny">{rematchReadyCount}/2 ready</p>
                   </div>
                   <div className="actions-row">
                     <button
-                      className="primary"
+                      className={`primary ${myRematchRequested ? 'ready' : ''}`}
                       onClick={() => void toggleRematchVote()}
                       disabled={rematchLoading}
                     >
-                      {rematchLoading ? 'Starting...' : 'Rematch'}
+                      {rematchLoading ? 'Starting...' : myRematchRequested ? 'Cancel' : 'Rematch'}
                     </button>
                   </div>
                 </div>
