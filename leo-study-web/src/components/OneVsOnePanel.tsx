@@ -914,8 +914,17 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setNotice('Joined room.')
   }
 
-  const joinPublicRoom = async (targetRoomId: string) => {
+  const joinPublicRoom = async (targetRoomId: string, asSpectator: boolean = false) => {
     if (!supabase || !isSignedIn) return
+    
+    // For spectators, just enter the room directly without joining as a player
+    if (asSpectator) {
+      setRoomId(targetRoomId)
+      setNotice('Spectating room.')
+      return
+    }
+    
+    // Regular join - try to become a player
     setLoading(true)
     setError('')
     const { data, error: rpcError } = await supabase.rpc('join_1v1_room', { p_room_id: targetRoomId })
@@ -1675,7 +1684,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                         </div>
                         <div className="onevone-public-actions">
                           {isActive ? (
-                            <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading}>
+                            <button className="primary" onClick={() => void joinPublicRoom(item.id, true)} disabled={loading}>
                               Spectate
                             </button>
                           ) : (
