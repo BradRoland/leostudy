@@ -1195,6 +1195,19 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       // Refresh room - this should show status: 'waiting'
       await refreshRoomSnapshot()
       
+      // Force clear ALL game state again after refresh to ensure no stale data
+      setResults([])
+      setMatchingCards([])
+      setSelectedMatchingCards([])
+      setWrongMatchingCardIds([])
+      setMatchedPairIds([])
+      setMatchingMistakes(0)
+      setMatchingRoundPoints(0)
+      setMatchingSubmitted(false)
+      setQuizChoice(null)
+      setQuizLocked(false)
+      setRoundStartedAt(0)
+      
       setRematchLoading(false)
     }
   }
