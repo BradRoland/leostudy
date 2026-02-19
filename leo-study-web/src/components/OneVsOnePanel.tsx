@@ -53,6 +53,14 @@ type LobbyRoomItem = {
   created_at: string
   host_user_id: string
   player_count: number
+  status?: DuelRoomStatus
+  players?: Array<{
+    user_id: string
+    display_name: string
+    is_host: boolean
+    ready: boolean
+    score: number
+  }>
 }
 
 type QuizRoundPayload = {
@@ -375,41 +383,88 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
   const loadPublicRooms = useCallback(async () => {
     if (!supabase || !isSignedIn) return
-    const { data, error: rpcError } = await supabase.rpc('list_public_1v1_rooms')
-    if (rpcError) {
-      setError(rpcError.message || 'Could not load public rooms.')
-      return
-    }
-    const mapped = (Array.isArray(data) ? data : []).map((row) => ({
-      id: String((row as Record<string, unknown>).id || ''),
-      game_type: String((row as Record<string, unknown>).game_type || 'quiz') as DuelGameType,
-      category: String((row as Record<string, unknown>).category || 'all') as DuelCategory,
-      rounds: Number((row as Record<string, unknown>).rounds || 5),
-      created_at: String((row as Record<string, unknown>).created_at || ''),
-      host_user_id: String((row as Record<string, unknown>).host_user_id || ''),
-      player_count: Number((row as Record<string, unknown>).player_count || 0),
-    }))
-      .filter((row) => row.id)
-    setPublicRooms(mapped)
 
-    const hostUserIds = [...new Set(mapped.map((row) => row.host_user_id).filter((value) => value.trim().length > 0))]
-    if (hostUserIds.length === 0) {
-      setPublicRoomHostNames({})
+    // Directly query rooms and players to show all active rooms
+    const { data: roomsData, error: roomsError } = await supabase
+      .from('rooms')
+      .select('*')
+      .eq('is_public', true)
+      .in('status', ['waiting', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (roomsError) {
+      setError(roomsError.message || 'Could not load public rooms.')
       return
     }
 
-    const { data: hostProfiles } = await supabase
+    const roomIds = (roomsData || []).map(r => r.id).filter(Boolean)
+    const { data: playersData } = await supabase
+      .from('room_players')
+      .select('*')
+      .in('room_id', roomIds)
+
+    const playersByRoom: Record<string, Array<{user_id: string, display_name: string, agency: string | null, is_host: boolean, ready: boolean, score: number}>> = {}
+    ;(playersData || []).forEach(p => {
+      if (!playersByRoom[p.room_id]) playersByRoom[p.room_id] = []
+      playersByRoom[p.room_id].push({
+        user_id: p.user_id,
+        display_name: p.display_name,
+        agency: p.agency,
+        is_host: p.is_host,
+        ready: p.ready,
+        score: p.score
+      })
+    })
+
+    // Get all unique user IDs
+    const allUserIds = [...new Set((playersData || []).map(p => p.user_id).filter(Boolean))]
+    
+    // Fetch profiles for all players
+    const { data: profilesData } = await supabase
       .from('profiles')
       .select('user_id,username')
-      .in('user_id', hostUserIds)
+      .in('user_id', allUserIds)
 
+    const usernameMap: Record<string, string> = {}
+    ;(profilesData || []).forEach(p => {
+      usernameMap[p.user_id] = p.username || `User ${p.user_id.slice(0, 6)}`
+    })
+
+    // Map to room items with player info
+    const mapped = (roomsData || []).map(row => {
+      const players = playersByRoom[row.id] || []
+      const playerNames = players.map(p => usernameMap[p.user_id] || p.display_name || `User ${p.user_id.slice(0, 6)}`)
+      return {
+        id: String(row.id),
+        game_type: String(row.game_type || 'quiz') as DuelGameType,
+        category: String(row.category || 'all') as DuelCategory,
+        rounds: Number(row.rounds || 5),
+        created_at: String(row.created_at || ''),
+        host_user_id: String(row.host_user_id || ''),
+        status: String(row.status || 'waiting') as DuelRoomStatus,
+        player_count: players.length,
+        players: players.map(p => ({
+          user_id: p.user_id,
+          display_name: usernameMap[p.user_id] || p.display_name || `User ${p.user_id.slice(0, 6)}`,
+          is_host: p.is_host,
+          ready: p.ready,
+          score: p.score
+        }))
+      }
+    }).filter(row => row.id && row.player_count > 0)
+
+    setPublicRooms(mapped)
+
+    // Also update host names map for compatibility
     const hostMap: Record<string, string> = {}
-    ;(Array.isArray(hostProfiles) ? hostProfiles : []).forEach((entry) => {
-      const value = entry as Record<string, unknown>
-      const userId = String(value.user_id || '')
-      if (!userId) return
-      const username = String(value.username || '').trim()
-      hostMap[userId] = username || `User ${userId.slice(0, 8)}`
+    mapped.forEach(row => {
+      if (row.host_user_id) {
+        const hostPlayer = row.players?.find(p => p.is_host)
+        if (hostPlayer) {
+          hostMap[row.host_user_id] = hostPlayer.display_name
+        }
+      }
     })
     setPublicRoomHostNames(hostMap)
   }, [isSignedIn])
@@ -1641,22 +1696,33 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 {publicRooms.length === 0 ? <p className="muted">No public rooms waiting right now.</p> : null}
                 <div className="onevone-public-list">
                   {publicRooms.map((item) => {
-                    const hostName = publicRoomHostNames[item.host_user_id]
-                      || (item.host_user_id === currentUserId ? (currentUsername || 'Host') : `User ${item.host_user_id.slice(0, 8)}`)
-                    const roomName = formatRoomName(hostName)
+                    const isActive = item.status === 'in_progress'
+                    const playersList = item.players || []
                     const canDeleteRoom = item.host_user_id === currentUserId || isOwner
+                    const canJoin = item.player_count < 2 && !isActive
+
+                    // Build player display
+                    const playerDisplay = playersList.map(p => p.display_name).join(' vs ') || 'Waiting for players'
+                    const statusLabel = isActive ? '🔴 Live' : '🟢 Waiting'
+
                     return (
-                      <div key={item.id} className="onevone-public-item">
+                      <div key={item.id} className={`onevone-public-item ${isActive ? 'active-room' : ''}`}>
                         <div>
-                          <strong>{roomName}</strong>
+                          <strong>{playerDisplay}</strong>
                           <p className="muted tiny">
-                            {item.game_type === 'quiz' ? '1v1 Quiz' : '1v1 Matching'} • Category: {item.category.toUpperCase()} • Players: {item.player_count}/2 • Questions: {item.rounds}
+                            {statusLabel} • {item.game_type === 'quiz' ? 'Quiz' : 'Matching'} • {item.category.toUpperCase()} • {item.rounds} questions
                           </p>
                         </div>
                         <div className="onevone-public-actions">
-                          <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading || item.player_count >= 2}>
-                            Join
-                          </button>
+                          {isActive ? (
+                            <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading}>
+                              Spectate
+                            </button>
+                          ) : (
+                            <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading || !canJoin}>
+                              Join
+                            </button>
+                          )}
                           {canDeleteRoom ? (
                             <button
                               className="secondary"

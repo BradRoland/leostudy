@@ -3839,6 +3839,16 @@ textarea {
   font-size: 0.98rem;
 }
 
+.onevone-public-item.active-room {
+  border-color: rgba(75, 164, 255, 0.5);
+  background: rgba(75, 164, 255, 0.1);
+}
+
+.onevone-public-item.active-room:hover {
+  border-color: rgba(75, 164, 255, 0.8);
+  background: rgba(75, 164, 255, 0.15);
+}
+
 .onevone-public-actions {
   display: inline-flex;
   align-items: center;
