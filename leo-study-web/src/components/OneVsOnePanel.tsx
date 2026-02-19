@@ -598,25 +598,100 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const refreshRoomSnapshot = useCallback(async () => {
     if (!supabase || !roomId || !isSignedIn) return
 
-    // Use RPC function that bypasses RLS for spectators
-    const { data: roomData, error: rpcError } = await supabase.rpc('get_1v1_room_details', { p_room_id: roomId })
-    
-    if (rpcError) {
-      setError(rpcError.message || 'Could not load room.')
+    // First try direct queries (works when user is a player in the room)
+    const [{ data: roomRow, error: roomError }, { data: playerRows, error: playersError }, { data: resultRows, error: resultsError }] = await Promise.all([
+      supabase.from('rooms').select('*').eq('id', roomId).maybeSingle(),
+      supabase.from('room_players').select('*').eq('room_id', roomId).order('slot_no', { ascending: true }),
+      supabase.from('room_results').select('*').eq('room_id', roomId).order('placement', { ascending: true }),
+    ])
+
+    // If room not found via direct query, try RPC (for spectators)
+    if (!roomRow) {
+      const { data: roomData, error: rpcError } = await supabase.rpc('get_1v1_room_details', { p_room_id: roomId })
+      if (rpcError || !roomData || !roomData.room) {
+        setError('Could not load room.')
+        setRoomId(null)
+        setRoom(null)
+        setPlayers([])
+        setResults([])
+        return
+      }
+      // Use RPC data
+      const r = roomData.room
+      const mappedRoom: DuelRoomRow = {
+        id: String(r.id || ''),
+        host_user_id: String(r.host_user_id || ''),
+        game_type: String(r.game_type || 'quiz') as DuelGameType,
+        category: String(r.category || 'all') as DuelCategory,
+        is_public: Boolean(r.is_public),
+        join_code: r.join_code ? String(r.join_code) : null,
+        rounds: Number(r.rounds || 5),
+        question_set: r.question_set,
+        status: String(r.status || 'waiting') as DuelRoomStatus,
+        current_round: Number(r.current_round || 1),
+        winner_user_id: r.winner_user_id ? String(r.winner_user_id) : null,
+        rematch_room_id: r.rematch_room_id ? String(r.rematch_room_id) : null,
+        created_at: String(r.created_at || ''),
+        started_at: r.started_at ? String(r.started_at) : null,
+      }
+      const mappedPlayers: DuelRoomPlayerRow[] = (roomData.players || []).map((row: Record<string, unknown>) => ({
+        id: String(row.id || ''),
+        room_id: String(row.room_id || ''),
+        user_id: String(row.user_id || ''),
+        slot_no: Number(row.slot_no || 1),
+        is_ready: Boolean(row.is_ready),
+        score: Number(row.score || 0),
+        total_time_ms: Number(row.total_time_ms || 0),
+        fastest_round_ms: Number(row.fastest_round_ms || 0),
+        current_round: Number(row.current_round || 1),
+        last_seen: String(row.last_seen || ''),
+      }))
+      const mappedResults: DuelRoomResultRow[] = (roomData.results || []).map((row: Record<string, unknown>) => ({
+        id: String(row.id || ''),
+        room_id: String(row.room_id || ''),
+        user_id: String(row.user_id || ''),
+        score: Number(row.score || 0),
+        total_time_ms: Number(row.total_time_ms || 0),
+        placement: Number(row.placement || 2),
+        is_winner: Boolean(row.is_winner),
+      }))
+      setRoom(mappedRoom)
+      setPlayers(mappedPlayers)
+      setResults(mappedResults)
+      const userIds = mappedPlayers.map((p) => p.user_id)
+      if (userIds.length > 0) {
+        const { data: profileRows } = await supabase.from('profiles').select('user_id,username').in('user_id', userIds)
+        const nameMap: Record<string, string> = {}
+        ;(profileRows || []).forEach((row) => {
+          const uid = String(row.user_id || '')
+          nameMap[uid] = row.username || `User ${uid.slice(0, 8)}`
+        })
+        setUsernameByUserId(nameMap)
+      }
       return
     }
-    
-    if (!roomData || !roomData.room) {
+
+    // Room found via direct query - process normally
+    if (roomError) {
+      setError(roomError.message || 'Could not load room.')
+      return
+    }
+    if (playersError) {
+      setError(playersError.message || 'Could not load players.')
+      return
+    }
+    if (resultsError) {
+      setError(resultsError.message || 'Could not load results.')
+      return
+    }
+
+    if (!roomRow) {
       setRoomId(null)
       setRoom(null)
       setPlayers([])
       setResults([])
       return
     }
-
-    const roomRow = roomData.room
-    const playerRows = roomData.players || []
-    const resultRows = roomData.results || []
 
     const mappedRoom: DuelRoomRow = {
       id: String((roomRow as Record<string, unknown>).id || ''),
