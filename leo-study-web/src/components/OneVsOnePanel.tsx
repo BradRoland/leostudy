@@ -383,92 +383,39 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
   const loadPublicRooms = useCallback(async () => {
     if (!supabase || !isSignedIn) return
-
-    // Directly query rooms and players to show all active rooms
-    const { data: roomsData, error: roomsError } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('is_public', true)
-      .in('status', ['waiting', 'in_progress'])
-      .order('created_at', { ascending: false })
-      .limit(50)
-
-    if (roomsError) {
-      setError(roomsError.message || 'Could not load public rooms.')
+    const { data, error: rpcError } = await supabase.rpc('list_public_1v1_rooms')
+    if (rpcError) {
+      setError(rpcError.message || 'Could not load public rooms.')
       return
     }
-
-    const roomIds = (roomsData || []).map(r => r.id).filter(Boolean)
-    const { data: playersData } = await supabase
-      .from('room_players')
-      .select('*')
-      .in('room_id', roomIds)
-
-    const playersByRoom: Record<string, Array<{user_id: string, display_name: string, agency: string | null, is_host: boolean, ready: boolean, score: number}>> = {}
-    ;(playersData || []).forEach(p => {
-      if (!playersByRoom[p.room_id]) playersByRoom[p.room_id] = []
-      playersByRoom[p.room_id].push({
-        user_id: p.user_id,
-        display_name: p.display_name,
-        agency: p.agency,
-        is_host: p.is_host,
-        ready: p.ready,
-        score: p.score
-      })
-    })
-
-    // Get all unique user IDs
-    const allUserIds = [...new Set((playersData || []).map(p => p.user_id).filter(Boolean))]
-    
-    // Fetch profiles for all players
-    const { data: profilesData } = await supabase
-      .from('profiles')
-      .select('user_id,username')
-      .in('user_id', allUserIds)
-
-    const usernameMap: Record<string, string> = {}
-    ;(profilesData || []).forEach(p => {
-      usernameMap[p.user_id] = p.username || `User ${p.user_id.slice(0, 6)}`
-    })
-
-    // Map to room items with player info
-    const mapped = (roomsData || []).map(row => {
-      const players = playersByRoom[row.id] || []
-      const playerNames = players.map(p => usernameMap[p.user_id] || p.display_name || `User ${p.user_id.slice(0, 6)}`)
+    const mapped = (Array.isArray(data) ? data : []).map((row) => {
+      const players = (row as Record<string, unknown>).players as Array<Record<string, unknown>> || []
       return {
-        id: String(row.id),
-        game_type: String(row.game_type || 'quiz') as DuelGameType,
-        category: String(row.category || 'all') as DuelCategory,
-        rounds: Number(row.rounds || 5),
-        created_at: String(row.created_at || ''),
-        host_user_id: String(row.host_user_id || ''),
-        status: String(row.status || 'waiting') as DuelRoomStatus,
-        player_count: players.length,
+        id: String((row as Record<string, unknown>).id || ''),
+        game_type: String((row as Record<string, unknown>).game_type || 'quiz') as DuelGameType,
+        category: String((row as Record<string, unknown>).category || 'all') as DuelCategory,
+        rounds: Number((row as Record<string, unknown>).rounds || 5),
+        created_at: String((row as Record<string, unknown>).created_at || ''),
+        host_user_id: String((row as Record<string, unknown>).host_user_id || ''),
+        status: String((row as Record<string, unknown>).status || 'waiting') as DuelRoomStatus,
+        player_count: Number((row as Record<string, unknown>).player_count || 0),
         players: players.map(p => ({
-          user_id: p.user_id,
-          display_name: usernameMap[p.user_id] || p.display_name || `User ${p.user_id.slice(0, 6)}`,
-          is_host: p.is_host,
-          ready: p.ready,
-          score: p.score
+          user_id: String(p.user_id || ''),
+          display_name: String(p.display_name || ''),
+          is_host: Boolean(p.is_host),
+          ready: Boolean(p.ready),
+          score: Number(p.score || 0)
         }))
       }
-    }).filter(row => {
-      // Show if has players and either in_progress OR waiting with room for more
-      if (!row.id || row.player_count === 0) return false
-      if (row.status === 'in_progress') return true
-      return row.status === 'waiting' && row.player_count < 2
-    })
-
+    }).filter((row) => row.id)
     setPublicRooms(mapped)
 
-    // Also update host names map for compatibility
+    // Build host map from player data
     const hostMap: Record<string, string> = {}
     mapped.forEach(row => {
-      if (row.host_user_id) {
-        const hostPlayer = row.players?.find(p => p.is_host)
-        if (hostPlayer) {
-          hostMap[row.host_user_id] = hostPlayer.display_name
-        }
+      const hostPlayer = row.players?.find(p => p.is_host)
+      if (hostPlayer && row.host_user_id) {
+        hostMap[row.host_user_id] = hostPlayer.display_name
       }
     })
     setPublicRoomHostNames(hostMap)
