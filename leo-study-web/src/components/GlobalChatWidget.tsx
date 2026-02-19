@@ -68,6 +68,25 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   const isOpenRef = useRef(isOpen)
   isOpenRef.current = isOpen
 
+  // Fallback: poll for new messages every 5 seconds
+  useEffect(() => {
+    if (!supabaseClient) return
+
+    const pollMessages = async () => {
+      const { data } = await supabaseClient
+        .from('public_messages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(MAX_MESSAGES)
+      if (data) {
+        setMessages(data.reverse())
+      }
+    }
+
+    const interval = setInterval(pollMessages, 5000)
+    return () => clearInterval(interval)
+  }, [supabaseClient])
+
   // Subscribe to realtime messages
   useEffect(() => {
     if (!supabaseClient) return
