@@ -951,8 +951,11 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
   const handleMatchingCardClick = (cardId: string) => {
     if (!canStartRound || !room || room.game_type !== 'matching' || matchingSubmitted) return
+    if (selectedMatchingCards.length >= 2) return  // Guard against selecting more than 2
     const card = matchingCards.find((item) => item.id === cardId)
     if (!card || matchedPairIds.includes(card.pairId)) return
+    // Prevent unchecking by checking if already selected - just ignore
+    if (selectedMatchingCards.includes(cardId)) return
     setSelectedMatchingCards((previous) => {
       if (previous.includes(cardId)) return previous
       if (previous.length >= 2) return previous
@@ -1154,6 +1157,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setResults([])
     setMatchingCards([])
     setSelectedMatchingCards([])
+    setWrongMatchingCardIds([])
     setMatchedPairIds([])
     setMatchingMistakes(0)
     setMatchingRoundPoints(0)
