@@ -5,6 +5,7 @@ import './App.css'
 import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem } from './content'
 import { useOwner } from './hooks/useOwner'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
+import { OneVsOnePanel } from './components/OneVsOnePanel'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
 type CodeFilter = CodeSet | 'all'
@@ -1810,7 +1811,7 @@ function App() {
   const [scenarioResult, setScenarioResult] = useState<string>('')
   const [scenarioSelectedChoice, setScenarioSelectedChoice] = useState<number | null>(null)
   const [scenarioStreak, setScenarioStreak] = useState(0)
-  const [gamesMode, setGamesMode] = useState<'matching' | 'speed'>('matching')
+  const [gamesMode, setGamesMode] = useState<'matching' | 'speed' | 'duel'>('matching')
   const homeMatchingRotationIndexRef = useRef(0)
   const homeSpeedRotationIndexRef = useRef(0)
   const lastAppStateUpdateRef = useRef(0)
@@ -6090,6 +6091,14 @@ function App() {
                 <span className="game-mode-title"><AppIcon name="study" className="button-icon" /> Speed Test</span>
                 <span className="muted tiny">Answer as many as possible</span>
               </button>
+              <button
+                type="button"
+                className={gamesMode === 'duel' ? 'card compact game-mode-card game-mode-active' : 'card compact game-mode-card'}
+                onClick={() => setGamesMode('duel')}
+              >
+                <span className="game-mode-title"><AppIcon name="games" className="button-icon" /> 1v1</span>
+                <span className="muted tiny">Realtime head-to-head</span>
+              </button>
               <article className="card compact muted-box">Gravity (Disabled)</article>
             </div>
 
@@ -6400,6 +6409,10 @@ function App() {
             </>
             ) : null}
               </>
+            ) : null}
+
+            {gamesMode === 'duel' ? (
+              <OneVsOnePanel currentUserId={currentUserId} currentUsername={profile?.username || currentUserEmail || 'You'} />
             ) : null}
           </section>
         )}

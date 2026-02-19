@@ -3348,6 +3348,137 @@ textarea {
   grid-template-columns: 48px minmax(0, 1fr) minmax(132px, auto);
 }
 
+.onevone-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.onevone-card {
+  display: grid;
+  gap: 10px;
+}
+
+.onevone-grid.two-col {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.onevone-cats {
+  margin-top: 4px;
+}
+
+.onevone-join-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.onevone-join-row input {
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(7, 14, 28, 0.45);
+  color: var(--text);
+  padding: 0 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.onevone-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.onevone-public-list {
+  display: grid;
+  gap: 8px;
+}
+
+.onevone-public-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(17, 29, 58, 0.42);
+}
+
+.onevone-lobby-head {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.onevone-slots {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.onevone-slot {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+  background: rgba(12, 22, 44, 0.48);
+}
+
+.onevone-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.onevone-round {
+  display: grid;
+  gap: 10px;
+}
+
+.choices .choice.active {
+  border-color: rgba(130, 193, 255, 0.85);
+  background: rgba(71, 133, 202, 0.32);
+}
+
+.onevone-match-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.onevone-match-list {
+  display: grid;
+  gap: 6px;
+}
+
+.onevone-results-list {
+  display: grid;
+  gap: 8px;
+}
+
+.onevone-result-item {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: minmax(120px, 1fr) auto auto auto;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(13, 24, 47, 0.5);
+}
+
+.onevone-result-item.winner {
+  border-color: rgba(255, 206, 115, 0.75);
+  background: rgba(85, 58, 14, 0.42);
+}
+
 .celebration-overlay {
   position: fixed;
   inset: 0;
@@ -3816,5 +3947,18 @@ button:disabled {
 
   .game-start-button {
     width: 100%;
+  }
+
+  .onevone-grid.two-col,
+  .onevone-match-grid,
+  .onevone-lobby-head,
+  .onevone-slots {
+    grid-template-columns: 1fr;
+  }
+
+  .onevone-public-item,
+  .onevone-result-item,
+  .onevone-join-row {
+    grid-template-columns: 1fr;
   }
 }
