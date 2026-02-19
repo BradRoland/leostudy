@@ -42,38 +42,15 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   const isNearBottomRef = useRef(true)
   const subscribedRef = useRef(false)
   const supabaseClient = supabase
+  const isOpenRef = useRef(isOpen)
 
   const isAuthenticated = Boolean(currentUserId && supabaseClient)
 
-  // Load initial messages
+  // Load initial messages once on mount
   useEffect(() => {
     if (!supabaseClient) return
 
     const loadMessages = async () => {
-      
-      const { data, error } = await supabaseClient
-        .from('public_messages')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(MAX_MESSAGES)
-      
-      
-      if (data) {
-        setMessages(data.reverse())
-      }
-    }
-
-    loadMessages()
-  }, [supabaseClient])
-
-  const isOpenRef = useRef(isOpen)
-  isOpenRef.current = isOpen
-
-  // Fallback: poll for new messages every 30 seconds (reduced to prevent excessive re-renders)
-  useEffect(() => {
-    if (!supabaseClient) return
-
-    const pollMessages = async () => {
       const { data } = await supabaseClient
         .from('public_messages')
         .select('*')
@@ -84,9 +61,13 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
       }
     }
 
-    const interval = setInterval(pollMessages, 30000)
-    return () => clearInterval(interval)
-  }, [supabaseClient])
+    loadMessages()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep isOpenRef in sync
+  useEffect(() => {
+    isOpenRef.current = isOpen
+  }, [isOpen])
 
   // Subscribe to realtime messages
   useEffect(() => {
@@ -130,7 +111,6 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     if (isOpen) {
       setUnreadCount(0)
       setShowNewMessagesIndicator(false)
-      // Scroll to bottom when opening
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
       }, 100)
@@ -179,7 +159,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         agency: userAgency || null,
         message: trimmed,
       })
-      // Reload messages to see the new one
+      // Reload messages after sending
       const { data } = await supabaseClient
         .from('public_messages')
         .select('*')
