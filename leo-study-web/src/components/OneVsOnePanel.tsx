@@ -857,6 +857,17 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const opponentPlayer = useMemo(() => players.find((player) => player.user_id !== currentUserId) || null, [players, currentUserId])
   const isSpectator = useMemo(() => !myPlayer && players.length > 0 && room?.status === 'in_progress', [myPlayer, players, room])
 
+  // Poll for updates when spectating (since realtime may not work due to RLS)
+  useEffect(() => {
+    if (!isSpectator || !roomId) return
+    
+    const pollInterval = window.setInterval(() => {
+      void refreshRoomSnapshot()
+    }, 3000) // Poll every 3 seconds
+    
+    return () => window.clearInterval(pollInterval)
+  }, [isSpectator, roomId, refreshRoomSnapshot])
+
   // Helper to get player name from usernameByUserId lookup
   const getPlayerName = (userId: string, fallback: string) => usernameByUserId[userId] || fallback
 
