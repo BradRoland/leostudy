@@ -266,7 +266,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
       // Get user profile
       const { data: profile } = await supabaseClient
         .from('profiles')
-        .select('id, username, avatar_url, agency')
+        .select('id, username, avatar_path, agency')
         .eq('id', userId)
         .maybeSingle()
       
@@ -281,7 +281,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         setSelectedProfile({
           user_id: userId,
           username: profile.username || 'Unknown',
-          avatarUrl: profile.avatar_url || '',
+          avatarUrl: profile.avatar_path || '',
           agency: profile.agency,
           wins: stats?.wins ?? 0,
           losses: stats?.losses ?? 0,
