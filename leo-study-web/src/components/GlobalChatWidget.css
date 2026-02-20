@@ -308,7 +308,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  z-index: 99999;
   animation: global-chat-fade-in 0.15s ease;
 }
 
@@ -488,4 +488,10 @@
 .profile-modal-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.profile-loading {
+  color: var(--muted, #b3bedf);
+  text-align: center;
+  padding: 40px;
 }

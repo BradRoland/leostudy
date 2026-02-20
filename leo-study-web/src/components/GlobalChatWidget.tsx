@@ -257,7 +257,11 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
 
   // Fetch user profile stats
   const fetchUserProfile = useCallback(async (userId: string) => {
-    if (!supabaseClient) return
+    console.log('Fetching profile for:', userId)
+    if (!supabaseClient) {
+      console.log('No supabase client')
+      return
+    }
     
     setProfileLoading(true)
     setSelectedProfile(null)
@@ -443,6 +447,11 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
 
       {selectedProfile && (
         <div className="global-chat-modal-overlay" onClick={() => setSelectedProfile(null)}>
+          {profileLoading ? (
+            <div className="global-chat-modal profile-modal">
+              <div className="profile-loading">Loading...</div>
+            </div>
+          ) : (
           <div className="global-chat-modal profile-modal" onClick={(e) => e.stopPropagation()}>
             <div className="profile-modal-header">
               <div className="profile-modal-avatar">
@@ -493,6 +502,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
               <button className="secondary" onClick={() => setSelectedProfile(null)}>Close</button>
             </div>
           </div>
+          )}
         </div>
       )}
     </div>
