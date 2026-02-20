@@ -11,6 +11,18 @@ type PublicMessage = {
   is_deleted: boolean
 }
 
+type UserProfileStats = {
+  user_id: string
+  username: string
+  avatarUrl: string
+  agency: string | null
+  wins: number
+  losses: number
+  matches_played: number
+  current_win_streak: number
+  best_win_streak: number
+}
+
 type Props = {
   currentUserId: string
   currentUsername: string
@@ -36,6 +48,8 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   const [hasNewMessages, setHasNewMessages] = useState(false)
   const [reportModalOpen, setReportModalOpen] = useState<string | null>(null)
   const [reportReason, setReportReason] = useState('')
+  const [selectedProfile, setSelectedProfile] = useState<UserProfileStats | null>(null)
+  const [profileLoading, setProfileLoading] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -241,6 +255,48 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     }).eq('id', messageId)
   }, [isOwner, currentUserId, supabaseClient])
 
+  // Fetch user profile stats
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    if (!supabaseClient) return
+    
+    setProfileLoading(true)
+    setSelectedProfile(null)
+    
+    try {
+      // Get user profile
+      const { data: profile } = await supabaseClient
+        .from('profiles')
+        .select('id, username, avatar_url, agency')
+        .eq('id', userId)
+        .single()
+      
+      // Get duel stats
+      const { data: stats } = await supabaseClient
+        .from('duel_player_stats')
+        .select('wins, losses, matches_played, current_win_streak, best_win_streak')
+        .eq('user_id', userId)
+        .single()
+      
+      if (profile) {
+        setSelectedProfile({
+          user_id: userId,
+          username: profile.username || 'Unknown',
+          avatarUrl: profile.avatar_url || '',
+          agency: profile.agency,
+          wins: stats?.wins || 0,
+          losses: stats?.losses || 0,
+          matches_played: stats?.matches_played || 0,
+          current_win_streak: stats?.current_win_streak || 0,
+          best_win_streak: stats?.best_win_streak || 0,
+        })
+      }
+    } catch (err) {
+      console.error('Failed to fetch profile:', err)
+    } finally {
+      setProfileLoading(false)
+    }
+  }, [supabaseClient])
+
   // Format timestamp
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -289,7 +345,12 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
                 className={`global-chat-message ${msg.user_id === currentUserId ? 'own' : ''} ${msg.is_deleted ? 'deleted' : ''}`}
               >
                 <div className="global-chat-message-header">
-                  <span className="global-chat-name">{msg.display_name}</span>
+                  <button 
+                    className="global-chat-name" 
+                    onClick={() => void fetchUserProfile(msg.user_id)}
+                  >
+                    {msg.display_name}
+                  </button>
                   {msg.agency && <span className="global-chat-agency">{msg.agency}</span>}
                   <span className="global-chat-time">{formatTime(msg.created_at)}</span>
                 </div>
@@ -375,6 +436,61 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
               <button className="primary" onClick={() => handleReport(reportModalOpen)} disabled={!reportReason.trim()}>
                 Report
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedProfile && (
+        <div className="global-chat-modal-overlay" onClick={() => setSelectedProfile(null)}>
+          <div className="global-chat-modal profile-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="profile-modal-header">
+              <div className="profile-modal-avatar">
+                {selectedProfile.avatarUrl ? (
+                  <img src={selectedProfile.avatarUrl} alt={selectedProfile.username} />
+                ) : (
+                  <div className="profile-avatar-placeholder">
+                    {selectedProfile.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div className="profile-modal-info">
+                <h4>{selectedProfile.username}</h4>
+                {selectedProfile.agency && <span className="profile-modal-agency">{selectedProfile.agency}</span>}
+              </div>
+            </div>
+            
+            <div className="profile-modal-stats">
+              <div className="profile-stat">
+                <span className="profile-stat-value">{selectedProfile.matches_played}</span>
+                <span className="profile-stat-label">Matches</span>
+              </div>
+              <div className="profile-stat">
+                <span className="profile-stat-value good">{selectedProfile.wins}</span>
+                <span className="profile-stat-label">Wins</span>
+              </div>
+              <div className="profile-stat">
+                <span className="profile-stat-value bad">{selectedProfile.losses}</span>
+                <span className="profile-stat-label">Losses</span>
+              </div>
+              <div className="profile-stat">
+                <span className="profile-stat-value">{selectedProfile.wins + selectedProfile.losses > 0 
+                  ? Math.round((selectedProfile.wins / (selectedProfile.wins + selectedProfile.losses)) * 100) 
+                  : 0}%</span>
+                <span className="profile-stat-label">Win Rate</span>
+              </div>
+              <div className="profile-stat">
+                <span className="profile-stat-value fire">🔥 {selectedProfile.current_win_streak}</span>
+                <span className="profile-stat-label">Current Streak</span>
+              </div>
+              <div className="profile-stat">
+                <span className="profile-stat-value fire">🏆 {selectedProfile.best_win_streak}</span>
+                <span className="profile-stat-label">Best Streak</span>
+              </div>
+            </div>
+            
+            <div className="profile-modal-actions">
+              <button className="secondary" onClick={() => setSelectedProfile(null)}>Close</button>
             </div>
           </div>
         </div>
