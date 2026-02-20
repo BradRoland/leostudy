@@ -270,18 +270,24 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         .eq('user_id', userId)
         .maybeSingle()
       
-      // Get duel stats (may not exist for new users)
+      // Get duel stats for 'all' game types (aggregate stats)
       const { data: stats } = await supabaseClient
         .from('duel_player_stats')
         .select('wins, losses, matches_played, current_win_streak, best_win_streak')
         .eq('user_id', userId)
+        .eq('game_type', 'all')
         .maybeSingle()
       
       if (profile) {
+        // Construct full avatar URL if avatar_path exists
+        const avatarUrl = profile.avatar_path 
+          ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/${profile.avatar_path}`
+          : ''
+        
         setSelectedProfile({
           user_id: userId,
           username: profile.username || 'Unknown',
-          avatarUrl: profile.avatar_path || '',
+          avatarUrl,
           agency: profile.agency,
           wins: stats?.wins ?? 0,
           losses: stats?.losses ?? 0,
