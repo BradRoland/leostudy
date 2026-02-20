@@ -290,11 +290,21 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         .eq('game_type', 'all')
         .maybeSingle()
       
-      // Calculate mastered codes from performance
+      // Calculate mastered codes from performance (same logic as App.tsx)
       let masteredCodes = 0
       if (appState?.performance) {
-        const perf = appState.performance as Record<string, { mastery?: string }>
-        masteredCodes = Object.values(perf).filter(item => item?.mastery === 'Mastered').length
+        const perf = appState.performance as Record<string, { correctCount?: number; incorrectCount?: number; correctStreak?: number }>
+        Object.values(perf).forEach(item => {
+          const correct = item?.correctCount ?? 0
+          const incorrect = item?.incorrectCount ?? 0
+          const attempts = correct + incorrect
+          const streak = item?.correctStreak ?? 0
+          
+          // Mastered = streak >= 20 (exact match to App.tsx)
+          if (streak >= 20) {
+            masteredCodes++
+          }
+        })
       }
       
       // Extract study stats from profile_details
