@@ -15,12 +15,17 @@ type UserProfileStats = {
   user_id: string
   username: string
   avatarUrl: string
-  agency: string | null
-  wins: number
-  losses: number
-  matches_played: number
-  current_win_streak: number
-  best_win_streak: number
+  agency: string
+  bio: string
+  // Study stats
+  studySeconds: number
+  studyDayStreak: number
+  masteredCodes: number
+  mostStudiedMode: string
+  // Duel stats
+  duelWins: number
+  duelLosses: number
+  duelCurrentWinStreak: number
 }
 
 type Props = {
@@ -266,17 +271,52 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
       // Get user profile
       const { data: profile } = await supabaseClient
         .from('profiles')
-        .select('user_id, username, avatar_path, agency')
+        .select('user_id, username, avatar_path, agency, bio')
         .eq('user_id', userId)
         .maybeSingle()
       
-      // Get duel stats for 'all' game types (aggregate stats)
-      const { data: stats } = await supabaseClient
+      // Get app_state for study stats
+      const { data: appState } = await supabaseClient
+        .from('app_state')
+        .select('profile_details, performance')
+        .eq('user_id', userId)
+        .maybeSingle()
+      
+      // Get duel stats for 'all' game types
+      const { data: duelStats } = await supabaseClient
         .from('duel_player_stats')
-        .select('wins, losses, matches_played, current_win_streak, best_win_streak')
+        .select('wins, losses, current_win_streak')
         .eq('user_id', userId)
         .eq('game_type', 'all')
         .maybeSingle()
+      
+      // Calculate mastered codes from performance
+      let masteredCodes = 0
+      if (appState?.performance) {
+        const perf = appState.performance as Record<string, { mastery?: string }>
+        masteredCodes = Object.values(perf).filter(item => item?.mastery === 'Mastered').length
+      }
+      
+      // Extract study stats from profile_details
+      let studySeconds = 0
+      let studyDayStreak = 0
+      let mostStudiedMode = ''
+      if (appState?.profile_details) {
+        const details = appState.profile_details as { stats?: { studySeconds?: number; studyDayStreak?: number; studyModeCounts?: Record<string, number> } }
+        studySeconds = details?.stats?.studySeconds ?? 0
+        studyDayStreak = details?.stats?.studyDayStreak ?? 0
+        
+        // Find most studied mode
+        const modeCounts = details?.stats?.studyModeCounts
+        if (modeCounts) {
+          const entries = Object.entries(modeCounts)
+          if (entries.length > 0) {
+            const sorted = entries.sort((a, b) => b[1] - a[1])
+            const modeMap: Record<string, string> = { penal: 'Penal', hs: 'Highway', vehicle: 'Vehicle', all: 'All' }
+            mostStudiedMode = modeMap[sorted[0][0]] || sorted[0][0]
+          }
+        }
+      }
       
       if (profile) {
         // Construct full avatar URL if avatar_path exists
@@ -288,12 +328,15 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
           user_id: userId,
           username: profile.username || 'Unknown',
           avatarUrl,
-          agency: profile.agency,
-          wins: stats?.wins ?? 0,
-          losses: stats?.losses ?? 0,
-          matches_played: stats?.matches_played ?? 0,
-          current_win_streak: stats?.current_win_streak ?? 0,
-          best_win_streak: stats?.best_win_streak ?? 0,
+          agency: profile.agency || '',
+          bio: profile.bio || '',
+          studySeconds,
+          studyDayStreak,
+          masteredCodes,
+          mostStudiedMode,
+          duelWins: duelStats?.wins ?? 0,
+          duelLosses: duelStats?.losses ?? 0,
+          duelCurrentWinStreak: duelStats?.current_win_streak ?? 0,
         })
       }
     } catch (err) {
@@ -313,6 +356,14 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m`
     if (diff < 86400000) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+  }
+
+  // Format study time in hours/minutes
+  const formatStudyTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600)
+    const mins = Math.floor((seconds % 3600) / 60)
+    if (hours > 0) return `${hours}h ${mins}m`
+    return `${mins}m`
   }
 
   if (!supabaseClient) return null
@@ -471,32 +522,51 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
               </div>
             </div>
             
-            <div className="profile-modal-stats">
-              <div className="profile-stat">
-                <span className="profile-stat-value">{selectedProfile.matches_played}</span>
-                <span className="profile-stat-label">Matches</span>
+            {selectedProfile.bio && (
+              <p className="profile-modal-bio">{selectedProfile.bio}</p>
+            )}
+            
+            <div className="profile-modal-section">
+              <h5>📚 Study</h5>
+              <div className="profile-modal-stats">
+                <div className="profile-stat">
+                  <span className="profile-stat-value">{selectedProfile.masteredCodes}</span>
+                  <span className="profile-stat-label">Mastered</span>
+                </div>
+                <div className="profile-stat">
+                  <span className="profile-stat-value">{formatStudyTime(selectedProfile.studySeconds)}</span>
+                  <span className="profile-stat-label">Study Time</span>
+                </div>
+                <div className="profile-stat">
+                  <span className="profile-stat-value fire">🔥 {selectedProfile.studyDayStreak}</span>
+                  <span className="profile-stat-label">Day Streak</span>
+                </div>
+                {selectedProfile.mostStudiedMode && (
+                  <div className="profile-stat">
+                    <span className="profile-stat-value">{selectedProfile.mostStudiedMode}</span>
+                    <span className="profile-stat-label">Top Mode</span>
+                  </div>
+                )}
               </div>
-              <div className="profile-stat">
-                <span className="profile-stat-value good">{selectedProfile.wins}</span>
-                <span className="profile-stat-label">Wins</span>
-              </div>
-              <div className="profile-stat">
-                <span className="profile-stat-value bad">{selectedProfile.losses}</span>
-                <span className="profile-stat-label">Losses</span>
-              </div>
-              <div className="profile-stat">
-                <span className="profile-stat-value">{selectedProfile.wins + selectedProfile.losses > 0 
-                  ? Math.round((selectedProfile.wins / (selectedProfile.wins + selectedProfile.losses)) * 100) 
-                  : 0}%</span>
-                <span className="profile-stat-label">Win Rate</span>
-              </div>
-              <div className="profile-stat">
-                <span className="profile-stat-value fire">🔥 {selectedProfile.current_win_streak}</span>
-                <span className="profile-stat-label">Current Streak</span>
-              </div>
-              <div className="profile-stat">
-                <span className="profile-stat-value fire">🏆 {selectedProfile.best_win_streak}</span>
-                <span className="profile-stat-label">Best Streak</span>
+            </div>
+            
+            <div className="profile-modal-section">
+              <h5>⚔️ Duel</h5>
+              <div className="profile-modal-stats">
+                <div className="profile-stat">
+                  <span className="profile-stat-value">{selectedProfile.duelWins}-{selectedProfile.duelLosses}</span>
+                  <span className="profile-stat-label">W-L</span>
+                </div>
+                <div className="profile-stat">
+                  <span className="profile-stat-value">{selectedProfile.duelWins + selectedProfile.duelLosses > 0 
+                    ? Math.round((selectedProfile.duelWins / (selectedProfile.duelWins + selectedProfile.duelLosses)) * 100) 
+                    : 0}%</span>
+                  <span className="profile-stat-label">Win Rate</span>
+                </div>
+                <div className="profile-stat">
+                  <span className="profile-stat-value fire">🔥 {selectedProfile.duelCurrentWinStreak}</span>
+                  <span className="profile-stat-label">Streak</span>
+                </div>
               </div>
             </div>
             
