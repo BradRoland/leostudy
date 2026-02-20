@@ -7,6 +7,13 @@
   font-family: inherit;
 }
 
+/* Hide floating toggle on mobile - chat is in tab bar */
+@media (max-width: 768px) {
+  .global-chat-widget .global-chat-toggle {
+    display: none;
+  }
+}
+
 /* Minimized toggle button */
 .global-chat-toggle {
   width: 56px;

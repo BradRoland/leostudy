@@ -18,7 +18,7 @@ type GameModeSelection = {
   duration: HomeDurationFilter
   filter: CodeFilter
 }
-type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'warning'
+type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'warning' | 'chat'
 type StatsIconName = 'overview' | 'time' | 'words' | 'penal' | 'flashcards' | 'scenarios' | 'streak' | 'game' | 'studyset'
 type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
 type StudyAnswerMode = 'multiple' | 'truefalse'
@@ -1462,6 +1462,13 @@ function AppIcon({ name, className = '' }: { name: AppIconName; className?: stri
         <path d="M12 3 1.8 20.5a1.4 1.4 0 0 0 1.2 2.1h18a1.4 1.4 0 0 0 1.2-2.1L12 3Z" />
         <path d="M12 9v5" />
         <path d="M12 17.3h.01" />
+      </svg>
+    )
+  }
+  if (name === 'chat') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       </svg>
     )
   }
@@ -7859,25 +7866,30 @@ function App() {
           { key: 'home', label: 'Home' },
           { key: 'scenarios', label: 'Scenarios' },
           { key: 'library', label: 'Library' },
-          { key: 'mission', label: 'Mission' },
+          { key: 'chat', label: 'Chat', isChat: true },
         ].map((tab) => (
           <button
             key={tab.key}
-            className={(tab.key === 'home' ? isHomePage : !isHomePage && activeTab === tab.key) ? 'tab active' : 'tab'}
+            className={`tab ${tab.key === 'home' ? isHomePage : !isHomePage && activeTab === tab.key ? 'active' : ''} ${tab.isChat ? 'tab-chat' : ''}`}
             onClick={() => {
-              setActiveTab(tab.key as AppTab)
-              const pathByTab: Record<AppTab, string> = {
-                home: '/home',
-                study: '/study',
-                games: '/games',
-                scenarios: '/scenarios',
-                library: '/library',
-                              }
-              navigate(pathByTab[tab.key as AppTab])
+              if (tab.isChat) {
+                // Trigger chat open - dispatch custom event
+                window.dispatchEvent(new CustomEvent('openGlobalChat'))
+              } else {
+                setActiveTab(tab.key as AppTab)
+                const pathByTab: Record<AppTab, string> = {
+                  home: '/home',
+                  study: '/study',
+                  games: '/games',
+                  scenarios: '/scenarios',
+                  library: '/library',
+                }
+                navigate(pathByTab[tab.key as AppTab])
+              }
             }}
           >
             <AppIcon
-              name={tab.key === 'home' ? 'home' : tab.key === 'study' ? 'study' : tab.key === 'games' ? 'games' : tab.key === 'scenarios' ? 'scenarios' : 'library'}
+              name={tab.isChat ? 'chat' : tab.key === 'home' ? 'home' : tab.key === 'study' ? 'study' : tab.key === 'games' ? 'games' : tab.key === 'scenarios' ? 'scenarios' : 'library'}
               className="tab-icon"
             />
             <span className="tab-label">{tab.label}</span>

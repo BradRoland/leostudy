@@ -89,6 +89,15 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     isOpenRef.current = isOpen
   }, [isOpen])
 
+  // Listen for custom event to open chat from tab bar (mobile)
+  useEffect(() => {
+    const handleOpenChat = () => {
+      setIsOpen(true)
+    }
+    window.addEventListener('openGlobalChat', handleOpenChat)
+    return () => window.removeEventListener('openGlobalChat', handleOpenChat)
+  }, [])
+
   // Subscribe to realtime messages
   useEffect(() => {
     if (!supabaseClient || subscribedRef.current) return

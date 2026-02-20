@@ -1859,6 +1859,21 @@ button:active:not(:disabled):not(.study-session-flashcard) {
   color: white;
 }
 
+/* Chat tab - hidden on desktop, shown on mobile */
+.tab-chat {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .tab-bar {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  
+  .tab-chat {
+    display: grid;
+  }
+}
+
 .onboarding-overlay {
   position: fixed;
   inset: 0;
