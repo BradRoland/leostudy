@@ -3367,6 +3367,18 @@ textarea {
   padding: 6px 0;
 }
 
+.games-mode-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.game-leader-panel {
+  align-content: start;
+  gap: 10px;
+}
+
 .game-leaderboard-filters {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -3415,8 +3427,126 @@ textarea {
   justify-content: center;
 }
 
+.game-start-panel {
+  align-content: start;
+  justify-items: start;
+  gap: 12px;
+  min-height: 100%;
+}
+
+.game-start-panel .game-start-button {
+  justify-self: start;
+}
+
+.game-start-note {
+  margin: 0;
+}
+
 .game-leader-row {
   grid-template-columns: 48px minmax(0, 1fr) minmax(132px, auto);
+}
+
+.duel-invite-stack {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: 12px;
+  z-index: 56;
+  width: min(360px, calc(100vw - 24px));
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.duel-invite-card {
+  pointer-events: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 26px rgba(2, 8, 24, 0.28);
+  display: grid;
+  gap: 8px;
+}
+
+.duel-invite-card-fresh {
+  animation: duel-invite-pop 360ms cubic-bezier(0.2, 0.92, 0.2, 1);
+}
+
+.duel-invite-card-error {
+  border-color: color-mix(in srgb, var(--bad) 60%, var(--border));
+}
+
+@keyframes duel-invite-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.96);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.duel-invite-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.duel-invite-sender {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.duel-invite-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel-soft) 72%, transparent);
+}
+
+.duel-invite-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.duel-invite-copy strong {
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.duel-invite-copy span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.duel-invite-time {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.duel-invite-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.duel-invite-actions button {
+  flex: 1;
+  min-height: 34px;
 }
 
 .onevone-wrap {
@@ -3532,6 +3662,8 @@ textarea {
   flex-direction: column;
   align-items: center;
   gap: 16px;
+  width: 100%;
+  max-width: 440px;
 }
 
 .onevone-waiting-footer p {
@@ -3546,6 +3678,95 @@ textarea {
 .onevone-waiting-buttons button {
   min-width: 120px;
   padding: 12px 24px;
+}
+
+.onevone-waiting-chat {
+  width: 100%;
+  max-width: 440px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  padding: 10px;
+}
+
+.onevone-waiting-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.onevone-waiting-chat-list {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.onevone-waiting-chat-empty {
+  margin: 0;
+  text-align: center;
+  padding: 8px 4px;
+}
+
+.onevone-waiting-chat-message {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-soft) 85%, transparent);
+  padding: 7px 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.onevone-waiting-chat-message.own {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-soft));
+}
+
+.onevone-waiting-chat-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.74rem;
+}
+
+.onevone-waiting-chat-message p {
+  margin: 0;
+  line-height: 1.3;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.onevone-waiting-chat-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.onevone-waiting-chat-input input {
+  min-width: 0;
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel-soft) 92%, transparent);
+  color: var(--text);
+  padding: 9px 10px;
+  outline: none;
+}
+
+.onevone-waiting-chat-input input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 44%, transparent);
+}
+
+.onevone-waiting-chat-input button {
+  min-width: 84px;
 }
 
 .onevone-lobby-layout {
@@ -3742,7 +3963,7 @@ textarea {
 
 .onevone-entry-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
   align-items: stretch;
 }
@@ -3778,6 +3999,28 @@ textarea {
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;
+}
+
+.onevone-invite-cta {
+  width: 100%;
+  min-height: 92px;
+  border-radius: 14px;
+  text-align: left;
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+}
+
+.onevone-invite-cta span {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.onevone-invite-cta small {
+  color: color-mix(in srgb, currentColor 76%, transparent);
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .onevone-join-block {
@@ -3825,6 +4068,75 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.onevone-invite-modal {
+  width: min(760px, 100%);
+}
+
+.onevone-online-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.onevone-online-list-head p {
+  margin: 0;
+}
+
+.onevone-online-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(340px, 46vh);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.onevone-online-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--panel-soft) 82%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.onevone-online-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.onevone-online-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel-soft) 72%, transparent);
+}
+
+.onevone-online-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.onevone-online-copy strong {
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.onevone-online-copy span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .onevone-public-list {
@@ -4869,6 +5181,11 @@ button:disabled {
     padding: 10px;
   }
 
+  .games-mode-layout {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
   .game-leaderboard-filters {
     grid-template-columns: 1fr;
     gap: 6px;
@@ -4892,6 +5209,22 @@ button:disabled {
     width: 100%;
   }
 
+  .game-start-panel {
+    justify-items: stretch;
+  }
+
+  .duel-invite-stack {
+    top: max(6px, env(safe-area-inset-top));
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+
+  .duel-invite-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .onevone-grid.two-col,
   .onevone-match-grid,
   .onevone-lobby-layout,
@@ -4907,6 +5240,15 @@ button:disabled {
   .onevone-result-item,
   .onevone-join-row {
     grid-template-columns: 1fr;
+  }
+
+  .onevone-online-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .onevone-online-row .primary {
+    width: 100%;
   }
 
   .onevone-entry-grid {
@@ -4936,6 +5278,41 @@ button:disabled {
 
   .onevone-create-button {
     min-height: 74px;
+  }
+
+  .onevone-wrap:has(.onevone-waiting-room) {
+    padding-top: max(18px, env(safe-area-inset-top));
+  }
+
+  .onevone-waiting-room {
+    max-width: 100%;
+    padding: 12px;
+    gap: 14px;
+  }
+
+  .onevone-waiting-players {
+    gap: 10px;
+  }
+
+  .onevone-player-slot {
+    min-height: 84px;
+    padding: 14px 8px;
+  }
+
+  .onevone-player-slot-name {
+    font-size: 0.96rem;
+  }
+
+  .onevone-waiting-chat {
+    max-width: 100%;
+  }
+
+  .onevone-waiting-chat-list {
+    max-height: 132px;
+  }
+
+  .onevone-waiting-chat-input button {
+    min-width: 72px;
   }
 
   .onevone-result-overlay {

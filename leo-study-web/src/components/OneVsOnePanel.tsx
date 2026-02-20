@@ -96,6 +96,13 @@ type DuelRoomActivity = {
   createdAt: number
 }
 
+type ReadyRpcState = {
+  status?: DuelRoomStatus
+  ready_count?: number
+  player_count?: number
+  rematch_started?: boolean
+}
+
 type DuelStatsMode = 'all' | DuelGameType
 
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
@@ -157,6 +164,23 @@ type DuelProfileSnapshot = {
     losses: number
     matches: number
   }
+}
+
+type OnlineInviteUser = {
+  user_id: string
+  username: string
+  avatarUrl: string
+  supporterTier: SupporterTier
+  last_active: string
+}
+
+type WaitingRoomMessage = {
+  id: string
+  room_id: string
+  user_id: string
+  display_name: string
+  message: string
+  created_at: string
 }
 
 const supporterTierLabel: Record<SupporterTier, string> = {
@@ -288,6 +312,7 @@ function formatClock(ms: number) {
 }
 
 function formatActivityTime(value: number) {
+  if (!Number.isFinite(value)) return '--'
   return new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
@@ -325,12 +350,73 @@ function isMatchingRound(value: unknown): value is MatchingRoundPayload {
   return typeof row.round === 'number' && Array.isArray(row.pairs)
 }
 
-export function OneVsOnePanel(props: { currentUserId: string; currentUsername: string; isOwner?: boolean }) {
-  const { currentUserId, currentUsername, isOwner = false } = props
+function parseReadyRpcState(value: unknown): ReadyRpcState {
+  if (typeof value === 'string') {
+    const rawStatus = value.trim()
+    const validStatuses: DuelRoomStatus[] = ['waiting', 'in_progress', 'completed', 'cancelled']
+    if (validStatuses.includes(rawStatus as DuelRoomStatus)) {
+      return { status: rawStatus as DuelRoomStatus }
+    }
+    return {}
+  }
+  const payload = Array.isArray(value) ? value[0] : value
+  if (!payload || typeof payload !== 'object') return {}
+  const row = payload as Record<string, unknown>
+  const rawStatus = String(row.status || '').trim()
+  const validStatuses: DuelRoomStatus[] = ['waiting', 'in_progress', 'completed', 'cancelled']
+  return {
+    status: validStatuses.includes(rawStatus as DuelRoomStatus) ? (rawStatus as DuelRoomStatus) : undefined,
+    ready_count: typeof row.ready_count === 'number' ? Number(row.ready_count) : undefined,
+    player_count: typeof row.player_count === 'number' ? Number(row.player_count) : undefined,
+    rematch_started: Boolean(row.rematch_started),
+  }
+}
+
+function parseWaitingRoomMessage(value: unknown): WaitingRoomMessage | null {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const id = String(row.id || '').trim()
+  const roomId = String(row.room_id || '').trim()
+  const userId = String(row.user_id || '').trim()
+  const displayName = String(row.display_name || '').trim()
+  const message = String(row.message || '').trim()
+  const createdAt = String(row.created_at || '').trim()
+  if (!id || !roomId || !userId || !message || !createdAt) return null
+  return {
+    id,
+    room_id: roomId,
+    user_id: userId,
+    display_name: displayName || `User ${userId.slice(0, 8)}`,
+    message,
+    created_at: createdAt,
+  }
+}
+
+export function OneVsOnePanel(props: {
+  currentUserId: string
+  currentUsername: string
+  isOwner?: boolean
+  externalJoinRoomId?: string | null
+  onExternalJoinHandled?: () => void
+}) {
+  const {
+    currentUserId,
+    currentUsername,
+    isOwner = false,
+    externalJoinRoomId = null,
+    onExternalJoinHandled,
+  } = props
 
   const [selectedGameType, setSelectedGameType] = useState<DuelGameType>('quiz')
   const [selectedCategory, setSelectedCategory] = useState<DuelCategory>('all')
   const [isPublicRoom, setIsPublicRoom] = useState(true)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteGameType, setInviteGameType] = useState<DuelGameType>('quiz')
+  const [inviteCategory, setInviteCategory] = useState<DuelCategory>('all')
+  const [inviteQuizRounds, setInviteQuizRounds] = useState(10)
+  const [onlineInviteUsers, setOnlineInviteUsers] = useState<OnlineInviteUser[]>([])
+  const [onlineInviteLoading, setOnlineInviteLoading] = useState(false)
+  const [inviteSendingUserId, setInviteSendingUserId] = useState<string | null>(null)
 
   const [publicRooms, setPublicRooms] = useState<LobbyRoomItem[]>([])
   const [joinCodeInput, setJoinCodeInput] = useState('')
@@ -352,14 +438,15 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const [usernameByUserId, setUsernameByUserId] = useState<Record<string, string>>({})
   const [presenceUserIds, setPresenceUserIds] = useState<string[]>([])
   const [spectatorCount, setSpectatorCount] = useState(0)
-  void setPresenceUserIds
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null)
   const [rematchLoading, setRematchLoading] = useState(false)
-  const [rematchCategory, setRematchCategory] = useState<DuelCategory>('all')
+  const [waitingChatMessages, setWaitingChatMessages] = useState<WaitingRoomMessage[]>([])
+  const [waitingChatInput, setWaitingChatInput] = useState('')
+  const [waitingChatSending, setWaitingChatSending] = useState(false)
 
   const [roundStartedAt, setRoundStartedAt] = useState<number>(0)
   const [hudNow, setHudNow] = useState<number>(() => Date.now())
@@ -378,9 +465,16 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const previousRoomStatusRef = useRef<DuelRoomStatus | null>(null)
   const activityBootstrappedRef = useRef(false)
   const initializedRoundKeyRef = useRef('')
-  const rematchStartLockRef = useRef('')
+  const livePlayersRef = useRef<DuelRoomPlayerRow[]>([])
+  const refreshInFlightRef = useRef(false)
+  const refreshQueuedRef = useRef(false)
+  const waitingChatEndRef = useRef<HTMLDivElement | null>(null)
 
   const isSignedIn = currentUserId.trim().length > 0
+
+  useEffect(() => {
+    livePlayersRef.current = players
+  }, [players])
 
   const loadPublicRooms = useCallback(async () => {
     if (!supabase || !isSignedIn) return
@@ -420,6 +514,32 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       }
     })
     setPublicRoomHostNames(hostMap)
+  }, [isSignedIn])
+
+  const loadOnlineInviteUsers = useCallback(async () => {
+    if (!supabase || !isSignedIn) return
+    setOnlineInviteLoading(true)
+    const { data, error: rpcError } = await supabase.rpc('list_online_1v1_users', { p_minutes_interval: 5 })
+    setOnlineInviteLoading(false)
+    if (rpcError) {
+      setError(rpcError.message || 'Could not load online users.')
+      return
+    }
+    const mapped: OnlineInviteUser[] = (Array.isArray(data) ? data : []).map((row) => {
+      const value = row as Record<string, unknown>
+      const userId = String(value.user_id || '')
+      const username = String(value.username || '').trim()
+      const avatarPath = String(value.avatar_path || '')
+      const lastActive = String(value.last_active || '')
+      return {
+        user_id: userId,
+        username: username || `User ${userId.slice(0, 8)}`,
+        avatarUrl: toPublicAvatarUrl(avatarPath),
+        supporterTier: sanitizeSupporterTier(value.supporter_tier),
+        last_active: lastActive,
+      }
+    }).filter((row) => row.user_id)
+    setOnlineInviteUsers(mapped)
   }, [isSignedIn])
 
   const loadDuelLeaderboards = useCallback(async () => {
@@ -596,167 +716,228 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setMyDuelStats(entries.find((entry) => entry.user_id === currentUserId) || null)
   }, [currentUserId, duelStatsMode, isSignedIn])
 
+  const loadWaitingChatMessages = useCallback(async (targetRoomId: string) => {
+    if (!supabase || !isSignedIn) return
+    const cleanRoomId = targetRoomId.trim()
+    if (!cleanRoomId) return
+    const { data, error: rpcError } = await supabase.rpc('list_1v1_waiting_chat_messages', {
+      p_room_id: cleanRoomId,
+      p_limit: 80,
+    })
+    if (rpcError) {
+      const errorCode = String((rpcError as unknown as { code?: string }).code || '')
+      if (errorCode === '42P01' || errorCode === '42883') {
+        return
+      }
+      setError(rpcError.message || 'Could not load waiting-room chat.')
+      return
+    }
+    const parsed = (Array.isArray(data) ? data : [])
+      .map((row) => parseWaitingRoomMessage(row))
+      .filter((row): row is WaitingRoomMessage => row !== null)
+    setWaitingChatMessages(parsed)
+  }, [isSignedIn])
+
+  const sendWaitingChatMessage = useCallback(async () => {
+    if (!supabase || !room || room.status !== 'waiting') return
+    const nextMessage = waitingChatInput.trim()
+    if (!nextMessage || waitingChatSending) return
+    setWaitingChatSending(true)
+    const { data, error: rpcError } = await supabase.rpc('send_1v1_waiting_chat_message', {
+      p_room_id: room.id,
+      p_message: nextMessage,
+    })
+    setWaitingChatSending(false)
+    if (rpcError) {
+      setError(rpcError.message || 'Could not send waiting-room message.')
+      return
+    }
+
+    setWaitingChatInput('')
+    const inserted = parseWaitingRoomMessage(Array.isArray(data) ? data[0] : data)
+    if (!inserted) return
+    setWaitingChatMessages((previous) => {
+      const byId = new Map(previous.map((row) => [row.id, row]))
+      byId.set(inserted.id, inserted)
+      return Array.from(byId.values())
+        .sort((left, right) => Date.parse(left.created_at) - Date.parse(right.created_at))
+        .slice(-120)
+    })
+  }, [room, waitingChatInput, waitingChatSending])
+
   const refreshRoomSnapshot = useCallback(async () => {
     if (!supabase || !roomId || !isSignedIn) return
+    if (refreshInFlightRef.current) {
+      refreshQueuedRef.current = true
+      return
+    }
+    refreshInFlightRef.current = true
 
-    // First try direct queries (works when user is a player in the room)
-    const [{ data: roomRow, error: roomError }, { data: playerRows, error: playersError }, { data: resultRows, error: resultsError }] = await Promise.all([
-      supabase.from('rooms').select('*').eq('id', roomId).maybeSingle(),
-      supabase.from('room_players').select('*').eq('room_id', roomId).order('slot_no', { ascending: true }),
-      supabase.from('room_results').select('*').eq('room_id', roomId).order('placement', { ascending: true }),
-    ])
+    try {
+      // First try direct queries (works when user is a player in the room)
+      const [{ data: roomRow, error: roomError }, { data: playerRows, error: playersError }, { data: resultRows, error: resultsError }] = await Promise.all([
+        supabase.from('rooms').select('*').eq('id', roomId).maybeSingle(),
+        supabase.from('room_players').select('*').eq('room_id', roomId).order('slot_no', { ascending: true }),
+        supabase.from('room_results').select('*').eq('room_id', roomId).order('placement', { ascending: true }),
+      ])
 
-    // If room not found via direct query, try RPC (for spectators)
-    if (!roomRow) {
-      const { data: roomData, error: rpcError } = await supabase.rpc('get_1v1_room_details', { p_room_id: roomId })
-      // RPC returns an array, get first element
-      const rpcResult = Array.isArray(roomData) ? roomData[0] : roomData
-      if (rpcError || !rpcResult || !rpcResult.room) {
-        setError('Could not load room.')
+      // If room not found via direct query, try RPC (for spectators)
+      if (!roomRow) {
+        const { data: roomData, error: rpcError } = await supabase.rpc('get_1v1_room_details', { p_room_id: roomId })
+        const rpcResult = Array.isArray(roomData) ? roomData[0] : roomData
+        if (rpcError || !rpcResult || !rpcResult.room) {
+          setError('Could not load room.')
+          setRoomId(null)
+          setRoom(null)
+          setPlayers([])
+          setResults([])
+          return
+        }
+        const r = rpcResult.room
+        const mappedRoom: DuelRoomRow = {
+          id: String(r.id || ''),
+          host_user_id: String(r.host_user_id || ''),
+          game_type: String(r.game_type || 'quiz') as DuelGameType,
+          category: String(r.category || 'all') as DuelCategory,
+          is_public: Boolean(r.is_public),
+          join_code: r.join_code ? String(r.join_code) : null,
+          rounds: Number(r.rounds || 5),
+          question_set: r.question_set,
+          status: String(r.status || 'waiting') as DuelRoomStatus,
+          current_round: Number(r.current_round || 1),
+          winner_user_id: r.winner_user_id ? String(r.winner_user_id) : null,
+          rematch_room_id: r.rematch_room_id ? String(r.rematch_room_id) : null,
+          created_at: String(r.created_at || ''),
+          started_at: r.started_at ? String(r.started_at) : null,
+        }
+        const mappedPlayers: DuelRoomPlayerRow[] = (rpcResult.players || []).map((row: Record<string, unknown>) => ({
+          id: String(row.id || ''),
+          room_id: String(row.room_id || ''),
+          user_id: String(row.user_id || ''),
+          slot_no: Number(row.slot_no || 1),
+          is_ready: Boolean(row.is_ready),
+          score: Number(row.score || 0),
+          total_time_ms: Number(row.total_time_ms || 0),
+          fastest_round_ms: Number(row.fastest_round_ms || 0),
+          current_round: Number(row.current_round || 1),
+          last_seen: String(row.last_seen || ''),
+        }))
+        const mappedResults: DuelRoomResultRow[] = (rpcResult.results || []).map((row: Record<string, unknown>) => ({
+          id: String(row.id || ''),
+          room_id: String(row.room_id || ''),
+          user_id: String(row.user_id || ''),
+          score: Number(row.score || 0),
+          total_time_ms: Number(row.total_time_ms || 0),
+          placement: Number(row.placement || 2),
+          is_winner: Boolean(row.is_winner),
+        }))
+        setRoom(mappedRoom)
+        setPlayers(mappedPlayers)
+        setResults(mappedResults)
+        const userIds = mappedPlayers.map((p) => p.user_id)
+        if (userIds.length > 0) {
+          const { data: profileRows } = await supabase.from('profiles').select('user_id,username').in('user_id', userIds)
+          const nameMap: Record<string, string> = {}
+          ;(profileRows || []).forEach((row) => {
+            const uid = String(row.user_id || '')
+            nameMap[uid] = row.username || `User ${uid.slice(0, 8)}`
+          })
+          setUsernameByUserId(nameMap)
+        }
+        return
+      }
+
+      if (roomError) {
+        setError(roomError.message || 'Could not load room.')
+        return
+      }
+      if (playersError) {
+        setError(playersError.message || 'Could not load players.')
+        return
+      }
+      if (resultsError) {
+        setError(resultsError.message || 'Could not load results.')
+        return
+      }
+
+      if (!roomRow) {
         setRoomId(null)
         setRoom(null)
         setPlayers([])
         setResults([])
         return
       }
-      // Use RPC data
-      const r = rpcResult.room
+
       const mappedRoom: DuelRoomRow = {
-        id: String(r.id || ''),
-        host_user_id: String(r.host_user_id || ''),
-        game_type: String(r.game_type || 'quiz') as DuelGameType,
-        category: String(r.category || 'all') as DuelCategory,
-        is_public: Boolean(r.is_public),
-        join_code: r.join_code ? String(r.join_code) : null,
-        rounds: Number(r.rounds || 5),
-        question_set: r.question_set,
-        status: String(r.status || 'waiting') as DuelRoomStatus,
-        current_round: Number(r.current_round || 1),
-        winner_user_id: r.winner_user_id ? String(r.winner_user_id) : null,
-        rematch_room_id: r.rematch_room_id ? String(r.rematch_room_id) : null,
-        created_at: String(r.created_at || ''),
-        started_at: r.started_at ? String(r.started_at) : null,
+        id: String((roomRow as Record<string, unknown>).id || ''),
+        host_user_id: String((roomRow as Record<string, unknown>).host_user_id || ''),
+        game_type: String((roomRow as Record<string, unknown>).game_type || 'quiz') as DuelGameType,
+        category: String((roomRow as Record<string, unknown>).category || 'all') as DuelCategory,
+        is_public: Boolean((roomRow as Record<string, unknown>).is_public),
+        join_code: (roomRow as Record<string, unknown>).join_code ? String((roomRow as Record<string, unknown>).join_code) : null,
+        rounds: Number((roomRow as Record<string, unknown>).rounds || 5),
+        question_set: (roomRow as Record<string, unknown>).question_set,
+        status: String((roomRow as Record<string, unknown>).status || 'waiting') as DuelRoomStatus,
+        current_round: Number((roomRow as Record<string, unknown>).current_round || 1),
+        winner_user_id: (roomRow as Record<string, unknown>).winner_user_id ? String((roomRow as Record<string, unknown>).winner_user_id) : null,
+        rematch_room_id: (roomRow as Record<string, unknown>).rematch_room_id ? String((roomRow as Record<string, unknown>).rematch_room_id) : null,
+        created_at: String((roomRow as Record<string, unknown>).created_at || ''),
+        started_at: (roomRow as Record<string, unknown>).started_at ? String((roomRow as Record<string, unknown>).started_at) : null,
       }
-      const mappedPlayers: DuelRoomPlayerRow[] = (rpcResult.players || []).map((row: Record<string, unknown>) => ({
-        id: String(row.id || ''),
-        room_id: String(row.room_id || ''),
-        user_id: String(row.user_id || ''),
-        slot_no: Number(row.slot_no || 1),
-        is_ready: Boolean(row.is_ready),
-        score: Number(row.score || 0),
-        total_time_ms: Number(row.total_time_ms || 0),
-        fastest_round_ms: Number(row.fastest_round_ms || 0),
-        current_round: Number(row.current_round || 1),
-        last_seen: String(row.last_seen || ''),
+
+      const mappedPlayers: DuelRoomPlayerRow[] = (Array.isArray(playerRows) ? playerRows : []).map((row) => ({
+        id: String((row as Record<string, unknown>).id || ''),
+        room_id: String((row as Record<string, unknown>).room_id || ''),
+        user_id: String((row as Record<string, unknown>).user_id || ''),
+        slot_no: Number((row as Record<string, unknown>).slot_no || 1),
+        is_ready: Boolean((row as Record<string, unknown>).is_ready),
+        score: Number((row as Record<string, unknown>).score || 0),
+        total_time_ms: Number((row as Record<string, unknown>).total_time_ms || 0),
+        fastest_round_ms: Number((row as Record<string, unknown>).fastest_round_ms || 0),
+        current_round: Number((row as Record<string, unknown>).current_round || 1),
+        last_seen: String((row as Record<string, unknown>).last_seen || ''),
       }))
-      const mappedResults: DuelRoomResultRow[] = (rpcResult.results || []).map((row: Record<string, unknown>) => ({
-        id: String(row.id || ''),
-        room_id: String(row.room_id || ''),
-        user_id: String(row.user_id || ''),
-        score: Number(row.score || 0),
-        total_time_ms: Number(row.total_time_ms || 0),
-        placement: Number(row.placement || 2),
-        is_winner: Boolean(row.is_winner),
+
+      const mappedResults: DuelRoomResultRow[] = (Array.isArray(resultRows) ? resultRows : []).map((row) => ({
+        id: String((row as Record<string, unknown>).id || ''),
+        room_id: String((row as Record<string, unknown>).room_id || ''),
+        user_id: String((row as Record<string, unknown>).user_id || ''),
+        score: Number((row as Record<string, unknown>).score || 0),
+        total_time_ms: Number((row as Record<string, unknown>).total_time_ms || 0),
+        placement: Number((row as Record<string, unknown>).placement || 2),
+        is_winner: Boolean((row as Record<string, unknown>).is_winner),
       }))
+
       setRoom(mappedRoom)
       setPlayers(mappedPlayers)
       setResults(mappedResults)
-      const userIds = mappedPlayers.map((p) => p.user_id)
+
+      const userIds = mappedPlayers.map((player) => player.user_id)
       if (userIds.length > 0) {
-        const { data: profileRows } = await supabase.from('profiles').select('user_id,username').in('user_id', userIds)
+        const { data: profileRows } = await supabase
+          .from('profiles')
+          .select('user_id,username')
+          .in('user_id', userIds)
+
         const nameMap: Record<string, string> = {}
-        ;(profileRows || []).forEach((row) => {
-          const uid = String(row.user_id || '')
-          nameMap[uid] = row.username || `User ${uid.slice(0, 8)}`
+        ;(Array.isArray(profileRows) ? profileRows : []).forEach((row) => {
+          const value = row as Record<string, unknown>
+          const userId = String(value.user_id || '')
+          const username = String(value.username || '').trim()
+          if (userId) nameMap[userId] = username || `User ${userId.slice(0, 8)}`
         })
         setUsernameByUserId(nameMap)
       }
-      return
+    } finally {
+      refreshInFlightRef.current = false
+      if (refreshQueuedRef.current) {
+        refreshQueuedRef.current = false
+        window.setTimeout(() => {
+          void refreshRoomSnapshot()
+        }, 60)
+      }
     }
-
-    // Room found via direct query - process normally
-    if (roomError) {
-      setError(roomError.message || 'Could not load room.')
-      return
-    }
-    if (playersError) {
-      setError(playersError.message || 'Could not load players.')
-      return
-    }
-    if (resultsError) {
-      setError(resultsError.message || 'Could not load results.')
-      return
-    }
-
-    if (!roomRow) {
-      setRoomId(null)
-      setRoom(null)
-      setPlayers([])
-      setResults([])
-      return
-    }
-
-    const mappedRoom: DuelRoomRow = {
-      id: String((roomRow as Record<string, unknown>).id || ''),
-      host_user_id: String((roomRow as Record<string, unknown>).host_user_id || ''),
-      game_type: String((roomRow as Record<string, unknown>).game_type || 'quiz') as DuelGameType,
-      category: String((roomRow as Record<string, unknown>).category || 'all') as DuelCategory,
-      is_public: Boolean((roomRow as Record<string, unknown>).is_public),
-      join_code: (roomRow as Record<string, unknown>).join_code ? String((roomRow as Record<string, unknown>).join_code) : null,
-      rounds: Number((roomRow as Record<string, unknown>).rounds || 5),
-      question_set: (roomRow as Record<string, unknown>).question_set,
-      status: String((roomRow as Record<string, unknown>).status || 'waiting') as DuelRoomStatus,
-      current_round: Number((roomRow as Record<string, unknown>).current_round || 1),
-      winner_user_id: (roomRow as Record<string, unknown>).winner_user_id ? String((roomRow as Record<string, unknown>).winner_user_id) : null,
-      rematch_room_id: (roomRow as Record<string, unknown>).rematch_room_id ? String((roomRow as Record<string, unknown>).rematch_room_id) : null,
-      created_at: String((roomRow as Record<string, unknown>).created_at || ''),
-      started_at: (roomRow as Record<string, unknown>).started_at ? String((roomRow as Record<string, unknown>).started_at) : null,
-    }
-
-    const mappedPlayers: DuelRoomPlayerRow[] = (Array.isArray(playerRows) ? playerRows : []).map((row) => ({
-      id: String((row as Record<string, unknown>).id || ''),
-      room_id: String((row as Record<string, unknown>).room_id || ''),
-      user_id: String((row as Record<string, unknown>).user_id || ''),
-      slot_no: Number((row as Record<string, unknown>).slot_no || 1),
-      is_ready: Boolean((row as Record<string, unknown>).is_ready),
-      score: Number((row as Record<string, unknown>).score || 0),
-      total_time_ms: Number((row as Record<string, unknown>).total_time_ms || 0),
-      fastest_round_ms: Number((row as Record<string, unknown>).fastest_round_ms || 0),
-      current_round: Number((row as Record<string, unknown>).current_round || 1),
-      last_seen: String((row as Record<string, unknown>).last_seen || ''),
-    }))
-
-    const mappedResults: DuelRoomResultRow[] = (Array.isArray(resultRows) ? resultRows : []).map((row) => ({
-      id: String((row as Record<string, unknown>).id || ''),
-      room_id: String((row as Record<string, unknown>).room_id || ''),
-      user_id: String((row as Record<string, unknown>).user_id || ''),
-      score: Number((row as Record<string, unknown>).score || 0),
-      total_time_ms: Number((row as Record<string, unknown>).total_time_ms || 0),
-      placement: Number((row as Record<string, unknown>).placement || 2),
-      is_winner: Boolean((row as Record<string, unknown>).is_winner),
-    }))
-
-    setRoom(mappedRoom)
-    setPlayers(mappedPlayers)
-    setResults(mappedResults)
-
-    const userIds = mappedPlayers.map((player) => player.user_id)
-    if (userIds.length > 0) {
-      const { data: profileRows } = await supabase
-        .from('profiles')
-        .select('user_id,username')
-        .in('user_id', userIds)
-
-      const nameMap: Record<string, string> = {}
-      ;(Array.isArray(profileRows) ? profileRows : []).forEach((row) => {
-        const value = row as Record<string, unknown>
-        const userId = String(value.user_id || '')
-        const username = String(value.username || '').trim()
-        if (userId) nameMap[userId] = username || `User ${userId.slice(0, 8)}`
-      })
-      setUsernameByUserId(nameMap)
-    }
-  }, [currentUserId, isSignedIn, roomId, supabase])
+  }, [isSignedIn, roomId])
 
   useEffect(() => {
     if (!isSignedIn) return
@@ -767,11 +948,31 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     return () => window.clearInterval(timer)
   }, [isSignedIn, loadPublicRooms])
 
-  // Debug: log room status changes
   useEffect(() => {
-    if (room) {
-          }
-  }, [room?.status, room?.current_round, room?.winner_user_id])
+    if (!isSignedIn || !showInviteModal) return
+    void loadOnlineInviteUsers()
+    const timer = window.setInterval(() => {
+      void loadOnlineInviteUsers()
+    }, 15000)
+    return () => window.clearInterval(timer)
+  }, [isSignedIn, loadOnlineInviteUsers, showInviteModal])
+
+  useEffect(() => {
+    if (inviteGameType === 'matching' && inviteCategory === 'scenarios') {
+      setInviteCategory('all')
+    }
+  }, [inviteCategory, inviteGameType])
+
+  useEffect(() => {
+    if (!externalJoinRoomId) return
+    if (roomId === externalJoinRoomId) {
+      onExternalJoinHandled?.()
+      return
+    }
+    setRoomId(externalJoinRoomId)
+    setNotice('Invite accepted. Joined 1v1 room.')
+    onExternalJoinHandled?.()
+  }, [externalJoinRoomId, onExternalJoinHandled, roomId])
 
   useEffect(() => {
     if (!isSignedIn) return
@@ -781,6 +982,28 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     }, 18000)
     return () => window.clearInterval(timer)
   }, [isSignedIn, loadDuelLeaderboards])
+
+  useEffect(() => {
+    if (!roomId || !room || room.status !== 'waiting') {
+      setWaitingChatMessages([])
+      setWaitingChatInput('')
+      return
+    }
+    void loadWaitingChatMessages(roomId)
+  }, [loadWaitingChatMessages, room, roomId])
+
+  useEffect(() => {
+    if (!roomId || !room || room.status !== 'waiting') return
+    const timer = window.setInterval(() => {
+      void loadWaitingChatMessages(roomId)
+    }, 6000)
+    return () => window.clearInterval(timer)
+  }, [loadWaitingChatMessages, room, roomId])
+
+  useEffect(() => {
+    if (waitingChatMessages.length === 0) return
+    waitingChatEndRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+  }, [waitingChatMessages])
 
   useEffect(() => {
     const client = supabase
@@ -806,13 +1029,16 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_results', filter: `room_id=eq.${roomId}` }, () => {
         void refreshRoomSnapshot()
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'duel_room_messages', filter: `room_id=eq.${roomId}` }, () => {
+        void loadWaitingChatMessages(roomId)
+      })
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState()
         const ids = Object.keys(state)
         setPresenceUserIds(ids)
         
         // Count spectators: users in presence but NOT in the player list
-        const playerUserIds = players.map(p => p.user_id)
+        const playerUserIds = livePlayersRef.current.map((player) => player.user_id)
         const spectatorIds = ids.filter(id => !playerUserIds.includes(id))
         setSpectatorCount(spectatorIds.length)
       })
@@ -829,7 +1055,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     return () => {
       void client.removeChannel(channel)
     }
-  }, [currentUserId, isSignedIn, players, refreshRoomSnapshot, roomId])
+  }, [currentUserId, isSignedIn, loadWaitingChatMessages, refreshRoomSnapshot, roomId])
 
   useEffect(() => {
     const client = supabase
@@ -981,6 +1207,80 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setNotice('Room created. Waiting for opponent.')
   }
 
+  const openInviteModal = () => {
+    setInviteGameType(selectedGameType)
+    setInviteCategory(selectedCategory)
+    setInviteQuizRounds(selectedQuizRounds)
+    setShowInviteModal(true)
+    setError('')
+    setNotice('')
+  }
+
+  const sendInvite = async (targetUser: OnlineInviteUser) => {
+    if (!supabase || !isSignedIn) return
+    setInviteSendingUserId(targetUser.user_id)
+    setError('')
+    setNotice('')
+    const inviteRounds = inviteGameType === 'quiz' ? inviteQuizRounds : 5
+    const { data, error: rpcError } = await supabase.rpc('create_1v1_invite', {
+      p_target_user_id: targetUser.user_id,
+      p_game_type: inviteGameType,
+      p_category: inviteCategory,
+      p_rounds: inviteRounds,
+    })
+    setInviteSendingUserId(null)
+    if (rpcError) {
+      setError(rpcError.message || 'Could not send invite.')
+      return
+    }
+    const payload = Array.isArray(data) ? data[0] : data
+    const nextRoomId = payload && typeof payload === 'object'
+      ? String((payload as Record<string, unknown>).room_id || '')
+      : ''
+    const nextInviteId = payload && typeof payload === 'object'
+      ? String((payload as Record<string, unknown>).invite_id || '')
+      : ''
+    if (!nextRoomId) {
+      setError('Invite was sent but room id was missing.')
+      return
+    }
+
+    if (supabase) {
+      const broadcastChannel = supabase.channel('duel-invite-broadcast')
+      await new Promise<void>((resolve) => {
+        let done = false
+        const finish = () => {
+          if (done) return
+          done = true
+          resolve()
+        }
+        broadcastChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED' || status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+            finish()
+          }
+        })
+        window.setTimeout(finish, 350)
+      })
+
+      void broadcastChannel.send({
+        type: 'broadcast',
+        event: 'duel-invite-created',
+        payload: {
+          target_user_id: targetUser.user_id,
+          sender_user_id: currentUserId,
+          invite_id: nextInviteId || null,
+          room_id: nextRoomId,
+          sent_at: new Date().toISOString(),
+        },
+      })
+      void supabase.removeChannel(broadcastChannel)
+    }
+
+    setShowInviteModal(false)
+    setRoomId(nextRoomId)
+    setNotice(`Invite sent to ${targetUser.username}. Waiting for response.`)
+  }
+
   const joinByCode = async () => {
     if (!supabase || !isSignedIn) return
     const code = joinCodeInput.trim()
@@ -1027,9 +1327,33 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const setReady = async (ready: boolean) => {
     if (!supabase || !roomId) return
     setError('')
-    const { error: rpcError } = await supabase.rpc('set_1v1_ready', { p_room_id: roomId, p_ready: ready })
+    const previousRoomStatus = room?.status
+    const { data, error: rpcError } = await supabase.rpc('set_1v1_ready', { p_room_id: roomId, p_ready: ready })
     if (rpcError) {
       setError(rpcError.message || 'Could not update ready status.')
+      return
+    }
+
+    const state = parseReadyRpcState(data)
+    void refreshRoomSnapshot()
+
+    if (state.rematch_started) {
+      setNotice('2/2 agreed. Starting rematch in 3…')
+      return
+    }
+
+    if (previousRoomStatus === 'completed' || state.status === 'completed') {
+      if (ready) {
+        const readyCount = state.ready_count ?? 1
+        setNotice(`${Math.min(2, Math.max(0, readyCount))}/2 agreed. Waiting for opponent…`)
+      } else {
+        setNotice('Rematch vote removed.')
+      }
+      return
+    }
+
+    if ((previousRoomStatus === 'waiting' || state.status === 'waiting') && ready && state.player_count === 2 && state.ready_count === 2) {
+      setNotice('2/2 ready. Match starts in 3…')
     }
   }
 
@@ -1049,7 +1373,6 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       setError(rpcError.message || 'Could not submit round.')
       return
     }
-    await refreshRoomSnapshot()
   }
 
   const submitQuizRound = async () => {
@@ -1146,7 +1469,6 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
 
   const leaveRoom = useCallback(() => {
     initializedRoundKeyRef.current = ''
-    rematchStartLockRef.current = ''
     setRoomId(null)
     setRoom(null)
     setPlayers([])
@@ -1163,6 +1485,9 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     setMatchingRoundPoints(0)
     setMatchingSubmitted(false)
     setRematchLoading(false)
+    setWaitingChatMessages([])
+    setWaitingChatInput('')
+    setWaitingChatSending(false)
     setActivityLog([])
     previousPlayersRef.current = []
     previousRoomStatusRef.current = null
@@ -1246,107 +1571,12 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }, [leaveRoom, loadPublicRooms, roomId, supabase])
 
   const toggleRematchVote = async () => {
-    if (!supabase || !room || room.status !== 'completed') return
-    
+    if (!room || room.status !== 'completed') return
+    const nextReadyState = !Boolean(myPlayer?.is_ready)
     setRematchLoading(true)
-    setError('')
-    
-    // Toggle my ready status (don't start rematch yet)
-    const newReadyState = !myPlayer?.is_ready
-    const { error: readyError } = await supabase.rpc('set_1v1_ready', {
-      p_room_id: room.id,
-      p_ready: newReadyState,
-    })
-    
-    if (readyError) {
-      console.error('Rematch ready error:', readyError)
-      setRematchLoading(false)
-      setError(readyError.message || 'Could not set ready status.')
-      return
-    }
-    
-    // Refresh to get updated ready states
-    await refreshRoomSnapshot()
-    
+    await setReady(nextReadyState)
     setRematchLoading(false)
-    
-    // Check if both players are ready - if so, start the rematch
-    const bothReady = players.filter(p => p.is_ready).length === 2
-    if (bothReady) {
-      setError('')
-      setRematchLoading(true)
-      
-      // Call rematch to reset room with new questions
-      const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
-        p_room_id: room.id,
-        p_category: rematchCategory,
-      })
-      
-      if (rpcError) {
-        console.error('Rematch error:', rpcError)
-        setRematchLoading(false)
-        setError(rpcError.message || 'Could not start rematch.')
-        return
-      }
-      
-      // Force complete local state reset
-      initializedRoundKeyRef.current = ''
-      rematchStartLockRef.current = ''
-      setResults([])
-      setMatchingCards([])
-      setSelectedMatchingCards([])
-      setWrongMatchingCardIds([])
-      setMatchedPairIds([])
-      setMatchingMistakes(0)
-      setMatchingRoundPoints(0)
-      setMatchingSubmitted(false)
-      setQuizChoice(null)
-      setQuizLocked(false)
-      
-      // Refresh room - this should show status: 'waiting'
-      await refreshRoomSnapshot()
-      
-      // Force clear ALL game state again after refresh to ensure no stale data
-      setResults([])
-      setMatchingCards([])
-      setSelectedMatchingCards([])
-      setWrongMatchingCardIds([])
-      setMatchedPairIds([])
-      setMatchingMistakes(0)
-      setMatchingRoundPoints(0)
-      setMatchingSubmitted(false)
-      setQuizChoice(null)
-      setQuizLocked(false)
-      setRoundStartedAt(0)
-      
-      setRematchLoading(false)
-    }
   }
-
-  const startRematch = useCallback(async () => {
-    if (!supabase || !room || room.status !== 'completed') return
-    
-    setRematchLoading(true)
-    setError('')
-    
-    // Call rematch to reset the room with new questions
-    const { data, error: rpcError } = await supabase.rpc('rematch_1v1_room', {
-      p_room_id: room.id,
-      p_category: rematchCategory,
-    })
-    
-    setRematchLoading(false)
-    
-    if (rpcError) {
-      rematchStartLockRef.current = ''
-      setError(rpcError.message || 'Could not start rematch.')
-      return
-    }
-    
-    // Refresh room state - don't change roomId, just refresh data
-    void refreshRoomSnapshot()
-    setNotice('Rematch starting...')
-  }, [room, rematchCategory, supabase, refreshRoomSnapshot])
 
   const roomPlayerRowsSorted = useMemo(() => {
     if (results.length > 0) {
@@ -1365,7 +1595,24 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const lobbyReadyCount = players.filter((player) => player.is_ready).length
   const rematchReadyCount = room?.status === 'completed' ? players.filter((player) => player.is_ready).length : 0
   const myRematchRequested = room?.status === 'completed' ? Boolean(myPlayer?.is_ready) : false
-  console.log('Rematch state:', { rematchReadyCount, myRematchRequested, players: players.map(p => ({ user_id: p.user_id?.slice(0,8), is_ready: p.is_ready })), status: room?.status })
+  const rematchStatusText = room?.status === 'completed'
+    ? rematchReadyCount >= 2
+      ? '2/2 agreed. Starting rematch…'
+      : rematchReadyCount === 1
+        ? '1/2 agreed. Waiting for opponent…'
+        : 'Both players must agree to start a rematch.'
+    : ''
+  const waitingChatSendDisabled = waitingChatSending || !waitingChatInput.trim() || !room || room.status !== 'waiting'
+  const inviteGameLabel = inviteGameType === 'quiz' ? 'Quiz' : 'Matching'
+  const inviteCategoryLabel = inviteCategory === 'all'
+    ? 'ALL'
+    : inviteCategory === 'pc'
+      ? 'PC'
+      : inviteCategory === 'vc'
+        ? 'VC'
+        : inviteCategory === 'hs'
+          ? 'HS'
+          : 'Scenarios'
   const inRoom = Boolean(room && roomId)
   // const waitingPlayersCount = players.length
   // const waitingStatusMessage = waitingPlayersCount < 2
@@ -1568,15 +1815,6 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   }, [loadDuelLeaderboards, loadPublicRooms, room, refreshRoomSnapshot])
 
   useEffect(() => {
-    if (!room || room.status !== 'completed') return
-    if (room.game_type === 'matching' && room.category === 'scenarios') {
-      setRematchCategory('all')
-      return
-    }
-    setRematchCategory(room.category)
-  }, [room])
-
-  useEffect(() => {
     if (!selectedDuelProfileUserId) return
     if (duelProfileByUserId[selectedDuelProfileUserId]) return
     setSelectedDuelProfileUserId(null)
@@ -1722,6 +1960,15 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                   >
                     <span>Create your own room</span>
                     <small>Choose game mode, category, privacy, and question count.</small>
+                  </button>
+                  <button
+                    className="secondary onevone-invite-cta"
+                    type="button"
+                    onClick={openInviteModal}
+                    disabled={loading || !supabase}
+                  >
+                    <span>Invite a Friend</span>
+                    <small>Send a direct 1v1 invite to someone online now.</small>
                   </button>
                   <div className="onevone-join-block">
                     <p className="muted tiny">Join Private Room</p>
@@ -1889,6 +2136,118 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
         </div>
       ) : null}
 
+      {!inRoom && showInviteModal ? (
+        <div
+          className="profile-modal-overlay game-setup-overlay"
+          onClick={() => setShowInviteModal(false)}
+        >
+          <div className="card game-settings-modal onevone-invite-modal" onClick={(event) => event.stopPropagation()}>
+            <h3>Invite a Friend</h3>
+            <p className="muted tiny">
+              Pick game settings, then send an invite to someone currently online.
+            </p>
+            <label className="game-control">
+              Game Mode
+              <div className="segmented">
+                <button
+                  type="button"
+                  className={inviteGameType === 'quiz' ? 'seg active' : 'seg'}
+                  onClick={() => setInviteGameType('quiz')}
+                >
+                  1v1 Quiz
+                </button>
+                <button
+                  type="button"
+                  className={inviteGameType === 'matching' ? 'seg active' : 'seg'}
+                  onClick={() => {
+                    setInviteGameType('matching')
+                    if (inviteCategory === 'scenarios') setInviteCategory('all')
+                  }}
+                >
+                  1v1 Matching
+                </button>
+              </div>
+            </label>
+            <label className="game-control">
+              Category
+              <div className="segmented">
+                {duelCategoryOptions
+                  .filter((option) => !(inviteGameType === 'matching' && option.quizOnly))
+                  .map((option) => (
+                    <button
+                      key={`invite-category-${option.value}`}
+                      type="button"
+                      className={inviteCategory === option.value ? 'seg active' : 'seg'}
+                      onClick={() => setInviteCategory(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+              </div>
+            </label>
+            {inviteGameType === 'quiz' ? (
+              <label className="game-control">
+                Questions
+                <div className="segmented">
+                  {duelQuizRoundOptions.map((count) => (
+                    <button
+                      key={`invite-rounds-${count}`}
+                      type="button"
+                      className={inviteQuizRounds === count ? 'seg active' : 'seg'}
+                      onClick={() => setInviteQuizRounds(count)}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </div>
+              </label>
+            ) : null}
+
+            <div className="onevone-online-list-head">
+              <p className="muted tiny">Online Now</p>
+              <button className="secondary" type="button" onClick={() => void loadOnlineInviteUsers()} disabled={onlineInviteLoading}>
+                Refresh
+              </button>
+            </div>
+
+            {onlineInviteUsers.length === 0 ? (
+              <p className="muted tiny">{onlineInviteLoading ? 'Loading online users…' : 'No one is online right now.'}</p>
+            ) : (
+              <div className="onevone-online-list">
+                {onlineInviteUsers.map((user) => (
+                  <article key={`online-user-${user.user_id}`} className="onevone-online-row">
+                    <div className="onevone-online-user">
+                      <img src={user.avatarUrl} alt={user.username} className="onevone-online-avatar" onError={handleAvatarImageError} />
+                      <div className="onevone-online-copy">
+                        <strong>{user.username}</strong>
+                        <span className="muted tiny">
+                          Invite: {inviteGameLabel} • {inviteCategoryLabel}
+                          {inviteGameType === 'quiz' ? ` • ${inviteQuizRounds} questions` : ''}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={() => void sendInvite(user)}
+                      disabled={Boolean(inviteSendingUserId)}
+                    >
+                      {inviteSendingUserId === user.user_id ? 'Sending…' : 'Send Invite'}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            <div className="actions-row">
+              <button className="secondary" type="button" onClick={() => setShowInviteModal(false)} disabled={Boolean(inviteSendingUserId)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {inRoom && room ? (
         <>
           {room.status !== 'completed' && room.status !== 'waiting' ? (
@@ -1965,6 +2324,51 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     {myPlayer?.is_ready ? 'Ready!' : 'Ready Up'}
                   </button>
                   <button className="secondary" onClick={() => void leaveCurrentRoom()}>Leave</button>
+                </div>
+                <div className="onevone-waiting-chat">
+                  <div className="onevone-waiting-chat-head">
+                    <strong>Room Chat</strong>
+                    <span className="muted tiny">Only you and your opponent can see this.</span>
+                  </div>
+                  <div className="onevone-waiting-chat-list">
+                    {waitingChatMessages.length === 0 ? (
+                      <p className="onevone-waiting-chat-empty muted tiny">No messages yet. Say hi before the match starts.</p>
+                    ) : waitingChatMessages.map((entry) => {
+                      const isMine = entry.user_id === currentUserId
+                      return (
+                        <article key={entry.id} className={`onevone-waiting-chat-message ${isMine ? 'own' : ''}`}>
+                          <div className="onevone-waiting-chat-meta">
+                            <span>{isMine ? 'You' : entry.display_name}</span>
+                            <small className="muted">{formatActivityTime(Date.parse(entry.created_at))}</small>
+                          </div>
+                          <p>{entry.message}</p>
+                        </article>
+                      )
+                    })}
+                    <div ref={waitingChatEndRef} />
+                  </div>
+                  <div className="onevone-waiting-chat-input">
+                    <input
+                      type="text"
+                      value={waitingChatInput}
+                      onChange={(event) => setWaitingChatInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter') return
+                        event.preventDefault()
+                        void sendWaitingChatMessage()
+                      }}
+                      maxLength={240}
+                      placeholder="Send a message..."
+                    />
+                    <button
+                      type="button"
+                      className="primary"
+                      disabled={waitingChatSendDisabled}
+                      onClick={() => void sendWaitingChatMessage()}
+                    >
+                      {waitingChatSending ? 'Sending…' : 'Send'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2287,8 +2691,9 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                 <div className="onevone-rematch-panel">
                   <div className="onevone-rematch-head">
                     <p className="muted tiny">Rematch</p>
-                    <p className="muted tiny">{rematchReadyCount}/2 ready</p>
+                    <p className="muted tiny">{rematchReadyCount}/2 agreed</p>
                   </div>
+                  <p className="muted tiny">{rematchStatusText}</p>
                   <div className="actions-row">
                     <button
                       className={`primary ${myRematchRequested ? 'ready' : ''}`}

@@ -6,6 +6,7 @@ import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem } f
 import { useOwner } from './hooks/useOwner'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { OneVsOnePanel } from './components/OneVsOnePanel'
+import { DuelInviteBanner } from './components/DuelInviteBanner'
 import { GlobalChatWidget } from './components/GlobalChatWidget'
 import './components/GlobalChatWidget.css'
 
@@ -1846,6 +1847,7 @@ function App() {
   const [scenarioSelectedChoice, setScenarioSelectedChoice] = useState<number | null>(null)
   const [scenarioStreak, setScenarioStreak] = useState(0)
   const [gamesMode, setGamesMode] = useState<'matching' | 'speed' | 'duel'>('matching')
+  const [duelInviteJoinRoomId, setDuelInviteJoinRoomId] = useState<string | null>(null)
   const homeMatchingRotationIndexRef = useRef(0)
   const homeSpeedRotationIndexRef = useRef(0)
   const lastAppStateUpdateRef = useRef(0)
@@ -5241,6 +5243,20 @@ function App() {
         </div>
       ) : null}
 
+      {authReady && currentUserId ? (
+        <DuelInviteBanner
+          currentUserId={currentUserId}
+          onJoinRoom={(nextRoomId) => {
+            setGamesMode('duel')
+            setActiveTab('games')
+            setDuelInviteJoinRoomId(nextRoomId)
+            if (!isGamesPage) {
+              navigate('/games')
+            }
+          }}
+        />
+      ) : null}
+
       {authReady && !currentUserId && isSignInPage ? (
         <div className="onboarding-overlay">
           <div className="onboarding-card">
@@ -6190,11 +6206,84 @@ function App() {
               <>
             <h2>Matching</h2>
             {!matchRunning && !matchDone ? (
-              <div className="card game-launch-card">
-                <button className="primary game-start-button" onClick={() => setShowMatchSetupModal(true)}>
-                  <AppIcon name="games" className="button-icon" />
-                  Start Matching
-                </button>
+              <div className="games-mode-layout">
+                <div className="card leaderboard-card game-leader-panel">
+                  {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
+                  <div className="leaderboard-card-head">
+                    <h3>Matching Leaderboard</h3>
+                    <p className="leaderboard-card-subtitle">Top scores for the selected mode</p>
+                  </div>
+                  <div className="game-leaderboard-filters">
+                    <div className="game-filter-group">
+                      <span className="game-filter-label">Time</span>
+                      <div className="segmented compact-segmented">
+                        {[15, 30, 60].map((duration) => (
+                          <button
+                            key={duration}
+                            className={gamesSelection.duration === duration ? 'seg active compact-seg' : 'seg compact-seg'}
+                            onClick={() => setGamesSelection((prev) => ({ ...prev, duration: duration as HomeDurationFilter }))}
+                          >
+                            {duration}s
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="game-filter-group">
+                      <span className="game-filter-label">Code Set</span>
+                      <div className="segmented compact-segmented">
+                        {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                          <button
+                            key={filter}
+                            className={gamesSelection.filter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
+                            onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}
+                          >
+                            {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {matchingLeaderboard.length === 0 ? (
+                    <p className="muted">No scores submitted yet.</p>
+                  ) : (
+                    matchingLeaderboard.map((entry, index) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        className="leader-row leader-row-button game-leader-row leader-row-rich"
+                        onClick={() => {
+                          setSelectedLeaderboardEntry(entry)
+                          setSelectedLeaderboardIsTop(index === 0)
+                        }}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className="leader-avatar-frame">
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <LeaderboardPlayerName entry={entry} />
+                        </span>
+                        <span className="leader-result">
+                          <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                          <strong>{entry.score} pts</strong>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                <div className="card game-launch-card game-start-panel">
+                  <button className="primary game-start-button" onClick={() => setShowMatchSetupModal(true)}>
+                    <AppIcon name="games" className="button-icon" />
+                    Start Matching
+                  </button>
+                  <p className="muted tiny game-start-note">
+                    Mode: {gamesSelection.duration}s • {gamesSelection.filter === 'all' ? 'All Codes' : codeSetLabel[gamesSelection.filter]}
+                  </p>
+                </div>
               </div>
             ) : null}
 
@@ -6268,75 +6357,6 @@ function App() {
                 </div>
               </div>
             ) : null}
-
-            {!matchRunning && !matchDone ? (
-            <>
-            <h2>Matching Leaderboard</h2>
-            <div className="card leaderboard-card">
-              {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
-              <div className="game-leaderboard-filters">
-                <div className="game-filter-group">
-                  <span className="game-filter-label">Time</span>
-                  <div className="segmented compact-segmented">
-                    {[15, 30, 60].map((duration) => (
-                      <button
-                        key={duration}
-                        className={gamesSelection.duration === duration ? 'seg active compact-seg' : 'seg compact-seg'}
-                        onClick={() => setGamesSelection((prev) => ({ ...prev, duration: duration as HomeDurationFilter }))}
-                      >
-                        {duration}s
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="game-filter-group">
-                  <span className="game-filter-label">Code Set</span>
-                  <div className="segmented compact-segmented">
-                    {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                      <button
-                        key={filter}
-                        className={gamesSelection.filter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
-                        onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}
-                      >
-                        {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {matchingLeaderboard.length === 0 ? (
-                <p className="muted">No scores submitted yet.</p>
-              ) : (
-                matchingLeaderboard.map((entry, index) => (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    className="leader-row leader-row-button game-leader-row leader-row-rich"
-                    onClick={() => {
-                      setSelectedLeaderboardEntry(entry)
-                      setSelectedLeaderboardIsTop(index === 0)
-                    }}
-                  >
-                    <span className="leader-rank">#{index + 1}</span>
-                    <span className="leader-player">
-                      <span className="leader-avatar-wrap">
-                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                        <span className="leader-avatar-frame">
-                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
-                        </span>
-                      </span>
-                      <LeaderboardPlayerName entry={entry} />
-                    </span>
-                    <span className="leader-result">
-                      <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
-                      <strong>{entry.score} pts</strong>
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-            </>
-            ) : null}
               </>
             ) : null}
 
@@ -6344,12 +6364,85 @@ function App() {
               <>
             <h2>Speed Test</h2>
             {!speedRunning && !speedDone ? (
-              <div className="card game-launch-card">
-                <button className="primary game-start-button" onClick={() => setShowSpeedSetupModal(true)} disabled={speedQuestionBank.length === 0}>
-                  <AppIcon name="study" className="button-icon" />
-                  Start Speed Test
-                </button>
-                {speedQuestionBank.length === 0 ? <p className="muted">No speed test questions loaded.</p> : null}
+              <div className="games-mode-layout">
+                <div className="card leaderboard-card game-leader-panel">
+                  {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
+                  <div className="leaderboard-card-head">
+                    <h3>Speed Test Leaderboard</h3>
+                    <p className="leaderboard-card-subtitle">Top scores for the selected mode</p>
+                  </div>
+                  <div className="game-leaderboard-filters">
+                    <div className="game-filter-group">
+                      <span className="game-filter-label">Time</span>
+                      <div className="segmented compact-segmented">
+                        {[15, 30, 60].map((duration) => (
+                          <button
+                            key={`speed-leader-time-${duration}`}
+                            className={gamesSelection.duration === duration ? 'seg active compact-seg' : 'seg compact-seg'}
+                            onClick={() => setGamesSelection((prev) => ({ ...prev, duration: duration as HomeDurationFilter }))}
+                          >
+                            {duration}s
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="game-filter-group">
+                      <span className="game-filter-label">Code Set</span>
+                      <div className="segmented compact-segmented">
+                        {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                          <button
+                            key={`speed-leader-filter-${filter}`}
+                            className={gamesSelection.filter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
+                            onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}
+                          >
+                            {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {speedLeaderboard.length === 0 ? (
+                    <p className="muted">No speed test scores submitted yet.</p>
+                  ) : (
+                    speedLeaderboard.map((entry, index) => (
+                      <button
+                        key={`speed-${entry.id}`}
+                        type="button"
+                        className="leader-row leader-row-button game-leader-row leader-row-rich"
+                        onClick={() => {
+                          setSelectedLeaderboardEntry(entry)
+                          setSelectedLeaderboardIsTop(index === 0)
+                        }}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className="leader-avatar-frame">
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <LeaderboardPlayerName entry={entry} />
+                        </span>
+                        <span className="leader-result">
+                          <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                          <strong>{entry.score} pts</strong>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                <div className="card game-launch-card game-start-panel">
+                  <button className="primary game-start-button" onClick={() => setShowSpeedSetupModal(true)} disabled={speedQuestionBank.length === 0}>
+                    <AppIcon name="study" className="button-icon" />
+                    Start Speed Test
+                  </button>
+                  {speedQuestionBank.length === 0 ? <p className="muted">No speed test questions loaded.</p> : null}
+                  <p className="muted tiny game-start-note">
+                    Mode: {gamesSelection.duration}s • {gamesSelection.filter === 'all' ? 'All Codes' : codeSetLabel[gamesSelection.filter]}
+                  </p>
+                </div>
               </div>
             ) : null}
 
@@ -6419,75 +6512,6 @@ function App() {
                 </div>
               </div>
             ) : null}
-
-            {!speedRunning && !speedDone ? (
-            <>
-            <h2>Speed Test Leaderboard</h2>
-            <div className="card leaderboard-card">
-              {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
-              <div className="game-leaderboard-filters">
-                <div className="game-filter-group">
-                  <span className="game-filter-label">Time</span>
-                  <div className="segmented compact-segmented">
-                    {[15, 30, 60].map((duration) => (
-                      <button
-                        key={`speed-leader-time-${duration}`}
-                        className={gamesSelection.duration === duration ? 'seg active compact-seg' : 'seg compact-seg'}
-                        onClick={() => setGamesSelection((prev) => ({ ...prev, duration: duration as HomeDurationFilter }))}
-                      >
-                        {duration}s
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="game-filter-group">
-                  <span className="game-filter-label">Code Set</span>
-                  <div className="segmented compact-segmented">
-                    {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                      <button
-                        key={`speed-leader-filter-${filter}`}
-                        className={gamesSelection.filter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
-                        onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}
-                      >
-                        {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {speedLeaderboard.length === 0 ? (
-                <p className="muted">No speed test scores submitted yet.</p>
-              ) : (
-                speedLeaderboard.map((entry, index) => (
-                  <button
-                    key={`speed-${entry.id}`}
-                    type="button"
-                    className="leader-row leader-row-button game-leader-row leader-row-rich"
-                    onClick={() => {
-                      setSelectedLeaderboardEntry(entry)
-                      setSelectedLeaderboardIsTop(index === 0)
-                    }}
-                  >
-                    <span className="leader-rank">#{index + 1}</span>
-                    <span className="leader-player">
-                      <span className="leader-avatar-wrap">
-                        {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                        <span className="leader-avatar-frame">
-                          <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
-                        </span>
-                      </span>
-                      <LeaderboardPlayerName entry={entry} />
-                    </span>
-                    <span className="leader-result">
-                      <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
-                      <strong>{entry.score} pts</strong>
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-            </>
-            ) : null}
               </>
             ) : null}
 
@@ -6496,6 +6520,8 @@ function App() {
                 currentUserId={currentUserId}
                 currentUsername={profile?.username || currentUserEmail || 'You'}
                 isOwner={isOwner}
+                externalJoinRoomId={duelInviteJoinRoomId}
+                onExternalJoinHandled={() => setDuelInviteJoinRoomId(null)}
               />
             ) : null}
           </section>
