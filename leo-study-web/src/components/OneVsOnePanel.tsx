@@ -351,6 +351,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
   const [results, setResults] = useState<DuelRoomResultRow[]>([])
   const [usernameByUserId, setUsernameByUserId] = useState<Record<string, string>>({})
   const [presenceUserIds, setPresenceUserIds] = useState<string[]>([])
+  const [spectatorCount, setSpectatorCount] = useState(0)
   void setPresenceUserIds
 
   const [loading, setLoading] = useState(false)
@@ -808,8 +809,12 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState()
         const ids = Object.keys(state)
-        // Presence tracking - available for future online status indicators
-        void ids
+        setPresenceUserIds(ids)
+        
+        // Count spectators: users in presence but NOT in the player list
+        const playerUserIds = players.map(p => p.user_id)
+        const spectatorIds = ids.filter(id => !playerUserIds.includes(id))
+        setSpectatorCount(spectatorIds.length)
       })
 
     channel.subscribe((status) => {
@@ -824,7 +829,7 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
     return () => {
       void client.removeChannel(channel)
     }
-  }, [currentUserId, isSignedIn, refreshRoomSnapshot, roomId])
+  }, [currentUserId, isSignedIn, players, refreshRoomSnapshot, roomId])
 
   useEffect(() => {
     const client = supabase
@@ -1974,6 +1979,29 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     <span className="muted tiny">{players[0] ? usernameByUserId[players[0].user_id] || 'Player 1' : 'Player 1'} vs {players[1] ? usernameByUserId[players[1].user_id] || 'Player 2' : 'Player 2'}</span>
                   </div>
                 )}
+                {/* Dual player live view for spectators */}
+                {isSpectator && players.length === 2 && (
+                  <div className="onevone-dual-player-view">
+                    <div className="onevone-player-live-card">
+                      <div className="onevone-player-live-header">
+                        <strong>{getPlayerName(players[0]?.user_id, 'Player 1')}</strong>
+                        <span className="muted tiny">Round {players[0]?.current_round || 1}/{room.rounds}</span>
+                      </div>
+                      <div className="onevone-player-live-score">
+                        <span>{players[0]?.score ?? 0} pts</span>
+                      </div>
+                    </div>
+                    <div className="onevone-player-live-card">
+                      <div className="onevone-player-live-header">
+                        <strong>{getPlayerName(players[1]?.user_id, 'Player 2')}</strong>
+                        <span className="muted tiny">Round {players[1]?.current_round || 1}/{room.rounds}</span>
+                      </div>
+                      <div className="onevone-player-live-score">
+                        <span>{players[1]?.score ?? 0} pts</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="speed-session-controls onevone-session-controls">
                   <button className="secondary speed-exit-button onevone-leave-button" onClick={() => void confirmLeaveMatch()}>
                     {isSpectator ? 'Stop Spectating' : 'Leave Match'}
@@ -1992,6 +2020,12 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     <small className="muted">Elapsed</small>
                     <strong>{formatClock(elapsedMs)}</strong>
                   </div>
+                  {!isSpectator && spectatorCount > 0 && (
+                    <div className="onevone-hud-chip spectator-count">
+                      <small className="muted">Watchers</small>
+                      <strong>👁 {spectatorCount}</strong>
+                    </div>
+                  )}
                   {isSpectator ? (
                     <div className="onevone-hud-chip">
                       <small className="muted">Progress</small>
@@ -2079,6 +2113,29 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     <span className="muted tiny">{players[0] ? usernameByUserId[players[0].user_id] || 'Player 1' : 'Player 1'} vs {players[1] ? usernameByUserId[players[1].user_id] || 'Player 2' : 'Player 2'}</span>
                   </div>
                 )}
+                {/* Dual player live view for spectators */}
+                {isSpectator && players.length === 2 && (
+                  <div className="onevone-dual-player-view">
+                    <div className="onevone-player-live-card">
+                      <div className="onevone-player-live-header">
+                        <strong>{getPlayerName(players[0]?.user_id, 'Player 1')}</strong>
+                        <span className="muted tiny">Round {players[0]?.current_round || 1}/{room.rounds}</span>
+                      </div>
+                      <div className="onevone-player-live-score">
+                        <span>{players[0]?.score ?? 0} pts</span>
+                      </div>
+                    </div>
+                    <div className="onevone-player-live-card">
+                      <div className="onevone-player-live-header">
+                        <strong>{getPlayerName(players[1]?.user_id, 'Player 2')}</strong>
+                        <span className="muted tiny">Round {players[1]?.current_round || 1}/{room.rounds}</span>
+                      </div>
+                      <div className="onevone-player-live-score">
+                        <span>{players[1]?.score ?? 0} pts</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="onevone-hud-grid">
                   <div className="onevone-hud-chip">
                     <small className="muted">Round</small>
@@ -2092,6 +2149,12 @@ export function OneVsOnePanel(props: { currentUserId: string; currentUsername: s
                     <small className="muted">Elapsed</small>
                     <strong>{formatClock(elapsedMs)}</strong>
                   </div>
+                  {!isSpectator && spectatorCount > 0 && (
+                    <div className="onevone-hud-chip spectator-count">
+                      <small className="muted">Watchers</small>
+                      <strong>👁 {spectatorCount}</strong>
+                    </div>
+                  )}
                   {isSpectator ? (
                     <div className="onevone-hud-chip">
                       <small className="muted">Progress</small>

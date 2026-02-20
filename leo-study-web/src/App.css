@@ -3970,6 +3970,61 @@ textarea {
   font-size: 1.3rem;
 }
 
+/* Dual player live view for spectators */
+.onevone-dual-player-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.onevone-player-live-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+}
+
+.onevone-player-live-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.onevone-player-live-header strong {
+  font-size: 1rem;
+  color: #4ba4ff;
+}
+
+.onevone-player-live-score {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.onevone-player-live-score span {
+  color: #4ba4ff;
+}
+
+/* Spectator count in HUD */
+.onevone-hud-chip.spectator-count {
+  background: rgba(75, 164, 255, 0.1);
+  border-color: rgba(75, 164, 255, 0.3);
+}
+
+.onevone-hud-chip.spectator-count strong {
+  color: #4ba4ff;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .onevone-dual-player-view {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
 .spectating-card {
   opacity: 0.9;
 }
