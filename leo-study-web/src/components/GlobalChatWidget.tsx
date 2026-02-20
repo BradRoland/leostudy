@@ -257,11 +257,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
 
   // Fetch user profile stats
   const fetchUserProfile = useCallback(async (userId: string) => {
-    console.log('Fetching profile for:', userId)
-    if (!supabaseClient) {
-      console.log('No supabase client')
-      return
-    }
+    if (!supabaseClient) return
     
     setProfileLoading(true)
     setSelectedProfile(null)
@@ -272,14 +268,14 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         .from('profiles')
         .select('id, username, avatar_url, agency')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
       
-      // Get duel stats
+      // Get duel stats (may not exist for new users)
       const { data: stats } = await supabaseClient
         .from('duel_player_stats')
         .select('wins, losses, matches_played, current_win_streak, best_win_streak')
         .eq('user_id', userId)
-        .single()
+        .maybeSingle()
       
       if (profile) {
         setSelectedProfile({
@@ -287,11 +283,11 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
           username: profile.username || 'Unknown',
           avatarUrl: profile.avatar_url || '',
           agency: profile.agency,
-          wins: stats?.wins || 0,
-          losses: stats?.losses || 0,
-          matches_played: stats?.matches_played || 0,
-          current_win_streak: stats?.current_win_streak || 0,
-          best_win_streak: stats?.best_win_streak || 0,
+          wins: stats?.wins ?? 0,
+          losses: stats?.losses ?? 0,
+          matches_played: stats?.matches_played ?? 0,
+          current_win_streak: stats?.current_win_streak ?? 0,
+          best_win_streak: stats?.best_win_streak ?? 0,
         })
       }
     } catch (err) {
