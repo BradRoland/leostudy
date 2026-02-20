@@ -266,8 +266,8 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
       // Get user profile
       const { data: profile } = await supabaseClient
         .from('profiles')
-        .select('id, username, avatar_path, agency')
-        .eq('id', userId)
+        .select('user_id, username, avatar_path, agency')
+        .eq('user_id', userId)
         .maybeSingle()
       
       // Get duel stats (may not exist for new users)
