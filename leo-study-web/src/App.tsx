@@ -7859,6 +7859,7 @@ function App() {
           { key: 'home', label: 'Home' },
           { key: 'scenarios', label: 'Scenarios' },
           { key: 'library', label: 'Library' },
+          { key: 'mission', label: 'Mission' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -7871,7 +7872,7 @@ function App() {
                 games: '/games',
                 scenarios: '/scenarios',
                 library: '/library',
-              }
+                              }
               navigate(pathByTab[tab.key as AppTab])
             }}
           >
