@@ -1655,6 +1655,208 @@ function SessionPerformanceReportCard({ report }: { report: SessionPerformanceRe
   )
 }
 
+type GameStartInsightsPanelProps = {
+  title: 'Matching' | 'Speed Test'
+  icon: 'games' | 'study'
+  startLabel: string
+  disabled?: boolean
+  disabledHint?: string | null
+  onStart: () => void
+  duration: HomeDurationFilter
+  filter: CodeFilter
+  sessionTrack: SessionTrack
+  focusTips: string[]
+  codeSetBreakdown: Array<{ codeSet: CodeSet; attempts: number; accuracyPercent: number }>
+}
+
+function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
+  const {
+    title,
+    icon,
+    startLabel,
+    disabled = false,
+    disabledHint = null,
+    onStart,
+    duration,
+    filter,
+    sessionTrack,
+    focusTips,
+    codeSetBreakdown,
+  } = props
+  const [hoveredTrendIndex, setHoveredTrendIndex] = useState<number | null>(null)
+  const trendValues = sessionTrack.accuracyHistory.slice(-8)
+  const chartValues = trendValues.length > 0
+    ? trendValues
+    : sessionTrack.lastAttempt
+      ? [sessionTrack.lastAttempt.accuracy]
+      : []
+  const trend = chartValues.length > 0 ? buildTrendPath(chartValues) : null
+  const activeTrendIndex = chartValues.length === 0
+    ? -1
+    : hoveredTrendIndex !== null && hoveredTrendIndex >= 0 && hoveredTrendIndex < chartValues.length
+      ? hoveredTrendIndex
+      : chartValues.length - 1
+  const activeTrendPoint = trend && activeTrendIndex >= 0 ? trend.coords[activeTrendIndex] : null
+  const activeTrendAccuracy = activeTrendIndex >= 0 ? chartValues[activeTrendIndex] : null
+  const previousTrendAccuracy = activeTrendIndex > 0 ? chartValues[activeTrendIndex - 1] : null
+  const trendDelta = activeTrendAccuracy !== null && previousTrendAccuracy !== null
+    ? activeTrendAccuracy - previousTrendAccuracy
+    : null
+  const trendSuggestion = activeTrendAccuracy === null
+    ? 'Complete a round to start tracking.'
+    : activeTrendAccuracy >= 85
+      ? 'Great accuracy. Push pace while keeping precision.'
+      : activeTrendAccuracy >= 70
+        ? 'Solid base. Focus on weak categories to break past 85%.'
+        : 'Prioritize accuracy first. Slow down and repeat weak sections.'
+  const weakestCategory = [...codeSetBreakdown]
+    .filter((entry) => entry.attempts > 0)
+    .sort((left, right) => left.accuracyPercent - right.accuracyPercent)[0]
+  const bestCategory = [...codeSetBreakdown]
+    .filter((entry) => entry.attempts > 0)
+    .sort((left, right) => right.accuracyPercent - left.accuracyPercent)[0]
+
+  return (
+    <div className="game-start-panel">
+      <div className="card game-start-cta-card">
+        <button className="primary game-start-button" onClick={onStart} disabled={disabled}>
+          <AppIcon name={icon} className="button-icon" />
+          {startLabel}
+        </button>
+        <p className="muted tiny game-start-note">
+          {duration}s • {filter === 'all' ? 'All Codes' : codeSetLabel[filter]}
+        </p>
+        {disabled && disabledHint ? <p className="muted tiny game-start-note">{disabledHint}</p> : null}
+      </div>
+
+      <div className="card game-start-stats-card">
+        <div className="game-insight-grid">
+          <article className="game-insight-card">
+            <p className="game-insight-label">Last attempt</p>
+            {sessionTrack.lastAttempt ? (
+              <>
+                <p className="game-insight-value">{sessionTrack.lastAttempt.accuracy}% accuracy</p>
+                <p className="muted tiny">
+                  Score {sessionTrack.lastAttempt.score} • {sessionTrack.lastAttempt.correct} correct / {sessionTrack.lastAttempt.incorrect} incorrect
+                </p>
+              </>
+            ) : (
+              <p className="muted tiny">No attempt yet for this mode.</p>
+            )}
+          </article>
+
+          <article className="game-insight-card">
+            <p className="game-insight-label">Focus recommendation</p>
+            <p className="game-insight-value">
+              {weakestCategory
+                ? `${codeSetLabel[weakestCategory.codeSet]} (${weakestCategory.accuracyPercent}% avg)`
+                : 'Play a round to generate focus targets'}
+            </p>
+            {focusTips.length > 0 ? (
+              <p className="muted tiny">Focus: {focusTips.join(' • ')}</p>
+            ) : null}
+          </article>
+        </div>
+
+        <article className="game-trend-card">
+          <div className="game-trend-head">
+            <p className="game-insight-label">{title} progress trend</p>
+            <span className="muted tiny">{chartValues.length > 0 ? `${chartValues.length} points` : 'No data yet'}</span>
+          </div>
+          {trend && activeTrendPoint && activeTrendAccuracy !== null ? (
+            <svg
+              viewBox={`0 0 ${trend.width} ${trend.height}`}
+              className="game-trend-chart"
+              role="img"
+              aria-label={`${title} accuracy trend`}
+              onMouseLeave={() => setHoveredTrendIndex(null)}
+            >
+              <path d={trend.path} className="session-trend-glow" />
+              <path d={trend.path} className="session-trend-line" />
+              {trend.coords.map((point, index) => (
+                <g key={`${title}-trend-point-${index}`}>
+                  <circle
+                    cx={point.x}
+                    cy={point.y}
+                    r={hoveredTrendIndex === index ? 3.8 : 3}
+                    className={hoveredTrendIndex === index ? 'game-trend-point game-trend-point-active' : 'game-trend-point'}
+                  />
+                  <circle
+                    cx={point.x}
+                    cy={point.y}
+                    r={9}
+                    className="game-trend-point-hit"
+                    onMouseEnter={() => setHoveredTrendIndex(index)}
+                    onFocus={() => setHoveredTrendIndex(index)}
+                    onClick={() => setHoveredTrendIndex(index)}
+                    aria-label={`Attempt ${index + 1}: ${chartValues[index]} percent accuracy`}
+                  />
+                </g>
+              ))}
+              <line
+                x1={activeTrendPoint.x}
+                y1={activeTrendPoint.y}
+                x2={activeTrendPoint.x}
+                y2={trend.height - 8}
+                className="game-trend-hover-line"
+              />
+              <circle cx={activeTrendPoint.x} cy={activeTrendPoint.y} r="5" className="session-trend-dot game-trend-dot-active" />
+              <text
+                x={Math.min(trend.width - 38, Math.max(12, activeTrendPoint.x + 8))}
+                y={Math.max(16, activeTrendPoint.y - 10)}
+                className="game-trend-hover-label"
+              >
+                {Math.round(activeTrendAccuracy)}%
+              </text>
+            </svg>
+          ) : (
+            <p className="muted tiny">Your graph appears after your first completed run.</p>
+          )}
+          {activeTrendAccuracy !== null ? (
+            <div className="game-trend-insight">
+              <span className="game-trend-insight-item">
+                Attempt {activeTrendIndex + 1}: <strong>{activeTrendAccuracy}%</strong>
+              </span>
+              <span className="game-trend-insight-item">
+                {trendDelta === null
+                  ? 'No prior point yet.'
+                  : trendDelta >= 0
+                    ? `+${trendDelta}% vs previous`
+                    : `${trendDelta}% vs previous`}
+              </span>
+              <span className="game-trend-insight-item">{trendSuggestion}</span>
+            </div>
+          ) : null}
+        </article>
+
+        <div className="game-category-focus">
+          {codeSetBreakdown.map((entry) => (
+            <div key={`${title}-focus-${entry.codeSet}`} className="game-category-row">
+              <span className="game-category-name">{codeSetLabel[entry.codeSet]}</span>
+              <div className="game-category-track">
+                <div
+                  className="game-category-fill"
+                  style={{ width: `${entry.attempts > 0 ? Math.max(6, entry.accuracyPercent) : 6}%` }}
+                  aria-hidden
+                />
+              </div>
+              <span className="game-category-metric">
+                {entry.attempts > 0 ? `${entry.accuracyPercent}%` : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <p className="muted tiny game-motivation-line">
+          {bestCategory
+            ? `${codeSetLabel[bestCategory.codeSet]} is currently your strongest set. Keep pushing consistency in weaker areas.`
+            : 'Start a session to unlock personalized coaching insights.'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -5199,6 +5401,47 @@ function App() {
     }).map((value) => (mode === 'speed' ? value : value))
   }
 
+  const gameCodeSetBreakdown = useMemo(() => {
+    const bySet: Record<CodeSet, { attempts: number; accuracyPercent: number }> = {
+      penal: { attempts: 0, accuracyPercent: 0 },
+      hs: { attempts: 0, accuracyPercent: 0 },
+      vehicle: { attempts: 0, accuracyPercent: 0 },
+    }
+    for (const item of studyNeedsSummary) {
+      bySet[item.codeSet] = { attempts: item.attempts, accuracyPercent: item.accuracyPercent }
+    }
+    return (['penal', 'hs', 'vehicle'] as CodeSet[]).map((codeSet) => ({
+      codeSet,
+      attempts: bySet[codeSet].attempts,
+      accuracyPercent: bySet[codeSet].accuracyPercent,
+    }))
+  }, [studyNeedsSummary])
+
+  const matchingTrackKey = useMemo(
+    () => sessionTrackKey({ mode: 'matching', duration: gamesSelection.duration, filter: gamesSelection.filter }),
+    [gamesSelection.duration, gamesSelection.filter],
+  )
+  const speedTrackKey = useMemo(
+    () => sessionTrackKey({ mode: 'speed', duration: gamesSelection.duration, filter: gamesSelection.filter }),
+    [gamesSelection.duration, gamesSelection.filter],
+  )
+  const matchingSessionTrack = useMemo(
+    () => getSessionTrack(profileDetails.stats, matchingTrackKey),
+    [profileDetails.stats, matchingTrackKey],
+  )
+  const speedSessionTrack = useMemo(
+    () => getSessionTrack(profileDetails.stats, speedTrackKey),
+    [profileDetails.stats, speedTrackKey],
+  )
+  const matchingFocusTips = useMemo(
+    () => getFocusTips(gamesSelection.filter, 'matching').slice(0, 3),
+    [gamesSelection.filter, sections, performance],
+  )
+  const speedFocusTips = useMemo(
+    () => getFocusTips(gamesSelection.filter, 'speed').slice(0, 3),
+    [gamesSelection.filter, sections, performance],
+  )
+
   const saveSessionAttempt = (trackKey: string, snapshot: SessionAttemptSnapshot) => {
     setProfileDetails((previous) => {
       const currentTrack = previous.stats.sessionTracks[trackKey] || { lastAttempt: null, accuracyHistory: [] }
@@ -6275,15 +6518,17 @@ function App() {
                   )}
                 </div>
 
-                <div className="card game-launch-card game-start-panel">
-                  <button className="primary game-start-button" onClick={() => setShowMatchSetupModal(true)}>
-                    <AppIcon name="games" className="button-icon" />
-                    Start Matching
-                  </button>
-                  <p className="muted tiny game-start-note">
-                    Mode: {gamesSelection.duration}s • {gamesSelection.filter === 'all' ? 'All Codes' : codeSetLabel[gamesSelection.filter]}
-                  </p>
-                </div>
+                <GameStartInsightsPanel
+                  title="Matching"
+                  icon="games"
+                  startLabel="Start Matching"
+                  onStart={() => setShowMatchSetupModal(true)}
+                  duration={gamesSelection.duration}
+                  filter={gamesSelection.filter}
+                  sessionTrack={matchingSessionTrack}
+                  focusTips={matchingFocusTips}
+                  codeSetBreakdown={gameCodeSetBreakdown}
+                />
               </div>
             ) : null}
 
@@ -6433,16 +6678,19 @@ function App() {
                   )}
                 </div>
 
-                <div className="card game-launch-card game-start-panel">
-                  <button className="primary game-start-button" onClick={() => setShowSpeedSetupModal(true)} disabled={speedQuestionBank.length === 0}>
-                    <AppIcon name="study" className="button-icon" />
-                    Start Speed Test
-                  </button>
-                  {speedQuestionBank.length === 0 ? <p className="muted">No speed test questions loaded.</p> : null}
-                  <p className="muted tiny game-start-note">
-                    Mode: {gamesSelection.duration}s • {gamesSelection.filter === 'all' ? 'All Codes' : codeSetLabel[gamesSelection.filter]}
-                  </p>
-                </div>
+                <GameStartInsightsPanel
+                  title="Speed Test"
+                  icon="study"
+                  startLabel="Start Speed Test"
+                  disabled={speedQuestionBank.length === 0}
+                  disabledHint={speedQuestionBank.length === 0 ? 'No speed test questions loaded.' : null}
+                  onStart={() => setShowSpeedSetupModal(true)}
+                  duration={gamesSelection.duration}
+                  filter={gamesSelection.filter}
+                  sessionTrack={speedSessionTrack}
+                  focusTips={speedFocusTips}
+                  codeSetBreakdown={gameCodeSetBreakdown}
+                />
               </div>
             ) : null}
 

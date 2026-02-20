@@ -1996,7 +1996,7 @@ export function OneVsOnePanel(props: {
                     Refresh
                   </button>
                 </div>
-                {publicRooms.length === 0 ? <p className="muted">No public rooms waiting right now.</p> : null}
+                {publicRooms.length === 0 ? <p className="muted">No public rooms available right now.</p> : null}
                 <div className="onevone-public-list">
                   {publicRooms.map((item) => {
                     const isActive = item.status === 'in_progress'
