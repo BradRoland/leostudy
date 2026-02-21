@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type Syntheti
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { FireFlame, type FireFlameOption } from '@9am/fire-flame-react'
 import './App.css'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem } from './content'
 import { useOwner } from './hooks/useOwner'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
@@ -8181,6 +8182,7 @@ function App() {
           isOwner={isOwner}
         />
       ) : null}
+      <SpeedInsights />
     </div>
   )
 }
