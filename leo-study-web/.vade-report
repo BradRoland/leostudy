@@ -1,49 +1,49 @@
-# Vercel Speed Insights Implementation
+# Vercel Web Analytics Implementation
 
-Successfully implemented Vercel Speed Insights for the LEO Study application.
+Successfully implemented Vercel Web Analytics for the leo-study-web project following the official Vercel documentation.
 
 ## Changes Made
 
-### 1. Installed Package
-- Added `@vercel/speed-insights` version 1.3.1 to project dependencies
-- Used npm to install the package
+### 1. Installed Dependencies
+- Added `@vercel/analytics` package (version ^1.6.1) to the project dependencies
+- Updated `package-lock.json` to reflect the new dependency and its transitive dependencies
 
 ### 2. Modified Files
 
-#### src/App.tsx
-- Added import statement for SpeedInsights component from '@vercel/speed-insights/react'
-- Added `<SpeedInsights />` component at the end of the main App component's return statement, just before the closing `</div>` tag
-- This placement ensures Speed Insights tracks all pages and routes in the React application
+#### `package.json`
+- Added `"@vercel/analytics": "^1.6.1"` to the dependencies section
 
-#### package.json
-- Added `@vercel/speed-insights` dependency
-
-#### package-lock.json
-- Updated with new dependency information for Speed Insights package
+#### `src/App.tsx`
+- Added import statement: `import { Analytics } from '@vercel/analytics/react'`
+- Added `<Analytics />` component in the main App component, placed immediately after the existing `<SpeedInsights />` component
 
 ## Implementation Details
 
-This is a React + Vite application, so I followed the Vercel Speed Insights guide for React applications:
-- Imported the `SpeedInsights` component from `@vercel/speed-insights/react`
-- Placed the component in the main App component to ensure tracking across all routes
+This React + Vite application follows the standard React implementation pattern for Vercel Web Analytics. The `Analytics` component was added to the main App component to ensure it tracks all page views and user interactions across the entire application.
 
-The implementation is minimal and non-intrusive, following React best practices. The component will automatically:
-- Track real user performance metrics (Core Web Vitals)
-- Send data to Vercel's Speed Insights dashboard
-- Only activate when deployed to Vercel (no impact in local development)
+The component placement is consistent with the existing Vercel Speed Insights integration, ensuring both analytics and performance monitoring are properly configured.
 
-## Testing
+## Framework
+- Framework: React 19.2.0 with Vite 7.3.1
+- Implementation: Used the `@vercel/analytics/react` package for React applications
+- Route Support: The Analytics component automatically integrates with the existing react-router-dom setup for proper route tracking
 
-1. ✅ Build verification - Project builds successfully with no errors
-2. ✅ Linter check - No new linting errors introduced by the changes
-3. ✅ Import verification - SpeedInsights component properly imported and typed
+## Verification
+
+✅ Build completed successfully with no errors
+✅ TypeScript compilation passed without issues
+✅ No new linting errors introduced
+✅ All changes are minimal and focused on the specific requirement
 
 ## Next Steps
 
 Once deployed to Vercel:
-1. Enable Speed Insights in the Vercel dashboard for this project
-2. The tracking script will be available at `/_vercel/speed-insights/script.js`
-3. Performance data will start appearing in the Speed Insights dashboard after users visit the site
-4. Metrics will include LCP, FID, CLS, FCP, TTFB, and INP
+1. The Analytics will automatically start tracking visitors and page views
+2. Data can be viewed in the Vercel dashboard under the Analytics tab
+3. Custom events can be added later if needed using the track() function from @vercel/analytics
 
-The implementation preserves all existing functionality and code structure while adding comprehensive performance monitoring capabilities.
+## Notes
+
+- The implementation follows the official Vercel Web Analytics documentation for React applications
+- No configuration is required; the Analytics component will work automatically when deployed to Vercel
+- The component will only send data in production environments by default

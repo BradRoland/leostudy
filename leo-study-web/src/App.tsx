@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type Syntheti
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { FireFlame, type FireFlameOption } from '@9am/fire-flame-react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
+import { Analytics } from '@vercel/analytics/react'
 import './App.css'
 import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem } from './content'
 import { useOwner } from './hooks/useOwner'
@@ -8183,6 +8184,7 @@ function App() {
         />
       ) : null}
       <SpeedInsights />
+      <Analytics />
     </div>
   )
 }
