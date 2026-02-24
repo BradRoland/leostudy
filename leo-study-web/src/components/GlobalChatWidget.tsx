@@ -33,14 +33,17 @@ type Props = {
   currentUsername: string
   userAgency?: string
   isOwner?: boolean
+  mode?: 'widget' | 'full'
 }
 
 const MAX_MESSAGES = 100
 const MESSAGE_MAX_LENGTH = 280
 const RATE_LIMIT_MS = 2000
 
-export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, isOwner }: Props) {
+export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, isOwner, mode = 'widget' }: Props) {
+  const isFullMode = mode === 'full'
   const [isOpen, setIsOpen] = useState(() => {
+    if (isFullMode) return true
     if (typeof window === 'undefined') return false
     const stored = localStorage.getItem('globalChatOpen')
     return stored ? stored === 'true' : false
@@ -55,16 +58,39 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   const [reportReason, setReportReason] = useState('')
   const [selectedProfile, setSelectedProfile] = useState<UserProfileStats | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
+  const [reactionPicker, setReactionPicker] = useState<{ messageId: string; left: number; top: number } | null>(null)
+  const [localReactions, setLocalReactions] = useState<Record<string, Record<string, string[]>>>(() => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const raw = window.localStorage.getItem('globalChatReactions')
+      return raw ? JSON.parse(raw) as Record<string, Record<string, string[]>> : {}
+    } catch {
+      return {}
+    }
+  })
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const lastSentRef = useRef(0)
   const isNearBottomRef = useRef(true)
   const subscribedRef = useRef(false)
+  const fullModeAutoScrolledRef = useRef(false)
   const supabaseClient = supabase
   const isOpenRef = useRef(isOpen)
 
   const isAuthenticated = Boolean(currentUserId && supabaseClient)
+  const popularReactionEmojis = ['👍', '❤️', '🔥', '😂', '👏', '💯', '🎉', '😎']
+  const allReactionEmojis = [
+    '😀', '😁', '😂', '🤣', '😊', '😍', '😎', '🤔', '😮', '🙌', '👏', '👍', '👎', '👌', '💪', '🔥',
+    '💯', '🎯', '🎉', '🚓', '📚', '✅', '⚡', '🧠', '🫡', '👀', '🙏', '🤝', '🥳', '😤', '😬', '😅',
+    '😴', '😡', '🤯', '❤️', '💙', '💚', '🧡', '💛', '⭐', '🏆', '🥇', '🚀', '💥', '🎮', '📝', '📈',
+  ]
+  const quickInsertEmojis = ['👍', '🔥', '🚓', '📚', '✅', '💯', '😂', '😎']
+
+  useEffect(() => {
+    if (!isFullMode) return
+    setIsOpen(true)
+  }, [isFullMode])
 
   // Load initial messages once on mount
   useEffect(() => {
@@ -91,12 +117,13 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
 
   // Listen for custom event to open chat from tab bar (mobile)
   useEffect(() => {
+    if (isFullMode) return
     const handleOpenChat = () => {
       setIsOpen(true)
     }
     window.addEventListener('openGlobalChat', handleOpenChat)
     return () => window.removeEventListener('openGlobalChat', handleOpenChat)
-  }, [])
+  }, [isFullMode])
 
   // Subscribe to realtime messages
   useEffect(() => {
@@ -170,6 +197,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
 
   // Persist open state
   useEffect(() => {
+    if (isFullMode) return
     if (typeof window === 'undefined') return
     localStorage.setItem('globalChatOpen', String(isOpen))
     if (isOpen) {
@@ -179,7 +207,23 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
       }, 100)
     }
-  }, [isOpen])
+  }, [isOpen, isFullMode])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('globalChatReactions', JSON.stringify(localReactions))
+  }, [localReactions])
+
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+      if (target.closest('.global-chat-reaction-picker') || target.closest('.global-chat-reaction-add')) return
+      setReactionPicker(null)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [])
 
   // Check scroll position
   const handleScroll = useCallback(() => {
@@ -187,6 +231,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight
     isNearBottomRef.current = distanceFromBottom < 100
+    setReactionPicker(null)
     
     if (isNearBottomRef.current) {
       setHasNewMessages(false)
@@ -194,11 +239,52 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   }, [])
 
   // Scroll to bottom
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const scrollToBottomWithBehavior = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({ top: containerRef.current.scrollHeight, behavior })
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior })
+    }
     setHasNewMessages(false)
     isNearBottomRef.current = true
   }, [])
+
+  const requestScrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const run = () => scrollToBottomWithBehavior(behavior)
+    run()
+    const raf = window.requestAnimationFrame(run)
+    const timerA = window.setTimeout(run, 90)
+    const timerB = window.setTimeout(run, 220)
+    return () => {
+      window.cancelAnimationFrame(raf)
+      window.clearTimeout(timerA)
+      window.clearTimeout(timerB)
+    }
+  }, [scrollToBottomWithBehavior])
+
+  const scrollToBottom = useCallback(() => {
+    scrollToBottomWithBehavior('smooth')
+  }, [scrollToBottomWithBehavior])
+
+  // In full-page chat, auto-jump to latest message when page opens
+  useEffect(() => {
+    if (!isFullMode) return
+    if (fullModeAutoScrolledRef.current) return
+    if (messages.length === 0) return
+
+    fullModeAutoScrolledRef.current = true
+    return requestScrollToBottom('auto')
+  }, [isFullMode, messages.length, requestScrollToBottom])
+
+  // Allow forcing chat to latest from navigation while already on chat page
+  useEffect(() => {
+    if (!isFullMode) return
+    const handleScrollRequest = () => {
+      requestScrollToBottom('auto')
+    }
+    window.addEventListener('scrollGlobalChatToBottom', handleScrollRequest)
+    return () => window.removeEventListener('scrollGlobalChatToBottom', handleScrollRequest)
+  }, [isFullMode, requestScrollToBottom])
 
   // Send message
   const sendMessage = useCallback(async () => {
@@ -242,6 +328,32 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
       setSending(false)
     }
   }, [inputValue, currentUserId, currentUsername, userAgency, supabaseClient, isAuthenticated])
+
+  const addEmojiToInput = useCallback((emoji: string) => {
+    setInputValue((previous) => `${previous}${emoji}`)
+  }, [])
+
+  const toggleReaction = useCallback((messageId: string, emoji: string) => {
+    setLocalReactions((previous) => {
+      const messageReactions = previous[messageId] || {}
+      const reactedUsers = messageReactions[emoji] || []
+      const hasReacted = reactedUsers.includes(currentUserId)
+      const nextUsers = hasReacted
+        ? reactedUsers.filter((userId) => userId !== currentUserId)
+        : [...reactedUsers, currentUserId]
+      const nextMessageReactions = {
+        ...messageReactions,
+        [emoji]: nextUsers,
+      }
+      const cleanedMessageReactions = Object.fromEntries(
+        Object.entries(nextMessageReactions).filter(([, users]) => users.length > 0),
+      )
+      return {
+        ...previous,
+        [messageId]: cleanedMessageReactions,
+      }
+    })
+  }, [currentUserId])
 
   // Handle report
   const handleReport = useCallback(async (messageId: string) => {
@@ -304,9 +416,6 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
       if (appState?.performance) {
         const perf = appState.performance as Record<string, { correctCount?: number; incorrectCount?: number; correctStreak?: number }>
         Object.values(perf).forEach(item => {
-          const correct = item?.correctCount ?? 0
-          const incorrect = item?.incorrectCount ?? 0
-          const attempts = correct + incorrect
           const streak = item?.correctStreak ?? 0
           
           // Mastered = streak >= 20 (exact match to App.tsx)
@@ -388,8 +497,8 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   if (!supabaseClient) return null
 
   return (
-    <div className="global-chat-widget">
-      {!isOpen && (
+    <div className={isFullMode ? 'global-chat-widget global-chat-widget-full' : 'global-chat-widget'}>
+      {!isOpen && !isFullMode && (
         <button
           className="global-chat-toggle"
           onClick={() => setIsOpen(true)}
@@ -403,15 +512,17 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
       )}
 
       {isOpen && (
-        <div className="global-chat-panel">
+        <div className={isFullMode ? 'global-chat-panel global-chat-panel-full' : 'global-chat-panel'}>
           <div className="global-chat-header">
             <span>Public Chat</span>
-            <button className="global-chat-close" onClick={() => setIsOpen(false)} aria-label="Close chat">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            {!isFullMode ? (
+              <button className="global-chat-close" onClick={() => setIsOpen(false)} aria-label="Close chat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            ) : null}
           </div>
 
           <div className="global-chat-messages" ref={containerRef} onScroll={handleScroll}>
@@ -431,6 +542,94 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
                   <span className="global-chat-time">{formatTime(msg.created_at)}</span>
                 </div>
                 <p className="global-chat-text">{msg.message}</p>
+                <div className="global-chat-reactions">
+                  {Object.entries(localReactions[msg.id] || {})
+                    .filter(([, users]) => users.length > 0)
+                    .sort((left, right) => right[1].length - left[1].length)
+                    .map(([emoji, users]) => {
+                      const count = users.length
+                      const active = users.includes(currentUserId)
+                      return (
+                        <button
+                          key={`${msg.id}-${emoji}`}
+                          type="button"
+                          className={active ? 'global-chat-reaction active' : 'global-chat-reaction'}
+                          onClick={() => toggleReaction(msg.id, emoji)}
+                        >
+                          <span>{emoji}</span>
+                          <small>{count}</small>
+                        </button>
+                      )
+                    })}
+                  {!msg.is_deleted ? (
+                    <button
+                      type="button"
+                      className="global-chat-reaction-add"
+                      onClick={(event) => {
+                        const button = event.currentTarget
+                        const buttonRect = button.getBoundingClientRect()
+                        const estimatedWidth = Math.min(320, window.innerWidth - 24)
+                        const left = Math.max(
+                          12,
+                          Math.min(
+                            buttonRect.left + buttonRect.width / 2 - estimatedWidth / 2,
+                            window.innerWidth - estimatedWidth - 12,
+                          ),
+                        )
+                        const top = Math.max(12, buttonRect.top)
+                        setReactionPicker((previous) =>
+                          previous?.messageId === msg.id ? null : { messageId: msg.id, left, top },
+                        )
+                      }}
+                      aria-label="Add reaction"
+                    >
+                      <span className="global-chat-reaction-add-plus">+</span>
+                      <span className="global-chat-reaction-add-emoji">😊</span>
+                    </button>
+                  ) : null}
+                </div>
+                {reactionPicker?.messageId === msg.id ? (
+                  <div
+                    className="global-chat-reaction-picker"
+                    style={{
+                      left: `${reactionPicker.left}px`,
+                      top: `${reactionPicker.top}px`,
+                    }}
+                  >
+                    <p className="global-chat-reaction-picker-title">Popular</p>
+                    <div className="global-chat-reaction-picker-row">
+                      {popularReactionEmojis.map((emoji) => (
+                        <button
+                          key={`popular-${msg.id}-${emoji}`}
+                          type="button"
+                          className="global-chat-reaction-option"
+                          onClick={() => {
+                            toggleReaction(msg.id, emoji)
+                            setReactionPicker(null)
+                          }}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="global-chat-reaction-picker-title">All emojis</p>
+                    <div className="global-chat-reaction-picker-grid">
+                      {allReactionEmojis.map((emoji) => (
+                        <button
+                          key={`all-${msg.id}-${emoji}`}
+                          type="button"
+                          className="global-chat-reaction-option"
+                          onClick={() => {
+                            toggleReaction(msg.id, emoji)
+                            setReactionPicker(null)
+                          }}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {!msg.is_deleted && msg.user_id !== currentUserId && (
                   <button
                     className="global-chat-report"
@@ -493,6 +692,15 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
               <span className="global-chat-signin">Sign in to chat</span>
             )}
           </div>
+          {isAuthenticated ? (
+            <div className="global-chat-emoji-row">
+              {quickInsertEmojis.map((emoji) => (
+                <button key={`insert-${emoji}`} type="button" className="global-chat-emoji-btn" onClick={() => addEmojiToInput(emoji)}>
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -508,7 +716,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
               <option value="other">Other</option>
             </select>
             <div className="global-chat-modal-actions">
-              <button className="secondary" onClick={() => setReportModalOpen(null)}>Cancel</button>
+              <button className="secondary cancel-button" onClick={() => setReportModalOpen(null)}>Cancel</button>
               <button className="primary" onClick={() => handleReport(reportModalOpen)} disabled={!reportReason.trim()}>
                 Report
               </button>

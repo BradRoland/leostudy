@@ -126,9 +126,6 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
 
   useEffect(() => {
     if (!isSignedIn) {
-      setPendingInvites([])
-      setFreshInviteIds([])
-      setError('')
       previousInviteIdsRef.current = []
       return
     }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { FireFlame, type FireFlameOption } from '@9am/fire-flame-react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
@@ -15,16 +15,28 @@ import './components/GlobalChatWidget.css'
 type CodeSet = 'penal' | 'hs' | 'vehicle'
 type CodeFilter = CodeSet | 'all'
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
-type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home'
+type DisplayMode = 'dark' | 'light'
+type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home' | 'leaderboards' | 'chat'
+type HomeActionTarget = 'study' | 'games-matching' | 'games-speed' | 'scenarios'
 type HomeDurationFilter = 15 | 30 | 60
+type DuelLeaderboardMode = 'all' | 'matching' | 'quiz'
 type GameModeSelection = {
   duration: HomeDurationFilter
   filter: CodeFilter
 }
-type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'warning' | 'chat'
+type HomeActionOptions = {
+  gamePreset?: GameModeSelection
+  forceAllTime?: boolean
+}
+type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'test' | 'warning' | 'chat' | 'leaderboards' | 'settings' | 'stats' | 'speed' | 'duel'
 type StatsIconName = 'overview' | 'time' | 'words' | 'penal' | 'flashcards' | 'scenarios' | 'streak' | 'game' | 'studyset'
 type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
 type StudyAnswerMode = 'multiple' | 'truefalse'
+type StudyActivitySource = 'flashcards' | 'study_test' | 'matching' | 'speed' | 'duel'
+type PresenceStatus = 'active' | 'away'
+
+const studyTrackingTickMs = 5000
+const studyActivityWindowMs = 20000
 
 type HomeLeaderboardEntry = {
   userId: string
@@ -44,6 +56,14 @@ type HomeLeaderboardEntry = {
   duelWins: number
   duelLosses: number
   duelCurrentWinStreak: number
+}
+
+type HomeLeaderboardCardKey = 'study_time' | 'study_streak' | 'matching' | 'speed' | 'mastered' | 'duel_wins' | 'duel_streak'
+
+type HomeLeaderboardPreferences = {
+  visibleCards: HomeLeaderboardCardKey[]
+  duelWinsMode: DuelLeaderboardMode
+  duelStreakMode: DuelLeaderboardMode
 }
 
 type CodeSection = {
@@ -166,7 +186,9 @@ type ContentEditorItem = {
 type ProfileDetails = {
   bio: string
   agency: string
+  displayMode: DisplayMode
   homeLeaderboardRotationMs: number
+  homeLeaderboardPreferences: HomeLeaderboardPreferences
   themeId: string
   nameStyle: NameStyle
   namePresets: NameStylePreset[]
@@ -199,6 +221,7 @@ type UserStats = {
   scenariosReviewed: number
   studyModeCounts: Record<CodeFilter, number>
   sessionTracks: Record<string, SessionTrack>
+  sessionTimeline: SessionTimelinePoint[]
 }
 
 type SessionMode = 'study_test' | 'matching' | 'speed'
@@ -206,6 +229,15 @@ type SessionMode = 'study_test' | 'matching' | 'speed'
 type SessionTrack = {
   lastAttempt: SessionAttemptSnapshot | null
   accuracyHistory: number[]
+  scoreHistory: number[]
+}
+
+type SessionTimelinePoint = {
+  mode: SessionMode
+  filter: CodeFilter
+  accuracy: number
+  score: number
+  at: number
 }
 
 type SessionAttemptSnapshot = {
@@ -219,11 +251,41 @@ type SessionAttemptSnapshot = {
   at: number
 }
 
+type ScoreTimelinePoint = {
+  at: number
+  score: number
+}
+
 type LeaderPreviewItem = {
   rank: number
   playerName: string
   score: number
   isCurrentUser: boolean
+}
+
+type LeaderboardBoard = {
+  key: string
+  game: 'Matching' | 'Speed Test'
+  duration: HomeDurationFilter
+  filter: CodeFilter
+  entries: LeaderboardEntry[]
+}
+
+type DepartmentLeaderboardEntry = {
+  key: string
+  agency: string
+  totalScore: number
+  averageScore: number
+  playerCount: number
+  attempts: number
+}
+
+type WeeklyPerformanceLeader = {
+  entry: LeaderboardEntry
+  firstPlaceCount: number
+  leaderboardAppearances: number
+  totalScore: number
+  bestSingleScore: number
 }
 
 type SessionPerformanceReport = {
@@ -235,7 +297,9 @@ type SessionPerformanceReport = {
   incorrect: number
   score: number
   deltaAccuracy: number | null
+  deltaScore: number | null
   trend: number[]
+  scoreTrend: number[]
   focusTips: string[]
   leaderboardPreview: LeaderPreviewItem[]
   currentRank: number | null
@@ -346,9 +410,56 @@ const codeSetLabel: Record<CodeSet, string> = {
 
 const homeLeaderboardRotationDurations: Array<15 | 30 | 60> = [15, 30, 60]
 const homeLeaderboardRotationCodeSets: CodeFilter[] = ['all', 'penal', 'hs', 'vehicle']
+const duelLeaderboardModeOrder: DuelLeaderboardMode[] = ['all', 'matching', 'quiz']
+const duelLeaderboardModeLabel: Record<DuelLeaderboardMode, string> = {
+  all: 'All',
+  matching: 'Matching',
+  quiz: 'Quiz',
+}
 const homeLeaderboardRotationSteps = homeLeaderboardRotationDurations.flatMap((duration) =>
   homeLeaderboardRotationCodeSets.map((codeSet) => ({ duration, codeSet })),
 )
+const homeLeaderboardCardOrder: HomeLeaderboardCardKey[] = ['study_time', 'study_streak', 'matching', 'speed', 'mastered', 'duel_wins', 'duel_streak']
+const homeLeaderboardCardLabel: Record<HomeLeaderboardCardKey, string> = {
+  study_time: 'Most Study Time',
+  study_streak: 'Best Study Streak',
+  matching: 'Best Matching Score',
+  speed: 'Best Speed Test Score',
+  mastered: 'Most Mastered Codes',
+  duel_wins: '1v1 Most Wins',
+  duel_streak: '1v1 Streak Leaderboard',
+}
+const homeLeaderboardCardDescription: Record<HomeLeaderboardCardKey, string> = {
+  study_time: 'Top total study minutes',
+  study_streak: 'Longest active daily streak',
+  matching: 'Highest matching game score',
+  speed: 'Highest speed test score',
+  mastered: 'Most 20-streak code masters',
+  duel_wins: 'Most 1v1 wins',
+  duel_streak: 'Largest active 1v1 streak',
+}
+const homeLeaderboardCardIcon: Record<HomeLeaderboardCardKey, AppIconName> = {
+  study_time: 'study',
+  study_streak: 'stats',
+  matching: 'games',
+  speed: 'speed',
+  mastered: 'library',
+  duel_wins: 'duel',
+  duel_streak: 'duel',
+}
+const defaultHomeLeaderboardPreferences: HomeLeaderboardPreferences = {
+  visibleCards: ['study_time', 'matching', 'speed'],
+  duelWinsMode: 'all',
+  duelStreakMode: 'all',
+}
+const homeEncouragementQuotes = [
+  'Consistency compounds. One focused session today makes tomorrow easier.',
+  'Train your weakest category first. Confidence follows reps.',
+  'Small wins stack fast. Keep your streak alive and protect momentum.',
+  'If you can answer under pressure, you can perform under pressure.',
+  'Mastery is repetition with feedback. Stay with the process.',
+]
+const studyStreakMilestones = [3, 7, 14, 21, 30]
 
 const defaultGamesModeSelection: GameModeSelection = { duration: 30, filter: 'all' }
 const gamesModeStorageKey = 'leo_study_games_mode_selection'
@@ -379,6 +490,12 @@ const tierLabel: Record<SupporterTier, string> = {
   tier10: '$10 Pro Supporter',
 }
 
+function normalizeRoutePath(path: string): string {
+  const lowered = String(path || '/').toLowerCase()
+  const normalized = lowered.replace(/\/+$/, '')
+  return normalized.length > 0 ? normalized : '/'
+}
+
 const supporterTierOrder: SupporterTier[] = ['free', 'tier2', 'tier5', 'tier10']
 const avatarCropFrameSize = 280
 const avatarOutputSize = 512
@@ -390,6 +507,40 @@ function tierRank(tier: SupporterTier) {
 function leaderboardCodeSetLabel(filter: CodeFilter | null | undefined) {
   if (!filter || filter === 'all') return 'All'
   return codeSetLabel[filter]
+}
+
+function normalizeAgencyKey(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\bpolice dept\b/g, 'police department')
+    .replace(/\bpd\b/g, 'police department')
+    .replace(/\bsheriff dept\b/g, 'sheriff department')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function toTitleCase(value: string) {
+  return value
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function canonicalAgencyName(rawAgency: string) {
+  const normalized = normalizeAgencyKey(rawAgency)
+  if (!normalized) return ''
+  if (normalized.includes('fresno')) return 'Fresno Police Department'
+  if (
+    normalized.includes('los banos') ||
+    normalized.includes('las banos') ||
+    normalized.includes('los vanos')
+  ) {
+    return 'Los Banos Police Department'
+  }
+  return toTitleCase(normalized)
 }
 
 function sessionModeLabel(mode: SessionMode) {
@@ -406,7 +557,7 @@ function sessionTrackKey(options: { mode: SessionMode; filter: CodeFilter; durat
 }
 
 function getSessionTrack(stats: UserStats, trackKey: string): SessionTrack {
-  return stats.sessionTracks[trackKey] || { lastAttempt: null, accuracyHistory: [] }
+  return stats.sessionTracks[trackKey] || { lastAttempt: null, accuracyHistory: [], scoreHistory: [] }
 }
 
 function getLeaderboardPreview(
@@ -430,6 +581,57 @@ function getLeaderboardPreview(
   )
   const currentRank = scoped.findIndex((entry) => entry.userId === currentUserId)
   return { preview, currentRank: currentRank >= 0 ? currentRank + 1 : null }
+}
+
+function topLeaderboardEntryForMode(
+  entries: LeaderboardEntry[],
+  options: {
+    game: 'Matching' | 'Speed Test'
+    duration: number
+    filter: CodeFilter
+    scope: 'weekly' | 'alltime'
+    weeklyWindow?: { weekStartMs: number; nextWeekStartMs: number }
+  },
+) {
+  const scoped = entries
+    .filter((entry) => entry.game === options.game)
+    .filter((entry) => entry.matchDuration === options.duration && entry.matchFilter === options.filter)
+    .filter((entry) => {
+      if (options.scope !== 'weekly') return true
+      if (!options.weeklyWindow) return false
+      return entry.createdAt >= options.weeklyWindow.weekStartMs && entry.createdAt < options.weeklyWindow.nextWeekStartMs
+    })
+    .sort((left, right) => right.score - left.score || right.round - left.round)
+  return scoped[0] || null
+}
+
+function buildLeaderboardBoards(entries: LeaderboardEntry[], limit = 5): LeaderboardBoard[] {
+  const durations: HomeDurationFilter[] = [15, 30, 60]
+  const filters: CodeFilter[] = ['all', 'penal', 'hs', 'vehicle']
+  const games: Array<'Matching' | 'Speed Test'> = ['Matching', 'Speed Test']
+  const boards: LeaderboardBoard[] = []
+
+  for (const game of games) {
+    for (const duration of durations) {
+      for (const filter of filters) {
+        const scoped = entries
+          .filter((entry) => entry.game === game)
+          .filter((entry) => entry.matchDuration === duration && entry.matchFilter === filter)
+          .sort((left, right) => right.score - left.score || right.round - left.round)
+        const trimmed = limit > 0 ? scoped.slice(0, limit) : scoped
+        if (trimmed.length === 0) continue
+        boards.push({
+          key: `${game.toLowerCase()}-${duration}-${filter}`,
+          game,
+          duration,
+          filter,
+          entries: trimmed,
+        })
+      }
+    }
+  }
+
+  return boards
 }
 
 async function createCroppedAvatarFile(sourceUrl: string, zoom: number, offsetX: number, offsetY: number, sourceName: string) {
@@ -491,148 +693,218 @@ const appThemePresets: AppThemePreset[] = [
   {
     id: 'midnight',
     name: 'Midnight Blue',
-    swatch: 'linear-gradient(120deg, #0b1f45, #0a1228)',
+    swatch: 'linear-gradient(120deg, #152441, #0b1328)',
     vars: {
-      bg: '#091225',
-      panel: 'rgba(35, 51, 84, 0.72)',
-      panelStrong: 'rgba(41, 58, 97, 0.92)',
-      border: 'rgba(158, 180, 228, 0.22)',
-      text: '#f0f4ff',
-      muted: '#b3bedf',
-      accent: '#4ba4ff',
-      good: '#34d17b',
-      bad: '#ff6666',
-      bodyRadial: '#11306d',
-      bodyBase: '#070d1d',
+      bg: '#091224',
+      panel: 'rgba(31, 47, 79, 0.76)',
+      panelStrong: 'rgba(22, 36, 66, 0.94)',
+      border: 'rgba(125, 153, 211, 0.28)',
+      text: '#eef4ff',
+      muted: '#aebddf',
+      accent: '#4f8dff',
+      good: '#2fd18d',
+      bad: '#ff6b7f',
+      bodyRadial: '#13284c',
+      bodyBase: '#060d1d',
     },
   },
   {
     id: 'pastel-sky',
     name: 'Pastel Sky',
-    swatch: 'linear-gradient(120deg, #9bc9ff, #cde0ff)',
+    swatch: 'linear-gradient(120deg, #9fc6ff, #d9e8ff)',
     vars: {
-      bg: '#e8f2ff',
-      panel: 'rgba(215, 231, 255, 0.84)',
-      panelStrong: 'rgba(204, 222, 251, 0.95)',
-      border: 'rgba(90, 124, 186, 0.3)',
-      text: '#10213f',
-      muted: '#455e8f',
-      accent: '#2f78f4',
-      good: '#26995e',
-      bad: '#c64c5f',
-      bodyRadial: '#82b7ff',
-      bodyBase: '#dcecff',
+      bg: '#e9f3ff',
+      panel: 'rgba(219, 233, 255, 0.86)',
+      panelStrong: 'rgba(206, 223, 250, 0.96)',
+      border: 'rgba(91, 124, 188, 0.3)',
+      text: '#0f2141',
+      muted: '#445d8d',
+      accent: '#2f74e5',
+      good: '#23935b',
+      bad: '#c45263',
+      bodyRadial: '#8db8f3',
+      bodyBase: '#dceaff',
     },
   },
   {
     id: 'pastel-rose',
     name: 'Pastel Rose',
-    swatch: 'linear-gradient(120deg, #ffd6e8, #ffe6c8)',
+    swatch: 'linear-gradient(120deg, #ffd9e6, #ffe8d2)',
     vars: {
-      bg: '#fff7fb',
-      panel: 'rgba(255, 238, 247, 0.86)',
-      panelStrong: 'rgba(255, 232, 243, 0.96)',
-      border: 'rgba(189, 128, 154, 0.26)',
-      text: '#301c2e',
-      muted: '#6f5470',
-      accent: '#ca5f95',
-      good: '#2a9b71',
-      bad: '#c84e62',
-      bodyRadial: '#ffd3ea',
-      bodyBase: '#fff2f7',
+      bg: '#fff6fb',
+      panel: 'rgba(255, 237, 245, 0.88)',
+      panelStrong: 'rgba(255, 230, 240, 0.96)',
+      border: 'rgba(188, 123, 150, 0.28)',
+      text: '#2f1b30',
+      muted: '#6f5270',
+      accent: '#c35f92',
+      good: '#2c9b6e',
+      bad: '#cc5163',
+      bodyRadial: '#ffd6ea',
+      bodyBase: '#fff1f8',
     },
   },
   {
     id: 'pure-white',
     name: 'Clean White',
-    swatch: 'linear-gradient(120deg, #ffffff, #f5f7fb)',
+    swatch: 'linear-gradient(120deg, #ffffff, #eef3fb)',
     vars: {
-      bg: '#ffffff',
-      panel: 'rgba(248, 250, 254, 0.92)',
-      panelStrong: 'rgba(242, 246, 252, 0.97)',
-      border: 'rgba(132, 148, 177, 0.26)',
-      text: '#101827',
-      muted: '#4c596f',
-      accent: '#2f6ae8',
-      good: '#248a57',
-      bad: '#bf4558',
-      bodyRadial: '#edf2fa',
-      bodyBase: '#f8fafd',
+      bg: '#f8fbff',
+      panel: 'rgba(251, 253, 255, 0.94)',
+      panelStrong: 'rgba(243, 248, 255, 0.98)',
+      border: 'rgba(122, 140, 173, 0.25)',
+      text: '#101a2e',
+      muted: '#4c5f83',
+      accent: '#2f70e1',
+      good: '#27895b',
+      bad: '#c3495f',
+      bodyRadial: '#edf3fb',
+      bodyBase: '#f7fafe',
     },
   },
   {
     id: 'pure-black',
-    name: 'Graphite Black',
-    swatch: 'linear-gradient(120deg, #161616, #080808)',
+    name: 'Obsidian Black',
+    swatch: 'linear-gradient(120deg, #17191e, #07080a)',
     vars: {
-      bg: '#070707',
-      panel: 'rgba(29, 29, 31, 0.82)',
-      panelStrong: 'rgba(36, 36, 39, 0.93)',
-      border: 'rgba(180, 180, 185, 0.24)',
-      text: '#f7f7f7',
-      muted: '#b9b9bf',
-      accent: '#5f9aff',
-      good: '#39c07a',
-      bad: '#ff6c6c',
-      bodyRadial: '#2a2a2f',
-      bodyBase: '#050505',
+      bg: '#07080a',
+      panel: 'rgba(27, 30, 36, 0.84)',
+      panelStrong: 'rgba(20, 22, 27, 0.95)',
+      border: 'rgba(126, 133, 149, 0.26)',
+      text: '#f4f6fb',
+      muted: '#aeb6c8',
+      accent: '#5f97ff',
+      good: '#3dc088',
+      bad: '#ff7080',
+      bodyRadial: '#242833',
+      bodyBase: '#050608',
     },
   },
   {
     id: 'golden',
     name: 'Executive Gold',
-    swatch: 'linear-gradient(120deg, #3f2a08, #d5a12a 55%, #8b6312)',
+    swatch: 'linear-gradient(120deg, #3a2a0e, #d8ad4a 54%, #705118)',
     vars: {
-      bg: '#1d1406',
-      panel: 'rgba(82, 57, 17, 0.8)',
-      panelStrong: 'rgba(96, 67, 20, 0.93)',
-      border: 'rgba(237, 200, 112, 0.38)',
-      text: '#fff6dc',
-      muted: '#ebd2a0',
-      accent: '#ffd069',
-      good: '#5de3a0',
-      bad: '#ff8a76',
-      bodyRadial: '#b07e21',
-      bodyBase: '#130b03',
+      bg: '#15100a',
+      panel: 'rgba(75, 56, 28, 0.78)',
+      panelStrong: 'rgba(63, 45, 18, 0.94)',
+      border: 'rgba(226, 188, 109, 0.4)',
+      text: '#fff4d4',
+      muted: '#e8d1a0',
+      accent: '#e3bc68',
+      good: '#5fd29b',
+      bad: '#f28d78',
+      bodyRadial: '#8f6c35',
+      bodyBase: '#0f0a04',
     },
   },
   {
     id: 'ocean-mint',
     name: 'Ocean Mint',
-    swatch: 'linear-gradient(120deg, #0f3e4a, #3cb9a0)',
+    swatch: 'linear-gradient(120deg, #0e4a59, #2ea88f)',
     vars: {
-      bg: '#062b35',
-      panel: 'rgba(18, 65, 79, 0.78)',
-      panelStrong: 'rgba(22, 74, 88, 0.93)',
-      border: 'rgba(124, 210, 205, 0.28)',
+      bg: '#05262f',
+      panel: 'rgba(17, 73, 86, 0.8)',
+      panelStrong: 'rgba(13, 60, 73, 0.93)',
+      border: 'rgba(114, 197, 195, 0.3)',
       text: '#e8fcff',
-      muted: '#a8d8de',
-      accent: '#58d0bd',
-      good: '#6df0b0',
-      bad: '#ff8b86',
-      bodyRadial: '#1d6f7f',
-      bodyBase: '#051a23',
+      muted: '#a2d6dd',
+      accent: '#47c4b2',
+      good: '#67ebb0',
+      bad: '#ff8f8a',
+      bodyRadial: '#1b6878',
+      bodyBase: '#041921',
     },
   },
   {
     id: 'lavender-dusk',
     name: 'Lavender Dusk',
-    swatch: 'linear-gradient(120deg, #4a3f7a, #8f7ad7)',
+    swatch: 'linear-gradient(120deg, #4a3f82, #8775d7)',
     vars: {
-      bg: '#1d1a33',
-      panel: 'rgba(56, 49, 96, 0.78)',
-      panelStrong: 'rgba(67, 57, 111, 0.93)',
-      border: 'rgba(184, 171, 255, 0.26)',
-      text: '#f3f0ff',
-      muted: '#c8c2eb',
-      accent: '#9f8dff',
-      good: '#63dca8',
-      bad: '#ff7c9b',
-      bodyRadial: '#544a91',
-      bodyBase: '#141026',
+      bg: '#18152f',
+      panel: 'rgba(55, 48, 97, 0.8)',
+      panelStrong: 'rgba(46, 39, 84, 0.94)',
+      border: 'rgba(170, 158, 247, 0.3)',
+      text: '#f4f0ff',
+      muted: '#c8c1eb',
+      accent: '#9a87ff',
+      good: '#67d7aa',
+      bad: '#ff829f',
+      bodyRadial: '#4f458e',
+      bodyBase: '#120f24',
+    },
+  },
+  {
+    id: 'sage-stone',
+    name: 'Sage Stone',
+    swatch: 'linear-gradient(120deg, #1c342d, #9eb8a8)',
+    vars: {
+      bg: '#0f1d19',
+      panel: 'rgba(45, 70, 61, 0.8)',
+      panelStrong: 'rgba(30, 49, 42, 0.94)',
+      border: 'rgba(146, 179, 160, 0.28)',
+      text: '#ecf6f1',
+      muted: '#b3cabc',
+      accent: '#70b69a',
+      good: '#55d198',
+      bad: '#ff7f8e',
+      bodyRadial: '#36574c',
+      bodyBase: '#0a1310',
+    },
+  },
+  {
+    id: 'berry-night',
+    name: 'Berry Night',
+    swatch: 'linear-gradient(120deg, #351634, #a03e7d)',
+    vars: {
+      bg: '#160a18',
+      panel: 'rgba(66, 28, 64, 0.82)',
+      panelStrong: 'rgba(54, 20, 51, 0.94)',
+      border: 'rgba(198, 113, 171, 0.3)',
+      text: '#fdeefe',
+      muted: '#deb4da',
+      accent: '#de6cb5',
+      good: '#5fd9a2',
+      bad: '#ff8194',
+      bodyRadial: '#6f2f66',
+      bodyBase: '#120612',
     },
   },
 ]
+
+const darkModeVars = {
+  bg: '#070a2b',
+  panel: '#1b2050',
+  panelStrong: '#0f133d',
+  sidebar: '#060928',
+  border: '#2d356f',
+  text: '#f4f6ff',
+  muted: '#c1c8f2',
+  textMuted: '#8b95ca',
+  accent: '#4a63ff',
+  good: '#2ed3ff',
+  bad: '#ff5d73',
+  gold: '#8ac4ff',
+  bodyRadial: '#111744',
+  bodyBase: '#070a2b',
+} as const
+
+const lightModeVars = {
+  bg: '#f3f5fb',
+  panel: '#ffffff',
+  panelStrong: '#eef1f8',
+  sidebar: '#ffffff',
+  border: '#d8dfef',
+  text: '#202a4c',
+  muted: '#67759a',
+  textMuted: '#8593b5',
+  accent: '#4a63ff',
+  good: '#3f63ff',
+  bad: '#d44a66',
+  gold: '#5f79ff',
+  bodyRadial: '#eff2f9',
+  bodyBase: '#f3f5fb',
+} as const
 
 const defaultUserStats: UserStats = {
   studySeconds: 0,
@@ -652,6 +924,7 @@ const defaultUserStats: UserStats = {
     vehicle: 0,
   },
   sessionTracks: {},
+  sessionTimeline: [],
 }
 
 const stripeTierLinks: Partial<Record<Exclude<SupporterTier, 'free'>, string>> = {
@@ -662,6 +935,35 @@ const stripeTierLinks: Partial<Record<Exclude<SupporterTier, 'free'>, string>> =
 const appContentSource = String(import.meta.env.VITE_CONTENT_SOURCE || 'local')
   .trim()
   .toLowerCase()
+
+function sanitizeDisplayMode(value: unknown): DisplayMode {
+  return value === 'light' ? 'light' : 'dark'
+}
+
+function sanitizeHomeLeaderboardPreferences(input: unknown): HomeLeaderboardPreferences {
+  const fallback: HomeLeaderboardPreferences = {
+    visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards],
+    duelWinsMode: defaultHomeLeaderboardPreferences.duelWinsMode,
+    duelStreakMode: defaultHomeLeaderboardPreferences.duelStreakMode,
+  }
+  if (!input || typeof input !== 'object') return fallback
+  const value = input as Partial<HomeLeaderboardPreferences>
+  const hasVisibleCards = Array.isArray(value.visibleCards)
+  const rawCards = hasVisibleCards ? (value.visibleCards as HomeLeaderboardCardKey[]) : []
+  const normalizedVisible = homeLeaderboardCardOrder.filter((card) => rawCards.includes(card))
+  const visibleCards = hasVisibleCards ? normalizedVisible : [...fallback.visibleCards]
+  const duelWinsMode = duelLeaderboardModeOrder.includes(String(value.duelWinsMode) as DuelLeaderboardMode)
+    ? (String(value.duelWinsMode) as DuelLeaderboardMode)
+    : fallback.duelWinsMode
+  const duelStreakMode = duelLeaderboardModeOrder.includes(String(value.duelStreakMode) as DuelLeaderboardMode)
+    ? (String(value.duelStreakMode) as DuelLeaderboardMode)
+    : fallback.duelStreakMode
+  return {
+    visibleCards,
+    duelWinsMode,
+    duelStreakMode,
+  }
+}
 
 function createEmptyEditorItem(): ContentEditorItem {
   return {
@@ -697,21 +999,63 @@ function formatStudyTime(seconds: number) {
   return `${hours}h ${minutes}m`
 }
 
-function dayKeyUtc(date = new Date()) {
-  return date.toISOString().slice(0, 10)
+function getCurrentWeeklyWindowMs(nowMs: number) {
+  const now = new Date(nowMs)
+  const weekStart = new Date(now)
+  weekStart.setHours(0, 0, 0, 0)
+  const dayOfWeek = weekStart.getDay() // 0 = Sunday, 1 = Monday
+  const daysSinceMonday = (dayOfWeek + 6) % 7
+  weekStart.setDate(weekStart.getDate() - daysSinceMonday)
+  const nextWeekStart = new Date(weekStart)
+  nextWeekStart.setDate(nextWeekStart.getDate() + 7)
+  return {
+    weekStartMs: weekStart.getTime(),
+    nextWeekStartMs: nextWeekStart.getTime(),
+  }
 }
 
-function previousDayKeyUtc(dayKey: string) {
-  const parsed = new Date(`${dayKey}T00:00:00.000Z`)
-  if (Number.isNaN(parsed.getTime())) return ''
-  parsed.setUTCDate(parsed.getUTCDate() - 1)
-  return dayKeyUtc(parsed)
+function dayKeyUtc(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function parseDayKeyLocal(dayKey: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayKey.trim())
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const parsed = new Date(year, month - 1, day)
+  parsed.setHours(0, 0, 0, 0)
+  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null
+  return parsed
+}
+
+function dayGapFromToday(dayKey: string) {
+  if (!dayKey.trim()) return null
+  const parsed = parseDayKeyLocal(dayKey)
+  if (!parsed) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.floor((today.getTime() - parsed.getTime()) / (24 * 60 * 60 * 1000))
+}
+
+function studyStreakLapseInfo(stats: UserStats) {
+  const gapDays = dayGapFromToday(stats.lastStudyDay)
+  if (gapDays === null || gapDays <= 1 || stats.studyDayStreak <= 0) return null
+  return {
+    gapDays,
+    previousStreak: Math.max(0, Math.floor(stats.studyDayStreak)),
+  }
 }
 
 function applyStudyDayActivity(stats: UserStats) {
   const today = dayKeyUtc()
   if (stats.lastStudyDay === today) return stats
-  const continuesStreak = stats.lastStudyDay && previousDayKeyUtc(today) === stats.lastStudyDay
+  const gapDays = dayGapFromToday(stats.lastStudyDay)
+  const continuesStreak = gapDays === 1
   const nextStreak = continuesStreak ? Math.max(1, stats.studyDayStreak) + 1 : 1
   return {
     ...stats,
@@ -997,7 +1341,7 @@ function performanceKey(codeSet: CodeSet, section: string) {
   return `${codeSet}|${section.trim().toLowerCase()}`
 }
 
-function mastery(performance?: CodePerformance) {
+function mastery(performance?: CodePerformance): MasteryStatus {
   if (!performance || performance.correctCount + performance.incorrectCount === 0) return ''
   const correct = performance.correctCount ?? 0
   const incorrect = performance.incorrectCount ?? 0
@@ -1117,14 +1461,50 @@ function sanitizeUserStats(input: unknown): UserStats {
           .filter((value): value is number => value !== null)
           .slice(-12)
       : []
+  const sanitizeScoreHistory = (entry: unknown) =>
+    Array.isArray(entry)
+      ? entry
+          .map((value) => (typeof value === 'number' ? Math.max(0, Math.round(value)) : null))
+          .filter((value): value is number => value !== null)
+          .slice(-12)
+      : []
   const sanitizeTrack = (entry: unknown): SessionTrack => {
-    if (!entry || typeof entry !== 'object') return { lastAttempt: null, accuracyHistory: [] }
-    const value = entry as { lastAttempt?: unknown; accuracyHistory?: unknown }
+    if (!entry || typeof entry !== 'object') return { lastAttempt: null, accuracyHistory: [], scoreHistory: [] }
+    const value = entry as { lastAttempt?: unknown; accuracyHistory?: unknown; scoreHistory?: unknown }
+    const lastAttempt = sanitizeAttempt(value.lastAttempt)
+    const scoreHistory = sanitizeScoreHistory(value.scoreHistory)
+    const normalizedScoreHistory = scoreHistory.length > 0
+      ? scoreHistory
+      : lastAttempt
+        ? [lastAttempt.score]
+        : []
     return {
-      lastAttempt: sanitizeAttempt(value.lastAttempt),
+      lastAttempt,
       accuracyHistory: sanitizeHistory(value.accuracyHistory),
+      scoreHistory: normalizedScoreHistory,
     }
   }
+  const sanitizeTimelinePoint = (entry: unknown): SessionTimelinePoint | null => {
+    if (!entry || typeof entry !== 'object') return null
+    const value = entry as Partial<SessionTimelinePoint>
+    const mode = (['study_test', 'matching', 'speed'].includes(String(value.mode)) ? String(value.mode) : '') as SessionMode | ''
+    const filter = (['all', 'penal', 'hs', 'vehicle'].includes(String(value.filter)) ? String(value.filter) : '') as CodeFilter | ''
+    if (!mode || !filter) return null
+    const accuracy = typeof value.accuracy === 'number' ? Math.max(0, Math.min(100, Math.round(value.accuracy))) : null
+    const score = typeof (value as { score?: unknown }).score === 'number'
+      ? Math.max(0, Math.round((value as { score?: number }).score || 0))
+      : null
+    const at = typeof value.at === 'number' ? value.at : null
+    if (accuracy === null || at === null) return null
+    return { mode, filter, accuracy, score: score ?? accuracy, at }
+  }
+  const sessionTimeline = Array.isArray(value.sessionTimeline)
+    ? value.sessionTimeline
+        .map((entry) => sanitizeTimelinePoint(entry))
+        .filter((entry): entry is SessionTimelinePoint => Boolean(entry))
+        .sort((left, right) => left.at - right.at)
+        .slice(-320)
+    : []
   const normalizedTracks = Object.entries(sessionTracks as Record<string, unknown>).reduce<Record<string, SessionTrack>>((accumulator, [key, value]) => {
     if (!key.trim()) return accumulator
     accumulator[key] = sanitizeTrack(value)
@@ -1135,9 +1515,11 @@ function sanitizeUserStats(input: unknown): UserStats {
     const legacyHistoryMap = legacyAccuracyHistory && typeof legacyAccuracyHistory === 'object' ? legacyAccuracyHistory as Record<string, unknown> : {}
     const legacyModes: SessionMode[] = ['study_test', 'matching', 'speed']
     for (const mode of legacyModes) {
+      const legacyAttempt = sanitizeAttempt(legacyAttemptsMap[mode])
       normalizedTracks[sessionTrackKey({ mode, filter: 'all', duration: mode === 'study_test' ? null : 0 })] = {
-        lastAttempt: sanitizeAttempt(legacyAttemptsMap[mode]),
+        lastAttempt: legacyAttempt,
         accuracyHistory: sanitizeHistory(legacyHistoryMap[mode]),
+        scoreHistory: legacyAttempt ? [legacyAttempt.score] : [],
       }
     }
   }
@@ -1159,6 +1541,7 @@ function sanitizeUserStats(input: unknown): UserStats {
       vehicle: typeof (studyModeCounts as Record<string, unknown>).vehicle === 'number' ? Math.max(0, Math.floor((studyModeCounts as Record<string, number>).vehicle)) : 0,
     },
     sessionTracks: normalizedTracks,
+    sessionTimeline,
   }
 }
 
@@ -1192,6 +1575,7 @@ function displayNameStyle(nameStyle: NameStyle | undefined, tier: SupporterTier)
   const glowColor = hexToRgba(style.color, glowAlpha)
   return {
     color: style.color,
+    WebkitTextFillColor: style.color,
     fontFamily: style.fontFamily,
     fontWeight: style.fontWeight,
     fontStyle: style.fontStyle,
@@ -1213,7 +1597,9 @@ function sanitizeState(input: unknown): PersistedState {
     profileDetails: {
       bio: '',
       agency: defaultAgency,
+      displayMode: 'dark',
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+      homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
       themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
@@ -1238,7 +1624,9 @@ function sanitizeState(input: unknown): PersistedState {
         ? {
             bio: String((state.profileDetails as Partial<ProfileDetails>).bio || ''),
             agency: String((state.profileDetails as Partial<ProfileDetails>).agency || ''),
+            displayMode: sanitizeDisplayMode((state.profileDetails as Partial<ProfileDetails>).displayMode),
             homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs((state.profileDetails as Partial<ProfileDetails>).homeLeaderboardRotationMs),
+            homeLeaderboardPreferences: sanitizeHomeLeaderboardPreferences((state.profileDetails as Partial<ProfileDetails>).homeLeaderboardPreferences),
             themeId: getThemePreset(String((state.profileDetails as Partial<ProfileDetails>).themeId || appThemePresets[0].id)).id,
             nameStyle: sanitizeNameStyle((state.profileDetails as Partial<ProfileDetails>).nameStyle),
             namePresets: sanitizeNamePresets((state.profileDetails as Partial<ProfileDetails>).namePresets),
@@ -1252,7 +1640,9 @@ function sanitizeState(input: unknown): PersistedState {
         : {
             bio: '',
             agency: defaultAgency,
+            displayMode: 'dark',
             homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+            homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
             themeId: appThemePresets[0].id,
             nameStyle: { ...defaultNameStyle },
             namePresets: [],
@@ -1395,15 +1785,38 @@ function tierNameClass(tier: SupporterTier) {
 }
 
 function displayNameClass(tier: SupporterTier, hasStyle: boolean) {
-  if (tier === 'tier10' && hasStyle) return 'tier-name'
+  if (tier === 'tier10' && hasStyle) return 'tier-name-custom'
   return tierNameClass(tier)
+}
+
+function leaderboardNameSizeClass(name: string) {
+  const length = name.trim().length
+  if (length >= 30) return 'is-very-long'
+  if (length >= 20) return 'is-long'
+  return ''
+}
+
+function leaderboardNameLayoutClass(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  const longestWord = words.reduce((maxLength, word) => Math.max(maxLength, word.length), 0)
+
+  const classes: string[] = []
+  if (words.length >= 2) classes.push('is-multi-word')
+  if (words.length === 1 && longestWord >= 16) classes.push('is-single-word-long')
+  if (words.length === 1 && longestWord >= 24) classes.push('is-single-word-very-long')
+  return classes.join(' ')
 }
 
 function LeaderboardPlayerName({ entry }: { entry: LeaderNameEntry }) {
   const streak = Math.max(0, Math.floor(entry.duelCurrentWinStreak || 0))
+  const nameSizeClass = leaderboardNameSizeClass(entry.playerName)
+  const nameLayoutClass = leaderboardNameLayoutClass(entry.playerName)
   return (
     <span className="leader-player-name-block">
-      <span className={displayNameClass(entry.supporterTier, true)} style={displayNameStyle(entry.nameStyle, entry.supporterTier)}>
+      <span
+        className={`${displayNameClass(entry.supporterTier, true)} leader-player-name-text ${nameSizeClass} ${nameLayoutClass}`.trim()}
+        style={displayNameStyle(entry.nameStyle, entry.supporterTier)}
+      >
         {entry.playerName}
       </span>
       {streak > 0 ? (
@@ -1475,6 +1888,75 @@ function AppIcon({ name, className = '' }: { name: AppIconName; className?: stri
       </svg>
     )
   }
+  if (name === 'leaderboards') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M4 18h16" />
+        <path d="M6 18V10" />
+        <path d="M12 18V6" />
+        <path d="M18 18V13" />
+      </svg>
+    )
+  }
+  if (name === 'settings') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <circle cx="12" cy="12" r="3.2" />
+        <path d="M19.2 15a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1.1 1.1a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a1 1 0 0 1-1 1h-1.6a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1 1 0 0 1-1.4 0l-1.1-1.1a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a1 1 0 0 1-1-1v-1.6a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1 1 0 0 1 0-1.4l1.1-1.1a1 1 0 0 1 1.4 0l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1.1 1.1a1 1 0 0 1 0 1.4l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2a1 1 0 0 1 1 1v1.6a1 1 0 0 1-1 1H20a1 1 0 0 0-.8.6Z" />
+      </svg>
+    )
+  }
+  if (name === 'stats') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M4 20V8" />
+        <path d="M10 20V4" />
+        <path d="M16 20v-7" />
+        <path d="M22 20v-4" />
+      </svg>
+    )
+  }
+  if (name === 'speed') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M5 15a7 7 0 1 1 14 0" />
+        <path d="M12 15l3.6-3.6" />
+        <path d="M12 20v-1" />
+      </svg>
+    )
+  }
+  if (name === 'duel') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <circle cx="8" cy="8" r="3" />
+        <circle cx="16" cy="8" r="3" />
+        <path d="M3.5 19c.8-3 2.4-4.5 4.5-4.5S11.7 16 12.5 19" />
+        <path d="M11.5 19c.8-3 2.4-4.5 4.5-4.5s3.7 1.5 4.5 4.5" />
+      </svg>
+    )
+  }
+  if (name === 'flashcards') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <rect x="3.5" y="8" width="13" height="10" rx="2.2" />
+        <rect x="7.5" y="4.5" width="13" height="10" rx="2.2" />
+        <path d="M10 8h6" />
+        <path d="M10 11h8" />
+      </svg>
+    )
+  }
+  if (name === 'test') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <rect x="5" y="3.5" width="14" height="17" rx="2.5" />
+        <path d="M9 8h6" />
+        <path d="M9 12h2.5" />
+        <path d="m14.4 12 1.2 1.2 2.2-2.2" />
+        <path d="M9 16h2.5" />
+        <path d="m14.4 16 1.2 1.2 2.2-2.2" />
+      </svg>
+    )
+  }
   return (
     <svg {...commonProps} className={className} aria-hidden>
       <path d="M3 11.5 12 4l9 7.5" />
@@ -1535,8 +2017,10 @@ function StatsIcon({ name, className = '' }: { name: StatsIconName; className?: 
   if (name === 'flashcards') {
     return (
       <svg {...commonProps} className={className} aria-hidden>
-        <rect x="5" y="6" width="12" height="10" rx="2" />
-        <path d="M9 4h9a2 2 0 0 1 2 2v9" />
+        <rect x="3.5" y="8" width="13" height="10" rx="2.2" />
+        <rect x="7.5" y="4.5" width="13" height="10" rx="2.2" />
+        <path d="M10 8h6" />
+        <path d="M10 11h8" />
       </svg>
     )
   }
@@ -1565,11 +2049,19 @@ function buildTrendPath(points: number[]) {
   const usableWidth = width - paddingX * 2
   const usableHeight = height - paddingY * 2
   const safePoints = points.length > 1 ? points : [points[0] ?? 0, points[0] ?? 0]
+  const finitePoints = safePoints.map((value) => (Number.isFinite(value) ? value : 0))
+  const minValue = Math.min(...finitePoints)
+  const maxValue = Math.max(...finitePoints)
+  const spread = maxValue - minValue
+  const padding = spread > 0 ? spread * 0.15 : Math.max(5, Math.abs(maxValue) * 0.2 + 2)
+  const rangeMin = minValue - padding
+  const rangeMax = maxValue + padding
+  const range = Math.max(1, rangeMax - rangeMin)
   const stepX = safePoints.length > 1 ? usableWidth / (safePoints.length - 1) : 0
-  const coords = safePoints.map((value, index) => {
-    const clamped = Math.max(0, Math.min(100, value))
+  const coords = finitePoints.map((value, index) => {
+    const clamped = Math.max(rangeMin, Math.min(rangeMax, value))
     const x = paddingX + index * stepX
-    const y = paddingY + ((100 - clamped) / 100) * usableHeight
+    const y = paddingY + ((rangeMax - clamped) / range) * usableHeight
     return { x, y }
   })
   return {
@@ -1580,10 +2072,150 @@ function buildTrendPath(points: number[]) {
   }
 }
 
+function compressTrendPoints(points: number[], maxPoints = 60) {
+  if (!Array.isArray(points) || points.length <= maxPoints) return points
+  const bucketSize = points.length / maxPoints
+  const compressed: number[] = []
+  for (let bucket = 0; bucket < maxPoints; bucket += 1) {
+    const start = Math.floor(bucket * bucketSize)
+    const end = Math.max(start + 1, Math.floor((bucket + 1) * bucketSize))
+    const chunk = points.slice(start, end).filter((value) => Number.isFinite(value))
+    if (chunk.length === 0) continue
+    const average = chunk.reduce((sum, value) => sum + value, 0) / chunk.length
+    compressed.push(Math.round(average))
+  }
+  return compressed.length > 0 ? compressed : points.slice(-maxPoints)
+}
+
+type InteractiveTrendChartProps = {
+  chartId: string
+  values: number[]
+  ariaLabel: string
+  pointLabel?: string
+  valueSuffix?: string
+  formatValue?: (value: number) => string
+  emptyMessage?: string
+  className?: string
+  describePoint?: (index: number, total: number, value: number) => string
+  describeSuggestion?: (value: number, delta: number | null) => string
+}
+
+function InteractiveTrendChart({
+  chartId,
+  values,
+  ariaLabel,
+  pointLabel = 'Point',
+  valueSuffix = '',
+  formatValue,
+  emptyMessage = 'No trend data yet.',
+  className = '',
+  describePoint,
+  describeSuggestion,
+}: InteractiveTrendChartProps) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const trend = values.length > 0 ? buildTrendPath(values) : null
+  const activeIndex = values.length === 0
+    ? -1
+    : hoveredIndex !== null && hoveredIndex >= 0 && hoveredIndex < values.length
+      ? hoveredIndex
+      : values.length - 1
+  const activePoint = trend && activeIndex >= 0 ? trend.coords[activeIndex] : null
+  const activeValue = activeIndex >= 0 ? values[activeIndex] : null
+  const previousValue = activeIndex > 0 ? values[activeIndex - 1] : null
+  const delta = activeValue !== null && previousValue !== null
+    ? activeValue - previousValue
+    : null
+  const pointDescription = activeValue === null
+    ? ''
+    : describePoint
+      ? describePoint(activeIndex, values.length, activeValue)
+      : `${pointLabel} ${activeIndex + 1}`
+  const renderValue = (value: number) => {
+    if (formatValue) return formatValue(value)
+    return `${Math.round(value)}${valueSuffix}`
+  }
+  const suggestion = activeValue === null
+    ? 'Complete more sessions to unlock deeper trend guidance.'
+    : describeSuggestion
+      ? describeSuggestion(activeValue, delta)
+      : delta === null
+        ? 'First tracked point. Keep building consistency.'
+        : delta > 0
+          ? 'Your trend is improving. Keep this pace.'
+          : delta < 0
+            ? 'Trend dipped. Review misses and rebound next run.'
+            : 'Stable trend. Keep stacking clean reps.'
+
+  if (!trend || !activePoint || activeValue === null) {
+    return <p className="muted tiny">{emptyMessage}</p>
+  }
+
+  return (
+    <>
+      <svg
+        viewBox={`0 0 ${trend.width} ${trend.height}`}
+        className={`session-trend-chart interactive-trend-chart ${className}`.trim()}
+        role="img"
+        aria-label={ariaLabel}
+        onMouseLeave={() => setHoveredIndex(null)}
+      >
+        <path d={trend.path} className="session-trend-glow" />
+        <path d={trend.path} className="session-trend-line" />
+        {trend.coords.map((point, index) => (
+          <g key={`${chartId}-trend-point-${index}`}>
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={hoveredIndex === index ? 3.8 : 3}
+              className={hoveredIndex === index ? 'interactive-trend-point interactive-trend-point-active' : 'interactive-trend-point'}
+            />
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={9}
+              className="interactive-trend-point-hit"
+              onMouseEnter={() => setHoveredIndex(index)}
+              onFocus={() => setHoveredIndex(index)}
+              onClick={() => setHoveredIndex(index)}
+              aria-label={`${pointLabel} ${index + 1}: ${renderValue(values[index])}`}
+            />
+          </g>
+        ))}
+        <line
+          x1={activePoint.x}
+          y1={activePoint.y}
+          x2={activePoint.x}
+          y2={trend.height - 8}
+          className="interactive-trend-hover-line"
+        />
+        <circle cx={activePoint.x} cy={activePoint.y} r="5" className="session-trend-dot interactive-trend-dot-active" />
+        <text
+          x={Math.min(trend.width - 42, Math.max(12, activePoint.x + 8))}
+          y={Math.max(16, activePoint.y - 10)}
+          className="interactive-trend-hover-label"
+        >
+          {renderValue(activeValue)}
+        </text>
+      </svg>
+      <div className="interactive-trend-insight">
+        <span className="interactive-trend-insight-item">
+          {pointDescription}: <strong>{renderValue(activeValue)}</strong>
+        </span>
+        <span className="interactive-trend-insight-item">
+          {delta === null
+            ? 'No previous point yet.'
+            : delta >= 0
+              ? `+${renderValue(delta)} vs previous`
+              : `${renderValue(delta)} vs previous`}
+        </span>
+        <span className="interactive-trend-insight-item">{suggestion}</span>
+      </div>
+    </>
+  )
+}
+
 function SessionPerformanceReportCard({ report }: { report: SessionPerformanceReport }) {
-  const trendValues = report.trend.length > 0 ? report.trend : [report.accuracy]
-  const trend = buildTrendPath(trendValues)
-  const lastPoint = trend.coords[trend.coords.length - 1]
+  const trendValues = compressTrendPoints(report.scoreTrend.length > 0 ? report.scoreTrend : [report.score], 64)
   const improvedRank = report.currentRank !== null && report.previousRank !== null && report.currentRank < report.previousRank
   const movedCount =
     report.currentRank !== null && report.previousRank !== null && report.currentRank < report.previousRank
@@ -1595,16 +2227,24 @@ function SessionPerformanceReportCard({ report }: { report: SessionPerformanceRe
       <div className="session-report-head">
         <div>
           <h3>{sessionModeLabel(report.mode)} Performance</h3>
-          <p className="muted">{report.contextLabel} • Accuracy: {report.accuracy}%</p>
+          <p className="muted">{report.contextLabel} • Score: {report.score} pts</p>
         </div>
       </div>
 
       <div className="session-trend-wrap">
-        <svg viewBox={`0 0 ${trend.width} ${trend.height}`} className="session-trend-chart" role="img" aria-label="Accuracy trend">
-          <path d={trend.path} className="session-trend-glow" />
-          <path d={trend.path} className="session-trend-line" />
-          <circle cx={lastPoint.x} cy={lastPoint.y} r="4.5" className="session-trend-dot" />
-        </svg>
+        <InteractiveTrendChart
+          chartId={`session-report-${report.mode}-${report.contextLabel}`}
+          values={trendValues}
+          ariaLabel={`${sessionModeLabel(report.mode)} score trend`}
+          pointLabel="Attempt"
+          valueSuffix=" pts"
+          describeSuggestion={(_, delta) => {
+            if (delta === null) return 'First tracked score for this mode.'
+            if (delta > 0) return 'Score is climbing. Keep pushing.'
+            if (delta < 0) return 'Score dipped. Tighten fundamentals and run it back.'
+            return 'Stable score. Focus on speed and consistency.'
+          }}
+        />
       </div>
 
       <div className="session-metrics-grid">
@@ -1623,11 +2263,11 @@ function SessionPerformanceReportCard({ report }: { report: SessionPerformanceRe
       </div>
 
       <p className="session-summary-line">
-        {report.deltaAccuracy === null
+        {report.deltaScore === null
           ? 'First tracked attempt for this mode. Keep building consistency.'
-          : report.deltaAccuracy >= 0
-            ? `You improved ${report.deltaAccuracy}% since your last attempt.`
-            : `You are down ${Math.abs(report.deltaAccuracy)}% from your last attempt. Bounce back next run.`}
+          : report.deltaScore >= 0
+            ? `You improved ${report.deltaScore} points since your last attempt.`
+            : `You are down ${Math.abs(report.deltaScore)} points from your last attempt. Bounce back next run.`}
       </p>
       {report.focusTips.length > 0 ? (
         <p className="session-focus-line">
@@ -1686,11 +2326,11 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
     codeSetBreakdown,
   } = props
   const [hoveredTrendIndex, setHoveredTrendIndex] = useState<number | null>(null)
-  const trendValues = sessionTrack.accuracyHistory.slice(-8)
+  const trendValues = compressTrendPoints(sessionTrack.scoreHistory || [], 64)
   const chartValues = trendValues.length > 0
     ? trendValues
     : sessionTrack.lastAttempt
-      ? [sessionTrack.lastAttempt.accuracy]
+      ? [sessionTrack.lastAttempt.score]
       : []
   const trend = chartValues.length > 0 ? buildTrendPath(chartValues) : null
   const activeTrendIndex = chartValues.length === 0
@@ -1699,18 +2339,20 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
       ? hoveredTrendIndex
       : chartValues.length - 1
   const activeTrendPoint = trend && activeTrendIndex >= 0 ? trend.coords[activeTrendIndex] : null
-  const activeTrendAccuracy = activeTrendIndex >= 0 ? chartValues[activeTrendIndex] : null
-  const previousTrendAccuracy = activeTrendIndex > 0 ? chartValues[activeTrendIndex - 1] : null
-  const trendDelta = activeTrendAccuracy !== null && previousTrendAccuracy !== null
-    ? activeTrendAccuracy - previousTrendAccuracy
+  const activeTrendScore = activeTrendIndex >= 0 ? chartValues[activeTrendIndex] : null
+  const previousTrendScore = activeTrendIndex > 0 ? chartValues[activeTrendIndex - 1] : null
+  const trendDelta = activeTrendScore !== null && previousTrendScore !== null
+    ? activeTrendScore - previousTrendScore
     : null
-  const trendSuggestion = activeTrendAccuracy === null
+  const trendSuggestion = activeTrendScore === null
     ? 'Complete a round to start tracking.'
-    : activeTrendAccuracy >= 85
-      ? 'Great accuracy. Push pace while keeping precision.'
-      : activeTrendAccuracy >= 70
-        ? 'Solid base. Focus on weak categories to break past 85%.'
-        : 'Prioritize accuracy first. Slow down and repeat weak sections.'
+    : trendDelta === null
+      ? 'First tracked score. Keep stacking clean runs.'
+      : trendDelta > 0
+        ? 'Your score trend is improving. Keep the pressure.'
+        : trendDelta < 0
+          ? 'Scores slipped. Slow down, then rebuild speed.'
+          : 'Score held steady. Push for the next jump.'
   const weakestCategory = [...codeSetBreakdown]
     .filter((entry) => entry.attempts > 0)
     .sort((left, right) => left.accuracyPercent - right.accuracyPercent)[0]
@@ -1737,9 +2379,9 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
             <p className="game-insight-label">Last attempt</p>
             {sessionTrack.lastAttempt ? (
               <>
-                <p className="game-insight-value">{sessionTrack.lastAttempt.accuracy}% accuracy</p>
+                <p className="game-insight-value">{sessionTrack.lastAttempt.score} pts</p>
                 <p className="muted tiny">
-                  Score {sessionTrack.lastAttempt.score} • {sessionTrack.lastAttempt.correct} correct / {sessionTrack.lastAttempt.incorrect} incorrect
+                  {sessionTrack.lastAttempt.correct} correct / {sessionTrack.lastAttempt.incorrect} incorrect
                 </p>
               </>
             ) : (
@@ -1765,12 +2407,12 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
             <p className="game-insight-label">{title} progress trend</p>
             <span className="muted tiny">{chartValues.length > 0 ? `${chartValues.length} points` : 'No data yet'}</span>
           </div>
-          {trend && activeTrendPoint && activeTrendAccuracy !== null ? (
+          {trend && activeTrendPoint && activeTrendScore !== null ? (
             <svg
               viewBox={`0 0 ${trend.width} ${trend.height}`}
               className="game-trend-chart"
               role="img"
-              aria-label={`${title} accuracy trend`}
+              aria-label={`${title} score trend`}
               onMouseLeave={() => setHoveredTrendIndex(null)}
             >
               <path d={trend.path} className="session-trend-glow" />
@@ -1791,7 +2433,7 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
                     onMouseEnter={() => setHoveredTrendIndex(index)}
                     onFocus={() => setHoveredTrendIndex(index)}
                     onClick={() => setHoveredTrendIndex(index)}
-                    aria-label={`Attempt ${index + 1}: ${chartValues[index]} percent accuracy`}
+                    aria-label={`Attempt ${index + 1}: ${Math.round(chartValues[index])} points`}
                   />
                 </g>
               ))}
@@ -1808,23 +2450,23 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
                 y={Math.max(16, activeTrendPoint.y - 10)}
                 className="game-trend-hover-label"
               >
-                {Math.round(activeTrendAccuracy)}%
+                {Math.round(activeTrendScore)} pts
               </text>
             </svg>
           ) : (
             <p className="muted tiny">Your graph appears after your first completed run.</p>
           )}
-          {activeTrendAccuracy !== null ? (
+          {activeTrendScore !== null ? (
             <div className="game-trend-insight">
               <span className="game-trend-insight-item">
-                Attempt {activeTrendIndex + 1}: <strong>{activeTrendAccuracy}%</strong>
+                Attempt {activeTrendIndex + 1}: <strong>{Math.round(activeTrendScore)} pts</strong>
               </span>
               <span className="game-trend-insight-item">
                 {trendDelta === null
                   ? 'No prior point yet.'
                   : trendDelta >= 0
-                    ? `+${trendDelta}% vs previous`
-                    : `${trendDelta}% vs previous`}
+                    ? `+${Math.round(trendDelta)} pts vs previous`
+                    : `${Math.round(trendDelta)} pts vs previous`}
               </span>
               <span className="game-trend-insight-item">{trendSuggestion}</span>
             </div>
@@ -1833,7 +2475,11 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
 
         <div className="game-category-focus">
           {codeSetBreakdown.map((entry) => (
-            <div key={`${title}-focus-${entry.codeSet}`} className="game-category-row">
+            <div
+              key={`${title}-focus-${entry.codeSet}`}
+              className="game-category-row"
+              title={`${codeSetLabel[entry.codeSet]}: ${entry.attempts > 0 ? `${entry.accuracyPercent}% accuracy (${entry.attempts} attempts)` : 'No attempts yet'}`}
+            >
               <span className="game-category-name">{codeSetLabel[entry.codeSet]}</span>
               <div className="game-category-track">
                 <div
@@ -1862,14 +2508,19 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
 function App() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [routePath, setRoutePath] = useState(() => normalizeRoutePath(location.pathname))
 
   const [sections, setSections] = useState<CodeSection[]>([])
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [scenarioItems, setScenarioItems] = useState<ScenarioBankItem[]>([])
   const [activeTab, setActiveTab] = useState<AppTab>('home')
+  const [leaderboardsScope, setLeaderboardsScope] = useState<'weekly' | 'alltime'>('weekly')
+  const [gameModeLeaderboardsScope, setGameModeLeaderboardsScope] = useState<'weekly' | 'alltime'>('alltime')
+  const [leaderboardViewGame, setLeaderboardViewGame] = useState<'Matching' | 'Speed Test'>('Matching')
+  const [leaderboardViewDuration, setLeaderboardViewDuration] = useState<HomeDurationFilter>(15)
+  const [leaderboardViewFilter, setLeaderboardViewFilter] = useState<CodeFilter>('all')
   const [onlineUsersCount, setOnlineUsersCount] = useState(0)
-  const [showStudyFlashSetupModal, setShowStudyFlashSetupModal] = useState(false)
-  const [showStudyTestSetupModal, setShowStudyTestSetupModal] = useState(false)
+  const [onlinePresenceByUserId, setOnlinePresenceByUserId] = useState<Record<string, PresenceStatus>>({})
   const [studyFlashFilter, setStudyFlashFilter] = useState<CodeFilter>('all')
   const [studyTestFilter, setStudyTestFilter] = useState<CodeFilter>('all')
   const [studyTestWrongness, setStudyTestWrongness] = useState<StudyWrongness>('needs_work')
@@ -1914,34 +2565,65 @@ function App() {
   const [authSuccess, setAuthSuccess] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [clockNowMs, setClockNowMs] = useState<number>(() => Date.now())
   
-  // Track online users - update last_active and fetch count
+  // Track online users - update last_active and fetch active/away presence
   useEffect(() => {
     const client = supabase
     if (!client || !currentUserId) return
-    
+    const activeThresholdMs = 10 * 60 * 1000
+
     const updateLastActive = async () => {
       try {
         await client.from('profiles').update({ last_active: new Date().toISOString() }).eq('user_id', currentUserId)
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
     }
 
-    const fetchOnlineCount = async () => {
+    const fetchOnlinePresence = async () => {
       try {
-        const { data } = await client.rpc('get_online_users_count', { minutes_interval: 5 })
-        setOnlineUsersCount(data || 0)
-      } catch (e) { setOnlineUsersCount(0) }
+        const { data, error } = await client.rpc('list_online_1v1_users', { p_minutes_interval: 60 })
+        if (!error && Array.isArray(data)) {
+          const now = Date.now()
+          const presence: Record<string, PresenceStatus> = {}
+          for (const row of data) {
+            const value = row as Record<string, unknown>
+            const userId = String(value.user_id || '').trim()
+            if (!userId) continue
+            const parsedMs = Date.parse(String(value.last_active || ''))
+            if (!Number.isFinite(parsedMs)) continue
+            const elapsedMs = Math.max(0, now - parsedMs)
+            presence[userId] = elapsedMs <= activeThresholdMs ? 'active' : 'away'
+          }
+          presence[currentUserId] = 'active'
+          setOnlinePresenceByUserId(presence)
+          setOnlineUsersCount(
+            Object.values(presence).filter((status) => status === 'active').length,
+          )
+          return
+        }
+      } catch {
+        // Ignore and try fallback count
+      }
+
+      setOnlinePresenceByUserId({ [currentUserId]: 'active' })
+      try {
+        const { data } = await client.rpc('get_online_users_count', { minutes_interval: 10 })
+        const fallbackCount = Number(data || 0)
+        setOnlineUsersCount(Number.isFinite(fallbackCount) ? fallbackCount : 0)
+      } catch {
+        setOnlineUsersCount(0)
+      }
     }
 
     updateLastActive()
     const interval = setInterval(() => {
       updateLastActive()
-      fetchOnlineCount()
+      fetchOnlinePresence()
     }, 30000)
-    fetchOnlineCount()
+    fetchOnlinePresence()
 
     return () => clearInterval(interval)
-  }, [supabase, currentUserId])
+  }, [currentUserId])
 
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
@@ -1959,7 +2641,9 @@ function App() {
   const [profileDetails, setProfileDetails] = useState<ProfileDetails>({
     bio: '',
     agency: defaultAgency,
+    displayMode: 'dark',
     homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+    homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
     themeId: appThemePresets[0].id,
     nameStyle: { ...defaultNameStyle },
     namePresets: [],
@@ -1983,6 +2667,8 @@ function App() {
   const [performance, setPerformance] = useState<Record<string, CodePerformance>>({})
   const [highScores, setHighScores] = useState(gameHighScoreSeed)
   const [bestStreak, setBestStreak] = useState(0)
+  const [remoteTrackScoreHistory, setRemoteTrackScoreHistory] = useState<Record<string, number[]>>({})
+  const [remoteScoreTimeline, setRemoteScoreTimeline] = useState<ScoreTimelinePoint[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [leaderboardError, setLeaderboardError] = useState('')
   const [selectedLeaderboardEntry, setSelectedLeaderboardEntry] = useState<LeaderboardEntry | null>(null)
@@ -1992,19 +2678,39 @@ function App() {
   const [homeStudyTimeLeaders, setHomeStudyTimeLeaders] = useState<HomeLeaderboardEntry[]>([])
   const [homeStudyStreakLeaders, setHomeStudyStreakLeaders] = useState<HomeLeaderboardEntry[]>([])
   const [homeMostMasteredLeaders, setHomeMostMasteredLeaders] = useState<HomeLeaderboardEntry[]>([])
+  const [homeDuelWinsLeadersByMode, setHomeDuelWinsLeadersByMode] = useState<Record<DuelLeaderboardMode, HomeLeaderboardEntry[]>>({
+    all: [],
+    matching: [],
+    quiz: [],
+  })
+  const [homeDuelStreakLeadersByMode, setHomeDuelStreakLeadersByMode] = useState<Record<DuelLeaderboardMode, HomeLeaderboardEntry[]>>({
+    all: [],
+    matching: [],
+    quiz: [],
+  })
   const [homeMatchingDurationFilter, setHomeMatchingDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeMatchingCodeFilter, setHomeMatchingCodeFilter] = useState<CodeFilter>('all')
   const [homeSpeedDurationFilter, setHomeSpeedDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeSpeedCodeFilter, setHomeSpeedCodeFilter] = useState<CodeFilter>('all')
   const [homeMatchingConfigOpen, setHomeMatchingConfigOpen] = useState(false)
   const [homeSpeedConfigOpen, setHomeSpeedConfigOpen] = useState(false)
+  const [homeLeaderboardSettingsOpen, setHomeLeaderboardSettingsOpen] = useState(false)
+  const [homeLeaderboardSettingsDraft, setHomeLeaderboardSettingsDraft] = useState<HomeLeaderboardPreferences>(() => ({
+    visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards],
+    duelWinsMode: defaultHomeLeaderboardPreferences.duelWinsMode,
+    duelStreakMode: defaultHomeLeaderboardPreferences.duelStreakMode,
+  }))
+  const [homeLeaderboardSettingsSaving, setHomeLeaderboardSettingsSaving] = useState(false)
+  const [homeLeaderboardSettingsError, setHomeLeaderboardSettingsError] = useState('')
   const [homeMasteredInfoOpen, setHomeMasteredInfoOpen] = useState(false)
+  const [studyInsightWindowDays, setStudyInsightWindowDays] = useState<7 | 14 | 30>(14)
   const [assistedLearningEnabled, setAssistedLearningEnabled] = useState(true)
   const [showAssistedLearningInfo, setShowAssistedLearningInfo] = useState(false)
   const [showDevNotice, setShowDevNotice] = useState(false)
   const [reduceVisualEffects, setReduceVisualEffects] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
+  const streakLossNoticeRef = useRef('')
 
   const [quizDeck, setQuizDeck] = useState<QuizQuestion[]>([])
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(null)
@@ -2045,12 +2751,12 @@ function App() {
   const [speedSessionFilter, setSpeedSessionFilter] = useState<CodeFilter>('all')
   const [showSpeedSetupModal, setShowSpeedSetupModal] = useState(false)
   const [speedFeedback, setSpeedFeedback] = useState('')
+  const [speedAnswerLocked, setSpeedAnswerLocked] = useState(false)
   const [scenarioDeck, setScenarioDeck] = useState<ScenarioQuestion[]>([])
   const [scenarioCurrentQuestion, setScenarioCurrentQuestion] = useState<ScenarioQuestion | null>(null)
   const [scenarioResult, setScenarioResult] = useState<string>('')
   const [scenarioSelectedChoice, setScenarioSelectedChoice] = useState<number | null>(null)
   const [scenarioStreak, setScenarioStreak] = useState(0)
-  const [gamesMode, setGamesMode] = useState<'matching' | 'speed' | 'duel'>('matching')
   const [duelInviteJoinRoomId, setDuelInviteJoinRoomId] = useState<string | null>(null)
   const homeMatchingRotationIndexRef = useRef(0)
   const homeSpeedRotationIndexRef = useRef(0)
@@ -2065,15 +2771,55 @@ function App() {
   const matchIncorrectCountRef = useRef(0)
   const speedCorrectCountRef = useRef(0)
   const speedIncorrectCountRef = useRef(0)
+  const speedAnswerLockRef = useRef(false)
+  const speedAdvanceTimerRef = useRef<number | null>(null)
+  const performanceRef = useRef<Record<string, CodePerformance>>({})
+  const matchWrongResetTimerRef = useRef<number | null>(null)
   const recentSpeedSectionsRef = useRef<string[]>([])
+  const scenarioDeckRef = useRef<ScenarioQuestion[]>([])
   const quizFireHostRef = useRef<HTMLDivElement | null>(null)
   const scenarioFireHostRef = useRef<HTMLDivElement | null>(null)
   const scenarioNextRef = useRef<HTMLDivElement | null>(null)
   const scenarioPromptRef = useRef<HTMLHeadingElement | null>(null)
   const quizNextRef = useRef<HTMLButtonElement | null>(null)
+  const studyActivityBySourceRef = useRef<Record<StudyActivitySource, number>>({
+    flashcards: 0,
+    study_test: 0,
+    matching: 0,
+    speed: 0,
+    duel: 0,
+  })
   const [quizFireWidth, setQuizFireWidth] = useState(0)
   const [scenarioFireWidth, setScenarioFireWidth] = useState(0)
   const { isOwner, loading: ownerLoading } = useOwner(currentUserId || null)
+
+  const markStudyActivity = useCallback((source: StudyActivitySource) => {
+    studyActivityBySourceRef.current[source] = Date.now()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (speedAdvanceTimerRef.current !== null) {
+        window.clearTimeout(speedAdvanceTimerRef.current)
+        speedAdvanceTimerRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    scenarioDeckRef.current = scenarioDeck
+  }, [scenarioDeck])
+
+  useEffect(() => {
+    performanceRef.current = performance
+  }, [performance])
+
+  useEffect(() => () => {
+    if (matchWrongResetTimerRef.current !== null) {
+      window.clearTimeout(matchWrongResetTimerRef.current)
+      matchWrongResetTimerRef.current = null
+    }
+  }, [])
 
   const persistAgencyOptions = async (nextOptions: string[]) => {
     if (!supabase || !isOwner) return false
@@ -2270,12 +3016,11 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!supabase || !currentUserId || !isOwner) {
-      setEditorItems([])
-      return
-    }
-    void loadOwnerEditorItems()
-  }, [currentUserId, isOwner])
+    const timer = window.setInterval(() => {
+      setClockNowMs(Date.now())
+    }, 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     const pendingSetup = window.localStorage.getItem('pending_profile_setup') === '1'
@@ -2492,11 +3237,11 @@ function App() {
     const userIds = [...new Set(rows.map((entry) => String(entry.user_id)))]
     let profilesByUserId: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
     let detailsByUserId: Record<string, ProfileDetails> = {}
-    let masteredCodesByUserId: Record<string, number> = {}
-    let studySecondsByUserId: Record<string, number> = {}
-    let studyDayStreakByUserId: Record<string, number> = {}
-    let mostStudiedModeByUserId: Record<string, CodeFilter | null> = {}
-    let duelStatsByUserId: Record<string, { wins: number; losses: number; currentWinStreak: number }> = {}
+    const masteredCodesByUserId: Record<string, number> = {}
+    const studySecondsByUserId: Record<string, number> = {}
+    const studyDayStreakByUserId: Record<string, number> = {}
+    const mostStudiedModeByUserId: Record<string, CodeFilter | null> = {}
+    let duelStatsByUserId: Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>> = {}
     let ownerUserIds = new Set<string>()
 
     if (userIds.length > 0) {
@@ -2521,7 +3266,9 @@ function App() {
         accumulator[String(entry.user_id)] = {
           bio: String(entry.bio || ''),
           agency: String(entry.agency || defaultAgency),
+          displayMode: 'dark',
           homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+          homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
           themeId: appThemePresets[0].id,
           nameStyle: { ...defaultNameStyle },
           namePresets: [],
@@ -2542,7 +3289,9 @@ function App() {
         const existing = detailsByUserId[userId] ?? {
           bio: '',
           agency: defaultAgency,
+          displayMode: 'dark',
           homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+          homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
           themeId: appThemePresets[0].id,
           nameStyle: { ...defaultNameStyle },
           namePresets: [],
@@ -2551,7 +3300,9 @@ function App() {
         detailsByUserId[userId] = {
           bio: existing.bio || details.bio,
           agency: existing.agency || details.agency,
+          displayMode: sanitizeDisplayMode(details.displayMode || existing.displayMode),
           homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs(details.homeLeaderboardRotationMs || existing.homeLeaderboardRotationMs),
+          homeLeaderboardPreferences: sanitizeHomeLeaderboardPreferences(details.homeLeaderboardPreferences || existing.homeLeaderboardPreferences),
           themeId: details.themeId || existing.themeId,
           nameStyle: details.nameStyle,
           namePresets: details.namePresets,
@@ -2572,25 +3323,35 @@ function App() {
 
       const { data: duelRows, error: duelError } = await supabase
         .from('duel_player_stats')
-        .select('user_id,wins,losses,current_win_streak')
-        .eq('game_type', 'all')
+        .select('user_id,game_type,wins,losses,current_win_streak')
+        .in('game_type', duelLeaderboardModeOrder)
         .in('user_id', userIds)
       if (!duelError) {
-        duelStatsByUserId = (duelRows || []).reduce<Record<string, { wins: number; losses: number; currentWinStreak: number }>>((accumulator, entry) => {
+        duelStatsByUserId = (duelRows || []).reduce<Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>>>((accumulator, entry) => {
           const userId = String(entry.user_id || '')
+          const gameType = String((entry as Record<string, unknown>).game_type || 'all') as DuelLeaderboardMode
           if (!userId) return accumulator
-          accumulator[userId] = {
+          if (!duelLeaderboardModeOrder.includes(gameType)) return accumulator
+          const current = accumulator[userId] || {
+            all: { wins: 0, losses: 0, currentWinStreak: 0 },
+            matching: { wins: 0, losses: 0, currentWinStreak: 0 },
+            quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+          }
+          current[gameType] = {
             wins: Number(entry.wins || 0),
             losses: Number(entry.losses || 0),
             currentWinStreak: Number(entry.current_win_streak || 0),
           }
+          accumulator[userId] = current
           return accumulator
         }, {})
       }
     }
 
     const mapped = rows.map(
-      (entry): LeaderboardEntry => ({
+      (entry): LeaderboardEntry => {
+        const duelStats = duelStatsByUserId[String(entry.user_id)]?.all
+        return ({
         id: String(entry.id),
         userId: String(entry.user_id || ''),
         game: String(entry.game),
@@ -2613,10 +3374,11 @@ function App() {
         studySeconds: studySecondsByUserId[String(entry.user_id)] || 0,
         studyDayStreak: studyDayStreakByUserId[String(entry.user_id)] || 0,
         mostStudiedMode: mostStudiedModeByUserId[String(entry.user_id)] || null,
-        duelWins: duelStatsByUserId[String(entry.user_id)]?.wins || 0,
-        duelLosses: duelStatsByUserId[String(entry.user_id)]?.losses || 0,
-        duelCurrentWinStreak: duelStatsByUserId[String(entry.user_id)]?.currentWinStreak || 0,
-      }),
+        duelWins: duelStats?.wins || 0,
+        duelLosses: duelStats?.losses || 0,
+        duelCurrentWinStreak: duelStats?.currentWinStreak || 0,
+      })
+    },
     )
 
     const deduped = Array.from(
@@ -2647,7 +3409,7 @@ function App() {
 
     const userIds = [...new Set(states.map((entry) => String(entry.user_id || '')))].filter(Boolean)
     let profileMap: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
-    let duelStatsByUserId: Record<string, { wins: number; losses: number; currentWinStreak: number }> = {}
+    let duelStatsByUserId: Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>> = {}
     let ownerUserIds = new Set<string>()
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
@@ -2672,18 +3434,26 @@ function App() {
 
       const { data: duelRows, error: duelError } = await supabase
         .from('duel_player_stats')
-        .select('user_id,wins,losses,current_win_streak')
-        .eq('game_type', 'all')
+        .select('user_id,game_type,wins,losses,current_win_streak')
+        .in('game_type', duelLeaderboardModeOrder)
         .in('user_id', userIds)
       if (!duelError) {
-        duelStatsByUserId = (duelRows || []).reduce<Record<string, { wins: number; losses: number; currentWinStreak: number }>>((accumulator, entry) => {
+        duelStatsByUserId = (duelRows || []).reduce<Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>>>((accumulator, entry) => {
           const userId = String(entry.user_id || '')
+          const gameType = String((entry as Record<string, unknown>).game_type || 'all') as DuelLeaderboardMode
           if (!userId) return accumulator
-          accumulator[userId] = {
+          if (!duelLeaderboardModeOrder.includes(gameType)) return accumulator
+          const current = accumulator[userId] || {
+            all: { wins: 0, losses: 0, currentWinStreak: 0 },
+            matching: { wins: 0, losses: 0, currentWinStreak: 0 },
+            quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+          }
+          current[gameType] = {
             wins: Number(entry.wins || 0),
             losses: Number(entry.losses || 0),
             currentWinStreak: Number(entry.current_win_streak || 0),
           }
+          accumulator[userId] = current
           return accumulator
         }, {})
       }
@@ -2692,6 +3462,16 @@ function App() {
     const studyRows: HomeLeaderboardEntry[] = []
     const studyStreakRows: HomeLeaderboardEntry[] = []
     const masteredRows: HomeLeaderboardEntry[] = []
+    const duelWinsRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
+      all: [],
+      matching: [],
+      quiz: [],
+    }
+    const duelStreakRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
+      all: [],
+      matching: [],
+      quiz: [],
+    }
     let ownerRotationMs: number | null = null
     for (const row of states) {
       const userId = String(row.user_id || '')
@@ -2705,7 +3485,12 @@ function App() {
       const studySeconds = parsed.profileDetails.stats.studySeconds
       const studyDayStreak = parsed.profileDetails.stats.studyDayStreak
       const mostStudiedMode = mostStudiedModeFromStats(parsed.profileDetails.stats)
-      const duelStats = duelStatsByUserId[userId] || { wins: 0, losses: 0, currentWinStreak: 0 }
+      const duelStatsByMode = duelStatsByUserId[userId] || {
+        all: { wins: 0, losses: 0, currentWinStreak: 0 },
+        matching: { wins: 0, losses: 0, currentWinStreak: 0 },
+        quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+      }
+      const duelStats = duelStatsByMode.all
       studyRows.push({
         userId,
         playerName: profile.username,
@@ -2763,11 +3548,79 @@ function App() {
         duelLosses: duelStats.losses,
         duelCurrentWinStreak: duelStats.currentWinStreak,
       })
+
+      for (const mode of duelLeaderboardModeOrder) {
+        const duelModeStats = duelStatsByMode[mode]
+        if (duelModeStats.wins > 0) {
+          duelWinsRowsByMode[mode].push({
+            userId,
+            playerName: profile.username,
+            avatarUrl: profile.avatarUrl,
+            supporterTier: profile.supporterTier,
+            themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
+            nameStyle: parsed.profileDetails.nameStyle,
+            bio: parsed.profileDetails.bio,
+            agency: parsed.profileDetails.agency,
+            isOwner: ownerUserIds.has(userId),
+            value: duelModeStats.wins,
+            masteredCodes: masteredCount,
+            studySeconds,
+            studyDayStreak,
+            mostStudiedMode,
+            duelWins: duelModeStats.wins,
+            duelLosses: duelModeStats.losses,
+            duelCurrentWinStreak: duelModeStats.currentWinStreak,
+          })
+        }
+        if (duelModeStats.currentWinStreak > 0) {
+          duelStreakRowsByMode[mode].push({
+            userId,
+            playerName: profile.username,
+            avatarUrl: profile.avatarUrl,
+            supporterTier: profile.supporterTier,
+            themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
+            nameStyle: parsed.profileDetails.nameStyle,
+            bio: parsed.profileDetails.bio,
+            agency: parsed.profileDetails.agency,
+            isOwner: ownerUserIds.has(userId),
+            value: duelModeStats.currentWinStreak,
+            masteredCodes: masteredCount,
+            studySeconds,
+            studyDayStreak,
+            mostStudiedMode,
+            duelWins: duelModeStats.wins,
+            duelLosses: duelModeStats.losses,
+            duelCurrentWinStreak: duelModeStats.currentWinStreak,
+          })
+        }
+      }
     }
 
     setHomeStudyTimeLeaders(studyRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
     setHomeStudyStreakLeaders(studyStreakRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
     setHomeMostMasteredLeaders(masteredRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
+    setHomeDuelWinsLeadersByMode({
+      all: duelWinsRowsByMode.all
+        .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
+        .slice(0, 5),
+      matching: duelWinsRowsByMode.matching
+        .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
+        .slice(0, 5),
+      quiz: duelWinsRowsByMode.quiz
+        .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
+        .slice(0, 5),
+    })
+    setHomeDuelStreakLeadersByMode({
+      all: duelStreakRowsByMode.all
+        .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
+        .slice(0, 5),
+      matching: duelStreakRowsByMode.matching
+        .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
+        .slice(0, 5),
+      quiz: duelStreakRowsByMode.quiz
+        .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
+        .slice(0, 5),
+    })
     if (ownerRotationMs !== null) {
       setLeaderboardRotateMs(ownerRotationMs)
     }
@@ -2798,18 +3651,18 @@ function App() {
 
     const {
       data: { subscription },
-    } = client.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state change:', event, session ? 'session exists' : 'no session')
+    } = client.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setCurrentUserId(session.user.id)
         setCurrentUserEmail(session.user.email || '')
         setCurrentUserProvider(String(session.user.app_metadata?.provider || 'email'))
       } else {
-        console.log('No session - clearing user')
         setCurrentUserId('')
         setCurrentUserEmail('')
         setCurrentUserProvider('email')
         setProfile(null)
+        setRemoteTrackScoreHistory({})
+        setRemoteScoreTimeline([])
         setStateHydrated(false)
       }
     })
@@ -2826,6 +3679,31 @@ function App() {
     const client = supabase
 
     const hydrate = async () => {
+      const { data: banRow, error: banLookupErrorRaw } = await client
+        .from('banned_users')
+        .select('user_id,reason')
+        .eq('user_id', currentUserId)
+        .maybeSingle()
+
+      const banLookupError = banLookupErrorRaw as { code?: string; message?: string } | null
+      const bannedTableMissing = banLookupError && ['42P01', '42703'].includes(String(banLookupError.code || ''))
+      if (banLookupError && !bannedTableMissing) {
+        console.warn('[banned_users] lookup failed:', banLookupError.message || banLookupError)
+      }
+
+      if (!banLookupError && banRow?.user_id) {
+        const reason = String((banRow as Record<string, unknown>).reason || '').trim()
+        setAuthError(reason ? `This account has been banned: ${reason}` : 'This account has been banned.')
+        await client.auth.signOut()
+        setCurrentUserId('')
+        setCurrentUserEmail('')
+        setCurrentUserProvider('email')
+        setProfile(null)
+        setStateHydrated(false)
+        navigate('/signin', { replace: true })
+        return
+      }
+
       const { data: profileRow } = await client
         .from('profiles')
         .select('user_id,username,avatar_path,supporter_tier,bio,agency')
@@ -2868,12 +3746,42 @@ function App() {
       setProfileDetails({
         bio: profileBio || nextState.profileDetails.bio,
         agency: profileAgency || nextState.profileDetails.agency,
+        displayMode: nextState.profileDetails.displayMode,
         homeLeaderboardRotationMs: nextState.profileDetails.homeLeaderboardRotationMs,
+        homeLeaderboardPreferences: nextState.profileDetails.homeLeaderboardPreferences,
         themeId: nextState.profileDetails.themeId,
         nameStyle: nextState.profileDetails.nameStyle,
         namePresets: nextState.profileDetails.namePresets,
         stats: nextState.profileDetails.stats,
       })
+
+      const { data: historyRows, error: historyError } = await client
+        .from('game_attempt_history')
+        .select('track_key,score,created_at')
+        .eq('user_id', currentUserId)
+        .order('created_at', { ascending: true })
+        .limit(6000)
+
+      if (!historyError && Array.isArray(historyRows)) {
+        const nextTrackHistory: Record<string, number[]> = {}
+        const nextTimeline: ScoreTimelinePoint[] = []
+        for (const rawRow of historyRows) {
+          const row = rawRow as Record<string, unknown>
+          const trackKey = String(row.track_key || '').trim()
+          if (!trackKey) continue
+          const score = Math.max(0, Math.round(Number(row.score || 0)))
+          const at = Date.parse(String(row.created_at || '')) || Date.now()
+          if (!nextTrackHistory[trackKey]) nextTrackHistory[trackKey] = []
+          nextTrackHistory[trackKey].push(score)
+          nextTimeline.push({ at, score })
+        }
+        setRemoteTrackScoreHistory(nextTrackHistory)
+        setRemoteScoreTimeline(nextTimeline)
+      } else {
+        setRemoteTrackScoreHistory({})
+        setRemoteScoreTimeline([])
+      }
+
       lastAppStateUpdateRef.current = Date.parse(String(stateRow?.updated_at || '')) || Date.now()
       setStateHydrated(true)
 
@@ -2882,7 +3790,7 @@ function App() {
     }
 
     hydrate().catch(() => undefined)
-  }, [currentUserId])
+  }, [currentUserId, navigate])
 
   useEffect(() => {
     if (!supabase || !stateHydrated || !currentUserId) return
@@ -2955,12 +3863,31 @@ function App() {
           setProfileDetails((previous) => ({
             bio: String(row.bio || ''),
             agency: String(row.agency || ''),
+            displayMode: previous.displayMode,
             homeLeaderboardRotationMs: previous.homeLeaderboardRotationMs,
+            homeLeaderboardPreferences: previous.homeLeaderboardPreferences,
             themeId: previous.themeId,
             nameStyle: previous.nameStyle,
             namePresets: previous.namePresets,
             stats: previous.stats,
           }))
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'game_attempt_history', filter: `user_id=eq.${currentUserId}` },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>
+          const trackKey = String(row.track_key || '').trim()
+          if (!trackKey) return
+          const score = Math.max(0, Math.round(Number(row.score || 0)))
+          const at = Date.parse(String(row.created_at || '')) || Date.now()
+          setRemoteTrackScoreHistory((previous) => {
+            const next = { ...previous }
+            next[trackKey] = [...(next[trackKey] || []), score].slice(-2000)
+            return next
+          })
+          setRemoteScoreTimeline((previous) => [...previous, { at, score }].slice(-8000))
         },
       )
       .subscribe()
@@ -3035,6 +3962,31 @@ function App() {
         .slice(0, 8),
     [leaderboard, gamesSelection.duration, gamesSelection.filter],
   )
+  const duelHubLeaderboard = useMemo(() => {
+    const perUser = new Map<string, LeaderboardEntry>()
+    for (const entry of leaderboard) {
+      if (entry.duelWins <= 0 && entry.duelCurrentWinStreak <= 0) continue
+      const current = perUser.get(entry.userId)
+      if (
+        !current ||
+        entry.duelWins > current.duelWins ||
+        (entry.duelWins === current.duelWins && entry.duelCurrentWinStreak > current.duelCurrentWinStreak) ||
+        (entry.duelWins === current.duelWins &&
+          entry.duelCurrentWinStreak === current.duelCurrentWinStreak &&
+          entry.duelLosses < current.duelLosses)
+      ) {
+        perUser.set(entry.userId, entry)
+      }
+    }
+    return Array.from(perUser.values())
+      .sort(
+        (left, right) =>
+          right.duelWins - left.duelWins ||
+          right.duelCurrentWinStreak - left.duelCurrentWinStreak ||
+          left.duelLosses - right.duelLosses,
+      )
+      .slice(0, 8)
+  }, [leaderboard])
   const homeMatchingLeaders = useMemo(
     () =>
       topEntryPerUser(
@@ -3084,6 +4036,225 @@ function App() {
         ),
       ),
     [leaderboard],
+  )
+  const homeLeaderboardPreferences = useMemo(
+    () => sanitizeHomeLeaderboardPreferences(profileDetails.homeLeaderboardPreferences),
+    [profileDetails.homeLeaderboardPreferences],
+  )
+  const effectiveHomeLeaderboardPreferences = useMemo(
+    () =>
+      sanitizeHomeLeaderboardPreferences(
+        homeLeaderboardSettingsOpen ? homeLeaderboardSettingsDraft : homeLeaderboardPreferences,
+      ),
+    [homeLeaderboardPreferences, homeLeaderboardSettingsDraft, homeLeaderboardSettingsOpen],
+  )
+  const homeVisibleLeaderboardCards = useMemo(() => {
+    return homeLeaderboardCardOrder.filter((card) => effectiveHomeLeaderboardPreferences.visibleCards.includes(card))
+  }, [effectiveHomeLeaderboardPreferences])
+  const homeShowsStudyTimeLeaderboard = homeVisibleLeaderboardCards.includes('study_time')
+  const homeShowsStudyStreakLeaderboard = homeVisibleLeaderboardCards.includes('study_streak')
+  const homeShowsMatchingLeaderboard = homeVisibleLeaderboardCards.includes('matching')
+  const homeShowsSpeedLeaderboard = homeVisibleLeaderboardCards.includes('speed')
+  const homeShowsMasteredLeaderboard = homeVisibleLeaderboardCards.includes('mastered')
+  const homeShowsDuelWinsLeaderboard = homeVisibleLeaderboardCards.includes('duel_wins')
+  const homeShowsDuelStreakLeaderboard = homeVisibleLeaderboardCards.includes('duel_streak')
+  const homeDuelWinsMode = effectiveHomeLeaderboardPreferences.duelWinsMode
+  const homeDuelStreakMode = effectiveHomeLeaderboardPreferences.duelStreakMode
+  const homeDuelWinsLeaders = homeDuelWinsLeadersByMode[homeDuelWinsMode] || []
+  const homeDuelStreakLeaders = homeDuelStreakLeadersByMode[homeDuelStreakMode] || []
+  const currentWeeklyWindow = useMemo(() => getCurrentWeeklyWindowMs(clockNowMs), [clockNowMs])
+  const weeklyLeaderboardEntries = useMemo(() => {
+    return leaderboard.filter(
+      (entry) => entry.createdAt >= currentWeeklyWindow.weekStartMs && entry.createdAt < currentWeeklyWindow.nextWeekStartMs,
+    )
+  }, [leaderboard, currentWeeklyWindow.weekStartMs, currentWeeklyWindow.nextWeekStartMs])
+  const gamesModeLeaderboardSource = useMemo(
+    () => (gameModeLeaderboardsScope === 'weekly' ? weeklyLeaderboardEntries : leaderboard),
+    [gameModeLeaderboardsScope, weeklyLeaderboardEntries, leaderboard],
+  )
+  const matchingModeLeaderboard = useMemo(
+    () =>
+      topEntryPerUser(
+        gamesModeLeaderboardSource
+          .filter((entry) => entry.game === 'Matching')
+          .filter((entry) => entry.matchDuration === gamesSelection.duration && entry.matchFilter === gamesSelection.filter),
+      ).slice(0, 8),
+    [gamesModeLeaderboardSource, gamesSelection.duration, gamesSelection.filter],
+  )
+  const speedModeLeaderboard = useMemo(
+    () =>
+      topEntryPerUser(
+        gamesModeLeaderboardSource
+          .filter((entry) => entry.game === 'Speed Test')
+          .filter((entry) => entry.matchDuration === gamesSelection.duration && entry.matchFilter === gamesSelection.filter),
+      ).slice(0, 8),
+    [gamesModeLeaderboardSource, gamesSelection.duration, gamesSelection.filter],
+  )
+  const allTimeLeaderboardBoards = useMemo(() => buildLeaderboardBoards(leaderboard), [leaderboard])
+  const weeklyLeaderboardBoards = useMemo(
+    () => buildLeaderboardBoards(weeklyLeaderboardEntries),
+    [weeklyLeaderboardEntries],
+  )
+  const weeklyLeaderboardBoardsFull = useMemo(
+    () => buildLeaderboardBoards(weeklyLeaderboardEntries, 0),
+    [weeklyLeaderboardEntries],
+  )
+  const weeklyTopPerformer = useMemo<WeeklyPerformanceLeader | null>(() => {
+    if (weeklyLeaderboardBoardsFull.length === 0) return null
+    const byUser = new Map<
+      string,
+      {
+        entry: LeaderboardEntry
+        firstPlaceCount: number
+        leaderboardAppearances: number
+        totalScore: number
+        bestSingleScore: number
+      }
+    >()
+
+    for (const board of weeklyLeaderboardBoardsFull) {
+      for (let index = 0; index < board.entries.length; index += 1) {
+        const entry = board.entries[index]
+        const current = byUser.get(entry.userId)
+        if (!current) {
+          byUser.set(entry.userId, {
+            entry,
+            firstPlaceCount: index === 0 ? 1 : 0,
+            leaderboardAppearances: 1,
+            totalScore: entry.score,
+            bestSingleScore: entry.score,
+          })
+          continue
+        }
+        current.firstPlaceCount += index === 0 ? 1 : 0
+        current.leaderboardAppearances += 1
+        current.totalScore += entry.score
+        current.bestSingleScore = Math.max(current.bestSingleScore, entry.score)
+        if (entry.score > current.entry.score || (entry.score === current.entry.score && entry.round > current.entry.round)) {
+          current.entry = entry
+        }
+      }
+    }
+
+    const sorted = [...byUser.values()].sort((left, right) =>
+      right.firstPlaceCount - left.firstPlaceCount ||
+      right.totalScore - left.totalScore ||
+      right.bestSingleScore - left.bestSingleScore ||
+      right.leaderboardAppearances - left.leaderboardAppearances,
+    )
+
+    if (sorted.length === 0) return null
+    return sorted[0]
+  }, [weeklyLeaderboardBoardsFull])
+  const weeklyDepartmentLeaders = useMemo(() => {
+    const buckets = new Map<
+      string,
+      {
+        key: string
+        agency: string
+        totalScore: number
+        attempts: number
+        players: Set<string>
+      }
+    >()
+    for (const entry of weeklyLeaderboardEntries) {
+      const canonicalAgency = canonicalAgencyName(entry.agency || '')
+      if (!canonicalAgency) continue
+      const key = normalizeAgencyKey(canonicalAgency)
+      const current = buckets.get(key) || {
+        key,
+        agency: canonicalAgency,
+        totalScore: 0,
+        attempts: 0,
+        players: new Set<string>(),
+      }
+      current.totalScore += Math.max(0, entry.score)
+      current.attempts += 1
+      current.players.add(entry.userId)
+      buckets.set(key, current)
+    }
+    return [...buckets.values()]
+      .map(
+        (entry): DepartmentLeaderboardEntry => ({
+          key: entry.key,
+          agency: entry.agency,
+          totalScore: entry.totalScore,
+          averageScore: entry.attempts > 0 ? Math.round(entry.totalScore / entry.attempts) : 0,
+          playerCount: entry.players.size,
+          attempts: entry.attempts,
+        }),
+      )
+      .sort((left, right) => right.averageScore - left.averageScore || right.totalScore - left.totalScore)
+  }, [weeklyLeaderboardEntries])
+  const bestWeeklyDepartment = weeklyDepartmentLeaders[0] || null
+  const visibleLeaderboardBoards = leaderboardsScope === 'weekly' ? weeklyLeaderboardBoards : allTimeLeaderboardBoards
+  const visibleMatchingBoards = useMemo(
+    () => visibleLeaderboardBoards.filter((board) => board.game === 'Matching'),
+    [visibleLeaderboardBoards],
+  )
+  const visibleSpeedBoards = useMemo(
+    () => visibleLeaderboardBoards.filter((board) => board.game === 'Speed Test'),
+    [visibleLeaderboardBoards],
+  )
+  const scopedLeaderboardEntries = leaderboardsScope === 'weekly' ? weeklyLeaderboardEntries : leaderboard
+  const leaderboardGameBoards = leaderboardViewGame === 'Matching' ? visibleMatchingBoards : visibleSpeedBoards
+  const leaderboardSelectedBoard = useMemo(() => {
+    if (leaderboardGameBoards.length === 0) return null
+    return (
+      leaderboardGameBoards.find(
+        (board) => board.duration === leaderboardViewDuration && board.filter === leaderboardViewFilter,
+      ) || leaderboardGameBoards[0]
+    )
+  }, [leaderboardGameBoards, leaderboardViewDuration, leaderboardViewFilter])
+  const leaderboardSelectedEntries = useMemo(() => {
+    if (!leaderboardSelectedBoard) return []
+    return topEntryPerUser(
+      scopedLeaderboardEntries
+        .filter((entry) => entry.game === leaderboardSelectedBoard.game)
+        .filter(
+          (entry) =>
+            entry.matchDuration === leaderboardSelectedBoard.duration && entry.matchFilter === leaderboardSelectedBoard.filter,
+        ),
+    ).slice(0, 5)
+  }, [leaderboardSelectedBoard, scopedLeaderboardEntries])
+  const leaderboardModeStats = useMemo(() => {
+    const stats = new Map<string, { duration: HomeDurationFilter; filter: CodeFilter; attempts: number; topScore: number }>()
+    for (const entry of scopedLeaderboardEntries) {
+      if (entry.game !== leaderboardViewGame) continue
+      if (entry.score <= 0) continue
+      const duration = [15, 30, 60].includes(Number(entry.matchDuration))
+        ? (Number(entry.matchDuration) as HomeDurationFilter)
+        : 30
+      const filter = (['all', 'penal', 'hs', 'vehicle'].includes(String(entry.matchFilter))
+        ? String(entry.matchFilter)
+        : 'all') as CodeFilter
+      const key = `${duration}|${filter}`
+      const current = stats.get(key) || { duration, filter, attempts: 0, topScore: 0 }
+      current.attempts += 1
+      current.topScore = Math.max(current.topScore, entry.score)
+      stats.set(key, current)
+    }
+    return [...stats.values()].sort(
+      (left, right) => right.attempts - left.attempts || right.topScore - left.topScore,
+    )
+  }, [scopedLeaderboardEntries, leaderboardViewGame])
+  const leaderboardModeStatMap = useMemo(() => {
+    const map = new Map<string, { duration: HomeDurationFilter; filter: CodeFilter; attempts: number; topScore: number }>()
+    for (const stat of leaderboardModeStats) {
+      map.set(`${stat.duration}|${stat.filter}`, stat)
+    }
+    return map
+  }, [leaderboardModeStats])
+  const leaderboardModeMatrix = useMemo(
+    () =>
+      ([15, 30, 60] as HomeDurationFilter[]).map((duration) => ({
+        duration,
+        modes: (['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => ({
+          filter,
+          stat: leaderboardModeStatMap.get(`${duration}|${filter}`) || null,
+        })),
+      })),
+    [leaderboardModeStatMap],
   )
 
   const speedQuestionBank = useMemo(() => {
@@ -3198,7 +4369,8 @@ function App() {
         explanation: `${question.explanation} ${useTrue ? 'This statement is true.' : 'This statement is false.'}`,
       })
     }
-    return deck
+    if (filter === 'all') return deck
+    return deck.filter((question) => question.codeSet === filter)
   }
 
   const beginStudyFlashcards = () => {
@@ -3219,7 +4391,6 @@ function App() {
     setStudyFlashSessionOrder(order)
     setStudyFlashSessionIndex(0)
     setStudyFlashSessionFlipped(false)
-    setShowStudyFlashSetupModal(false)
     setStudyFlashSessionOpen(true)
   }
 
@@ -3237,7 +4408,6 @@ function App() {
     setStudyTestSessionCorrect(0)
     setStudyTestSessionDone(false)
     setStudyTestReport(null)
-    setShowStudyTestSetupModal(false)
     setStudyTestSessionOpen(true)
     setQuizDeck(remaining)
     setCurrentQuestion(first)
@@ -3246,7 +4416,244 @@ function App() {
     setStreak(0)
   }
 
-  const advanceStudyTestQuestion = () => {
+  const incrementUserStats = useCallback((updater: (stats: UserStats) => UserStats, trackStudyDay = false) => {
+    setProfileDetails((previous) => ({
+      ...previous,
+      stats: trackStudyDay ? applyStudyDayActivity(updater(previous.stats)) : updater(previous.stats),
+    }))
+  }, [])
+
+  const triggerCelebration = useCallback((title: string, subtitle: string) => {
+    const burst = Date.now()
+    setCelebration({ title, subtitle, burst })
+    window.setTimeout(() => {
+      setCelebration((current) => (current?.burst === burst ? null : current))
+    }, 2200)
+  }, [])
+
+  useEffect(() => {
+    if (!stateHydrated || !currentUserId) return
+    const lapse = studyStreakLapseInfo(profileDetails.stats)
+    if (!lapse) return
+    const noticeKey = `${currentUserId}:${profileDetails.stats.lastStudyDay}:${profileDetails.stats.studyDayStreak}`
+    if (streakLossNoticeRef.current === noticeKey) return
+    streakLossNoticeRef.current = noticeKey
+    setProfileDetails((previous) => {
+      const nextLapse = studyStreakLapseInfo(previous.stats)
+      if (!nextLapse) return previous
+      return {
+        ...previous,
+        stats: {
+          ...previous.stats,
+          studyDayStreak: 0,
+        },
+      }
+    })
+    triggerCelebration(
+      'Streak lost',
+      `You lost your study streak (${lapse.previousStreak} days). You’re back to 0.`,
+    )
+  }, [
+    currentUserId,
+    profileDetails.stats,
+    stateHydrated,
+    triggerCelebration,
+  ])
+
+  const postPublicChatAnnouncement = useCallback(async (message: string) => {
+    if (!supabase || !currentUserId) return
+    const trimmed = message.trim()
+    if (!trimmed) return
+    const displayName = String(profile?.username || currentUserEmail || 'Player').trim() || 'Player'
+    try {
+      await supabase.from('public_messages').insert({
+        user_id: currentUserId,
+        display_name: displayName.slice(0, 80),
+        agency: profileDetails.agency || null,
+        message: trimmed.slice(0, 260),
+      })
+    } catch (error) {
+      console.error('Could not post leaderboard announcement:', error)
+    }
+  }, [currentUserEmail, currentUserId, profile?.username, profileDetails.agency])
+
+  const handleLeaderboardTopMilestones = useCallback(async (options: {
+    game: 'Matching' | 'Speed Test'
+    duration: number
+    filter: CodeFilter
+    beforeEntries: LeaderboardEntry[]
+    afterEntries: LeaderboardEntry[]
+  }) => {
+    if (!currentUserId) return { becameWeeklyTop: false, becameAllTimeTop: false }
+
+    const weeklyWindow = getCurrentWeeklyWindowMs(Date.now())
+    const beforeAllTimeTop = topLeaderboardEntryForMode(options.beforeEntries, {
+      game: options.game,
+      duration: options.duration,
+      filter: options.filter,
+      scope: 'alltime',
+    })
+    const beforeWeeklyTop = topLeaderboardEntryForMode(options.beforeEntries, {
+      game: options.game,
+      duration: options.duration,
+      filter: options.filter,
+      scope: 'weekly',
+      weeklyWindow,
+    })
+    const afterAllTimeTop = topLeaderboardEntryForMode(options.afterEntries, {
+      game: options.game,
+      duration: options.duration,
+      filter: options.filter,
+      scope: 'alltime',
+    })
+    const afterWeeklyTop = topLeaderboardEntryForMode(options.afterEntries, {
+      game: options.game,
+      duration: options.duration,
+      filter: options.filter,
+      scope: 'weekly',
+      weeklyWindow,
+    })
+
+    const becameAllTimeTop =
+      Boolean(afterAllTimeTop) &&
+      afterAllTimeTop?.userId === currentUserId &&
+      beforeAllTimeTop?.userId !== currentUserId
+    const becameWeeklyTop =
+      Boolean(afterWeeklyTop) &&
+      afterWeeklyTop?.userId === currentUserId &&
+      beforeWeeklyTop?.userId !== currentUserId
+
+    const leaderboardLabel = `${options.game} ${options.duration}s • ${leaderboardCodeSetLabel(options.filter)}`
+    if (becameAllTimeTop && becameWeeklyTop) {
+      triggerCelebration('🏆 You beat weekly + all-time high scores', `You are #1 on ${leaderboardLabel}`)
+    } else if (becameAllTimeTop) {
+      triggerCelebration('🏆 You beat the all-time high score', `You are #1 on ${leaderboardLabel}`)
+    } else if (becameWeeklyTop) {
+      triggerCelebration('🔥 You beat the weekly high score', `You are #1 on ${leaderboardLabel}`)
+    }
+
+    const actorName = String(profile?.username || currentUserEmail || 'Player').trim() || 'Player'
+    const weeklyKnockOff = becameWeeklyTop && beforeWeeklyTop && beforeWeeklyTop.userId !== currentUserId ? beforeWeeklyTop : null
+    const allTimeKnockOff = becameAllTimeTop && beforeAllTimeTop && beforeAllTimeTop.userId !== currentUserId ? beforeAllTimeTop : null
+    if (weeklyKnockOff && allTimeKnockOff && weeklyKnockOff.userId === allTimeKnockOff.userId) {
+      await postPublicChatAnnouncement(
+        `🔥 @${weeklyKnockOff.playerName} was knocked off #1 Weekly + All-Time (${leaderboardLabel}) by @${actorName}.`,
+      )
+    } else {
+      if (weeklyKnockOff) {
+        await postPublicChatAnnouncement(
+          `🔥 @${weeklyKnockOff.playerName} was knocked off #1 Weekly (${leaderboardLabel}) by @${actorName}.`,
+        )
+      }
+      if (allTimeKnockOff) {
+        await postPublicChatAnnouncement(
+          `🏆 @${allTimeKnockOff.playerName} was knocked off #1 All-Time (${leaderboardLabel}) by @${actorName}.`,
+        )
+      }
+    }
+
+    return { becameWeeklyTop, becameAllTimeTop }
+  }, [currentUserEmail, currentUserId, postPublicChatAnnouncement, profile?.username, triggerCelebration])
+
+  const saveSessionAttempt = useCallback((trackKey: string, snapshot: SessionAttemptSnapshot) => {
+    const mode: SessionMode = trackKey.startsWith('study_test|')
+      ? 'study_test'
+      : trackKey.startsWith('matching|')
+        ? 'matching'
+        : 'speed'
+
+    setProfileDetails((previous) => {
+      const currentTrack = previous.stats.sessionTracks[trackKey] || { lastAttempt: null, accuracyHistory: [], scoreHistory: [] }
+      const nextHistory = [...currentTrack.accuracyHistory, snapshot.accuracy].slice(-12)
+      const baseScoreHistory = currentTrack.scoreHistory && currentTrack.scoreHistory.length > 0
+        ? currentTrack.scoreHistory
+        : currentTrack.lastAttempt
+          ? [currentTrack.lastAttempt.score]
+          : []
+      const nextScoreHistory = [...baseScoreHistory, snapshot.score].slice(-12)
+      const timelinePoint: SessionTimelinePoint = {
+        mode,
+        filter: snapshot.filter,
+        accuracy: snapshot.accuracy,
+        score: snapshot.score,
+        at: snapshot.at,
+      }
+      const nextTimeline = [...previous.stats.sessionTimeline, timelinePoint]
+        .sort((left, right) => left.at - right.at)
+        .slice(-320)
+      return {
+        ...previous,
+        stats: {
+          ...previous.stats,
+          sessionTracks: {
+            ...previous.stats.sessionTracks,
+            [trackKey]: {
+              lastAttempt: snapshot,
+              accuracyHistory: nextHistory,
+              scoreHistory: nextScoreHistory,
+            },
+          },
+          sessionTimeline: nextTimeline,
+        },
+      }
+    })
+
+    setRemoteTrackScoreHistory((previous) => {
+      const next = { ...previous }
+      next[trackKey] = [...(next[trackKey] || []), snapshot.score].slice(-2000)
+      return next
+    })
+    setRemoteScoreTimeline((previous) => [...previous, { at: snapshot.at, score: snapshot.score }].slice(-8000))
+
+    if (supabase && currentUserId) {
+      void supabase
+        .from('game_attempt_history')
+        .insert({
+          user_id: currentUserId,
+          mode,
+          track_key: trackKey,
+          filter: snapshot.filter,
+          duration: snapshot.duration,
+          score: snapshot.score,
+          correct: snapshot.correct,
+          incorrect: snapshot.incorrect,
+          accuracy: snapshot.accuracy,
+          rank: snapshot.rank,
+          created_at: new Date(snapshot.at).toISOString(),
+        })
+        .then(({ error }) => {
+          if (error) {
+            console.error('Could not persist game attempt history:', error)
+          }
+        })
+    }
+  }, [currentUserId])
+
+  const getFocusTips = useCallback((filter: CodeFilter, mode: SessionMode) => {
+    const prioritized = sections
+      .filter((section) => filter === 'all' || section.codeSet === filter)
+      .map((section) => {
+        const stats = performance[performanceKey(section.codeSet, section.sectionNumber)]
+        const weight = performanceNeedWorkWeight(stats)
+        const attempts = (stats?.correctCount ?? 0) + (stats?.incorrectCount ?? 0)
+        return { section, weight, attempts }
+      })
+      .filter((item) => item.attempts > 0 && item.weight >= 2)
+      .sort((left, right) => right.weight - left.weight)
+      .slice(0, 2)
+
+    return prioritized.map((item) => {
+      if (item.section.codeSet === 'penal') {
+        return `${item.section.sectionNumber} scenarios`
+      }
+      if (item.section.codeSet === 'vehicle') {
+        return `${item.section.sectionNumber} definitions`
+      }
+      return `${item.section.sectionNumber} elements`
+    }).map((value) => (mode === 'speed' ? value : value))
+  }, [sections, performance])
+
+  const advanceStudyTestQuestion = useCallback(() => {
     if (!studyTestSessionOpen) return
     if (quizDeck.length === 0) {
       setStudyTestSessionDone(true)
@@ -3265,7 +4672,17 @@ function App() {
       const track = getSessionTrack(profileDetails.stats, trackKey)
       const previous = track.lastAttempt
       const trend = [...track.accuracyHistory, accuracy].slice(-8)
+      const remoteTrend = remoteTrackScoreHistory[trackKey] || []
+      const baseScoreTrend = remoteTrend.length > 0
+        ? remoteTrend
+        : track.scoreHistory && track.scoreHistory.length > 0
+          ? track.scoreHistory
+          : previous
+            ? [previous.score]
+            : []
+      const scoreTrend = [...baseScoreTrend, correct]
       const delta = previous ? accuracy - previous.accuracy : null
+      const deltaScore = previous ? correct - previous.score : null
       const focusTips = getFocusTips(studyTestSessionFilter, 'study_test')
       setStudyTestReport({
         mode: 'study_test',
@@ -3276,7 +4693,9 @@ function App() {
         incorrect,
         score: correct,
         deltaAccuracy: delta,
+        deltaScore,
         trend,
+        scoreTrend,
         focusTips,
         leaderboardPreview: [],
         currentRank: null,
@@ -3299,7 +4718,20 @@ function App() {
     setQuizDeck(remaining)
     setSelectedChoice(null)
     setFeedback('')
-  }
+  }, [
+    getFocusTips,
+    profileDetails.stats,
+    quizDeck,
+    remoteTrackScoreHistory,
+    saveSessionAttempt,
+    studyTestAnswerMode,
+    studyTestQuestionCount,
+    studyTestSessionAnswered,
+    studyTestSessionCorrect,
+    studyTestSessionFilter,
+    studyTestSessionOpen,
+    studyTestWrongness,
+  ])
 
   useEffect(() => {
     if (!matchRunning) return
@@ -3319,22 +4751,23 @@ function App() {
           const track = getSessionTrack(profileDetails.stats, trackKey)
           const previousAttempt = track.lastAttempt
           const trend = [...track.accuracyHistory, finalAccuracy].slice(-8)
+          const remoteTrend = remoteTrackScoreHistory[trackKey] || []
+          const baseScoreTrend = remoteTrend.length > 0
+            ? remoteTrend
+            : track.scoreHistory && track.scoreHistory.length > 0
+              ? track.scoreHistory
+              : previousAttempt
+                ? [previousAttempt.score]
+                : []
+          const scoreTrend = [...baseScoreTrend, finalMatchScore]
           const focusTips = getFocusTips(matchSessionFilter, 'matching')
           const previousBest = highScoresRef.current.matching
-          const globalBest = leaderboardRef.current
-            .filter((entry) => entry.game === 'Matching')
-            .reduce((max, entry) => Math.max(max, entry.score), 0)
           const isPersonalBest = finalMatchScore > previousBest
-          const isGlobalBest = finalMatchScore > globalBest
           setHighScores((previous) => ({ ...previous, matching: Math.max(previous.matching, finalMatchScore) }))
-          if (isGlobalBest) {
-            triggerCelebration('🏆 New #1 Matching Score', `${finalMatchScore} points`)
-          } else if (isPersonalBest) {
-            triggerCelebration('🎉 New Personal Best', `Matching: ${finalMatchScore} points`)
-          }
 
           if (supabase && currentUserId) {
             void (async () => {
+              const leaderboardBeforeSave = [...leaderboardRef.current]
               // Only save if it's a personal best for this category
               const existingMatch = leaderboardRef.current.find(
                 (e) => e.userId === currentUserId && 
@@ -3343,9 +4776,7 @@ function App() {
                        e.matchFilter === matchSessionFilter
               )
               
-              if (existingMatch && existingMatch.score >= finalMatchScore) {
-                console.log('Matching score not high enough to save:', { new: finalMatchScore, existing: existingMatch.score })
-              } else {
+              if (!(existingMatch && existingMatch.score >= finalMatchScore)) {
                 const { error: insertError } = await supabase
                   .from('leaderboard')
                   .upsert({
@@ -3355,6 +4786,7 @@ function App() {
                     user_id: currentUserId,
                     match_duration: matchSessionDuration,
                     match_filter: matchSessionFilter,
+                    created_at: new Date().toISOString(),
                   }, {
                     onConflict: 'user_id,game,match_duration,match_filter',
                     ignoreDuplicates: false,
@@ -3362,16 +4794,25 @@ function App() {
 
                 if (insertError) {
                   console.error('Matching leaderboard save failed:', insertError)
-                } else {
-                  console.log('Matching high score saved!')
                 }
               }
 
               const refreshed = await refreshLeaderboard()
               await refreshHomeLeaderboards()
+              const leaderboardAfterSave = refreshed.length > 0 ? refreshed : leaderboardRef.current
+              const milestone = await handleLeaderboardTopMilestones({
+                game: 'Matching',
+                duration: matchSessionDuration,
+                filter: matchSessionFilter,
+                beforeEntries: leaderboardBeforeSave,
+                afterEntries: leaderboardAfterSave,
+              })
+              if (!milestone.becameWeeklyTop && !milestone.becameAllTimeTop && isPersonalBest) {
+                triggerCelebration('🎉 New Personal Best', `Matching: ${finalMatchScore} points`)
+              }
 
               const { preview, currentRank } = getLeaderboardPreview(
-                refreshed.length > 0 ? refreshed : leaderboardRef.current,
+                leaderboardAfterSave,
                 'Matching',
                 matchSessionDuration,
                 matchSessionFilter,
@@ -3386,7 +4827,9 @@ function App() {
                 incorrect: finalIncorrect,
                 score: finalMatchScore,
                 deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+                deltaScore: previousAttempt ? finalMatchScore - previousAttempt.score : null,
                 trend,
+                scoreTrend,
                 focusTips,
                 leaderboardPreview: preview,
                 currentRank,
@@ -3413,7 +4856,9 @@ function App() {
               incorrect: finalIncorrect,
               score: finalMatchScore,
               deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+              deltaScore: previousAttempt ? finalMatchScore - previousAttempt.score : null,
               trend,
+              scoreTrend,
               focusTips,
               leaderboardPreview: [],
               currentRank: null,
@@ -3439,24 +4884,38 @@ function App() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [matchRunning, currentUserId, matchSessionDuration, matchSessionFilter, profileDetails.stats.sessionTracks, sections, performance])
+  }, [
+    currentUserId,
+    getFocusTips,
+    handleLeaderboardTopMilestones,
+    matchRunning,
+    matchSessionDuration,
+    matchSessionFilter,
+    profileDetails.stats,
+    remoteTrackScoreHistory,
+    saveSessionAttempt,
+    triggerCelebration,
+  ])
 
-  const markPerformance = (codeSet: CodeSet, sectionNumber: string, correct: boolean) => {
+  const markPerformance = useCallback((codeSet: CodeSet, sectionNumber: string, correct: boolean) => {
     const key = performanceKey(codeSet, sectionNumber)
-    const current = performance[key] ?? { correctCount: 0, incorrectCount: 0, correctStreak: 0 }
+    const current = performanceRef.current[key] ?? { correctCount: 0, incorrectCount: 0, correctStreak: 0 }
     const previousStatus = mastery(current)
     const updated: CodePerformance = {
       correctCount: current.correctCount + (correct ? 1 : 0),
       incorrectCount: current.incorrectCount + (correct ? 0 : 1),
       correctStreak: correct ? (current.correctStreak ?? 0) + 1 : 0,
     }
-    setPerformance((previous) => ({ ...previous, [key]: updated }))
+    const nextPerformance = { ...performanceRef.current, [key]: updated }
+    performanceRef.current = nextPerformance
+    setPerformance(nextPerformance)
     const nextStatus = mastery(updated)
     return nextStatus !== previousStatus ? nextStatus : ''
-  }
+  }, [])
 
-  const answerQuestion = (index: number) => {
+  const answerQuestion = useCallback((index: number) => {
     if (!studyTestSessionOpen || !currentQuestion || selectedChoice !== null || studyTestSessionDone) return
+    markStudyActivity('study_test')
     setSelectedChoice(index)
     incrementUserStats((stats) => ({
       ...stats,
@@ -3484,13 +4943,40 @@ function App() {
     }
     setStreak(0)
     setFeedback('Incorrect answer.')
-  }
+  }, [
+    currentQuestion,
+    incrementUserStats,
+    markStudyActivity,
+    markPerformance,
+    selectedChoice,
+    streak,
+    studyTestSessionDone,
+    studyTestSessionFilter,
+    studyTestSessionOpen,
+    triggerCelebration,
+  ])
 
-  const makeRoundCards = (targetFilter: CodeFilter) => {
-    const pool = (targetFilter === 'all' ? sections : sections.filter((section) => section.codeSet === targetFilter)).filter(
+  const makeRoundCards = useCallback((targetFilter: CodeFilter) => {
+    const basePool = targetFilter === 'all'
+      ? sections
+      : sections.filter((section) => section.codeSet === targetFilter)
+    if (basePool.length === 0) {
+      setMatchCards([])
+      setMatchedPairIds([])
+      setSelectedCards([])
+      setWrongCardIds([])
+      return
+    }
+
+    const freshPool = basePool.filter(
       (section) => !recentMatchSections.includes(section.sectionNumber.toLowerCase()),
     )
-    const selected = shuffle(pool.length >= 3 ? pool : sections).slice(0, 3)
+    const sourcePool = freshPool.length >= 3 ? freshPool : basePool
+    const shuffledSource = shuffle(sourcePool)
+    const selected: CodeSection[] = []
+    while (selected.length < 3 && shuffledSource.length > 0) {
+      selected.push(shuffledSource[selected.length % shuffledSource.length])
+    }
 
     const cards = selected.flatMap((section) => {
       const pairId = crypto.randomUUID()
@@ -3519,7 +5005,7 @@ function App() {
     setSelectedCards([])
     setWrongCardIds([])
     setRecentMatchSections((previous) => [...previous, ...selected.map((item) => item.sectionNumber.toLowerCase())].slice(-18))
-  }
+  }, [recentMatchSections, sections])
 
   const startMatching = () => {
     const selectedDuration = gamesSelection.duration
@@ -3562,8 +5048,10 @@ function App() {
     setMatchedPairIds([])
   }
 
-  const nextSpeedQuestion = (candidateDeck?: QuizQuestion[], previousId?: string) => {
+  const nextSpeedQuestion = useCallback((candidateDeck?: QuizQuestion[], previousId?: string) => {
     const source = Array.isArray(candidateDeck) ? candidateDeck : speedSessionQuestions
+    speedAnswerLockRef.current = false
+    setSpeedAnswerLocked(false)
     if (source.length === 0) {
       setSpeedCurrentQuestion(null)
       setSpeedDeck([])
@@ -3579,12 +5067,20 @@ function App() {
     if (next) {
       recentSpeedSectionsRef.current = [...recentSpeedSectionsRef.current, next.linkedSectionNumber.toLowerCase()].slice(-5)
     }
-  }
+  }, [speedSessionQuestions])
 
   const startSpeedTest = () => {
     const selectedDuration = gamesSelection.duration
     const selectedFilter = gamesSelection.filter
-    const pool = speedQuestionBank.filter((question) => selectedFilter === 'all' || question.codeSet === selectedFilter)
+    const pool = selectedFilter === 'all'
+      ? speedQuestionBank
+      : speedQuestionBank.filter((question) => question.codeSet === selectedFilter)
+    if (speedAdvanceTimerRef.current !== null) {
+      window.clearTimeout(speedAdvanceTimerRef.current)
+      speedAdvanceTimerRef.current = null
+    }
+    speedAnswerLockRef.current = false
+    setSpeedAnswerLocked(false)
     if (pool.length === 0) {
       setSpeedCurrentQuestion(null)
       setSpeedDeck([])
@@ -3626,13 +5122,22 @@ function App() {
   }
 
   const exitSpeedSession = () => {
+    if (speedAdvanceTimerRef.current !== null) {
+      window.clearTimeout(speedAdvanceTimerRef.current)
+      speedAdvanceTimerRef.current = null
+    }
+    speedAnswerLockRef.current = false
+    setSpeedAnswerLocked(false)
     setSpeedRunning(false)
     setSpeedDone(false)
     setSpeedFeedback('')
   }
 
-  const answerSpeedQuestion = (choiceIndex: number) => {
-    if (!speedRunning || !speedCurrentQuestion) return
+  const answerSpeedQuestion = useCallback((choiceIndex: number) => {
+    if (!speedRunning || !speedCurrentQuestion || speedAnswerLockRef.current) return
+    speedAnswerLockRef.current = true
+    setSpeedAnswerLocked(true)
+    markStudyActivity('speed')
     const isCorrect = choiceIndex === speedCurrentQuestion.correctIndex
     setSpeedAnsweredCount((count) => count + 1)
     if (isCorrect) {
@@ -3653,19 +5158,27 @@ function App() {
       setSpeedFeedback('Incorrect')
     }
     const previousId = speedCurrentQuestion.id
-    setTimeout(() => {
+    if (speedAdvanceTimerRef.current !== null) {
+      window.clearTimeout(speedAdvanceTimerRef.current)
+      speedAdvanceTimerRef.current = null
+    }
+    speedAdvanceTimerRef.current = window.setTimeout(() => {
       nextSpeedQuestion(undefined, previousId)
       setSpeedFeedback('')
+      speedAnswerLockRef.current = false
+      setSpeedAnswerLocked(false)
+      speedAdvanceTimerRef.current = null
     }, 150)
-  }
+  }, [nextSpeedQuestion, speedCurrentQuestion, speedRunning, markStudyActivity])
 
-  const nextScenarioQuestion = (candidateDeck?: ScenarioQuestion[], previousId?: string) => {
-    let deck = candidateDeck ? [...candidateDeck] : [...scenarioDeck]
+  const nextScenarioQuestion = useCallback((candidateDeck?: ScenarioQuestion[], previousId?: string) => {
+    let deck = candidateDeck ? [...candidateDeck] : [...scenarioDeckRef.current]
     if (deck.length === 0) {
       deck = shuffle(scenarioQuestionBank)
     }
     if (deck.length === 0) {
       setScenarioCurrentQuestion(null)
+      scenarioDeckRef.current = []
       setScenarioDeck([])
       return
     }
@@ -3674,6 +5187,7 @@ function App() {
     }
     const [next, ...remaining] = deck
     setScenarioCurrentQuestion(next)
+    scenarioDeckRef.current = remaining
     setScenarioDeck(remaining)
     setScenarioResult('')
     setScenarioSelectedChoice(null)
@@ -3685,9 +5199,9 @@ function App() {
       const targetTop = Math.max(0, rect.top + window.scrollY - topOffset)
       window.scrollTo({ top: targetTop, behavior: 'smooth' })
     }, 40)
-  }
+  }, [scenarioQuestionBank])
 
-  const answerScenario = (choiceIndex: number) => {
+  const answerScenario = useCallback((choiceIndex: number) => {
     if (!scenarioCurrentQuestion) return
     setScenarioSelectedChoice(choiceIndex)
     const isCorrect = choiceIndex === scenarioCurrentQuestion.correctIndex
@@ -3701,7 +5215,7 @@ function App() {
       setScenarioStreak(0)
     }
     setScenarioResult(isCorrect ? 'Correct' : `Incorrect • Correct answer: ${scenarioCurrentQuestion.choices[scenarioCurrentQuestion.correctIndex]}`)
-  }
+  }, [incrementUserStats, scenarioCurrentQuestion, scenarioStreak, triggerCelebration])
 
   useEffect(() => {
     if (!scenarioResult) return
@@ -3765,14 +5279,25 @@ function App() {
       setWrongCardIds(selected.map((card) => card.id))
       markPerformance(selected[0].codeSet, selected[0].sectionNumber, false)
       markPerformance(selected[1].codeSet, selected[1].sectionNumber, false)
+      if (matchWrongResetTimerRef.current !== null) {
+        window.clearTimeout(matchWrongResetTimerRef.current)
+      }
+      matchWrongResetTimerRef.current = window.setTimeout(() => {
+        setSelectedCards([])
+        setWrongCardIds([])
+        matchWrongResetTimerRef.current = null
+      }, 260)
     }
+  }, [markPerformance, matchCards, selectedCards])
 
-    const timeout = setTimeout(() => {
-      setSelectedCards([])
-      setWrongCardIds([])
-    }, 260)
-    return () => clearTimeout(timeout)
-  }, [selectedCards, matchCards])
+  const handleMatchCardSelect = useCallback((cardId: string) => {
+    setSelectedCards((previous) => {
+      if (wrongCardIds.length > 0) return previous
+      if (previous.includes(cardId)) return previous.filter((value) => value !== cardId)
+      if (previous.length >= 2) return previous
+      return [...previous, cardId]
+    })
+  }, [wrongCardIds.length])
 
   useEffect(() => {
     if (!matchRunning || matchCards.length === 0) return
@@ -3781,7 +5306,7 @@ function App() {
     setMatchRound((round) => round + 1)
     setMatchScore((score) => score + 20)
     makeRoundCards(matchSessionFilter)
-  }, [matchedPairIds, matchCards, matchRunning, matchSessionFilter])
+  }, [makeRoundCards, matchCards, matchRunning, matchSessionFilter, matchedPairIds])
 
   useEffect(() => {
     if (!speedRunning) return
@@ -3791,6 +5316,12 @@ function App() {
           clearInterval(timer)
           setSpeedRunning(false)
           setSpeedDone(true)
+          if (speedAdvanceTimerRef.current !== null) {
+            window.clearTimeout(speedAdvanceTimerRef.current)
+            speedAdvanceTimerRef.current = null
+          }
+          speedAnswerLockRef.current = false
+          setSpeedAnswerLocked(false)
           const finalSpeedScore = speedScoreRef.current
           const finalAnswered = speedAnsweredCountRef.current
           const finalCorrect = speedCorrectCountRef.current
@@ -3800,22 +5331,23 @@ function App() {
           const track = getSessionTrack(profileDetails.stats, trackKey)
           const previousAttempt = track.lastAttempt
           const trend = [...track.accuracyHistory, finalAccuracy].slice(-8)
+          const remoteTrend = remoteTrackScoreHistory[trackKey] || []
+          const baseScoreTrend = remoteTrend.length > 0
+            ? remoteTrend
+            : track.scoreHistory && track.scoreHistory.length > 0
+              ? track.scoreHistory
+              : previousAttempt
+                ? [previousAttempt.score]
+                : []
+          const scoreTrend = [...baseScoreTrend, finalSpeedScore]
           const focusTips = getFocusTips(speedSessionFilter, 'speed')
           const previousBest = highScoresRef.current.rapidFire
-          const globalBest = leaderboardRef.current
-            .filter((entry) => entry.game === 'Speed Test')
-            .reduce((max, entry) => Math.max(max, entry.score), 0)
           const isPersonalBest = finalSpeedScore > previousBest
-          const isGlobalBest = finalSpeedScore > globalBest
           setHighScores((previous) => ({ ...previous, rapidFire: Math.max(previous.rapidFire, finalSpeedScore) }))
-          if (isGlobalBest) {
-            triggerCelebration('🏆 New #1 Speed Score', `${finalSpeedScore} points`)
-          } else if (isPersonalBest) {
-            triggerCelebration('🎉 New Personal Best', `Speed: ${finalSpeedScore} points`)
-          }
 
           if (supabase && currentUserId) {
             void (async () => {
+              const leaderboardBeforeSave = [...leaderboardRef.current]
               // Only save if it's a personal best for this category
               const existing = leaderboardRef.current.find(
                 (e) => e.userId === currentUserId && 
@@ -3824,9 +5356,7 @@ function App() {
                        e.matchFilter === speedSessionFilter
               )
               
-              if (existing && existing.score >= finalSpeedScore) {
-                console.log('Score not high enough to save:', { new: finalSpeedScore, existing: existing.score })
-              } else {
+              if (!(existing && existing.score >= finalSpeedScore)) {
                 const { error: insertError } = await supabase
                   .from('leaderboard')
                   .upsert({
@@ -3836,6 +5366,7 @@ function App() {
                     user_id: currentUserId,
                     match_duration: speedSessionDuration,
                     match_filter: speedSessionFilter,
+                    created_at: new Date().toISOString(),
                   }, {
                     onConflict: 'user_id,game,match_duration,match_filter',
                     ignoreDuplicates: false,
@@ -3850,9 +5381,20 @@ function App() {
 
               const refreshed = await refreshLeaderboard()
               await refreshHomeLeaderboards()
+              const leaderboardAfterSave = refreshed.length > 0 ? refreshed : leaderboardRef.current
+              const milestone = await handleLeaderboardTopMilestones({
+                game: 'Speed Test',
+                duration: speedSessionDuration,
+                filter: speedSessionFilter,
+                beforeEntries: leaderboardBeforeSave,
+                afterEntries: leaderboardAfterSave,
+              })
+              if (!milestone.becameWeeklyTop && !milestone.becameAllTimeTop && isPersonalBest) {
+                triggerCelebration('🎉 New Personal Best', `Speed: ${finalSpeedScore} points`)
+              }
 
               const { preview, currentRank } = getLeaderboardPreview(
-                refreshed.length > 0 ? refreshed : leaderboardRef.current,
+                leaderboardAfterSave,
                 'Speed Test',
                 speedSessionDuration,
                 speedSessionFilter,
@@ -3867,7 +5409,9 @@ function App() {
                 incorrect: finalIncorrect,
                 score: finalSpeedScore,
                 deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+                deltaScore: previousAttempt ? finalSpeedScore - previousAttempt.score : null,
                 trend,
+                scoreTrend,
                 focusTips,
                 leaderboardPreview: preview,
                 currentRank,
@@ -3894,7 +5438,9 @@ function App() {
               incorrect: finalIncorrect,
               score: finalSpeedScore,
               deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+              deltaScore: previousAttempt ? finalSpeedScore - previousAttempt.score : null,
               trend,
+              scoreTrend,
               focusTips,
               leaderboardPreview: [],
               currentRank: null,
@@ -3918,13 +5464,24 @@ function App() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [speedRunning, speedSessionDuration, speedSessionFilter, currentUserId, profileDetails.stats.sessionTracks, sections, performance])
+  }, [
+    currentUserId,
+    getFocusTips,
+    handleLeaderboardTopMilestones,
+    profileDetails.stats,
+    remoteTrackScoreHistory,
+    saveSessionAttempt,
+    speedRunning,
+    speedSessionDuration,
+    speedSessionFilter,
+    triggerCelebration,
+  ])
 
   useEffect(() => {
     setScenarioDeck([])
     setScenarioStreak(0)
     nextScenarioQuestion([])
-  }, [scenarioQuestionBank])
+  }, [nextScenarioQuestion, scenarioQuestionBank])
 
   const submitSignIn = async () => {
     if (!supabase) return
@@ -3952,10 +5509,22 @@ function App() {
     setAuthLoading(false)
   }
 
+  const handleSignInEnterKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    if (authLoading) return
+    void submitSignIn()
+  }
+
   const submitSignUp = async () => {
     if (!supabase) return
+    const normalizedEmail = authEmail.trim().toLowerCase()
     if (authPassword !== authPasswordConfirm) {
       setAuthError('Passwords do not match.')
+      return
+    }
+    if (!normalizedEmail) {
+      setAuthError('Enter an email address.')
       return
     }
     setAuthLoading(true)
@@ -3964,7 +5533,7 @@ function App() {
     window.localStorage.removeItem('pending_profile_setup')
 
     const { data, error } = await supabase.auth.signUp({
-      email: authEmail,
+      email: normalizedEmail,
       password: authPassword,
     })
 
@@ -3986,34 +5555,16 @@ function App() {
       return
     }
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: authEmail,
-      password: authPassword,
-    })
-
-    if (signInError) {
-      const message = signInError.message.toLowerCase()
-      if (message.includes('email not confirmed') || message.includes('confirmation')) {
-        setAuthError('Account created, but email confirmation is enabled in Supabase. Disable email confirmation to allow immediate sign-in.')
-      } else {
-        setAuthError(`Account created, but sign-in failed: ${signInError.message}`)
-      }
-      setAuthLoading(false)
-      return
-    }
-
     window.localStorage.setItem('pending_profile_setup', '1')
     window.localStorage.setItem('pending_dev_notice', '1')
     setForceProfileSetup(true)
-    await supabase.auth.signOut()
-    const normalizedEmail = authEmail.trim().toLowerCase()
     setAuthEmail(normalizedEmail)
-    setAuthSuccess("You're able to sign in now.")
+    setAuthSuccess('Account created. You can sign in now.')
     setAuthPassword('')
     setAuthPasswordConfirm('')
     setShowSignUpPassword(false)
     setShowSignUpPasswordConfirm(false)
-    navigate('/signin')
+    navigate('/signin', { replace: true })
 
     setAuthLoading(false)
   }
@@ -4138,7 +5689,7 @@ function App() {
     setProfileAvatar(null)
     if (profileAvatarPreviewUrl) URL.revokeObjectURL(profileAvatarPreviewUrl)
     setProfileAvatarPreviewUrl('')
-    await supabase
+    const { data: appStateRow, error: appStateError } = await supabase
       .from('app_state')
       .upsert(
         {
@@ -4154,6 +5705,15 @@ function App() {
         },
         { onConflict: 'user_id' },
       )
+      .select('updated_at')
+      .maybeSingle()
+    if (appStateError) {
+      setAuthError(`Profile saved, but theme/settings persistence failed: ${appStateError.message || 'Could not update app state.'}`)
+      setAuthLoading(false)
+      return
+    }
+    const nextUpdatedAt = Date.parse(String(appStateRow?.updated_at || '')) || Date.now()
+    lastAppStateUpdateRef.current = Math.max(lastAppStateUpdateRef.current, nextUpdatedAt)
     await refreshLeaderboard()
     await refreshHomeLeaderboards()
     setAuthSuccess('All changes saved')
@@ -4271,7 +5831,9 @@ function App() {
     setProfileDetails({
       bio: '',
       agency: defaultAgency,
+      displayMode: 'dark',
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+      homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
       themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
@@ -4279,9 +5841,9 @@ function App() {
     })
     setNewPresetName('')
     setStateHydrated(false)
+    setRemoteTrackScoreHistory({})
+    setRemoteScoreTimeline([])
     recentSpeedSectionsRef.current = []
-    setShowStudyFlashSetupModal(false)
-    setShowStudyTestSetupModal(false)
     setStudyFlashSessionOpen(false)
     setStudyTestSessionOpen(false)
     setStudyTestSessionDone(false)
@@ -4295,21 +5857,39 @@ function App() {
     setAuthLoading(true)
 
     if (supabase) {
-      const [{ error: stateError }, { error: leaderboardError }] = await Promise.all([
-        supabase.from('app_state').delete().eq('user_id', currentUserId),
-        supabase.from('leaderboard').delete().eq('user_id', currentUserId),
-      ])
+      const { error: resetRpcErrorRaw } = await supabase.rpc('reset_user_progress_data')
+      const resetRpcError = resetRpcErrorRaw as { code?: string; message?: string } | null
+      const rpcMissing = String(resetRpcError?.code || '') === '42883'
 
-      if (stateError || leaderboardError) {
-        setAuthError(stateError?.message || leaderboardError?.message || 'Could not reset data.')
+      if (resetRpcError && !rpcMissing) {
+        setAuthError(resetRpcError.message || 'Could not reset data.')
         setAuthLoading(false)
         return
+      }
+
+      if (rpcMissing) {
+        const [{ error: stateError }, { error: leaderboardError }, { error: historyErrorRaw }] = await Promise.all([
+          supabase.from('app_state').delete().eq('user_id', currentUserId),
+          supabase.from('leaderboard').delete().eq('user_id', currentUserId),
+          supabase.from('game_attempt_history').delete().eq('user_id', currentUserId),
+        ])
+        const historyError = historyErrorRaw && String((historyErrorRaw as { code?: string }).code || '') !== '42P01'
+          ? historyErrorRaw
+          : null
+
+        if (stateError || leaderboardError || historyError) {
+          setAuthError(stateError?.message || leaderboardError?.message || historyError?.message || 'Could not reset data.')
+          setAuthLoading(false)
+          return
+        }
       }
     }
 
     setPerformance({})
     setHighScores(gameHighScoreSeed)
     setBestStreak(0)
+    setRemoteTrackScoreHistory({})
+    setRemoteScoreTimeline([])
     setQuizDeck([])
     setCurrentQuestion(null)
     setSelectedChoice(null)
@@ -4338,8 +5918,6 @@ function App() {
     setSpeedAnsweredCount(0)
     setMatchScore(0)
     setMatchRound(1)
-    setShowStudyFlashSetupModal(false)
-    setShowStudyTestSetupModal(false)
     setStudyFlashSessionOpen(false)
     setStudyTestSessionOpen(false)
     setStudyTestSessionDone(false)
@@ -4379,33 +5957,74 @@ function App() {
     return buildFireParticles(scenarioFireLevel)
   }, [scenarioFireLevel])
 
-  const currentPath = location.pathname.toLowerCase()
+  useEffect(() => {
+    const nextPath = normalizeRoutePath(location.pathname)
+    setRoutePath((current) => (current === nextPath ? current : nextPath))
+  }, [location.pathname])
+
+  const currentPath = routePath
   const isSignInPage = currentPath === '/signin'
   const isSignUpPage = currentPath === '/signup'
   const isHomePage = currentPath === '/home'
-  const isStudyPage = currentPath === '/study'
-  const isGamesPage = currentPath === '/games'
+  const isStudyHubPage = currentPath === '/study'
+  const isStudyFlashcardsPage = currentPath === '/study/flashcards'
+  const isStudyTestPage = currentPath === '/study/test'
+  const isStudyPage = isStudyHubPage || isStudyFlashcardsPage || isStudyTestPage
+  const isGamesHubPage = currentPath === '/games'
+  const isGamesMatchingPage = currentPath === '/games/matching'
+  const isGamesSpeedPage = currentPath === '/games/speed'
+  const isGamesDuelPage = currentPath === '/games/duel'
+  const isGamesPage = isGamesHubPage || isGamesMatchingPage || isGamesSpeedPage || isGamesDuelPage
   const isScenariosPage = currentPath === '/scenarios'
   const isLibraryPage = currentPath === '/library'
+  const isLeaderboardsPage = currentPath === '/leaderboards'
+  const isChatPage = currentPath === '/chat'
   const isSupportPage = currentPath === '/support'
   const isProfilePage = currentPath === '/profile'
   const isStatsPage = currentPath === '/stats'
+  const activeStudyActivitySource: StudyActivitySource | null =
+    isStudyFlashcardsPage && studyFlashSessionOpen && orderedStudyFlashSessionCards.length > 0
+      ? 'flashcards'
+      : isStudyTestPage && studyTestSessionOpen && !studyTestSessionDone && Boolean(currentQuestion)
+        ? 'study_test'
+        : isGamesMatchingPage && matchRunning && !matchDone
+          ? 'matching'
+          : isGamesSpeedPage && speedRunning && !speedDone && Boolean(speedCurrentQuestion)
+            ? 'speed'
+            : isGamesDuelPage
+              ? 'duel'
+              : null
   const isKnownAuthedPage =
     isHomePage ||
     isStudyPage ||
     isGamesPage ||
     isScenariosPage ||
     isLibraryPage ||
+    isLeaderboardsPage ||
+    isChatPage ||
     isSupportPage ||
     isProfilePage ||
     isStatsPage
   const needsProfileSetup = Boolean(authReady && currentUserId && profile && !profile.username && forceProfileSetup)
 
+  const goToPath = useCallback(
+    (path: string, options?: { tab?: AppTab; replace?: boolean }) => {
+      const normalizedPath = normalizeRoutePath(path)
+      setRoutePath(normalizedPath)
+      if (options?.tab) {
+        setActiveTab(options.tab)
+      }
+      navigate(path, options?.replace ? { replace: true } : undefined)
+    },
+    [navigate],
+  )
+
   // Flashcard keyboard controls: Space to flip, Arrow keys to navigate
   useEffect(() => {
-    if (!isStudyPage || !studyFlashSessionOpen || orderedStudyFlashSessionCards.length === 0) return
+    if (!isStudyFlashcardsPage || !studyFlashSessionOpen || orderedStudyFlashSessionCards.length === 0) return
 
     const goToPreviousCard = () => {
+      markStudyActivity('flashcards')
       setStudyFlashSessionFlipped(false)
       setStudyFlashSessionIndex((current) => {
         if (orderedStudyFlashSessionCards.length === 0) return 0
@@ -4415,12 +6034,13 @@ function App() {
     }
 
     const goToNextCard = () => {
+      markStudyActivity('flashcards')
       setStudyFlashSessionFlipped(false)
       setStudyFlashSessionIndex((current) => {
         if (orderedStudyFlashSessionCards.length === 0) return 0
         if (current < orderedStudyFlashSessionCards.length - 1) return current + 1
         const lastCardId = orderedStudyFlashSessionCards[current]?.id
-        let reshuffled = shuffle(studyFlashSessionCards.map((card) => card.id))
+        const reshuffled = shuffle(studyFlashSessionCards.map((card) => card.id))
         if (reshuffled.length > 1 && reshuffled[0] === lastCardId) {
           ;[reshuffled[0], reshuffled[1]] = [reshuffled[1], reshuffled[0]]
         }
@@ -4439,6 +6059,7 @@ function App() {
 
       if (event.key === ' ' || event.code === 'Space') {
         event.preventDefault()
+        markStudyActivity('flashcards')
         setStudyFlashSessionFlipped((value) => !value)
         return
       }
@@ -4455,10 +6076,11 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isStudyPage, studyFlashSessionOpen, orderedStudyFlashSessionCards, studyFlashSessionCards])
+  }, [incrementUserStats, isStudyFlashcardsPage, studyFlashSessionOpen, orderedStudyFlashSessionCards, studyFlashSessionCards, markStudyActivity])
 
   // Keyboard shortcuts for answering multiple-choice questions (1-4 keys)
   useEffect(() => {
+    if (!isStudyTestPage) return
     if (!currentQuestion || selectedChoice !== null) return
 
     // Spam detection: track recent keypresses
@@ -4480,7 +6102,6 @@ function App() {
         // Detect spam: same key pressed within threshold
         if (key === lastKeyPress.key && now - lastKeyPress.time < SPAM_THRESHOLD_MS) {
           // Penalty for spamming - ignore the input
-          console.log('Spam detected, key ignored')
           return
         }
         
@@ -4497,10 +6118,11 @@ function App() {
 
     window.addEventListener('keydown', handleAnswerKeyDown)
     return () => window.removeEventListener('keydown', handleAnswerKeyDown)
-  }, [currentQuestion, selectedChoice, answerQuestion])
+  }, [currentQuestion, selectedChoice, answerQuestion, isStudyTestPage])
 
   // Enter key to advance study test question
   useEffect(() => {
+    if (!isStudyTestPage) return
     if (!currentQuestion || selectedChoice === null || studyTestSessionDone) return
 
     const handleEnterKey = (event: KeyboardEvent) => {
@@ -4517,11 +6139,11 @@ function App() {
 
     window.addEventListener('keydown', handleEnterKey)
     return () => window.removeEventListener('keydown', handleEnterKey)
-  }, [currentQuestion, selectedChoice, studyTestSessionDone, advanceStudyTestQuestion])
+  }, [currentQuestion, selectedChoice, studyTestSessionDone, advanceStudyTestQuestion, isStudyTestPage])
 
   // Keyboard shortcuts for speed test questions (1-4 keys)
   useEffect(() => {
-    if (!speedCurrentQuestion || speedFeedback) return
+    if (!speedCurrentQuestion || speedFeedback || speedAnswerLocked) return
 
     // Spam detection: track recent keypresses
     const lastKeyPress = { key: '', time: 0 }
@@ -4542,7 +6164,6 @@ function App() {
         // Detect spam: same key pressed within threshold
         if (key === lastKeyPress.key && now - lastKeyPress.time < SPAM_THRESHOLD_MS) {
           // Penalty for spamming - ignore the input
-          console.log('Spam detected, key ignored')
           return
         }
         
@@ -4559,7 +6180,7 @@ function App() {
 
     window.addEventListener('keydown', handleSpeedAnswerKeyDown)
     return () => window.removeEventListener('keydown', handleSpeedAnswerKeyDown)
-  }, [speedCurrentQuestion, speedFeedback, answerSpeedQuestion])
+  }, [speedCurrentQuestion, speedFeedback, speedAnswerLocked, answerSpeedQuestion])
 
   // Keyboard shortcuts for scenario questions (1-4 keys)
   useEffect(() => {
@@ -4622,10 +6243,9 @@ function App() {
   useEffect(() => {
     if (!authReady || !currentUserId) return
     if (currentPath === '/') {
-      navigate('/home', { replace: true })
-      setActiveTab('home')
+      goToPath('/home', { replace: true, tab: 'home' })
     }
-  }, [authReady, currentUserId, currentPath, navigate])
+  }, [authReady, currentUserId, currentPath, goToPath])
 
   useEffect(() => {
     if (isHomePage) {
@@ -4646,8 +6266,55 @@ function App() {
     }
     if (isLibraryPage) {
       setActiveTab('library')
+      return
     }
-  }, [isHomePage, isStudyPage, isGamesPage, isScenariosPage, isLibraryPage])
+    if (isLeaderboardsPage) {
+      setActiveTab('leaderboards')
+      return
+    }
+    if (isChatPage) {
+      setActiveTab('chat')
+    }
+  }, [isHomePage, isStudyPage, isGamesPage, isScenariosPage, isLibraryPage, isLeaderboardsPage, isChatPage])
+
+  useEffect(() => {
+    if (!authReady || !currentUserId) return
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [authReady, currentPath, currentUserId])
+
+  useEffect(() => {
+    if (!isStudyFlashcardsPage) {
+      setStudyFlashSessionOpen(false)
+      return
+    }
+  }, [isStudyFlashcardsPage])
+
+  useEffect(() => {
+    if (!isStudyTestPage) {
+      setStudyTestSessionOpen(false)
+      setStudyTestSessionDone(false)
+      setCurrentQuestion(null)
+      setQuizDeck([])
+      setSelectedChoice(null)
+      setFeedback('')
+      setStreak(0)
+      return
+    }
+  }, [isStudyTestPage])
+
+  useEffect(() => {
+    if (!isGamesMatchingPage && !isGamesSpeedPage) return
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    }
+    scrollToTop()
+    const raf = window.requestAnimationFrame(scrollToTop)
+    const timer = window.setTimeout(scrollToTop, 120)
+    return () => {
+      window.cancelAnimationFrame(raf)
+      window.clearTimeout(timer)
+    }
+  }, [isGamesMatchingPage, isGamesSpeedPage, matchRunning, speedRunning, matchDone, speedDone])
 
   useEffect(() => {
     if (homeMatchingRotationSteps.length === 0) return
@@ -4674,7 +6341,7 @@ function App() {
   }, [homeSpeedRotationSteps, homeSpeedDurationFilter, homeSpeedCodeFilter])
 
   useEffect(() => {
-    if (!isHomePage || homeMatchingConfigOpen || homeMatchingRotationSteps.length === 0) return
+    if (!isHomePage || !homeShowsMatchingLeaderboard || homeMatchingConfigOpen || homeMatchingRotationSteps.length === 0) return
 
     const currentIndex = homeMatchingRotationSteps.findIndex(
       (step) => step.duration === homeMatchingDurationFilter && step.codeSet === homeMatchingCodeFilter,
@@ -4690,10 +6357,10 @@ function App() {
     }, leaderboardRotateMs)
 
     return () => window.clearInterval(timer)
-  }, [isHomePage, homeMatchingConfigOpen, homeMatchingDurationFilter, homeMatchingCodeFilter, homeMatchingRotationSteps, leaderboardRotateMs])
+  }, [isHomePage, homeShowsMatchingLeaderboard, homeMatchingConfigOpen, homeMatchingDurationFilter, homeMatchingCodeFilter, homeMatchingRotationSteps, leaderboardRotateMs])
 
   useEffect(() => {
-    if (!isHomePage || homeSpeedConfigOpen || homeSpeedRotationSteps.length === 0) return
+    if (!isHomePage || !homeShowsSpeedLeaderboard || homeSpeedConfigOpen || homeSpeedRotationSteps.length === 0) return
 
     const currentIndex = homeSpeedRotationSteps.findIndex(
       (step) => step.duration === homeSpeedDurationFilter && step.codeSet === homeSpeedCodeFilter,
@@ -4709,7 +6376,41 @@ function App() {
     }, leaderboardRotateMs)
 
     return () => window.clearInterval(timer)
-  }, [isHomePage, homeSpeedConfigOpen, homeSpeedDurationFilter, homeSpeedCodeFilter, homeSpeedRotationSteps, leaderboardRotateMs])
+  }, [isHomePage, homeShowsSpeedLeaderboard, homeSpeedConfigOpen, homeSpeedDurationFilter, homeSpeedCodeFilter, homeSpeedRotationSteps, leaderboardRotateMs])
+
+  useEffect(() => {
+    if (homeShowsMatchingLeaderboard) return
+    if (homeMatchingConfigOpen) setHomeMatchingConfigOpen(false)
+  }, [homeShowsMatchingLeaderboard, homeMatchingConfigOpen])
+
+  useEffect(() => {
+    if (homeShowsSpeedLeaderboard) return
+    if (homeSpeedConfigOpen) setHomeSpeedConfigOpen(false)
+  }, [homeShowsSpeedLeaderboard, homeSpeedConfigOpen])
+
+  useEffect(() => {
+    if (!homeLeaderboardSettingsOpen) return
+    setHomeLeaderboardSettingsDraft(homeLeaderboardPreferences)
+    setHomeLeaderboardSettingsError('')
+  }, [homeLeaderboardPreferences, homeLeaderboardSettingsOpen])
+
+  useEffect(() => {
+    if (isHomePage) return
+    setHomeLeaderboardSettingsOpen(false)
+    setHomeLeaderboardSettingsError('')
+  }, [isHomePage])
+
+  useEffect(() => {
+    if (!leaderboardSelectedBoard) return
+    if (
+      leaderboardViewDuration === leaderboardSelectedBoard.duration &&
+      leaderboardViewFilter === leaderboardSelectedBoard.filter
+    ) {
+      return
+    }
+    setLeaderboardViewDuration(leaderboardSelectedBoard.duration)
+    setLeaderboardViewFilter(leaderboardSelectedBoard.filter)
+  }, [leaderboardSelectedBoard, leaderboardViewDuration, leaderboardViewFilter])
 
   const refreshSupporterTier = async () => {
     if (!supabase || !currentUserId || !profile) return
@@ -4724,13 +6425,197 @@ function App() {
     setProfile(mapped)
   }
 
+  const toggleDisplayMode = async () => {
+    const nextMode: DisplayMode = profileDetails.displayMode === 'light' ? 'dark' : 'light'
+    setProfileDetails((previous) => ({
+      ...previous,
+      displayMode: nextMode,
+    }))
+
+    if (!supabase || !currentUserId || !stateHydrated) return
+    const algorithmSnapshot = buildAlgorithmSnapshot(sections, performance)
+    const { data } = await supabase
+      .from('app_state')
+      .upsert(
+        {
+          user_id: currentUserId,
+          performance,
+          high_scores: highScores,
+          best_streak: bestStreak,
+          profile_details: {
+            ...profileDetails,
+            displayMode: nextMode,
+            algorithmSnapshot,
+          },
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' },
+      )
+      .select('updated_at')
+      .maybeSingle()
+    const nextUpdatedAt = Date.parse(String(data?.updated_at || '')) || Date.now()
+    lastAppStateUpdateRef.current = Math.max(lastAppStateUpdateRef.current, nextUpdatedAt)
+  }
+
   const canCustomizeName = profile?.supporterTier === 'tier10'
   const canUseThemes = tierRank(profile?.supporterTier || 'free') >= tierRank('tier5')
   const selectedTheme = getThemePreset(canUseThemes ? profileDetails.themeId : appThemePresets[0].id)
-  const isLightTheme = ['pure-white', 'pastel-sky', 'pastel-rose'].includes(selectedTheme.id)
+  const isUiLightMode = profileDetails.displayMode === 'light'
   const activeProfileTier: SupporterTier = profile?.supporterTier || 'free'
   const activeProfileName = profile?.username || 'Officer'
-  const showHomeButton = !isHomePage
+  const pageTitle = isProfilePage
+    ? 'Settings'
+    : isStatsPage
+      ? 'Stats'
+    : isSupportPage
+        ? 'Support Creator'
+        : isStudyFlashcardsPage
+          ? 'Study Flashcards'
+          : isStudyTestPage
+            ? 'Study Test'
+        : isLeaderboardsPage
+          ? 'Leaderboards'
+          : isChatPage
+            ? 'Chat'
+          : activeTab === 'study'
+            ? 'Study'
+            : activeTab === 'library'
+              ? 'Library'
+              : activeTab === 'games'
+                ? 'Games'
+                : activeTab === 'scenarios'
+                  ? 'Scenarios'
+                  : 'Home'
+  const toggleHomeLeaderboardDraftCard = useCallback((card: HomeLeaderboardCardKey) => {
+    setHomeLeaderboardSettingsDraft((current) => {
+      const visibleCards = current.visibleCards.includes(card)
+        ? current.visibleCards.filter((value) => value !== card)
+        : [...current.visibleCards, card]
+      return sanitizeHomeLeaderboardPreferences({ ...current, visibleCards })
+    })
+  }, [])
+  const setHomeLeaderboardDraftMode = useCallback((target: 'duelWinsMode' | 'duelStreakMode', mode: DuelLeaderboardMode) => {
+    setHomeLeaderboardSettingsDraft((current) =>
+      sanitizeHomeLeaderboardPreferences({
+        ...current,
+        [target]: mode,
+      }),
+    )
+  }, [])
+  const selectAllHomeLeaderboardCards = useCallback(() => {
+    setHomeLeaderboardSettingsDraft((current) =>
+      sanitizeHomeLeaderboardPreferences({
+        ...current,
+        visibleCards: [...homeLeaderboardCardOrder],
+      }),
+    )
+  }, [])
+  const clearAllHomeLeaderboardCards = useCallback(() => {
+    setHomeLeaderboardSettingsDraft((current) =>
+      sanitizeHomeLeaderboardPreferences({
+        ...current,
+        visibleCards: [],
+      }),
+    )
+  }, [])
+  const resetHomeLeaderboardDraftDefaults = useCallback(() => {
+    setHomeLeaderboardSettingsDraft({
+      visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards],
+      duelWinsMode: defaultHomeLeaderboardPreferences.duelWinsMode,
+      duelStreakMode: defaultHomeLeaderboardPreferences.duelStreakMode,
+    })
+  }, [])
+  const closeHomeLeaderboardSettings = useCallback(() => {
+    if (homeLeaderboardSettingsSaving) return
+    setHomeLeaderboardSettingsOpen(false)
+    setHomeLeaderboardSettingsError('')
+  }, [homeLeaderboardSettingsSaving])
+  const saveHomeLeaderboardSettings = useCallback(async () => {
+    const nextPreferences = sanitizeHomeLeaderboardPreferences(homeLeaderboardSettingsDraft)
+    const nextProfileDetails = {
+      ...profileDetails,
+      homeLeaderboardPreferences: nextPreferences,
+    }
+
+    if (!supabase || !currentUserId || !stateHydrated) {
+      setProfileDetails(nextProfileDetails)
+      setHomeLeaderboardSettingsOpen(false)
+      setHomeLeaderboardSettingsError('')
+      return
+    }
+
+    setHomeLeaderboardSettingsSaving(true)
+    setHomeLeaderboardSettingsError('')
+    try {
+      const algorithmSnapshot = buildAlgorithmSnapshot(sections, performance)
+      const { data, error } = await supabase
+        .from('app_state')
+        .upsert(
+          {
+            user_id: currentUserId,
+            performance,
+            high_scores: highScores,
+            best_streak: bestStreak,
+            profile_details: {
+              ...nextProfileDetails,
+              algorithmSnapshot,
+            },
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id' },
+        )
+        .select('updated_at')
+        .maybeSingle()
+      if (error) {
+        throw error
+      }
+      setProfileDetails(nextProfileDetails)
+      const nextUpdatedAt = Date.parse(String(data?.updated_at || '')) || Date.now()
+      lastAppStateUpdateRef.current = Math.max(lastAppStateUpdateRef.current, nextUpdatedAt)
+      setHomeLeaderboardSettingsOpen(false)
+    } catch (error) {
+      setHomeLeaderboardSettingsError(error instanceof Error ? error.message : 'Could not save leaderboard settings.')
+    } finally {
+      setHomeLeaderboardSettingsSaving(false)
+    }
+  }, [
+    bestStreak,
+    currentUserId,
+    highScores,
+    homeLeaderboardSettingsDraft,
+    performance,
+    profileDetails,
+    sections,
+    stateHydrated,
+  ])
+  const navigateToTab = (tab: AppTab) => {
+    const pathByTab: Record<AppTab, string> = {
+      home: '/home',
+      study: '/study',
+      games: '/games',
+      scenarios: '/scenarios',
+      library: '/library',
+      leaderboards: '/leaderboards',
+      chat: '/chat',
+    }
+    goToPath(pathByTab[tab], { tab })
+    if (tab === 'chat') {
+      const requestScrollToLatest = () => {
+        window.dispatchEvent(new Event('scrollGlobalChatToBottom'))
+      }
+      requestScrollToLatest()
+      window.requestAnimationFrame(requestScrollToLatest)
+      window.setTimeout(requestScrollToLatest, 120)
+      window.setTimeout(requestScrollToLatest, 320)
+    }
+  }
+  const openStudyFlashcardsPage = useCallback(() => {
+    goToPath('/study/flashcards', { tab: 'study' })
+  }, [goToPath])
+
+  const openStudyTestPage = useCallback(() => {
+    goToPath('/study/test', { tab: 'study' })
+  }, [goToPath])
   const selectedLeaderboardTheme = selectedLeaderboardEntry
     ? getThemePreset(selectedLeaderboardEntry.themeId)
     : appThemePresets[0]
@@ -4754,18 +6639,15 @@ function App() {
       textShadow: 'none',
     }
     : undefined
-  const incrementUserStats = (updater: (stats: UserStats) => UserStats, trackStudyDay = false) => {
-    setProfileDetails((previous) => ({
-      ...previous,
-      stats: trackStudyDay ? applyStudyDayActivity(updater(previous.stats)) : updater(previous.stats),
-    }))
-  }
-  const triggerCelebration = (title: string, subtitle: string) => {
-    const burst = Date.now()
-    setCelebration({ title, subtitle, burst })
-    window.setTimeout(() => {
-      setCelebration((current) => (current?.burst === burst ? null : current))
-    }, 2200)
+  const leaderAvatarFrameClass = (userId?: string, extraClassName?: string) => {
+    const classes = ['leader-avatar-frame']
+    if (extraClassName) classes.push(extraClassName)
+    if (userId) {
+      const presence = onlinePresenceByUserId[userId]
+      if (presence === 'active') classes.push('leader-avatar-frame-online')
+      if (presence === 'away') classes.push('leader-avatar-frame-away')
+    }
+    return classes.join(' ')
   }
   const avatarFor = (rawValue?: string) => {
     const value = String(rawValue || '').trim()
@@ -4786,7 +6668,42 @@ function App() {
   }
   useEffect(() => {
     const root = document.documentElement
-    const vars = selectedTheme.vars
+    const vars = isUiLightMode
+      ? {
+        ...lightModeVars,
+        bg: `color-mix(in srgb, ${selectedTheme.vars.bodyBase} 10%, #f6f9ff)`,
+        panel: `color-mix(in srgb, ${selectedTheme.vars.panelStrong} 14%, #ffffff)`,
+        panelStrong: `color-mix(in srgb, ${selectedTheme.vars.panelStrong} 20%, #f2f6ff)`,
+        sidebar: `color-mix(in srgb, ${selectedTheme.vars.bodyBase} 12%, #f9fbff)`,
+        border: `color-mix(in srgb, ${selectedTheme.vars.accent} 30%, #d5deef)`,
+        text: '#18233d',
+        muted: `color-mix(in srgb, ${selectedTheme.vars.accent} 24%, #5f7193)`,
+        textMuted: `color-mix(in srgb, ${selectedTheme.vars.accent} 18%, #7f91b3)`,
+        accent: selectedTheme.vars.accent,
+        good: selectedTheme.vars.good,
+        bad: selectedTheme.vars.bad,
+        gold: selectedTheme.vars.accent,
+        bodyRadial: `color-mix(in srgb, ${selectedTheme.vars.bodyRadial} 16%, #eaf1fc)`,
+        bodyBase: `color-mix(in srgb, ${selectedTheme.vars.bodyBase} 10%, #f6f9ff)`,
+      }
+      : {
+        ...darkModeVars,
+        ...selectedTheme.vars,
+        sidebar: selectedTheme.vars.panelStrong,
+        textMuted: selectedTheme.vars.muted,
+        gold: selectedTheme.vars.accent,
+      }
+    root.style.setProperty('--bg-main', vars.bg)
+    root.style.setProperty('--bg-panel', vars.panelStrong)
+    root.style.setProperty('--bg-sidebar', vars.sidebar)
+    root.style.setProperty('--card-bg', vars.panel)
+    root.style.setProperty('--card-border', vars.border)
+    root.style.setProperty('--text-primary', vars.text)
+    root.style.setProperty('--text-secondary', vars.muted)
+    root.style.setProperty('--text-muted', vars.textMuted)
+    root.style.setProperty('--success', vars.good)
+    root.style.setProperty('--danger', vars.bad)
+    root.style.setProperty('--gold', vars.gold)
     root.style.setProperty('--bg', vars.bg)
     root.style.setProperty('--panel', vars.panel)
     root.style.setProperty('--panel-strong', vars.panelStrong)
@@ -4798,13 +6715,13 @@ function App() {
     root.style.setProperty('--bad', vars.bad)
     root.style.setProperty('--body-radial', vars.bodyRadial)
     root.style.setProperty('--body-base', vars.bodyBase)
-  }, [selectedTheme])
+  }, [isUiLightMode, selectedTheme])
 
   useEffect(() => {
     if (!isOwner) return
     setLeaderboardRotateMs(sanitizeLeaderboardRotationMs(profileDetails.homeLeaderboardRotationMs))
   }, [isOwner, profileDetails.homeLeaderboardRotationMs])
-  const loadOwnerEditorItems = async () => {
+  const loadOwnerEditorItems = useCallback(async () => {
     if (!currentUserId || !isOwner) return
     setEditorLoading(true)
     setEditorError('')
@@ -4838,7 +6755,14 @@ function App() {
 
     setEditorItems(mapped)
     setEditorLoading(false)
-  }
+  }, [currentUserId, isOwner])
+  useEffect(() => {
+    if (!supabase || !currentUserId || !isOwner) {
+      setEditorItems([])
+      return
+    }
+    void loadOwnerEditorItems()
+  }, [currentUserId, isOwner, loadOwnerEditorItems])
   const selectEditorItem = (item: ContentEditorItem) => {
     setEditorSelectedId(item.id)
     setEditorDraft({ ...item })
@@ -5236,7 +7160,7 @@ function App() {
       matchFilter: null,
       score: entry.value,
       round: 0,
-      createdAt: Date.now(),
+      createdAt: clockNowMs,
       masteredCodes: entry.masteredCodes,
       studySeconds: entry.studySeconds,
       studyDayStreak: entry.studyDayStreak,
@@ -5250,14 +7174,15 @@ function App() {
 
   useEffect(() => {
     if (!currentUserId) return
-    if (activeTab !== 'study') return
-    if (isProfilePage || isStatsPage || isHomePage) return
+    if (!activeStudyActivitySource) return
     const interval = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
-      incrementUserStats((stats) => ({ ...stats, studySeconds: stats.studySeconds + 5 }), true)
-    }, 5000)
+      const lastActivityAt = studyActivityBySourceRef.current[activeStudyActivitySource] || 0
+      if (Date.now() - lastActivityAt > studyActivityWindowMs) return
+      incrementUserStats((stats) => ({ ...stats, studySeconds: stats.studySeconds + studyTrackingTickMs / 1000 }), true)
+    }, studyTrackingTickMs)
     return () => window.clearInterval(interval)
-  }, [currentUserId, activeTab, isProfilePage, isStatsPage, isHomePage])
+  }, [incrementUserStats, currentUserId, activeStudyActivitySource])
   const saveCurrentNamePreset = () => {
     const name = newPresetName.trim()
     if (!name) return
@@ -5338,6 +7263,44 @@ function App() {
     () => questions.filter((question) => studyTestFilter === 'all' || question.codeSet === studyTestFilter).length,
     [questions, studyTestFilter],
   )
+  const flashcardSetupInsights = useMemo(() => {
+    const availableSections = sections.filter((section) => studyFlashFilter === 'all' || section.codeSet === studyFlashFilter)
+    const analyzed = availableSections.map((section) => {
+      const stats = performance[performanceKey(section.codeSet, section.sectionNumber)]
+      const correct = stats?.correctCount ?? 0
+      const incorrect = stats?.incorrectCount ?? 0
+      const attempts = correct + incorrect
+      const accuracyPercent = attempts > 0 ? Math.round((correct / attempts) * 100) : null
+      const needScore = performanceNeedWorkWeight(stats)
+      return { section, attempts, accuracyPercent, needScore }
+    })
+    const tracked = analyzed.filter((item) => item.attempts > 0)
+    const totalAttempts = tracked.reduce((sum, item) => sum + item.attempts, 0)
+    const totalCorrect = tracked.reduce((sum, item) => {
+      if (item.accuracyPercent === null) return sum
+      return sum + Math.round((item.accuracyPercent / 100) * item.attempts)
+    }, 0)
+    const averageAccuracyPercent = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : null
+    const topFocus = [...tracked]
+      .sort((left, right) =>
+        (left.accuracyPercent ?? 100) - (right.accuracyPercent ?? 100) ||
+        right.needScore - left.needScore ||
+        right.attempts - left.attempts,
+      )
+      .slice(0, 8)
+    const recommendation =
+      topFocus.length > 0
+        ? `Start with ${topFocus[0].section.sectionNumber} first (${topFocus[0].accuracyPercent ?? 0}% accuracy).`
+        : 'Start a few rounds to generate personalized flashcard priorities.'
+    return {
+      totalCards: availableSections.length,
+      trackedCards: tracked.length,
+      totalAttempts,
+      averageAccuracyPercent,
+      topFocus,
+      recommendation,
+    }
+  }, [sections, performance, studyFlashFilter])
   const algorithmInsights = useMemo(() => {
     const analyzed = sections.map((section) => {
       const stats = performance[performanceKey(section.codeSet, section.sectionNumber)]
@@ -5379,30 +7342,6 @@ function App() {
     }
   }, [sections, performance])
 
-  const getFocusTips = (filter: CodeFilter, mode: SessionMode) => {
-    const prioritized = sections
-      .filter((section) => filter === 'all' || section.codeSet === filter)
-      .map((section) => {
-        const stats = performance[performanceKey(section.codeSet, section.sectionNumber)]
-        const weight = performanceNeedWorkWeight(stats)
-        const attempts = (stats?.correctCount ?? 0) + (stats?.incorrectCount ?? 0)
-        return { section, weight, attempts }
-      })
-      .filter((item) => item.attempts > 0 && item.weight >= 2)
-      .sort((left, right) => right.weight - left.weight)
-      .slice(0, 2)
-
-    return prioritized.map((item) => {
-      if (item.section.codeSet === 'penal') {
-        return `${item.section.sectionNumber} scenarios`
-      }
-      if (item.section.codeSet === 'vehicle') {
-        return `${item.section.sectionNumber} definitions`
-      }
-      return `${item.section.sectionNumber} elements`
-    }).map((value) => (mode === 'speed' ? value : value))
-  }
-
   const gameCodeSetBreakdown = useMemo(() => {
     const bySet: Record<CodeSet, { attempts: number; accuracyPercent: number }> = {
       penal: { attempts: 0, accuracyPercent: 0 },
@@ -5418,6 +7357,254 @@ function App() {
       accuracyPercent: bySet[codeSet].accuracyPercent,
     }))
   }, [studyNeedsSummary])
+  const effectiveScoreTimeline = useMemo<ScoreTimelinePoint[]>(() => {
+    if (remoteScoreTimeline.length > 0) {
+      return [...remoteScoreTimeline].sort((left, right) => left.at - right.at)
+    }
+    return profileDetails.stats.sessionTimeline
+      .filter((point) => Number.isFinite(point.at))
+      .map((point) => ({
+        at: point.at,
+        score: Math.max(0, Math.round(typeof point.score === 'number' ? point.score : point.accuracy)),
+      }))
+      .sort((left, right) => left.at - right.at)
+  }, [profileDetails.stats.sessionTimeline, remoteScoreTimeline])
+  const statsAnalytics = useMemo(() => {
+    const analyzed = sections.map((section) => {
+      const stats = performance[performanceKey(section.codeSet, section.sectionNumber)]
+      const correct = stats?.correctCount ?? 0
+      const incorrect = stats?.incorrectCount ?? 0
+      const attempts = correct + incorrect
+      const accuracyPercent = attempts > 0 ? Math.round((correct / attempts) * 100) : 0
+      const status = mastery(stats)
+      return {
+        section,
+        stats,
+        correct,
+        incorrect,
+        attempts,
+        accuracyPercent,
+        status,
+        needScore: performanceNeedWorkWeight(stats),
+      }
+    })
+
+    const attempted = analyzed.filter((item) => item.attempts > 0)
+    const totalCorrect = attempted.reduce((sum, item) => sum + item.correct, 0)
+    const totalIncorrect = attempted.reduce((sum, item) => sum + item.incorrect, 0)
+    const totalAttempts = totalCorrect + totalIncorrect
+    const overallAccuracyPercent = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0
+
+    const masteryCounts: Record<Exclude<MasteryStatus, ''>, number> = {
+      'Needs Work': 0,
+      'Getting There': 0,
+      'On Track': 0,
+      'Almost Mastered': 0,
+      'Mastered': 0,
+    }
+
+    for (const item of attempted) {
+      if (!item.status) continue
+      masteryCounts[item.status] += 1
+    }
+
+    const codeSetMap: Record<CodeSet, { attempts: number; trackedCodes: number; correct: number; mastered: number; needsWork: number }> = {
+      penal: { attempts: 0, trackedCodes: 0, correct: 0, mastered: 0, needsWork: 0 },
+      hs: { attempts: 0, trackedCodes: 0, correct: 0, mastered: 0, needsWork: 0 },
+      vehicle: { attempts: 0, trackedCodes: 0, correct: 0, mastered: 0, needsWork: 0 },
+    }
+
+    for (const item of attempted) {
+      const bucket = codeSetMap[item.section.codeSet]
+      bucket.attempts += item.attempts
+      bucket.trackedCodes += 1
+      bucket.correct += item.correct
+      if (item.status === 'Mastered') bucket.mastered += 1
+      if (item.status === 'Needs Work') bucket.needsWork += 1
+    }
+
+    const codeSetBreakdown = (['penal', 'hs', 'vehicle'] as CodeSet[]).map((codeSet) => {
+      const bucket = codeSetMap[codeSet]
+      const accuracyPercent = bucket.attempts > 0 ? Math.round((bucket.correct / bucket.attempts) * 100) : 0
+      return {
+        codeSet,
+        attempts: bucket.attempts,
+        trackedCodes: bucket.trackedCodes,
+        accuracyPercent,
+        mastered: bucket.mastered,
+        needsWork: bucket.needsWork,
+      }
+    })
+
+    const needsWorkCodes = [...attempted]
+      .filter((item) => item.status !== 'Mastered')
+      .sort((left, right) =>
+        left.accuracyPercent - right.accuracyPercent ||
+        right.needScore - left.needScore ||
+        right.attempts - left.attempts,
+      )
+      .slice(0, 12)
+
+    const strongestCodes = [...attempted]
+      .filter((item) => item.attempts >= 2)
+      .sort((left, right) =>
+        right.accuracyPercent - left.accuracyPercent ||
+        right.attempts - left.attempts ||
+        right.needScore - left.needScore,
+      )
+      .slice(0, 12)
+
+    const modeBuckets: Record<SessionMode, { points: number[] }> = {
+      study_test: { points: [] },
+      matching: { points: [] },
+      speed: { points: [] },
+    }
+
+    const combinedTrackScores: Record<string, number[]> = {}
+    for (const [trackKey, track] of Object.entries(profileDetails.stats.sessionTracks)) {
+      if (!track || typeof track !== 'object') continue
+      const localScores = Array.isArray(track.scoreHistory) && track.scoreHistory.length > 0
+        ? track.scoreHistory
+        : track.lastAttempt && typeof track.lastAttempt.score === 'number'
+          ? [track.lastAttempt.score]
+          : []
+      if (localScores.length > 0) combinedTrackScores[trackKey] = localScores
+    }
+    for (const [trackKey, scores] of Object.entries(remoteTrackScoreHistory)) {
+      if (Array.isArray(scores) && scores.length > 0) {
+        combinedTrackScores[trackKey] = scores
+      }
+    }
+
+    for (const [trackKey, scores] of Object.entries(combinedTrackScores)) {
+      const mode = trackKey.startsWith('study_test|')
+        ? 'study_test'
+        : trackKey.startsWith('matching|')
+          ? 'matching'
+          : trackKey.startsWith('speed|')
+            ? 'speed'
+            : null
+      if (!mode) continue
+      if (Array.isArray(scores) && scores.length > 0) {
+        modeBuckets[mode].points.push(...scores.filter((value) => Number.isFinite(value)))
+      }
+    }
+
+    const modePerformance = (['study_test', 'matching', 'speed'] as SessionMode[]).map((mode) => {
+      const points = modeBuckets[mode].points.filter((value) => Number.isFinite(value))
+      const runs = points.length
+      const averageScore = runs > 0 ? Math.round(points.reduce((sum, value) => sum + value, 0) / runs) : 0
+      const bestScore = runs > 0 ? Math.max(...points) : 0
+      const scoreDelta = runs > 1 ? points[points.length - 1] - points[0] : 0
+      return { mode, runs, averageScore, bestScore, scoreDelta, recent: points.slice(-8) }
+    })
+
+    const fullScoreTrend = effectiveScoreTimeline
+      .map((point) => Math.max(0, Math.round(point.score)))
+
+    const trend = fullScoreTrend.length > 0
+      ? fullScoreTrend
+      : totalAttempts > 0
+        ? [totalCorrect]
+        : []
+
+    const weakestCategory = codeSetBreakdown
+      .filter((item) => item.attempts > 0)
+      .sort((left, right) => left.accuracyPercent - right.accuracyPercent)[0] || null
+    const strongestCategory = codeSetBreakdown
+      .filter((item) => item.attempts > 0)
+      .sort((left, right) => right.accuracyPercent - left.accuracyPercent)[0] || null
+
+    const recommendation =
+      needsWorkCodes.length > 0
+        ? `Focus on ${needsWorkCodes[0].section.sectionNumber} first (${needsWorkCodes[0].accuracyPercent}% accuracy).`
+        : strongestCategory
+          ? `${codeSetLabel[strongestCategory.codeSet]} is stable right now. Keep rotating through all sets to maintain retention.`
+          : 'Start a study session to generate personalized coaching insights.'
+
+    return {
+      totalTrackedCodes: attempted.length,
+      totalAttempts,
+      totalCorrect,
+      totalIncorrect,
+      overallAccuracyPercent,
+      unattemptedCodes: Math.max(0, sections.length - attempted.length),
+      masteryCounts,
+      codeSetBreakdown,
+      modePerformance,
+      recentScoreTrend: trend,
+      needsWorkCodes,
+      strongestCodes,
+      weakestCategory,
+      strongestCategory,
+      recommendation,
+    }
+  }, [effectiveScoreTimeline, sections, performance, profileDetails.stats.sessionTracks, remoteTrackScoreHistory])
+  const studyHubInsights = useMemo(() => {
+    const windowMs = studyInsightWindowDays * 24 * 60 * 60 * 1000
+    const now = clockNowMs
+    const currentStart = now - windowMs
+    const previousStart = currentStart - windowMs
+    const timeline = effectiveScoreTimeline
+
+    const currentPoints = timeline.filter((point) => point.at >= currentStart)
+    const previousPoints = timeline.filter((point) => point.at >= previousStart && point.at < currentStart)
+
+    const averageScore = (points: ScoreTimelinePoint[]) =>
+      points.length > 0 ? Math.round(points.reduce((sum, point) => sum + point.score, 0) / points.length) : null
+    const currentAverageScore = averageScore(currentPoints)
+    const previousAverageScore = averageScore(previousPoints)
+    const scoreDelta =
+      currentAverageScore !== null && previousAverageScore !== null
+        ? currentAverageScore - previousAverageScore
+        : null
+
+    const dailyBuckets = new Map<string, ScoreTimelinePoint[]>()
+    for (const point of currentPoints) {
+      const day = new Date(point.at).toISOString().slice(0, 10)
+      const bucket = dailyBuckets.get(day) || []
+      bucket.push(point)
+      dailyBuckets.set(day, bucket)
+    }
+    const dailyTrend = [...dailyBuckets.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, points]) => Math.round(points.reduce((sum, point) => sum + point.score, 0) / points.length))
+
+    const trendValues = dailyTrend.length > 0 ? dailyTrend : statsAnalytics.recentScoreTrend.slice(-8)
+    const weakCodes = statsAnalytics.needsWorkCodes.slice(0, 10)
+    const weakBySet = {
+      penal: weakCodes.filter((item) => item.section.codeSet === 'penal').slice(0, 4),
+      hs: weakCodes.filter((item) => item.section.codeSet === 'hs').slice(0, 4),
+      vehicle: weakCodes.filter((item) => item.section.codeSet === 'vehicle').slice(0, 4),
+    }
+
+    const tracked = statsAnalytics.totalTrackedCodes || 0
+    const mastered = statsAnalytics.masteryCounts.Mastered
+    const gettingThere =
+      statsAnalytics.masteryCounts['Getting There'] +
+      statsAnalytics.masteryCounts['On Track'] +
+      statsAnalytics.masteryCounts['Almost Mastered']
+    const masteryRatePercent = tracked > 0 ? Math.round((mastered / tracked) * 100) : 0
+    const progressRatePercent = tracked > 0 ? Math.round((gettingThere / tracked) * 100) : 0
+    const recommendation =
+      weakCodes.length > 0
+        ? `${weakCodes[0].section.sectionNumber} is your highest-priority code. Review its elements and retest it today.`
+        : 'Keep rotating through all code sets to build long-term retention.'
+
+    return {
+      trendValues,
+      currentAverageScore,
+      previousAverageScore,
+      scoreDelta,
+      currentAttempts: currentPoints.length,
+      previousAttempts: previousPoints.length,
+      weakCodes,
+      weakBySet,
+      masteryRatePercent,
+      progressRatePercent,
+      recommendation,
+    }
+  }, [clockNowMs, effectiveScoreTimeline, statsAnalytics, studyInsightWindowDays])
 
   const matchingTrackKey = useMemo(
     () => sessionTrackKey({ mode: 'matching', duration: gamesSelection.duration, filter: gamesSelection.filter }),
@@ -5427,46 +7614,198 @@ function App() {
     () => sessionTrackKey({ mode: 'speed', duration: gamesSelection.duration, filter: gamesSelection.filter }),
     [gamesSelection.duration, gamesSelection.filter],
   )
+  const mergeTrackWithRemoteHistory = useCallback((trackKey: string, track: SessionTrack): SessionTrack => {
+    const remoteScores = remoteTrackScoreHistory[trackKey] || []
+    if (remoteScores.length === 0) return track
+    return {
+      ...track,
+      scoreHistory: remoteScores,
+    }
+  }, [remoteTrackScoreHistory])
   const matchingSessionTrack = useMemo(
-    () => getSessionTrack(profileDetails.stats, matchingTrackKey),
-    [profileDetails.stats, matchingTrackKey],
+    () => mergeTrackWithRemoteHistory(matchingTrackKey, getSessionTrack(profileDetails.stats, matchingTrackKey)),
+    [mergeTrackWithRemoteHistory, profileDetails.stats, matchingTrackKey],
   )
   const speedSessionTrack = useMemo(
-    () => getSessionTrack(profileDetails.stats, speedTrackKey),
-    [profileDetails.stats, speedTrackKey],
+    () => mergeTrackWithRemoteHistory(speedTrackKey, getSessionTrack(profileDetails.stats, speedTrackKey)),
+    [mergeTrackWithRemoteHistory, profileDetails.stats, speedTrackKey],
   )
   const matchingFocusTips = useMemo(
     () => getFocusTips(gamesSelection.filter, 'matching').slice(0, 3),
-    [gamesSelection.filter, sections, performance],
+    [gamesSelection.filter, getFocusTips],
   )
   const speedFocusTips = useMemo(
     () => getFocusTips(gamesSelection.filter, 'speed').slice(0, 3),
-    [gamesSelection.filter, sections, performance],
+    [gamesSelection.filter, getFocusTips],
   )
+  const homeDailyQuote = useMemo(() => {
+    const seed = `${currentUserId || 'guest'}-${dayKeyUtc()}-${profileDetails.stats.studyDayStreak}`
+    let hash = 0
+    for (let index = 0; index < seed.length; index += 1) {
+      hash = (hash * 31 + seed.charCodeAt(index)) >>> 0
+    }
+    return homeEncouragementQuotes[hash % homeEncouragementQuotes.length]
+  }, [currentUserId, profileDetails.stats.studyDayStreak])
+  const nextStreakMilestone = useMemo(() => {
+    const streak = profileDetails.stats.studyDayStreak
+    const next = studyStreakMilestones.find((value) => value > streak)
+    if (next) return next
+    return Math.ceil((Math.max(streak, 1) + 1) / 7) * 7
+  }, [profileDetails.stats.studyDayStreak])
+  const homeLeaderboardChase = useMemo(() => {
+    if (!currentUserId) return null
+    const candidates: Array<{
+      game: 'Matching' | 'Speed Test'
+      duration: HomeDurationFilter
+      filter: CodeFilter
+      topScore: number
+      yourScore: number
+      gap: number
+      status: 'leading' | 'chasing' | 'unranked'
+    }> = []
 
-  const saveSessionAttempt = (trackKey: string, snapshot: SessionAttemptSnapshot) => {
-    setProfileDetails((previous) => {
-      const currentTrack = previous.stats.sessionTracks[trackKey] || { lastAttempt: null, accuracyHistory: [] }
-      const nextHistory = [...currentTrack.accuracyHistory, snapshot.accuracy].slice(-12)
-      return {
-        ...previous,
-        stats: {
-          ...previous.stats,
-          sessionTracks: {
-            ...previous.stats.sessionTracks,
-            [trackKey]: {
-              lastAttempt: snapshot,
-              accuracyHistory: nextHistory,
-            },
-          },
-        },
+    for (const game of ['Matching', 'Speed Test'] as const) {
+      for (const step of homeLeaderboardRotationSteps) {
+        const scoped = topEntryPerUser(
+          leaderboard
+            .filter((entry) => entry.game === game)
+            .filter((entry) => entry.matchDuration === step.duration && entry.matchFilter === step.codeSet)
+            .filter((entry) => entry.score > 0),
+        )
+        if (scoped.length === 0) continue
+        const topScore = scoped[0].score
+        const mine = scoped.find((entry) => entry.userId === currentUserId)
+        const yourScore = mine?.score ?? 0
+        const status: 'leading' | 'chasing' | 'unranked' = !mine
+          ? 'unranked'
+          : mine.score >= topScore
+            ? 'leading'
+            : 'chasing'
+        const gap = status === 'leading' ? 0 : Math.max(1, topScore - yourScore)
+        candidates.push({
+          game,
+          duration: step.duration,
+          filter: step.codeSet,
+          topScore,
+          yourScore,
+          gap,
+          status,
+        })
       }
-    })
+    }
+
+    if (candidates.length === 0) return null
+    const chasing = candidates
+      .filter((item) => item.status === 'chasing')
+      .sort((left, right) => left.gap - right.gap || right.yourScore - left.yourScore)
+    if (chasing.length > 0) return chasing[0]
+    const unranked = candidates
+      .filter((item) => item.status === 'unranked')
+      .sort((left, right) => left.topScore - right.topScore)
+    if (unranked.length > 0) return unranked[0]
+    return candidates
+      .filter((item) => item.status === 'leading')
+      .sort((left, right) => right.topScore - left.topScore)[0] || null
+  }, [leaderboard, currentUserId])
+  const homePrimaryNeed = studyNeedsSummary[0] || null
+  const homePersonalizedPlan = useMemo(
+    () => {
+      const actionItems: Array<{
+        title: string
+        detail: string
+        cta: string
+        target: HomeActionTarget
+        gamePreset?: GameModeSelection
+      }> = []
+
+      if (homePrimaryNeed) {
+        const detail = homePrimaryNeed.attempts > 0
+          ? `${codeSetLabel[homePrimaryNeed.codeSet]} accuracy is ${homePrimaryNeed.accuracyPercent}%. Reps here give your biggest gain right now.`
+          : `Start with ${codeSetLabel[homePrimaryNeed.codeSet]} to build your baseline and unlock algorithm coaching.`
+        actionItems.push({
+          title: `Focus ${codeSetLabel[homePrimaryNeed.codeSet]} first`,
+          detail,
+          cta: 'Start Study',
+          target: 'study',
+        })
+      }
+
+      if (homeLeaderboardChase) {
+        const label = `${homeLeaderboardChase.duration}s • ${leaderboardCodeSetLabel(homeLeaderboardChase.filter)}`
+        const chasePreset: GameModeSelection = {
+          duration: homeLeaderboardChase.duration,
+          filter: homeLeaderboardChase.filter,
+        }
+        if (homeLeaderboardChase.status === 'leading') {
+          actionItems.push({
+            title: `You’re holding #1 in ${homeLeaderboardChase.game}`,
+            detail: `Defend your lead in ${label}. One more run increases your cushion.`,
+            cta: `Defend ${homeLeaderboardChase.game}`,
+            target: homeLeaderboardChase.game === 'Matching' ? 'games-matching' : 'games-speed',
+            gamePreset: chasePreset,
+          })
+        } else {
+          actionItems.push({
+            title: `${homeLeaderboardChase.gap} points to #1`,
+            detail: `${homeLeaderboardChase.game} ${label} is your closest jump target right now.`,
+            cta: `Chase #1`,
+            target: homeLeaderboardChase.game === 'Matching' ? 'games-matching' : 'games-speed',
+            gamePreset: chasePreset,
+          })
+        }
+      }
+
+      const focusCodes = algorithmInsights.topFocusCodes.slice(0, 2)
+      if (focusCodes.length > 0) {
+        actionItems.push({
+          title: 'Priority review items',
+          detail: `Review ${focusCodes.join(' and ')} next. These are causing the most misses.`,
+          cta: 'Run Scenarios',
+          target: 'scenarios',
+        })
+      }
+
+      return actionItems.slice(0, 3)
+    },
+    [homePrimaryNeed, homeLeaderboardChase, algorithmInsights.topFocusCodes],
+  )
+  const handleHomeAction = (target: HomeActionTarget, options?: HomeActionOptions) => {
+    const preset = options?.gamePreset
+    if (preset) {
+      setGamesSelection((previous) => {
+        if (previous.duration === preset.duration && previous.filter === preset.filter) return previous
+        return {
+          ...previous,
+          duration: preset.duration,
+          filter: preset.filter,
+        }
+      })
+    }
+    if (options?.forceAllTime) {
+      setGameModeLeaderboardsScope('alltime')
+    }
+    if (target === 'study') {
+      setActiveTab('study')
+      navigate('/study')
+      return
+    }
+    if (target === 'games-matching') {
+      setActiveTab('games')
+      navigate('/games/matching')
+      return
+    }
+    if (target === 'games-speed') {
+      setActiveTab('games')
+      navigate('/games/speed')
+      return
+    }
+    setActiveTab('scenarios')
+    navigate('/scenarios')
   }
 
   return (
     <div
-      className={`app-shell ${isHomePage ? 'home-page' : ''} ${isLightTheme ? 'theme-light theme-glass' : ''} ${selectedTheme.id === 'golden' ? 'theme-gold' : ''} ${reduceVisualEffects ? 'reduced-effects' : ''}`}
+      className={`app-shell ${isHomePage ? 'home-page' : ''} ${isUiLightMode ? 'ui-light-mode theme-light theme-glass' : ''} ${!isUiLightMode && selectedTheme.id === 'golden' ? 'theme-gold' : ''} ${reduceVisualEffects ? 'reduced-effects' : ''}`}
     >
       {!isSupabaseConfigured ? (
         <div className="onboarding-overlay">
@@ -5492,11 +7831,10 @@ function App() {
         <DuelInviteBanner
           currentUserId={currentUserId}
           onJoinRoom={(nextRoomId) => {
-            setGamesMode('duel')
             setActiveTab('games')
             setDuelInviteJoinRoomId(nextRoomId)
-            if (!isGamesPage) {
-              navigate('/games')
+            if (!isGamesDuelPage) {
+              navigate('/games/duel')
             }
           }}
         />
@@ -5509,7 +7847,7 @@ function App() {
             <h1>LEO Study</h1>
             <label>
               Email
-              <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
+              <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} onKeyDown={handleSignInEnterKey} />
             </label>
             <label>
               Password
@@ -5518,6 +7856,7 @@ function App() {
                   type={showSignInPassword ? 'text' : 'password'}
                   value={authPassword}
                   onChange={(event) => setAuthPassword(event.target.value)}
+                  onKeyDown={handleSignInEnterKey}
                 />
                 <button type="button" className="password-eye" onClick={() => setShowSignInPassword((value) => !value)} aria-label="Toggle password visibility">
                   {showSignInPassword ? (
@@ -5700,64 +8039,143 @@ function App() {
 
       {authReady && currentUserId ? (
         <>
-      {!isHomePage ? (
-      <header className="top-header">
-        <div className="header-left">
-          {showHomeButton ? (
-            <button
-              className="secondary header-home-button"
-              onClick={() => {
-                setActiveTab('home')
-                navigate('/home')
-              }}
-            >
-              <AppIcon name="home" className="button-icon" />
-              {isSupportPage ? 'Back' : 'Home'}
-            </button>
-          ) : null}
-          {!isHomePage ? (
-            <h1>{isProfilePage ? 'Settings' : isStatsPage ? 'Stats' : isSupportPage ? 'Support Creator' : activeTab === 'study' ? 'Study' : activeTab === 'library' ? 'Library' : activeTab === 'games' ? 'Games' : 'Scenarios'}</h1>
-          ) : null}
-        </div>
-        {profile ? (
-          <div className="profile-shortcut-wrap" ref={profileMenuRef}>
-            <button className="profile-shortcut" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="Open profile menu">
-              <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="profile-shortcut-image" onError={handleAvatarImageError} />
-            </button>
-            <span className={`profile-shortcut-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
-              {profile.username || 'Profile'}
-            </span>
-            {profileMenuOpen ? (
-              <div className="profile-menu">
+        <div className="workspace-layout">
+          <aside className="left-taskbar">
+            <div className="taskbar-section">
+              <button className={isHomePage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('home')}>
+                <AppIcon name="home" className="taskbar-icon" />
+                Home
+              </button>
+              <button className={isLeaderboardsPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('leaderboards')}>
+                <AppIcon name="leaderboards" className="taskbar-icon" />
+                Leaderboards
+              </button>
+              <button className={isLibraryPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('library')}>
+                <AppIcon name="library" className="taskbar-icon" />
+                Library
+              </button>
+              <button className={isScenariosPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('scenarios')}>
+                <AppIcon name="scenarios" className="taskbar-icon" />
+                Scenarios
+              </button>
+              <button className={isStatsPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => goToPath('/stats')}>
+                <AppIcon name="stats" className="taskbar-icon" />
+                Stats
+              </button>
+              <button className={isChatPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('chat')}>
+                <AppIcon name="chat" className="taskbar-icon" />
+                Chat
+              </button>
+            </div>
+
+            <div className="taskbar-section">
+              <p className="taskbar-label">Study</p>
+              <button className={isStudyPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('study')}>
+                <AppIcon name="study" className="taskbar-icon" />
+                Study Hub
+              </button>
+              <div className="taskbar-submenu">
                 <button
-                  className="profile-menu-item"
-                  onClick={() => {
-                    setProfileMenuOpen(false)
-                    navigate('/profile')
-                  }}
+                  className={isStudyFlashcardsPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
+                  onClick={openStudyFlashcardsPage}
                 >
-                  Settings
+                  <AppIcon name="flashcards" className="taskbar-sub-icon" />
+                  Flashcards
                 </button>
                 <button
-                  className="profile-menu-item"
-                  onClick={() => {
-                    setProfileMenuOpen(false)
-                    navigate('/stats')
-                  }}
+                  className={isStudyTestPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
+                  onClick={openStudyTestPage}
                 >
-                  Stats
-                </button>
-                <button className="profile-menu-item danger-item" onClick={signOut}>
-                  Sign Out
+                  <AppIcon name="test" className="taskbar-sub-icon" />
+                  Test
                 </button>
               </div>
-            ) : null}
-          </div>
-        ) : null}
-      </header>
-      ) : null}
+            </div>
 
-      <main className="content-area">
+            <div className="taskbar-section">
+              <p className="taskbar-label">Games</p>
+              <button className={isGamesPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('games')}>
+                <AppIcon name="games" className="taskbar-icon" />
+                Games Hub
+              </button>
+              <div className="taskbar-submenu">
+                <button
+                  className={isGamesSpeedPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
+                  onClick={() => {
+                    goToPath('/games/speed', { tab: 'games' })
+                  }}
+                >
+                  <AppIcon name="speed" className="taskbar-sub-icon" />
+                  Speed Test
+                </button>
+                <button
+                  className={isGamesMatchingPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
+                  onClick={() => {
+                    goToPath('/games/matching', { tab: 'games' })
+                  }}
+                >
+                  <AppIcon name="games" className="taskbar-sub-icon" />
+                  Matching
+                </button>
+                <button
+                  className={isGamesDuelPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
+                  onClick={() => {
+                    goToPath('/games/duel', { tab: 'games' })
+                  }}
+                >
+                  <AppIcon name="duel" className="taskbar-sub-icon" />
+                  1v1
+                </button>
+              </div>
+            </div>
+
+            <div className="home-online-indicator taskbar-online-indicator">
+              <span className="online-dot"></span>
+              <span className="online-count">{onlineUsersCount}</span>
+              <span className="online-label">studying now</span>
+            </div>
+
+            {profile ? (
+              <div className="taskbar-profile-wrap" ref={profileMenuRef}>
+                <button className="taskbar-profile" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="Open profile menu">
+                  <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="taskbar-profile-image" onError={handleAvatarImageError} />
+                  <span className="taskbar-profile-info">
+                    <span className={`taskbar-profile-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
+                      {profile.username || 'Profile'}
+                    </span>
+                    <span className="taskbar-profile-tier">{tierLabel[activeProfileTier]}</span>
+                  </span>
+                </button>
+                {profileMenuOpen ? (
+                  <div className="profile-menu profile-menu-sidebar">
+                    <button className="profile-menu-item" onClick={() => { setProfileMenuOpen(false); goToPath('/profile') }}>Settings</button>
+                    <button className="profile-menu-item" onClick={() => { setProfileMenuOpen(false); goToPath('/support') }}>Support</button>
+                    <button
+                      className="profile-menu-item"
+                      onClick={() => {
+                        setProfileMenuOpen(false)
+                        void toggleDisplayMode()
+                      }}
+                    >
+                      {isUiLightMode ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+                    </button>
+                    <button className="profile-menu-item danger-item" onClick={signOut}>Sign Out</button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </aside>
+
+          <div className="workspace-main">
+            {!isHomePage ? (
+              <header className="top-header app-page-header">
+                <div className="header-left">
+                  <h1>{pageTitle}</h1>
+                </div>
+              </header>
+            ) : null}
+
+            <main className="content-area" key={currentPath}>
         {contentWarning ? <p className="muted content-warning">{contentWarning}</p> : null}
         {!isProfilePage && !isStatsPage && isHomePage && (
           <section className="home-section">
@@ -5769,48 +8187,25 @@ function App() {
                     {activeProfileName}
                   </h2>
                   <p className="muted">Pick your focus and keep building momentum.</p>
+                  <p className="home-quote-line">“{homeDailyQuote}”</p>
                   <div className={profileDetails.stats.studyDayStreak >= 7 ? 'day-streak-chip day-streak-chip-fire' : 'day-streak-chip'}>
                     <span className="day-streak-label">Study Streak</span>
                     <strong>{profileDetails.stats.studyDayStreak} day{profileDetails.stats.studyDayStreak === 1 ? '' : 's'}</strong>
                     {profileDetails.stats.studyDayStreak >= 7 ? <span className="day-streak-fire" aria-hidden>🔥</span> : null}
                   </div>
                 </div>
-                {profile ? (
-                  <div className="profile-shortcut-wrap home-hero-profile" ref={profileMenuRef}>
-                    <button className="profile-shortcut" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="Open profile menu">
-                      <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="profile-shortcut-image" onError={handleAvatarImageError} />
-                    </button>
-                    {profileMenuOpen ? (
-                      <div className="profile-menu">
-                        <button
-                          className="profile-menu-item"
-                          onClick={() => {
-                            setProfileMenuOpen(false)
-                            navigate('/profile')
-                          }}
-                        >
-                          Settings
-                        </button>
-                        <button
-                          className="profile-menu-item"
-                          onClick={() => {
-                            setProfileMenuOpen(false)
-                            navigate('/stats')
-                          }}
-                        >
-                          Stats
-                        </button>
-                        <button className="profile-menu-item danger-item" onClick={signOut}>
-                          Sign Out
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
+                <button
+                  className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
+                  onClick={() => setHomeLeaderboardSettingsOpen((value) => !value)}
+                  aria-label="Customize home leaderboards"
+                  aria-expanded={homeLeaderboardSettingsOpen}
+                >
+                  <AppIcon name="settings" className="button-icon" />
+                </button>
               </div>
               <div className="home-actions">
                 <button className="primary" onClick={() => { setActiveTab('study'); navigate('/study') }}>
-                  <AppIcon name="study" className="button-icon" />
+                  <AppIcon name="flashcards" className="button-icon" />
                   Go Study
                 </button>
                 <button className="secondary" onClick={() => { setActiveTab('games'); navigate('/games') }}>
@@ -5828,13 +8223,106 @@ function App() {
               </div>
             </div>
 
-            <div className="home-online-indicator">
-              <span className="online-dot"></span>
-              <span className="online-count">{onlineUsersCount}</span>
-              <span className="online-label">studying now</span>
+            <div className="home-guidance-grid">
+              <article className="card home-guidance-card">
+                <div className="home-guidance-head">
+                  <p className="eyebrow">Progress Signal</p>
+                  <strong>Next streak goal: {nextStreakMilestone} days</strong>
+                </div>
+                <p className="muted">
+                  {profileDetails.stats.studyDayStreak >= nextStreakMilestone
+                    ? 'You hit the current streak target. Keep the momentum alive.'
+                    : `${Math.max(1, nextStreakMilestone - profileDetails.stats.studyDayStreak)} more day${Math.max(1, nextStreakMilestone - profileDetails.stats.studyDayStreak) === 1 ? '' : 's'} to the next streak milestone.`}
+                </p>
+                <div className="home-guidance-metric-row">
+                  <span>Tracked codes</span>
+                  <strong>{algorithmInsights.trackedCodes}</strong>
+                </div>
+                <div className="home-guidance-metric-row">
+                  <span>Average accuracy</span>
+                  <strong>{Math.round(algorithmInsights.averageAccuracy * 100)}%</strong>
+                </div>
+              </article>
+
+              <article className="card home-guidance-card">
+                <div className="home-guidance-head">
+                  <p className="eyebrow">Leaderboard Chase</p>
+                  <strong>
+                    {homeLeaderboardChase
+                      ? `${homeLeaderboardChase.game} • ${homeLeaderboardChase.duration}s • ${leaderboardCodeSetLabel(homeLeaderboardChase.filter)}`
+                      : 'No active board yet'}
+                  </strong>
+                </div>
+                {homeLeaderboardChase ? (
+                  <>
+                    <p className="muted">
+                      {homeLeaderboardChase.status === 'leading'
+                        ? `You hold #1 in this mode. Keep building separation with one more run.`
+                        : `You are ${homeLeaderboardChase.gap} points away from #1 in this mode.`}
+                    </p>
+                    <button
+                      className="primary"
+                      onClick={() => handleHomeAction(
+                        homeLeaderboardChase.game === 'Matching' ? 'games-matching' : 'games-speed',
+                        {
+                          gamePreset: {
+                            duration: homeLeaderboardChase.duration,
+                            filter: homeLeaderboardChase.filter,
+                          },
+                          forceAllTime: true,
+                        },
+                      )}
+                    >
+                      {homeLeaderboardChase.status === 'leading' ? 'Defend #1' : 'Go for #1'}
+                    </button>
+                  </>
+                ) : (
+                  <p className="muted">Complete a matching or speed run to unlock your chase target.</p>
+                )}
+              </article>
+
+              <article className="card home-guidance-card">
+                <div className="home-guidance-head">
+                  <p className="eyebrow">What to do next</p>
+                  <strong>Personalized action plan</strong>
+                </div>
+                {homePersonalizedPlan.length === 0 ? (
+                  <p className="muted">Start one study session to generate personalized guidance.</p>
+                ) : (
+                  <div className="home-guidance-actions">
+                    {homePersonalizedPlan.map((item) => (
+                      <div key={`home-plan-${item.title}`} className="home-guidance-action-row">
+                        <div>
+                          <p className="home-guidance-action-title">{item.title}</p>
+                          <p className="muted tiny">{item.detail}</p>
+                        </div>
+                        <button
+                          className="secondary"
+                          onClick={() => handleHomeAction(
+                            item.target,
+                            item.gamePreset
+                              ? { gamePreset: item.gamePreset, forceAllTime: true }
+                              : undefined,
+                          )}
+                        >
+                          {item.cta}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
             </div>
 
             <div className="home-leaderboard-grid">
+              {homeVisibleLeaderboardCards.length === 0 ? (
+                <div className="card leaderboard-card home-leaderboard-empty-card">
+                  <h3>Home Leaderboards Hidden</h3>
+                  <p className="muted">Use the settings gear above to choose which leaderboards to show.</p>
+                </div>
+              ) : null}
+
+              {homeShowsStudyTimeLeaderboard ? (
               <div className="card leaderboard-card">
                 <div className="leaderboard-card-head">
                   <h3>Most Study Time</h3>
@@ -5853,7 +8341,7 @@ function App() {
                         <span className="leader-player">
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className="leader-avatar-frame">
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
@@ -5868,7 +8356,9 @@ function App() {
                   </div>
                 )}
               </div>
+              ) : null}
 
+              {homeShowsStudyStreakLeaderboard ? (
               <div className="card leaderboard-card">
                 <div className="leaderboard-card-head">
                   <h3>Best Study Streak</h3>
@@ -5887,7 +8377,7 @@ function App() {
                         <span className="leader-player">
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className="leader-avatar-frame">
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
@@ -5902,8 +8392,9 @@ function App() {
                   </div>
                 )}
               </div>
+              ) : null}
 
-              {homeMatchingRotationSteps.length > 0 ? (
+              {homeShowsMatchingLeaderboard ? (
               <div className="card leaderboard-card">
                 <div className="card-menu-head">
                   <div className="leaderboard-card-head">
@@ -5940,6 +8431,7 @@ function App() {
                     </div>
                   </div>
                 ) : null}
+                {homeMatchingRotationSteps.length === 0 ? <p className="muted">No matching leaderboard data yet.</p> : null}
                 {homeMatchingLeaders.length === 0 ? <p className="muted">No scores yet.</p> : (
                   <div
                     key={`home-match-rotation-${homeMatchingDurationFilter}-${homeMatchingCodeFilter}`}
@@ -5959,7 +8451,7 @@ function App() {
                         <span className="leader-player">
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className="leader-avatar-frame">
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
@@ -5976,7 +8468,7 @@ function App() {
               </div>
               ) : null}
 
-              {homeSpeedRotationSteps.length > 0 ? (
+              {homeShowsSpeedLeaderboard ? (
               <div className="card leaderboard-card">
                 <div className="card-menu-head">
                   <div className="leaderboard-card-head">
@@ -6013,6 +8505,7 @@ function App() {
                     </div>
                   </div>
                 ) : null}
+                {homeSpeedRotationSteps.length === 0 ? <p className="muted">No speed leaderboard data yet.</p> : null}
                 {homeSpeedLeaders.length === 0 ? <p className="muted">No scores yet.</p> : (
                   <div
                     key={`home-speed-rotation-${homeSpeedDurationFilter}-${homeSpeedCodeFilter}`}
@@ -6032,7 +8525,7 @@ function App() {
                         <span className="leader-player">
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className="leader-avatar-frame">
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
@@ -6049,6 +8542,79 @@ function App() {
               </div>
               ) : null}
 
+              {homeShowsDuelWinsLeaderboard ? (
+              <div className="card leaderboard-card">
+                <div className="leaderboard-card-head">
+                  <h3>1v1 Most Wins</h3>
+                  <p className="leaderboard-card-subtitle">{duelLeaderboardModeLabel[homeDuelWinsMode]} mode</p>
+                </div>
+                {homeDuelWinsLeaders.length === 0 ? <p className="muted">No 1v1 wins yet for this mode.</p> : (
+                  <div className="leaderboard-list">
+                    {homeDuelWinsLeaders.map((entry, index) => (
+                      <button
+                        key={`home-duel-wins-${homeDuelWinsMode}-${entry.userId}-${index}`}
+                        type="button"
+                        className="leader-row leader-row-button leader-row-rich"
+                        onClick={() => openHomeProfile(entry, `1v1 ${duelLeaderboardModeLabel[homeDuelWinsMode]} Wins`, index === 0)}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <LeaderboardPlayerName entry={entry} />
+                        </span>
+                        <span className="leader-result">
+                          <small>{entry.duelCurrentWinStreak > 0 ? `🔥 ${entry.duelCurrentWinStreak} streak` : 'No active streak'}</small>
+                          <strong>{entry.duelWins} wins</strong>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              ) : null}
+
+              {homeShowsDuelStreakLeaderboard ? (
+              <div className="card leaderboard-card">
+                <div className="leaderboard-card-head">
+                  <h3>1v1 Streak Leaderboard</h3>
+                  <p className="leaderboard-card-subtitle">{duelLeaderboardModeLabel[homeDuelStreakMode]} mode</p>
+                </div>
+                {homeDuelStreakLeaders.length === 0 ? <p className="muted">No active 1v1 streaks yet for this mode.</p> : (
+                  <div className="leaderboard-list">
+                    {homeDuelStreakLeaders.map((entry, index) => (
+                      <button
+                        key={`home-duel-streak-${homeDuelStreakMode}-${entry.userId}-${index}`}
+                        type="button"
+                        className="leader-row leader-row-button leader-row-rich"
+                        onClick={() => openHomeProfile(entry, `1v1 ${duelLeaderboardModeLabel[homeDuelStreakMode]} Streak`, index === 0)}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <LeaderboardPlayerName entry={entry} />
+                        </span>
+                        <span className="leader-result">
+                          <small>{entry.duelWins} wins • {entry.duelLosses} losses</small>
+                          <strong>{entry.duelCurrentWinStreak} streak</strong>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              ) : null}
+
+              {homeShowsMasteredLeaderboard ? (
               <div className="card leaderboard-card">
                 <div className="card-menu-head">
                   <div className="leaderboard-card-head">
@@ -6077,7 +8643,7 @@ function App() {
                         <span className="leader-player">
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className="leader-avatar-frame">
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
@@ -6092,9 +8658,234 @@ function App() {
                   </div>
                 )}
               </div>
+              ) : null}
             </div>
           </section>
         )}
+
+        {!isProfilePage && !isStatsPage && isLeaderboardsPage && (
+          <section className="leaderboards-section">
+            <div className="leaderboards-overview-grid">
+              <article className="card leaderboard-summary-card leaderboard-summary-card-condensed">
+                <div className="leaderboard-card-head">
+                  <h3>Top Performer This Week</h3>
+                  <p className="leaderboard-card-subtitle">Combined across all weekly leaderboards</p>
+                </div>
+                {!weeklyTopPerformer ? (
+                  <p className="muted">No weekly scores yet.</p>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="leader-row leader-row-button leader-row-rich leader-row-summary"
+                      onClick={() => {
+                        setSelectedLeaderboardEntry(weeklyTopPerformer.entry)
+                        setSelectedLeaderboardIsTop(true)
+                      }}
+                    >
+                      <span className="leader-rank">#1</span>
+                      <span className="leader-player">
+                        <span className="leader-avatar-wrap">
+                          <span className="leader-crown" aria-label="Top Player">👑</span>
+                          <span className={leaderAvatarFrameClass(weeklyTopPerformer.entry.userId)}>
+                            <img src={avatarFor(weeklyTopPerformer.entry.avatarUrl)} alt={weeklyTopPerformer.entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                          </span>
+                        </span>
+                        <LeaderboardPlayerName entry={weeklyTopPerformer.entry} />
+                      </span>
+                      <span className="leader-result">
+                        <small>Weekly total</small>
+                        <strong>{weeklyTopPerformer.totalScore} pts</strong>
+                      </span>
+                    </button>
+                    <div className="leaderboard-summary-metrics">
+                      <div className="leaderboard-summary-metric">
+                        <strong>{weeklyTopPerformer.firstPlaceCount}</strong>
+                        <span>#1 spots</span>
+                      </div>
+                      <div className="leaderboard-summary-metric">
+                        <strong>{weeklyTopPerformer.leaderboardAppearances}</strong>
+                        <span>board appearances</span>
+                      </div>
+                      <div className="leaderboard-summary-metric">
+                        <strong>{weeklyTopPerformer.bestSingleScore}</strong>
+                        <span>best single score</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </article>
+
+              <article className="card leaderboard-summary-card">
+                <div className="leaderboard-card-head">
+                  <h3>Best Department This Week</h3>
+                  <p className="leaderboard-card-subtitle">Ranked by average score across weekly attempts</p>
+                </div>
+                {!bestWeeklyDepartment ? (
+                  <p className="muted">No department data yet.</p>
+                ) : (
+                  <div className="leaderboard-department-list">
+                    {weeklyDepartmentLeaders.slice(0, 5).map((entry, index) => (
+                      <div key={`weekly-department-${entry.key}`} className="leaderboard-department-item">
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span>{entry.agency}</span>
+                        <small>{entry.averageScore} avg • {entry.playerCount} player{entry.playerCount === 1 ? '' : 's'}</small>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
+            </div>
+
+            <article className="card leaderboard-block-card">
+              <div className="card-menu-head">
+                <div className="leaderboard-card-head">
+                  <h3>{leaderboardsScope === 'weekly' ? 'Weekly Leaderboards' : 'All-Time Leaderboards'}</h3>
+                  <p className="leaderboard-card-subtitle">
+                    {leaderboardsScope === 'weekly'
+                      ? 'Matching and Speed Test boards by mode • resets every Monday at 12:00 AM'
+                      : 'Matching and Speed Test boards by mode'}
+                  </p>
+                </div>
+                <div className="segmented compact-segmented leaderboards-scope-switch">
+                  <button
+                    className={leaderboardsScope === 'weekly' ? 'seg active compact-seg' : 'seg compact-seg'}
+                    onClick={() => setLeaderboardsScope('weekly')}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    className={leaderboardsScope === 'alltime' ? 'seg active compact-seg' : 'seg compact-seg'}
+                    onClick={() => setLeaderboardsScope('alltime')}
+                  >
+                    All-Time
+                  </button>
+                </div>
+              </div>
+              {visibleLeaderboardBoards.length === 0 ? (
+                <p className="muted">{leaderboardsScope === 'weekly' ? 'No weekly game scores yet.' : 'No all-time game scores yet.'}</p>
+              ) : (
+                <div className="leaderboards-mode-explorer">
+                  <div className="leaderboards-toolbar">
+                    <div className="segmented compact-segmented leaderboards-game-switch">
+                      <button
+                        className={leaderboardViewGame === 'Matching' ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setLeaderboardViewGame('Matching')}
+                      >
+                        Matching
+                      </button>
+                      <button
+                        className={leaderboardViewGame === 'Speed Test' ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setLeaderboardViewGame('Speed Test')}
+                      >
+                        Speed Test
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="leaderboards-mode-matrix">
+                    {leaderboardModeMatrix.map((group) => (
+                      <div key={`leaderboard-mode-group-${group.duration}`} className="leaderboards-duration-group">
+                        <p className="leaderboards-duration-label">{group.duration}s</p>
+                        <div className="leaderboards-duration-modes">
+                          {group.modes.map(({ filter, stat }) => {
+                            const isSelected = Boolean(
+                              leaderboardSelectedBoard &&
+                                leaderboardSelectedBoard.duration === group.duration &&
+                                leaderboardSelectedBoard.filter === filter &&
+                                leaderboardSelectedBoard.game === leaderboardViewGame,
+                            )
+                            return (
+                              <button
+                                key={`leaderboard-mode-${leaderboardViewGame}-${group.duration}-${filter}`}
+                                type="button"
+                                className={
+                                  isSelected
+                                    ? 'leaderboards-mode-chip leaderboards-mode-chip-active'
+                                    : stat
+                                      ? 'leaderboards-mode-chip'
+                                      : 'leaderboards-mode-chip leaderboards-mode-chip-empty'
+                                }
+                                disabled={!stat}
+                                onClick={() => {
+                                  if (!stat) return
+                                  setLeaderboardViewDuration(group.duration)
+                                  setLeaderboardViewFilter(filter)
+                                }}
+                              >
+                                <span>{leaderboardCodeSetLabel(filter)}</span>
+                                <small>{stat ? `${stat.attempts} run${stat.attempts === 1 ? '' : 's'}` : 'No scores'}</small>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="leaderboards-mode-card">
+                    <div className="leaderboards-mode-head">
+                      <strong>{leaderboardViewGame}</strong>
+                      <small>
+                        {leaderboardSelectedBoard
+                          ? `${leaderboardSelectedBoard.duration}s • ${leaderboardCodeSetLabel(leaderboardSelectedBoard.filter)}`
+                          : 'No board selected'}
+                      </small>
+                    </div>
+                    {leaderboardSelectedEntries.length > 0 ? (
+                      <div
+                        key={`leaderboard-selected-${leaderboardsScope}-${leaderboardViewGame}-${leaderboardSelectedBoard?.duration}-${leaderboardSelectedBoard?.filter}`}
+                        className="leaderboards-mode-list"
+                      >
+                        {leaderboardSelectedEntries.map((entry, index) => (
+                          <button
+                            key={`leaderboard-selected-entry-${entry.id}-${index}`}
+                            type="button"
+                            className="leader-row leader-row-button leader-row-compact"
+                            onClick={() => {
+                              setSelectedLeaderboardEntry(entry)
+                              setSelectedLeaderboardIsTop(index === 0)
+                            }}
+                          >
+                            <span className="leader-rank">#{index + 1}</span>
+                            <span className="leader-player">
+                              <span className="leader-avatar-wrap">
+                                {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                                <span className={leaderAvatarFrameClass(entry.userId)}>
+                                  <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                                </span>
+                              </span>
+                              <LeaderboardPlayerName entry={entry} />
+                            </span>
+                            <span className="leader-result">
+                              <strong>{entry.score} pts</strong>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="muted">No scores yet for this mode.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </article>
+          </section>
+        )}
+
+        {!isProfilePage && !isStatsPage && isChatPage && currentUserId ? (
+          <section className="chat-page-section">
+            <div className="card chat-page-card">
+              <GlobalChatWidget
+                currentUserId={currentUserId}
+                currentUsername={profileUsername}
+                userAgency={profileDetails?.agency}
+                isOwner={isOwner}
+                mode="full"
+              />
+            </div>
+          </section>
+        ) : null}
 
         {!isProfilePage && !isStatsPage && isSupportPage && profile ? (
           <section className="support-section">
@@ -6184,10 +8975,10 @@ function App() {
           </section>
         )}
 
-        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isStudyPage && (
+        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isStudyHubPage && (
           <section className="study-section study-hub">
             <div className="study-actions-grid">
-              <button className="card study-action-card" onClick={() => setShowStudyFlashSetupModal(true)}>
+              <button className="card study-action-card" onClick={openStudyFlashcardsPage}>
                 <div className="study-action-icon">
                   <AppIcon name="flashcards" className="button-icon" />
                 </div>
@@ -6196,9 +8987,9 @@ function App() {
                   <p className="muted">Open a full-screen flashcard session with smart ordering.</p>
                 </div>
               </button>
-              <button className="card study-action-card" onClick={() => setShowStudyTestSetupModal(true)}>
+              <button className="card study-action-card" onClick={openStudyTestPage}>
                 <div className="study-action-icon">
-                  <AppIcon name="study" className="button-icon" />
+                  <AppIcon name="test" className="button-icon" />
                 </div>
                 <div>
                   <h3>Test</h3>
@@ -6228,41 +9019,241 @@ function App() {
                 ))}
               </div>
             </article>
+
+            <article className="card study-momentum-card">
+              <div className="study-momentum-head">
+                <div>
+                  <h3>Study Momentum</h3>
+                  <p className="muted">
+                    Score trend over the last {studyInsightWindowDays} days.
+                  </p>
+                </div>
+                <div className="segmented compact-segmented">
+                  {([7, 14, 30] as const).map((days) => (
+                    <button
+                      key={`study-window-${days}`}
+                      className={studyInsightWindowDays === days ? 'seg active compact-seg' : 'seg compact-seg'}
+                      onClick={() => setStudyInsightWindowDays(days)}
+                    >
+                      {days}d
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <InteractiveTrendChart
+                chartId={`study-momentum-${studyInsightWindowDays}`}
+                values={compressTrendPoints(studyHubInsights.trendValues, 42)}
+                ariaLabel="Study momentum trend"
+                pointLabel="Day"
+                valueSuffix=" pts"
+                className="study-momentum-chart"
+                emptyMessage="Complete more sessions to build your trend graph."
+                describePoint={(index, total) => `Day ${index + 1} of ${total}`}
+              />
+              <div className="study-momentum-metrics">
+                <div className="study-momentum-item">
+                  <small>Current average score</small>
+                  <strong>{studyHubInsights.currentAverageScore !== null ? `${studyHubInsights.currentAverageScore} pts` : '--'}</strong>
+                </div>
+                <div className="study-momentum-item">
+                  <small>Previous average score</small>
+                  <strong>{studyHubInsights.previousAverageScore !== null ? `${studyHubInsights.previousAverageScore} pts` : '--'}</strong>
+                </div>
+                <div className="study-momentum-item">
+                  <small>Improvement</small>
+                  <strong>
+                    {studyHubInsights.scoreDelta === null
+                      ? '--'
+                      : `${studyHubInsights.scoreDelta >= 0 ? '+' : ''}${studyHubInsights.scoreDelta} pts`}
+                  </strong>
+                </div>
+                <div className="study-momentum-item">
+                  <small>Tracked attempts</small>
+                  <strong>{studyHubInsights.currentAttempts}</strong>
+                </div>
+              </div>
+            </article>
+
+            <div className="study-insights-grid">
+              <article className="card study-priority-card">
+                <h3>Priority Codes</h3>
+                <p className="muted">Lowest-performing codes that should be reviewed first.</p>
+                <div className="study-priority-groups">
+                  {(['penal', 'hs', 'vehicle'] as CodeSet[]).map((codeSet) => {
+                    const list = studyHubInsights.weakBySet[codeSet]
+                    return (
+                      <div key={`priority-${codeSet}`} className="study-priority-group">
+                        <p className="study-priority-group-title">{codeSetLabel[codeSet]}</p>
+                        {list.length === 0 ? (
+                          <p className="study-priority-empty">No weak codes tracked yet.</p>
+                        ) : (
+                          list.map((item) => (
+                            <div key={`priority-${codeSet}-${item.section.id}`} className="study-priority-item">
+                              <span>{item.section.sectionNumber}</span>
+                              <small>{item.accuracyPercent}% • {item.attempts} attempts</small>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="study-priority-recommendation">{studyHubInsights.recommendation}</p>
+              </article>
+
+              <article className="card study-priority-card">
+                <h3>Mastery Pipeline</h3>
+                <p className="muted">How your tracked codes are progressing through each level.</p>
+                <div className="stats-bar-list">
+                  {(['Needs Work', 'Getting There', 'On Track', 'Almost Mastered', 'Mastered'] as Array<Exclude<MasteryStatus, ''>>).map((status) => {
+                    const count = statsAnalytics.masteryCounts[status]
+                    const tracked = statsAnalytics.totalTrackedCodes
+                    const width = tracked > 0 ? Math.max(4, Math.round((count / tracked) * 100)) : 0
+                    return (
+                      <div
+                        key={`study-mastery-${status}`}
+                        className="stats-bar-row"
+                        title={`${status}: ${count} code${count === 1 ? '' : 's'} (${tracked > 0 ? Math.round((count / tracked) * 100) : 0}%)`}
+                      >
+                        <div className="stats-bar-meta">
+                          <strong>{status}</strong>
+                          <small>{count} code{count === 1 ? '' : 's'}</small>
+                        </div>
+                        <div className="stats-bar-track">
+                          <div className={`stats-bar-fill stats-bar-fill-${status.toLowerCase().replace(/\s+/g, '-')}`} style={{ width: `${width}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="study-momentum-metrics">
+                  <div className="study-momentum-item">
+                    <small>Mastered rate</small>
+                    <strong>{studyHubInsights.masteryRatePercent}%</strong>
+                  </div>
+                  <div className="study-momentum-item">
+                    <small>Getting there+</small>
+                    <strong>{studyHubInsights.progressRatePercent}%</strong>
+                  </div>
+                  <div className="study-momentum-item">
+                    <small>Codes tracked</small>
+                    <strong>{statsAnalytics.totalTrackedCodes}</strong>
+                  </div>
+                </div>
+              </article>
+            </div>
           </section>
         )}
 
-        {isStudyPage && studyFlashSessionOpen ? (
-          <div className="study-session-overlay">
-            <div className="study-session-shell">
-              <div className="study-session-top">
-                <button className="secondary" onClick={() => setStudyFlashSessionOpen(false)}>Exit</button>
-                <span>{studyFlashSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyFlashSessionFilter]}</span>
+        {isStudyFlashcardsPage ? (
+          <section className="study-session-page">
+            <div className="study-session-shell study-session-shell-page">
+              <div className={`study-session-top study-session-top-compact ${studyFlashSessionOpen ? 'study-session-top-flash-open' : ''}`}>
+                <span>{studyFlashSessionOpen ? (studyFlashSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyFlashSessionFilter]) : 'Flashcards Setup'}</span>
                 <span>
-                  {orderedStudyFlashSessionCards.length > 0 ? studyFlashSessionIndex + 1 : 0}/{orderedStudyFlashSessionCards.length}
+                  {studyFlashSessionOpen
+                    ? `${orderedStudyFlashSessionCards.length > 0 ? studyFlashSessionIndex + 1 : 0}/${orderedStudyFlashSessionCards.length}`
+                    : `${studyFlashSelectionCount} cards`}
                 </span>
+                {studyFlashSessionOpen ? (
+                  <button
+                    className="secondary study-session-exit-btn"
+                    onClick={() => {
+                      setStudyFlashSessionOpen(false)
+                      setStudyFlashSessionFlipped(false)
+                      navigate('/study')
+                    }}
+                  >
+                    Exit
+                  </button>
+                ) : null}
               </div>
-              {orderedStudyFlashSessionCards.length === 0 ? (
+              {!studyFlashSessionOpen ? (
+                <article className="card study-priority-card study-setup-card">
+                  <h3>Choose flashcard set</h3>
+                  <label className="game-control">
+                    Subject
+                    <div className="segmented">
+                      {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                        <button
+                          key={`study-flash-filter-page-${filter}`}
+                          className={studyFlashFilter === filter ? 'seg active' : 'seg'}
+                          onClick={() => setStudyFlashFilter(filter)}
+                        >
+                          {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+                  <div className="study-momentum-metrics">
+                    <div className="study-momentum-item">
+                      <small>Cards available</small>
+                      <strong>{flashcardSetupInsights.totalCards}</strong>
+                    </div>
+                    <div className="study-momentum-item">
+                      <small>Cards tracked</small>
+                      <strong>{flashcardSetupInsights.trackedCards}</strong>
+                    </div>
+                    <div className="study-momentum-item">
+                      <small>Average accuracy</small>
+                      <strong>{flashcardSetupInsights.averageAccuracyPercent === null ? '--' : `${flashcardSetupInsights.averageAccuracyPercent}%`}</strong>
+                    </div>
+                    <div className="study-momentum-item">
+                      <small>Total attempts</small>
+                      <strong>{flashcardSetupInsights.totalAttempts}</strong>
+                    </div>
+                  </div>
+                  <div className="study-setup-divider" />
+                  <div className="study-setup-focus">
+                    <h3>What to focus on</h3>
+                    <p className="muted">Flashcards with lowest accuracy are listed first.</p>
+                    {flashcardSetupInsights.topFocus.length === 0 ? (
+                      <p className="study-priority-empty">No flashcard attempts yet. Run a few rounds and this list will personalize.</p>
+                    ) : (
+                      <div className="study-priority-groups">
+                        <div className="study-priority-group">
+                          {flashcardSetupInsights.topFocus.map((item) => (
+                            <div key={`flash-priority-${item.section.id}`} className="study-priority-item">
+                              <span>{item.section.sectionNumber} · {shortText(item.section.title, 34)}</span>
+                              <small>{item.accuracyPercent}% • {item.attempts} attempts</small>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <p className="study-priority-recommendation">{flashcardSetupInsights.recommendation}</p>
+                  </div>
+                  <div className="actions-row">
+                    <button className="secondary" onClick={() => navigate('/study')}>Back</button>
+                    <button className="primary" onClick={beginStudyFlashcards} disabled={studyFlashSelectionCount === 0}>Start Flashcards</button>
+                  </div>
+                </article>
+              ) : orderedStudyFlashSessionCards.length === 0 ? (
                 <div className="card study-session-empty">
                   <p>No flashcards found for this selection.</p>
-                  <button className="primary" onClick={() => setStudyFlashSessionOpen(false)}>Back</button>
+                  <button className="primary" onClick={() => navigate('/study')}>Back</button>
                 </div>
               ) : (
                 <>
                   <button
                     tabIndex={0}
-                    className={studyFlashSessionFlipped ? 'study-session-flashcard flipped' : 'study-session-flashcard'}
+                    className="study-session-flashcard"
                     onClick={(e) => {
                       e.stopPropagation()
+                      markStudyActivity('flashcards')
                       setStudyFlashSessionFlipped((value) => !value)
                     }}
                   >
-                    <div className="face front">{orderedStudyFlashSessionCards[studyFlashSessionIndex]?.front}</div>
-                    <div className="face back">{orderedStudyFlashSessionCards[studyFlashSessionIndex]?.back}</div>
+                    <div className={studyFlashSessionFlipped ? 'study-session-flashcard-inner flipped' : 'study-session-flashcard-inner'}>
+                      <div className="study-session-face study-session-face-front">{orderedStudyFlashSessionCards[studyFlashSessionIndex]?.front}</div>
+                      <div className="study-session-face study-session-face-back">{orderedStudyFlashSessionCards[studyFlashSessionIndex]?.back}</div>
+                    </div>
                   </button>
                   <div className="study-session-actions">
                     <button
                       className="secondary study-session-nav"
                       onClick={() => {
+                        markStudyActivity('flashcards')
                         setStudyFlashSessionFlipped(false)
                         setStudyFlashSessionIndex((current) => {
                           if (orderedStudyFlashSessionCards.length === 0) return 0
@@ -6273,18 +9264,22 @@ function App() {
                     >
                       Previous
                     </button>
-                    <button className="secondary study-session-nav" onClick={() => setStudyFlashSessionFlipped((value) => !value)}>
+                    <button className="secondary study-session-nav" onClick={() => {
+                      markStudyActivity('flashcards')
+                      setStudyFlashSessionFlipped((value) => !value)
+                    }}>
                       Flip
                     </button>
                     <button
                       className="primary study-session-nav"
                       onClick={() => {
+                        markStudyActivity('flashcards')
                         setStudyFlashSessionFlipped(false)
                         setStudyFlashSessionIndex((current) => {
                           if (orderedStudyFlashSessionCards.length === 0) return 0
                           if (current < orderedStudyFlashSessionCards.length - 1) return current + 1
                           const lastCardId = orderedStudyFlashSessionCards[current]?.id
-                          let reshuffled = shuffle(studyFlashSessionCards.map((card) => card.id))
+                          const reshuffled = shuffle(studyFlashSessionCards.map((card) => card.id))
                           if (reshuffled.length > 1 && reshuffled[0] === lastCardId) {
                             ;[reshuffled[0], reshuffled[1]] = [reshuffled[1], reshuffled[0]]
                           }
@@ -6300,32 +9295,107 @@ function App() {
                 </>
               )}
             </div>
-          </div>
+          </section>
         ) : null}
 
-        {isStudyPage && studyTestSessionOpen ? (
-          <div className="study-session-overlay">
-            <div className="study-session-shell study-test-shell">
-              <div className="study-session-top">
-                <button
-                  className="secondary"
-                  onClick={() => {
-                    setStudyTestSessionOpen(false)
-                    setStudyTestSessionDone(false)
-                    setCurrentQuestion(null)
-                    setQuizDeck([])
-                    setSelectedChoice(null)
-                    setFeedback('')
-                    setStreak(0)
-                  }}
-                >
-                  Exit
-                </button>
-                <span>{studyTestSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyTestSessionFilter]}</span>
-                <span>{studyTestSessionAnswered}/{studyTestSessionTotal}</span>
+        {isStudyTestPage ? (
+          <section className="study-session-page">
+            <div className="study-session-shell study-session-shell-page study-test-shell">
+              <div className="study-session-top study-session-top-compact">
+                <span>{studyTestSessionOpen ? (studyTestSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyTestSessionFilter]) : 'Test Setup'}</span>
+                <span>{studyTestSessionOpen ? `${studyTestSessionAnswered}/${studyTestSessionTotal}` : `${studyTestSelectionCount} source questions`}</span>
               </div>
 
-              {!studyTestSessionDone && currentQuestion ? (
+              {!studyTestSessionOpen ? (
+                <article className="card study-priority-card study-setup-card">
+                  <h3>Build your test</h3>
+                  <label className="game-control">
+                    Subject
+                    <div className="segmented">
+                      {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                        <button
+                          key={`study-test-filter-page-${filter}`}
+                          className={studyTestFilter === filter ? 'seg active' : 'seg'}
+                          onClick={() => setStudyTestFilter(filter)}
+                        >
+                          {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+                  <label className="game-control">
+                    Focus Level
+                    <div className="segmented">
+                      {(
+                        [
+                          { value: 'balanced', label: 'Balanced' },
+                          { value: 'needs_work', label: 'Needs Work' },
+                          { value: 'most_needs_work', label: 'Most Wrong' },
+                        ] as Array<{ value: StudyWrongness; label: string }>
+                      ).map((option) => (
+                        <button
+                          key={`study-test-wrongness-page-${option.value}`}
+                          className={studyTestWrongness === option.value ? 'seg active' : 'seg'}
+                          onClick={() => setStudyTestWrongness(option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+                  <label className="game-control">
+                    Answer Type
+                    <div className="segmented">
+                      {(
+                        [
+                          { value: 'multiple', label: 'Multiple Choice' },
+                          { value: 'truefalse', label: 'True / False' },
+                        ] as Array<{ value: StudyAnswerMode; label: string }>
+                      ).map((option) => (
+                        <button
+                          key={`study-test-answer-mode-page-${option.value}`}
+                          className={studyTestAnswerMode === option.value ? 'seg active' : 'seg'}
+                          onClick={() => setStudyTestAnswerMode(option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+                  <label className="game-control">
+                    Question Count
+                    <div className="segmented">
+                      {[20, 30, 50, 100].map((size) => (
+                        <button
+                          key={`study-test-count-page-${size}`}
+                          className={studyTestQuestionCount === size ? 'seg active' : 'seg'}
+                          onClick={() => setStudyTestQuestionCount(size)}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+                  <div className="study-momentum-metrics">
+                    <div className="study-momentum-item">
+                      <small>Questions available</small>
+                      <strong>{studyTestSelectionCount}</strong>
+                    </div>
+                    <div className="study-momentum-item">
+                      <small>Tracked codes</small>
+                      <strong>{algorithmInsights.trackedCodes}</strong>
+                    </div>
+                    <div className="study-momentum-item">
+                      <small>Average accuracy</small>
+                      <strong>{Math.round(algorithmInsights.averageAccuracy * 100)}%</strong>
+                    </div>
+                  </div>
+                  <div className="actions-row">
+                    <button className="secondary" onClick={() => navigate('/study')}>Back</button>
+                    <button className="primary" onClick={beginStudyTest} disabled={studyTestSelectionCount === 0}>Start Test</button>
+                  </div>
+                </article>
+              ) : !studyTestSessionDone && currentQuestion ? (
                 <div className="quiz-wrap study-test-quiz-wrap">
                   <div
                     className={`quiz-fire-host level-${fireLevel}`}
@@ -6400,63 +9470,246 @@ function App() {
               ) : null}
 
               {studyTestSessionDone ? (
-                <div className="card study-test-complete">
-                  <h3>Test Complete</h3>
-                  {studyTestReport ? <SessionPerformanceReportCard report={studyTestReport} /> : (
+                studyTestReport ? (
+                  <div className="study-test-complete study-test-complete-single">
+                    <SessionPerformanceReportCard report={studyTestReport} />
+                    <div className="actions-row study-test-complete-actions">
+                      <button className="primary" onClick={beginStudyTest}>Retake Test</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card study-test-complete">
+                    <h3>Test Complete</h3>
                     <p className="muted">
                       Score: {studyTestSessionCorrect}/{studyTestSessionTotal} ({studyTestSessionTotal > 0 ? Math.round((studyTestSessionCorrect / studyTestSessionTotal) * 100) : 0}%)
                     </p>
-                  )}
-                  <div className="actions-row">
-                    <button className="secondary" onClick={() => setStudyTestSessionOpen(false)}>Exit</button>
-                    <button className="primary" onClick={beginStudyTest}>Retake Test</button>
+                    <div className="actions-row">
+                      <button className="primary" onClick={beginStudyTest}>Retake Test</button>
+                    </div>
                   </div>
-                </div>
+                )
               ) : null}
             </div>
-          </div>
+          </section>
         ) : null}
 
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isGamesPage && (
           <section className="games-section">
-            <div className="game-scores">
-              <button
-                type="button"
-                className={gamesMode === 'matching' ? 'card compact game-mode-card game-mode-active' : 'card compact game-mode-card'}
-                onClick={() => setGamesMode('matching')}
-              >
-                <span className="game-mode-title"><AppIcon name="games" className="button-icon" /> Matching</span>
-                <span className="muted tiny">Match code sections fast</span>
-              </button>
-              <button
-                type="button"
-                className={gamesMode === 'speed' ? 'card compact game-mode-card game-mode-active' : 'card compact game-mode-card'}
-                onClick={() => setGamesMode('speed')}
-              >
-                <span className="game-mode-title"><AppIcon name="study" className="button-icon" /> Speed Test</span>
-                <span className="muted tiny">Answer as many as possible</span>
-              </button>
-              <button
-                type="button"
-                className={gamesMode === 'duel' ? 'card compact game-mode-card game-mode-active' : 'card compact game-mode-card'}
-                onClick={() => setGamesMode('duel')}
-              >
-                <span className="game-mode-title"><AppIcon name="games" className="button-icon" /> 1v1</span>
-                <span className="muted tiny">Realtime head-to-head</span>
-              </button>
-              <article className="card compact muted-box">Gravity (Disabled)</article>
-            </div>
+            {isGamesHubPage ? (
+              <>
+                <div className="games-hub-grid">
+                  <button
+                    type="button"
+                    className="card compact game-mode-card games-hub-game-card"
+                    onClick={() => {
+                      navigate('/games/matching')
+                    }}
+                  >
+                    <span className="game-mode-title"><AppIcon name="games" className="button-icon" /> Matching</span>
+                    <span className="muted tiny">Match code sections fast</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="card compact game-mode-card games-hub-game-card"
+                    onClick={() => {
+                      navigate('/games/speed')
+                    }}
+                  >
+                    <span className="game-mode-title"><AppIcon name="study" className="button-icon" /> Speed Test</span>
+                    <span className="muted tiny">Answer as many as possible</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="card compact game-mode-card games-hub-game-card"
+                    onClick={() => {
+                      navigate('/games/duel')
+                    }}
+                  >
+                    <span className="game-mode-title"><AppIcon name="duel" className="button-icon" /> 1v1</span>
+                    <span className="muted tiny">Realtime head-to-head</span>
+                  </button>
+                </div>
 
-            {gamesMode === 'matching' ? (
+                <div className="card games-hub-filter-card">
+                  <div className="game-leaderboard-filters">
+                    <div className="game-filter-group">
+                      <span className="game-filter-label">Time</span>
+                      <div className="segmented compact-segmented">
+                        {[15, 30, 60].map((duration) => (
+                          <button
+                            key={`hub-leader-time-${duration}`}
+                            className={gamesSelection.duration === duration ? 'seg active compact-seg' : 'seg compact-seg'}
+                            onClick={() => setGamesSelection((prev) => ({ ...prev, duration: duration as HomeDurationFilter }))}
+                          >
+                            {duration}s
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="game-filter-group">
+                      <span className="game-filter-label">Code Set</span>
+                      <div className="segmented compact-segmented">
+                        {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                          <button
+                            key={`hub-leader-filter-${filter}`}
+                            className={gamesSelection.filter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
+                            onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}
+                          >
+                            {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="games-hub-leaderboards">
+                  <article className="card leaderboard-card game-leader-panel">
+                    {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
+                    <div className="leaderboard-card-head">
+                      <h3>Matching Leaderboard</h3>
+                      <p className="leaderboard-card-subtitle">Top scores for the selected mode</p>
+                    </div>
+                    {matchingLeaderboard.length === 0 ? (
+                      <p className="muted">No matching scores submitted yet.</p>
+                    ) : (
+                      matchingLeaderboard.map((entry, index) => (
+                        <button
+                          key={`hub-matching-${entry.id}`}
+                          type="button"
+                          className="leader-row leader-row-button game-leader-row leader-row-rich"
+                          onClick={() => {
+                            setSelectedLeaderboardEntry(entry)
+                            setSelectedLeaderboardIsTop(index === 0)
+                          }}
+                        >
+                          <span className="leader-rank">#{index + 1}</span>
+                          <span className="leader-player">
+                            <span className="leader-avatar-wrap">
+                              {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                              <span className={leaderAvatarFrameClass(entry.userId)}>
+                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              </span>
+                            </span>
+                            <LeaderboardPlayerName entry={entry} />
+                          </span>
+                          <span className="leader-result">
+                            <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                            <strong>{entry.score} pts</strong>
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </article>
+
+                  <article className="card leaderboard-card game-leader-panel">
+                    {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
+                    <div className="leaderboard-card-head">
+                      <h3>Speed Test Leaderboard</h3>
+                      <p className="leaderboard-card-subtitle">Top scores for the selected mode</p>
+                    </div>
+                    {speedLeaderboard.length === 0 ? (
+                      <p className="muted">No speed test scores submitted yet.</p>
+                    ) : (
+                      speedLeaderboard.map((entry, index) => (
+                        <button
+                          key={`hub-speed-${entry.id}`}
+                          type="button"
+                          className="leader-row leader-row-button game-leader-row leader-row-rich"
+                          onClick={() => {
+                            setSelectedLeaderboardEntry(entry)
+                            setSelectedLeaderboardIsTop(index === 0)
+                          }}
+                        >
+                          <span className="leader-rank">#{index + 1}</span>
+                          <span className="leader-player">
+                            <span className="leader-avatar-wrap">
+                              {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                              <span className={leaderAvatarFrameClass(entry.userId)}>
+                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              </span>
+                            </span>
+                            <LeaderboardPlayerName entry={entry} />
+                          </span>
+                          <span className="leader-result">
+                            <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                            <strong>{entry.score} pts</strong>
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </article>
+
+                  <article className="card leaderboard-card game-leader-panel">
+                    <div className="leaderboard-card-head">
+                      <h3>1v1 Leaderboard</h3>
+                      <p className="leaderboard-card-subtitle">Most wins and current streaks</p>
+                    </div>
+                    {duelHubLeaderboard.length === 0 ? (
+                      <p className="muted">No 1v1 records yet. Play a duel to get ranked.</p>
+                    ) : (
+                      duelHubLeaderboard.map((entry, index) => (
+                        <button
+                          key={`hub-duel-${entry.userId}-${index}`}
+                          type="button"
+                          className="leader-row leader-row-button game-leader-row leader-row-rich"
+                          onClick={() => {
+                            setSelectedLeaderboardEntry(entry)
+                            setSelectedLeaderboardIsTop(index === 0)
+                          }}
+                        >
+                          <span className="leader-rank">#{index + 1}</span>
+                          <span className="leader-player">
+                            <span className="leader-avatar-wrap">
+                              {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                              <span className={leaderAvatarFrameClass(entry.userId)}>
+                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              </span>
+                            </span>
+                            <LeaderboardPlayerName entry={entry} />
+                          </span>
+                          <span className="leader-result">
+                            <small>{entry.duelCurrentWinStreak > 0 ? `🔥 ${entry.duelCurrentWinStreak} streak` : 'No active streak'}</small>
+                            <strong>{entry.duelWins}-{entry.duelLosses}</strong>
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </article>
+                </div>
+              </>
+            ) : null}
+
+            {isGamesMatchingPage ? (
               <>
             <h2>Matching</h2>
             {!matchRunning && !matchDone ? (
               <div className="games-mode-layout">
                 <div className="card leaderboard-card game-leader-panel">
                   {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
-                  <div className="leaderboard-card-head">
-                    <h3>Matching Leaderboard</h3>
-                    <p className="leaderboard-card-subtitle">Top scores for the selected mode</p>
+                  <div className="leaderboard-card-head leaderboard-card-head-split">
+                    <div>
+                      <h3>Matching Leaderboard</h3>
+                      <p className="leaderboard-card-subtitle">
+                        {gameModeLeaderboardsScope === 'weekly'
+                          ? 'Top weekly scores for the selected mode'
+                          : 'Top all-time scores for the selected mode'}
+                      </p>
+                    </div>
+                    <div className="segmented compact-segmented game-mode-scope-switch">
+                      <button
+                        className={gameModeLeaderboardsScope === 'weekly' ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setGameModeLeaderboardsScope('weekly')}
+                      >
+                        Weekly
+                      </button>
+                      <button
+                        className={gameModeLeaderboardsScope === 'alltime' ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setGameModeLeaderboardsScope('alltime')}
+                      >
+                        All Time
+                      </button>
+                    </div>
                   </div>
                   <div className="game-leaderboard-filters">
                     <div className="game-filter-group">
@@ -6488,10 +9741,14 @@ function App() {
                       </div>
                     </div>
                   </div>
-                  {matchingLeaderboard.length === 0 ? (
-                    <p className="muted">No scores submitted yet.</p>
+                  {matchingModeLeaderboard.length === 0 ? (
+                    <p className="muted">
+                      {gameModeLeaderboardsScope === 'weekly'
+                        ? 'No weekly scores submitted yet.'
+                        : 'No all-time scores submitted yet.'}
+                    </p>
                   ) : (
-                    matchingLeaderboard.map((entry, index) => (
+                    matchingModeLeaderboard.map((entry, index) => (
                       <button
                         key={entry.id}
                         type="button"
@@ -6505,7 +9762,7 @@ function App() {
                         <span className="leader-player">
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className="leader-avatar-frame">
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
@@ -6566,8 +9823,11 @@ function App() {
                           <button
                             key={card.id}
                             className={`match-card ${selected ? 'match-selected' : ''} ${matched ? 'match-done' : ''} ${wrongCardIds.includes(card.id) ? 'match-wrong' : ''}`}
-                            disabled={matched || selected || selectedCards.length >= 2}
-                            onClick={() => setSelectedCards((previous) => [...previous, card.id])}
+                            disabled={matched || (!selected && selectedCards.length >= 2)}
+                            onClick={() => {
+                              markStudyActivity('matching')
+                              handleMatchCardSelect(card.id)
+                            }}
                           >
                             <small>{card.kind === 'code' ? 'Penal code' : 'Definition'}</small>
                             <strong>{card.text}</strong>
@@ -6607,16 +9867,36 @@ function App() {
               </>
             ) : null}
 
-            {gamesMode === 'speed' ? (
+            {isGamesSpeedPage ? (
               <>
             <h2>Speed Test</h2>
             {!speedRunning && !speedDone ? (
               <div className="games-mode-layout">
                 <div className="card leaderboard-card game-leader-panel">
                   {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
-                  <div className="leaderboard-card-head">
-                    <h3>Speed Test Leaderboard</h3>
-                    <p className="leaderboard-card-subtitle">Top scores for the selected mode</p>
+                  <div className="leaderboard-card-head leaderboard-card-head-split">
+                    <div>
+                      <h3>Speed Test Leaderboard</h3>
+                      <p className="leaderboard-card-subtitle">
+                        {gameModeLeaderboardsScope === 'weekly'
+                          ? 'Top weekly scores for the selected mode'
+                          : 'Top all-time scores for the selected mode'}
+                      </p>
+                    </div>
+                    <div className="segmented compact-segmented game-mode-scope-switch">
+                      <button
+                        className={gameModeLeaderboardsScope === 'weekly' ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setGameModeLeaderboardsScope('weekly')}
+                      >
+                        Weekly
+                      </button>
+                      <button
+                        className={gameModeLeaderboardsScope === 'alltime' ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setGameModeLeaderboardsScope('alltime')}
+                      >
+                        All Time
+                      </button>
+                    </div>
                   </div>
                   <div className="game-leaderboard-filters">
                     <div className="game-filter-group">
@@ -6648,10 +9928,14 @@ function App() {
                       </div>
                     </div>
                   </div>
-                  {speedLeaderboard.length === 0 ? (
-                    <p className="muted">No speed test scores submitted yet.</p>
+                  {speedModeLeaderboard.length === 0 ? (
+                    <p className="muted">
+                      {gameModeLeaderboardsScope === 'weekly'
+                        ? 'No weekly speed test scores submitted yet.'
+                        : 'No all-time speed test scores submitted yet.'}
+                    </p>
                   ) : (
-                    speedLeaderboard.map((entry, index) => (
+                    speedModeLeaderboard.map((entry, index) => (
                       <button
                         key={`speed-${entry.id}`}
                         type="button"
@@ -6665,7 +9949,7 @@ function App() {
                         <span className="leader-player">
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className="leader-avatar-frame">
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
                               <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                             </span>
                           </span>
@@ -6729,6 +10013,7 @@ function App() {
                             key={`speed-choice-${speedCurrentQuestion.id}-${index}`}
                             className="choice"
                             onClick={() => answerSpeedQuestion(index)}
+                            disabled={speedAnswerLocked}
                           >
                             <span className="choice-key">{index + 1}</span>
                             {choice}
@@ -6765,13 +10050,14 @@ function App() {
               </>
             ) : null}
 
-            {gamesMode === 'duel' ? (
+            {isGamesDuelPage ? (
               <OneVsOnePanel
                 currentUserId={currentUserId}
                 currentUsername={profile?.username || currentUserEmail || 'You'}
                 isOwner={isOwner}
                 externalJoinRoomId={duelInviteJoinRoomId}
                 onExternalJoinHandled={() => setDuelInviteJoinRoomId(null)}
+                onStudyActivity={() => markStudyActivity('duel')}
               />
             ) : null}
           </section>
@@ -6878,7 +10164,7 @@ function App() {
                 </span>
                 <h3>Study Stats</h3>
               </div>
-              <p className="muted">Track your progress across study, games, and scenarios.</p>
+              <p className="muted">Track your progress across study, games, and scenarios with detailed coaching analytics.</p>
               <div className="stats-grid">
                 <article className="stats-item">
                   <p className="stats-icon" aria-hidden>
@@ -6922,6 +10208,34 @@ function App() {
                   <p className="stats-label">Best Quiz Streak</p>
                   <p className="stats-value">{bestStreak}</p>
                 </article>
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="overview" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Overall Accuracy</p>
+                  <p className="stats-value">{statsAnalytics.overallAccuracyPercent}%</p>
+                </article>
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="studyset" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Codes Tracked</p>
+                  <p className="stats-value">{statsAnalytics.totalTrackedCodes}</p>
+                </article>
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="game" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Total Answers</p>
+                  <p className="stats-value">{statsAnalytics.totalAttempts}</p>
+                </article>
+                <article className="stats-item">
+                  <p className="stats-icon" aria-hidden>
+                    <StatsIcon name="words" className="stats-icon-svg" />
+                  </p>
+                  <p className="stats-label">Unattempted Codes</p>
+                  <p className="stats-value">{statsAnalytics.unattemptedCodes}</p>
+                </article>
               </div>
               <div className="stats-highlight-row">
                 <article className="stats-highlight">
@@ -6945,6 +10259,143 @@ function App() {
                   </p>
                 </article>
               </div>
+              <div className="stats-analytics-grid">
+                <article className="card compact stats-chart-card">
+                  <div className="stats-chart-head">
+                    <h4>Recent Score Trend</h4>
+                    <p className="stats-focus-meta">Latest session scores across all study and game modes</p>
+                  </div>
+                  <InteractiveTrendChart
+                    chartId="stats-recent-accuracy"
+                    values={compressTrendPoints(statsAnalytics.recentScoreTrend, 72)}
+                    ariaLabel="Recent score trend"
+                    pointLabel="Attempt"
+                    valueSuffix=" pts"
+                    className="stats-trend-chart"
+                    emptyMessage="Complete more sessions to unlock trend analytics."
+                  />
+                </article>
+
+                <article className="card compact stats-chart-card">
+                  <div className="stats-chart-head">
+                    <h4>Accuracy by Code Set</h4>
+                    <p className="stats-focus-meta">Shows where you should focus next</p>
+                  </div>
+                  <div className="stats-bar-list">
+                    {statsAnalytics.codeSetBreakdown.map((item) => (
+                      <div
+                        key={`stats-codeset-${item.codeSet}`}
+                        className="stats-bar-row"
+                        title={`${codeSetLabel[item.codeSet]}: ${item.accuracyPercent}% accuracy • ${item.attempts} attempts • ${item.trackedCodes} codes`}
+                      >
+                        <div className="stats-bar-meta">
+                          <strong>{codeSetLabel[item.codeSet]}</strong>
+                          <small>{item.accuracyPercent}% • {item.attempts} attempts • {item.trackedCodes} codes</small>
+                        </div>
+                        <div className="stats-bar-track">
+                          <div className="stats-bar-fill" style={{ width: `${Math.max(4, item.accuracyPercent)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="stats-focus-meta">
+                    {statsAnalytics.weakestCategory
+                      ? `Needs attention: ${codeSetLabel[statsAnalytics.weakestCategory.codeSet]} (${statsAnalytics.weakestCategory.accuracyPercent}% average).`
+                      : 'No category data yet.'}
+                  </p>
+                </article>
+
+                <article className="card compact stats-chart-card">
+                  <div className="stats-chart-head">
+                    <h4>Mastery Progress</h4>
+                    <p className="stats-focus-meta">Distribution of your current code mastery levels</p>
+                  </div>
+                  <div className="stats-bar-list">
+                    {(['Needs Work', 'Getting There', 'On Track', 'Almost Mastered', 'Mastered'] as Array<Exclude<MasteryStatus, ''>>).map((status) => {
+                      const count = statsAnalytics.masteryCounts[status]
+                      const width = statsAnalytics.totalTrackedCodes > 0 ? Math.max(4, Math.round((count / statsAnalytics.totalTrackedCodes) * 100)) : 0
+                      return (
+                        <div
+                          key={`stats-mastery-${status}`}
+                          className="stats-bar-row"
+                          title={`${status}: ${count} code${count === 1 ? '' : 's'} (${statsAnalytics.totalTrackedCodes > 0 ? Math.round((count / statsAnalytics.totalTrackedCodes) * 100) : 0}%)`}
+                        >
+                          <div className="stats-bar-meta">
+                            <strong>{status}</strong>
+                            <small>{count} code{count === 1 ? '' : 's'}</small>
+                          </div>
+                          <div className="stats-bar-track">
+                            <div className={`stats-bar-fill stats-bar-fill-${status.toLowerCase().replace(/\s+/g, '-')}`} style={{ width: `${width}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </article>
+
+                <article className="card compact stats-chart-card">
+                  <div className="stats-chart-head">
+                    <h4>Mode Performance</h4>
+                    <p className="stats-focus-meta">Average and best score by mode</p>
+                  </div>
+                  <div className="stats-mode-grid">
+                    {statsAnalytics.modePerformance.map((mode) => (
+                      <div key={`stats-mode-${mode.mode}`} className="stats-mode-item">
+                        <p className="stats-mode-title">{sessionModeLabel(mode.mode)}</p>
+                        <p className="stats-mode-metric">
+                          <strong>{mode.averageScore} pts</strong> avg • {mode.bestScore} pts best
+                        </p>
+                        <p className="stats-mode-meta">
+                          {mode.runs} runs • {mode.scoreDelta >= 0 ? '+' : ''}{mode.scoreDelta} pts trend
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </div>
+
+              <div className="stats-code-list-grid">
+                <article className="card compact stats-focus-card">
+                  <h4>Needs Work First</h4>
+                  <p className="stats-focus-meta">Lowest-accuracy codes the algorithm recommends reviewing now.</p>
+                  <div className="stats-code-list">
+                    {statsAnalytics.needsWorkCodes.length === 0 ? (
+                      <p className="muted">No weak codes identified yet.</p>
+                    ) : (
+                      statsAnalytics.needsWorkCodes.map((item) => (
+                        <article key={`stats-needs-${item.section.id}`} className="stats-code-item">
+                          <div>
+                            <p className="stats-code-title">{item.section.sectionNumber} • {item.section.title}</p>
+                            <p className="stats-code-meta">{codeSetLabel[item.section.codeSet]} • {item.attempts} attempts</p>
+                          </div>
+                          <span className="badge badge-work">{item.accuracyPercent}%</span>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </article>
+
+                <article className="card compact stats-focus-card">
+                  <h4>Strongest Codes</h4>
+                  <p className="stats-focus-meta">Codes you currently know best, based on accuracy and attempts.</p>
+                  <div className="stats-code-list">
+                    {statsAnalytics.strongestCodes.length === 0 ? (
+                      <p className="muted">No strong-code data yet.</p>
+                    ) : (
+                      statsAnalytics.strongestCodes.map((item) => (
+                        <article key={`stats-strong-${item.section.id}`} className="stats-code-item">
+                          <div>
+                            <p className="stats-code-title">{item.section.sectionNumber} • {item.section.title}</p>
+                            <p className="stats-code-meta">{codeSetLabel[item.section.codeSet]} • {item.attempts} attempts</p>
+                          </div>
+                          <span className="badge badge-mastered">{item.accuracyPercent}%</span>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </article>
+              </div>
+
               <div className="card compact stats-focus-card">
                 <h4>Assisted Learning Insights</h4>
                 <p className="muted">
@@ -6997,6 +10448,7 @@ function App() {
                 <p className="stats-focus-meta">
                   Current top focus: {algorithmInsights.topFocusCodes.length > 0 ? algorithmInsights.topFocusCodes.join(', ') : 'No current weak-code targets'}
                 </p>
+                <p className="stats-focus-meta">{statsAnalytics.recommendation}</p>
               </div>
             </div>
           </section>
@@ -7562,7 +11014,7 @@ function App() {
                                 <button className="primary" type="button" onClick={() => void saveEditedAgencyOption()} disabled={agencySaving}>
                                   Save
                                 </button>
-                                <button className="secondary" type="button" onClick={cancelEditAgencyOption} disabled={agencySaving}>
+                                <button className="secondary cancel-button" type="button" onClick={cancelEditAgencyOption} disabled={agencySaving}>
                                   Cancel
                                 </button>
                               </>
@@ -7706,6 +11158,108 @@ function App() {
         )}
       </main>
 
+      {homeLeaderboardSettingsOpen ? (
+        <div className="profile-modal-overlay home-leaderboard-settings-overlay" onClick={closeHomeLeaderboardSettings}>
+          <div className="card home-leaderboard-settings-modal home-leaderboard-settings-modal-modern" onClick={(event) => event.stopPropagation()}>
+            <div className="home-leaderboard-settings-topbar">
+              <div className="home-leaderboard-settings-head">
+                <h3>Customize Home Leaderboards</h3>
+                <small>Live preview is active. Save to make it persistent.</small>
+              </div>
+              <button className="secondary" onClick={closeHomeLeaderboardSettings} disabled={homeLeaderboardSettingsSaving}>
+                Cancel
+              </button>
+            </div>
+
+            <div className="home-leaderboard-mode-row">
+              <div className="home-leaderboard-mode-card">
+                <p className="home-leaderboard-mode-title">1v1 Most Wins Source</p>
+                <div className="mini-chip-row">
+                  {duelLeaderboardModeOrder.map((mode) => (
+                    <button
+                      key={`home-duel-wins-mode-${mode}`}
+                      className={homeLeaderboardSettingsDraft.duelWinsMode === mode ? 'chip chip-active' : 'chip'}
+                      onClick={() => setHomeLeaderboardDraftMode('duelWinsMode', mode)}
+                    >
+                      {duelLeaderboardModeLabel[mode]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="home-leaderboard-mode-card">
+                <p className="home-leaderboard-mode-title">1v1 Streak Source</p>
+                <div className="mini-chip-row">
+                  {duelLeaderboardModeOrder.map((mode) => (
+                    <button
+                      key={`home-duel-streak-mode-${mode}`}
+                      className={homeLeaderboardSettingsDraft.duelStreakMode === mode ? 'chip chip-active' : 'chip'}
+                      onClick={() => setHomeLeaderboardDraftMode('duelStreakMode', mode)}
+                    >
+                      {duelLeaderboardModeLabel[mode]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="home-leaderboard-live-row">
+              <p className="muted home-leaderboard-selection-note">
+                {homeLeaderboardSettingsDraft.visibleCards.length === 0
+                  ? 'No boards selected for Home right now.'
+                  : `${homeLeaderboardSettingsDraft.visibleCards.length} board${homeLeaderboardSettingsDraft.visibleCards.length === 1 ? '' : 's'} selected.`}
+              </p>
+              <div className="actions-row home-leaderboard-settings-actions-inline">
+                <button className="secondary" onClick={selectAllHomeLeaderboardCards} disabled={homeLeaderboardSettingsSaving}>Select All</button>
+                <button className="secondary" onClick={clearAllHomeLeaderboardCards} disabled={homeLeaderboardSettingsSaving}>Select None</button>
+                <button className="secondary" onClick={resetHomeLeaderboardDraftDefaults} disabled={homeLeaderboardSettingsSaving}>Reset Default</button>
+              </div>
+            </div>
+
+            <div className="home-leaderboard-live-preview">
+              {homeVisibleLeaderboardCards.length === 0 ? (
+                <span className="home-leaderboard-preview-pill home-leaderboard-preview-empty">No cards visible</span>
+              ) : (
+                homeVisibleLeaderboardCards.map((card) => (
+                  <span key={`home-preview-${card}`} className="home-leaderboard-preview-pill">
+                    {homeLeaderboardCardLabel[card]}
+                  </span>
+                ))
+              )}
+            </div>
+
+            <div className="home-leaderboard-settings-grid home-leaderboard-settings-grid-modern">
+              {homeLeaderboardCardOrder.map((card) => {
+                const selected = homeLeaderboardSettingsDraft.visibleCards.includes(card)
+                return (
+                  <button
+                    key={`home-leaderboard-card-${card}`}
+                    className={selected ? 'home-leaderboard-toggle home-leaderboard-toggle-active' : 'home-leaderboard-toggle'}
+                    onClick={() => toggleHomeLeaderboardDraftCard(card)}
+                  >
+                    <span className="home-leaderboard-toggle-top">
+                      <span className="home-leaderboard-toggle-title-wrap">
+                        <AppIcon name={homeLeaderboardCardIcon[card]} className="home-leaderboard-toggle-icon" />
+                        <span>{homeLeaderboardCardLabel[card]}</span>
+                      </span>
+                      <span className={selected ? 'home-leaderboard-toggle-state shown' : 'home-leaderboard-toggle-state hidden'}>
+                        {selected ? 'Shown' : 'Hidden'}
+                      </span>
+                    </span>
+                    <small>{homeLeaderboardCardDescription[card]}</small>
+                  </button>
+                )
+              })}
+            </div>
+            {homeLeaderboardSettingsError ? <p className="bad">{homeLeaderboardSettingsError}</p> : null}
+            <div className="actions-row home-leaderboard-settings-actions">
+              <button className="primary" onClick={() => void saveHomeLeaderboardSettings()} disabled={homeLeaderboardSettingsSaving}>
+                {homeLeaderboardSettingsSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showResetConfirmModal ? (
         <div
           className="profile-modal-overlay"
@@ -7731,7 +11285,7 @@ function App() {
             />
             <div className="actions-row">
               <button
-                className="secondary"
+                className="secondary cancel-button"
                 onClick={() => {
                   if (authLoading) return
                   setShowResetConfirmModal(false)
@@ -7838,7 +11392,7 @@ function App() {
             <div className="leader-player">
               <span className="leader-avatar-wrap">
                 {selectedLeaderboardIsTop ? <span className="leader-crown leader-crown-modal" aria-label="Top Player">👑</span> : null}
-                <span className="leader-avatar-frame modal-avatar">
+                <span className={leaderAvatarFrameClass(selectedLeaderboardEntry.userId, 'modal-avatar')}>
                   <img src={avatarFor(selectedLeaderboardEntry.avatarUrl)} alt={selectedLeaderboardEntry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
                 </span>
               </span>
@@ -7957,115 +11511,8 @@ function App() {
               </label>
             </div>
             <div className="actions-row">
-              <button className="secondary" onClick={cancelAvatarCrop}>Cancel</button>
+              <button className="secondary cancel-button" onClick={cancelAvatarCrop}>Cancel</button>
               <button className="primary" onClick={applyAvatarCrop}>Use This Crop</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showStudyFlashSetupModal ? (
-        <div className="profile-modal-overlay study-setup-overlay" onClick={() => setShowStudyFlashSetupModal(false)}>
-          <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
-            <h3>Flashcards Setup</h3>
-            <label className="game-control">
-              Subject
-              <div className="segmented">
-                {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                  <button
-                    key={`study-flash-filter-${filter}`}
-                    className={studyFlashFilter === filter ? 'seg active' : 'seg'}
-                    onClick={() => setStudyFlashFilter(filter)}
-                  >
-                    {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <p className="muted">{studyFlashSelectionCount} cards available</p>
-            <div className="actions-row">
-              <button className="secondary" onClick={() => setShowStudyFlashSetupModal(false)}>Cancel</button>
-              <button className="primary" onClick={beginStudyFlashcards} disabled={studyFlashSelectionCount === 0}>Start Flashcards</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showStudyTestSetupModal ? (
-        <div className="profile-modal-overlay study-setup-overlay" onClick={() => setShowStudyTestSetupModal(false)}>
-          <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
-            <h3>Test Setup</h3>
-            <label className="game-control">
-              Subject
-              <div className="segmented">
-                {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                  <button
-                    key={`study-test-filter-${filter}`}
-                    className={studyTestFilter === filter ? 'seg active' : 'seg'}
-                    onClick={() => setStudyTestFilter(filter)}
-                  >
-                    {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <label className="game-control">
-              Focus Level
-              <div className="segmented">
-                {(
-                  [
-                    { value: 'balanced', label: 'Balanced' },
-                    { value: 'needs_work', label: 'Needs Work' },
-                    { value: 'most_needs_work', label: 'Most Wrong' },
-                  ] as Array<{ value: StudyWrongness; label: string }>
-                ).map((option) => (
-                  <button
-                    key={`study-test-wrongness-${option.value}`}
-                    className={studyTestWrongness === option.value ? 'seg active' : 'seg'}
-                    onClick={() => setStudyTestWrongness(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <label className="game-control">
-              Answer Type
-              <div className="segmented">
-                {(
-                  [
-                    { value: 'multiple', label: 'Multiple Choice' },
-                    { value: 'truefalse', label: 'True / False' },
-                  ] as Array<{ value: StudyAnswerMode; label: string }>
-                ).map((option) => (
-                  <button
-                    key={`study-test-answer-mode-${option.value}`}
-                    className={studyTestAnswerMode === option.value ? 'seg active' : 'seg'}
-                    onClick={() => setStudyTestAnswerMode(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <label className="game-control">
-              Question Count
-              <div className="segmented">
-                {[20, 30, 50, 100].map((size) => (
-                  <button
-                    key={`study-test-count-${size}`}
-                    className={studyTestQuestionCount === size ? 'seg active' : 'seg'}
-                    onClick={() => setStudyTestQuestionCount(size)}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <p className="muted">{studyTestSelectionCount} source questions available</p>
-            <div className="actions-row">
-              <button className="secondary" onClick={() => setShowStudyTestSetupModal(false)}>Cancel</button>
-              <button className="primary" onClick={beginStudyTest} disabled={studyTestSelectionCount === 0}>Start Test</button>
             </div>
           </div>
         </div>
@@ -8096,7 +11543,7 @@ function App() {
               </div>
             </label>
             <div className="actions-row">
-              <button className="secondary" onClick={() => setShowMatchSetupModal(false)}>Cancel</button>
+              <button className="secondary cancel-button" onClick={() => setShowMatchSetupModal(false)}>Cancel</button>
               <button className="primary" onClick={beginMatchingFromSetup}>Start</button>
             </div>
           </div>
@@ -8128,54 +11575,47 @@ function App() {
               </div>
             </label>
             <div className="actions-row">
-              <button className="secondary" onClick={() => setShowSpeedSetupModal(false)}>Cancel</button>
+              <button className="secondary cancel-button" onClick={() => setShowSpeedSetupModal(false)}>Cancel</button>
               <button className="primary" onClick={beginSpeedFromSetup} disabled={speedQuestionBank.length === 0}>Start</button>
             </div>
           </div>
         </div>
       ) : null}
-
-      <nav className="tab-bar">
-        {[
-          { key: 'study', label: 'Study' },
-          { key: 'games', label: 'Games' },
-          { key: 'home', label: 'Home' },
-          { key: 'scenarios', label: 'Scenarios' },
-          { key: 'library', label: 'Library' },
-          { key: 'chat', label: 'Chat', isChat: true },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            className={`tab ${tab.key === 'home' ? isHomePage : !isHomePage && activeTab === tab.key ? 'active' : ''} ${tab.isChat ? 'tab-chat' : ''}`}
-            onClick={() => {
-              if (tab.isChat) {
-                // Trigger chat open - dispatch custom event
-                window.dispatchEvent(new CustomEvent('openGlobalChat'))
-              } else {
-                setActiveTab(tab.key as AppTab)
-                const pathByTab: Record<AppTab, string> = {
-                  home: '/home',
-                  study: '/study',
-                  games: '/games',
-                  scenarios: '/scenarios',
-                  library: '/library',
-                }
-                navigate(pathByTab[tab.key as AppTab])
-              }
-            }}
-          >
-            <AppIcon
-              name={tab.isChat ? 'chat' : tab.key === 'home' ? 'home' : tab.key === 'study' ? 'study' : tab.key === 'games' ? 'games' : tab.key === 'scenarios' ? 'scenarios' : 'library'}
-              className="tab-icon"
-            />
-            <span className="tab-label">{tab.label}</span>
+          </div>
+        </div>
+        <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+          <button className={isStudyPage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'} onClick={() => navigateToTab('study')}>
+            <AppIcon name="study" className="mobile-bottom-icon" />
+            <span>Study</span>
           </button>
-        ))}
-      </nav>
+          <button className={isGamesPage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'} onClick={() => navigateToTab('games')}>
+            <AppIcon name="games" className="mobile-bottom-icon" />
+            <span>Games</span>
+          </button>
+          <button className={isHomePage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'} onClick={() => navigateToTab('home')}>
+            <AppIcon name="home" className="mobile-bottom-icon" />
+            <span>Home</span>
+          </button>
+          <button className={isScenariosPage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'} onClick={() => navigateToTab('scenarios')}>
+            <AppIcon name="scenarios" className="mobile-bottom-icon" />
+            <span>Scenarios</span>
+          </button>
+          <button className={isLibraryPage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'} onClick={() => navigateToTab('library')}>
+            <AppIcon name="library" className="mobile-bottom-icon" />
+            <span>Library</span>
+          </button>
+          <button
+            className={isProfilePage || isStatsPage || isSupportPage || isLeaderboardsPage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'}
+            onClick={() => navigate('/profile')}
+          >
+            <AppIcon name="settings" className="mobile-bottom-icon" />
+            <span>More</span>
+          </button>
+        </nav>
         </>
       ) : null}
 
-      {authReady && currentUserId ? (
+      {authReady && currentUserId && !isChatPage ? (
         <GlobalChatWidget
           currentUserId={currentUserId}
           currentUsername={profileUsername}

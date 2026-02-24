@@ -43,6 +43,12 @@ Required vars:
   - Includes `leaderboard.match_duration` and `leaderboard.match_filter` for categorized matching leaderboards.
 - `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260215_owner_roles_and_content_items.sql`
   - Adds `user_roles` + `content_items` + owner-only RLS for content editing.
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260222_public_chat_retention_cleanup.sql`
+  - Adds hourly server-side cleanup for `public_messages` rows older than 48 hours.
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_account_moderation.sql`
+  - Adds owner ban/delete account tools, removes banned users from leaderboards, and blocks banned users from writing progress/scores.
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_account_moderation_rpc_hotfix.sql`
+  - Adds a stable owner moderation RPC (`owner_moderate_account_json`) and refreshes PostgREST schema cache.
 
 4. Run app:
 
@@ -231,3 +237,41 @@ pm2 startup
 Useful commands:
 - `npm run pm2:webhook:restart`
 - `npm run pm2:webhook:logs`
+
+## Owner moderation RPC troubleshooting
+
+If the owner sees `Owner moderation RPC is missing in Supabase`, run:
+
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_moderation_public_rpc_repair.sql`
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_moderation_minimal_last_resort.sql`
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_moderation_rpc_v2.sql`
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_account_moderation_rpc_hotfix.sql`
+- If that still fails, run:
+  - `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_moderation_emergency_single_rpc.sql`
+
+Then hard refresh the app.
+
+## Public chat 48-hour retention
+
+Run this migration in Supabase SQL editor:
+
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260222_public_chat_retention_cleanup.sql`
+
+What it does:
+
+- Creates `public.cleanup_public_messages_48h()` as a `security definer` function.
+- Schedules hourly cron job `public_chat_cleanup_48h_hourly` with `pg_cron`.
+- Deletes rows from `public.public_messages` where `created_at < now() - interval '48 hours'`.
+- Keeps cleanup server-side (no client cleanup code required).
+
+Verify job + behavior:
+
+```sql
+select jobid, jobname, schedule, command
+from cron.job
+where jobname = 'public_chat_cleanup_48h_hourly';
+```
+
+```sql
+select public.cleanup_public_messages_48h();
+```

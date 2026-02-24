@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 type OwnerState = {
@@ -40,7 +40,7 @@ export function useOwner(userId: string | null): OwnerState {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!supabase || !userId) {
       setIsOwner(false)
       setLoading(false)
@@ -76,17 +76,11 @@ export function useOwner(userId: string | null): OwnerState {
     setIsOwner(value)
     writeCachedOwner(userId, value)
     setLoading(false)
-  }
+  }, [userId])
 
   useEffect(() => {
-    if (!userId) {
-      setIsOwner(false)
-      setLoading(false)
-      setError('')
-      return
-    }
     void refresh()
-  }, [userId])
+  }, [refresh])
 
   return { isOwner, loading, error, refresh }
 }
