@@ -2709,6 +2709,7 @@ function App() {
   const [showDevNotice, setShowDevNotice] = useState(false)
   const [reduceVisualEffects, setReduceVisualEffects] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [mobileNavMenuOpen, setMobileNavMenuOpen] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const streakLossNoticeRef = useRef('')
 
@@ -6401,6 +6402,11 @@ function App() {
   }, [isHomePage])
 
   useEffect(() => {
+    if (!mobileNavMenuOpen) return
+    setMobileNavMenuOpen(false)
+  }, [currentPath, mobileNavMenuOpen])
+
+  useEffect(() => {
     if (!leaderboardSelectedBoard) return
     if (
       leaderboardViewDuration === leaderboardSelectedBoard.duration &&
@@ -6588,27 +6594,31 @@ function App() {
     sections,
     stateHydrated,
   ])
-  const navigateToTab = (tab: AppTab) => {
-    const pathByTab: Record<AppTab, string> = {
-      home: '/home',
-      study: '/study',
-      games: '/games',
-      scenarios: '/scenarios',
-      library: '/library',
-      leaderboards: '/leaderboards',
-      chat: '/chat',
-    }
-    goToPath(pathByTab[tab], { tab })
-    if (tab === 'chat') {
-      const requestScrollToLatest = () => {
-        window.dispatchEvent(new Event('scrollGlobalChatToBottom'))
+  const navigateToTab = useCallback(
+    (tab: AppTab) => {
+      setMobileNavMenuOpen(false)
+      const pathByTab: Record<AppTab, string> = {
+        home: '/home',
+        study: '/study',
+        games: '/games',
+        scenarios: '/scenarios',
+        library: '/library',
+        leaderboards: '/leaderboards',
+        chat: '/chat',
       }
-      requestScrollToLatest()
-      window.requestAnimationFrame(requestScrollToLatest)
-      window.setTimeout(requestScrollToLatest, 120)
-      window.setTimeout(requestScrollToLatest, 320)
-    }
-  }
+      goToPath(pathByTab[tab], { tab })
+      if (tab === 'chat') {
+        const requestScrollToLatest = () => {
+          window.dispatchEvent(new Event('scrollGlobalChatToBottom'))
+        }
+        requestScrollToLatest()
+        window.requestAnimationFrame(requestScrollToLatest)
+        window.setTimeout(requestScrollToLatest, 120)
+        window.setTimeout(requestScrollToLatest, 320)
+      }
+    },
+    [goToPath],
+  )
   const openStudyFlashcardsPage = useCallback(() => {
     goToPath('/study/flashcards', { tab: 'study' })
   }, [goToPath])
@@ -6616,6 +6626,150 @@ function App() {
   const openStudyTestPage = useCallback(() => {
     goToPath('/study/test', { tab: 'study' })
   }, [goToPath])
+  const mobileQuickLinks = useMemo(
+    () =>
+      [
+        {
+          key: 'leaderboards',
+          label: 'Leaderboards',
+          icon: 'leaderboards' as AppIconName,
+          active: isLeaderboardsPage,
+          onClick: () => navigateToTab('leaderboards'),
+        },
+        {
+          key: 'stats',
+          label: 'Stats',
+          icon: 'stats' as AppIconName,
+          active: isStatsPage,
+          onClick: () => {
+            setMobileNavMenuOpen(false)
+            goToPath('/stats')
+          },
+        },
+        {
+          key: 'chat',
+          label: 'Chat',
+          icon: 'chat' as AppIconName,
+          active: isChatPage,
+          onClick: () => navigateToTab('chat'),
+        },
+        {
+          key: 'profile',
+          label: 'Settings',
+          icon: 'settings' as AppIconName,
+          active: isProfilePage,
+          onClick: () => {
+            setMobileNavMenuOpen(false)
+            goToPath('/profile')
+          },
+        },
+        {
+          key: 'support',
+          label: 'Support',
+          icon: 'support' as AppIconName,
+          active: isSupportPage,
+          onClick: () => {
+            setMobileNavMenuOpen(false)
+            goToPath('/support')
+          },
+        },
+      ].concat(
+        isStudyPage
+          ? [
+              {
+                key: 'study-hub',
+                label: 'Study Hub',
+                icon: 'study' as AppIconName,
+                active: isStudyHubPage,
+                onClick: () => navigateToTab('study'),
+              },
+              {
+                key: 'study-flashcards',
+                label: 'Flashcards',
+                icon: 'flashcards' as AppIconName,
+                active: isStudyFlashcardsPage,
+                onClick: () => {
+                  setMobileNavMenuOpen(false)
+                  openStudyFlashcardsPage()
+                },
+              },
+              {
+                key: 'study-test',
+                label: 'Test',
+                icon: 'test' as AppIconName,
+                active: isStudyTestPage,
+                onClick: () => {
+                  setMobileNavMenuOpen(false)
+                  openStudyTestPage()
+                },
+              },
+            ]
+          : [],
+      )
+      .concat(
+        isGamesPage
+          ? [
+              {
+                key: 'games-hub',
+                label: 'Games Hub',
+                icon: 'games' as AppIconName,
+                active: isGamesHubPage,
+                onClick: () => navigateToTab('games'),
+              },
+              {
+                key: 'games-speed',
+                label: 'Speed Test',
+                icon: 'speed' as AppIconName,
+                active: isGamesSpeedPage,
+                onClick: () => {
+                  setMobileNavMenuOpen(false)
+                  goToPath('/games/speed', { tab: 'games' })
+                },
+              },
+              {
+                key: 'games-matching',
+                label: 'Matching',
+                icon: 'games' as AppIconName,
+                active: isGamesMatchingPage,
+                onClick: () => {
+                  setMobileNavMenuOpen(false)
+                  goToPath('/games/matching', { tab: 'games' })
+                },
+              },
+              {
+                key: 'games-duel',
+                label: '1v1',
+                icon: 'duel' as AppIconName,
+                active: isGamesDuelPage,
+                onClick: () => {
+                  setMobileNavMenuOpen(false)
+                  goToPath('/games/duel', { tab: 'games' })
+                },
+              },
+            ]
+          : [],
+      ),
+    [
+      goToPath,
+      isChatPage,
+      isGamesDuelPage,
+      isGamesHubPage,
+      isGamesMatchingPage,
+      isGamesPage,
+      isGamesSpeedPage,
+      isLeaderboardsPage,
+      isProfilePage,
+      isStatsPage,
+      isStudyFlashcardsPage,
+      isStudyHubPage,
+      isStudyPage,
+      isStudyTestPage,
+      isSupportPage,
+      navigateToTab,
+      openStudyFlashcardsPage,
+      openStudyTestPage,
+    ],
+  )
   const selectedLeaderboardTheme = selectedLeaderboardEntry
     ? getThemePreset(selectedLeaderboardEntry.themeId)
     : appThemePresets[0]
@@ -11583,6 +11737,18 @@ function App() {
       ) : null}
           </div>
         </div>
+        {mobileQuickLinks.length > 0 ? (
+          <div className="mobile-quick-strip" aria-label="Mobile quick shortcuts">
+            <div className="mobile-quick-strip-track">
+              {mobileQuickLinks.map((link) => (
+                <button key={link.key} className={link.active ? 'mobile-quick-chip active' : 'mobile-quick-chip'} onClick={link.onClick}>
+                  <AppIcon name={link.icon} className="mobile-bottom-icon" />
+                  <span>{link.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
           <button className={isStudyPage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'} onClick={() => navigateToTab('study')}>
             <AppIcon name="study" className="mobile-bottom-icon" />
@@ -11600,18 +11766,96 @@ function App() {
             <AppIcon name="scenarios" className="mobile-bottom-icon" />
             <span>Scenarios</span>
           </button>
-          <button className={isLibraryPage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'} onClick={() => navigateToTab('library')}>
-            <AppIcon name="library" className="mobile-bottom-icon" />
-            <span>Library</span>
-          </button>
           <button
-            className={isProfilePage || isStatsPage || isSupportPage || isLeaderboardsPage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'}
-            onClick={() => navigate('/profile')}
+            className={
+              mobileNavMenuOpen ||
+              isLibraryPage ||
+              isProfilePage ||
+              isStatsPage ||
+              isSupportPage ||
+              isLeaderboardsPage ||
+              isChatPage
+                ? 'mobile-bottom-tab active'
+                : 'mobile-bottom-tab'
+            }
+            onClick={() => setMobileNavMenuOpen((value) => !value)}
           >
             <AppIcon name="settings" className="mobile-bottom-icon" />
-            <span>More</span>
+            <span>Menu</span>
           </button>
         </nav>
+        {mobileNavMenuOpen ? (
+          <div className="mobile-nav-backdrop" onClick={() => setMobileNavMenuOpen(false)}>
+            <div className="mobile-nav-sheet card" onClick={(event) => event.stopPropagation()}>
+              <div className="mobile-nav-sheet-head">
+                <h3>Quick Access</h3>
+                <button className="secondary" onClick={() => setMobileNavMenuOpen(false)}>Close</button>
+              </div>
+              <div className="mobile-nav-grid">
+                <button className={isLibraryPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => navigateToTab('library')}>
+                  <AppIcon name="library" className="mobile-bottom-icon" />
+                  <span>Library</span>
+                </button>
+                <button className={isLeaderboardsPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => navigateToTab('leaderboards')}>
+                  <AppIcon name="leaderboards" className="mobile-bottom-icon" />
+                  <span>Leaderboards</span>
+                </button>
+                <button className={isStatsPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); goToPath('/stats') }}>
+                  <AppIcon name="stats" className="mobile-bottom-icon" />
+                  <span>Stats</span>
+                </button>
+                <button className={isChatPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => navigateToTab('chat')}>
+                  <AppIcon name="chat" className="mobile-bottom-icon" />
+                  <span>Chat</span>
+                </button>
+                <button className={isProfilePage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); goToPath('/profile') }}>
+                  <AppIcon name="settings" className="mobile-bottom-icon" />
+                  <span>Settings</span>
+                </button>
+                <button className={isSupportPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); goToPath('/support') }}>
+                  <AppIcon name="support" className="mobile-bottom-icon" />
+                  <span>Support</span>
+                </button>
+              </div>
+
+              <p className="mobile-nav-group-label">Study</p>
+              <div className="mobile-nav-grid mobile-nav-grid-sub">
+                <button className={isStudyHubPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => navigateToTab('study')}>
+                  <AppIcon name="study" className="mobile-bottom-icon" />
+                  <span>Study Hub</span>
+                </button>
+                <button className={isStudyFlashcardsPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); openStudyFlashcardsPage() }}>
+                  <AppIcon name="flashcards" className="mobile-bottom-icon" />
+                  <span>Flashcards</span>
+                </button>
+                <button className={isStudyTestPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); openStudyTestPage() }}>
+                  <AppIcon name="test" className="mobile-bottom-icon" />
+                  <span>Test</span>
+                </button>
+              </div>
+
+              <p className="mobile-nav-group-label">Games</p>
+              <div className="mobile-nav-grid mobile-nav-grid-sub">
+                <button className={isGamesHubPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => navigateToTab('games')}>
+                  <AppIcon name="games" className="mobile-bottom-icon" />
+                  <span>Games Hub</span>
+                </button>
+                <button className={isGamesSpeedPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); goToPath('/games/speed', { tab: 'games' }) }}>
+                  <AppIcon name="speed" className="mobile-bottom-icon" />
+                  <span>Speed Test</span>
+                </button>
+                <button className={isGamesMatchingPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); goToPath('/games/matching', { tab: 'games' }) }}>
+                  <AppIcon name="games" className="mobile-bottom-icon" />
+                  <span>Matching</span>
+                </button>
+                <button className={isGamesDuelPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); goToPath('/games/duel', { tab: 'games' }) }}>
+                  <AppIcon name="duel" className="mobile-bottom-icon" />
+                  <span>1v1</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         </>
       ) : null}
 

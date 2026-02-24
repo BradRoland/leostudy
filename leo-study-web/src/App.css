@@ -237,6 +237,162 @@ body {
   height: 17px;
 }
 
+.mobile-quick-strip,
+.mobile-nav-backdrop {
+  display: none;
+}
+
+.mobile-quick-strip {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(74px + env(safe-area-inset-bottom));
+  z-index: 35;
+  pointer-events: none;
+}
+
+.mobile-quick-strip-track {
+  pointer-events: auto;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  background: color-mix(in srgb, var(--panel-strong) 84%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.mobile-quick-strip-track::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-quick-chip {
+  flex: 0 0 auto;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.mobile-quick-chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-strong));
+}
+
+.mobile-quick-chip.active {
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--border));
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+}
+
+.mobile-nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 42;
+  background: rgba(5, 9, 24, 0.52);
+  backdrop-filter: blur(8px);
+  align-items: flex-end;
+  justify-content: center;
+  padding: 10px 10px calc(88px + env(safe-area-inset-bottom));
+  animation: mobileNavBackdropIn 0.16s ease;
+}
+
+.mobile-nav-sheet {
+  width: min(680px, 100%);
+  max-height: min(78dvh, 620px);
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+  border-radius: 16px;
+  padding: 14px;
+  animation: mobileNavSheetIn 0.2s ease;
+}
+
+.mobile-nav-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mobile-nav-sheet-head h3 {
+  margin: 0;
+}
+
+.mobile-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobile-nav-grid-sub {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mobile-nav-action {
+  min-height: 52px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 8px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mobile-nav-action:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-strong));
+}
+
+.mobile-nav-action.active {
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--border));
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  color: var(--accent);
+}
+
+.mobile-nav-group-label {
+  margin: 0;
+  font-size: 0.73rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@keyframes mobileNavBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mobileNavSheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .app-page-header {
   min-height: 48px;
 }
@@ -7106,7 +7262,15 @@ button:disabled {
   }
 
   .workspace-main {
-    padding-bottom: calc(86px + env(safe-area-inset-bottom));
+    padding-bottom: calc(152px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-quick-strip {
+    display: block;
+  }
+
+  .mobile-nav-backdrop {
+    display: flex;
   }
 
   .mobile-bottom-nav {
@@ -7121,7 +7285,7 @@ button:disabled {
     backdrop-filter: blur(16px);
     padding: 6px;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 4px;
   }
 
@@ -7149,6 +7313,40 @@ button:disabled {
   .mobile-bottom-icon {
     width: 16px;
     height: 16px;
+  }
+
+  .mobile-quick-strip {
+    bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-quick-strip-track {
+    padding: 7px;
+    gap: 6px;
+  }
+
+  .mobile-quick-chip {
+    font-size: 0.69rem;
+    min-height: 32px;
+    padding: 0 10px;
+  }
+
+  .mobile-nav-sheet {
+    max-height: min(80dvh, 620px);
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .mobile-nav-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-nav-grid-sub {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-nav-action {
+    min-height: 50px;
+    font-size: 0.74rem;
   }
 
   .leaderboard-summary-metrics {
@@ -7548,6 +7746,36 @@ button:hover:not(:disabled):not(.study-session-flashcard) {
 .app-shell.ui-light-mode .mobile-bottom-tab:hover {
   border-color: color-mix(in srgb, var(--accent) 36%, var(--card-border)) !important;
   background: color-mix(in srgb, var(--accent) 14%, var(--panel)) !important;
+}
+
+.app-shell.ui-light-mode .mobile-quick-strip-track,
+.app-shell.ui-light-mode .mobile-bottom-nav {
+  background: color-mix(in srgb, var(--panel) 90%, #ffffff) !important;
+  border-color: color-mix(in srgb, var(--border) 84%, #d7deef) !important;
+}
+
+.app-shell.ui-light-mode .mobile-quick-chip,
+.app-shell.ui-light-mode .mobile-nav-action {
+  background: color-mix(in srgb, #ffffff 88%, var(--panel)) !important;
+  border-color: color-mix(in srgb, var(--border) 82%, #d7deef) !important;
+  color: var(--text) !important;
+}
+
+.app-shell.ui-light-mode .mobile-quick-chip:hover,
+.app-shell.ui-light-mode .mobile-nav-action:hover {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--card-border)) !important;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel)) !important;
+}
+
+.app-shell.ui-light-mode .mobile-quick-chip.active,
+.app-shell.ui-light-mode .mobile-nav-action.active {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--card-border)) !important;
+  background: color-mix(in srgb, var(--accent) 20%, var(--panel)) !important;
+  color: var(--accent) !important;
+}
+
+.app-shell.ui-light-mode .mobile-nav-backdrop {
+  background: rgba(11, 18, 45, 0.28) !important;
 }
 
 .app-shell.ui-light-mode .taskbar-nav-btn.active,
