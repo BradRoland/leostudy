@@ -11,12 +11,22 @@ type PublicMessage = {
   is_deleted: boolean
 }
 
+type PublicMessageReaction = {
+  id: string
+  message_id: string
+  user_id: string
+  emoji: string
+  created_at: string
+}
+
 type UserProfileStats = {
   user_id: string
   username: string
   avatarUrl: string
   agency: string
   bio: string
+  leaderboardFirstSpotsAllTime: number
+  leaderboardFirstSpotsWeekly: number
   // Study stats
   studySeconds: number
   studyDayStreak: number
@@ -33,6 +43,10 @@ type Props = {
   currentUsername: string
   userAgency?: string
   isOwner?: boolean
+  leaderboardFirstSpotCounts?: {
+    allTime: Record<string, number>
+    weekly: Record<string, number>
+  }
   mode?: 'widget' | 'full'
 }
 
@@ -40,7 +54,73 @@ const MAX_MESSAGES = 100
 const MESSAGE_MAX_LENGTH = 280
 const RATE_LIMIT_MS = 2000
 
-export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, isOwner, mode = 'widget' }: Props) {
+function reactionsToMap(rows: PublicMessageReaction[]) {
+  const map: Record<string, Record<string, string[]>> = {}
+  for (const row of rows) {
+    if (!map[row.message_id]) map[row.message_id] = {}
+    if (!map[row.message_id][row.emoji]) map[row.message_id][row.emoji] = []
+    if (!map[row.message_id][row.emoji].includes(row.user_id)) {
+      map[row.message_id][row.emoji].push(row.user_id)
+    }
+  }
+  return map
+}
+
+function addReactionToMap(
+  prev: Record<string, Record<string, string[]>>,
+  messageId: string,
+  emoji: string,
+  userId: string,
+) {
+  const messageReactions = prev[messageId] || {}
+  const currentUsers = messageReactions[emoji] || []
+  if (currentUsers.includes(userId)) return prev
+  return {
+    ...prev,
+    [messageId]: {
+      ...messageReactions,
+      [emoji]: [...currentUsers, userId],
+    },
+  }
+}
+
+function removeReactionFromMap(
+  prev: Record<string, Record<string, string[]>>,
+  messageId: string,
+  emoji: string,
+  userId: string,
+) {
+  const messageReactions = prev[messageId] || {}
+  const currentUsers = messageReactions[emoji] || []
+  if (!currentUsers.includes(userId)) return prev
+  const nextUsers = currentUsers.filter((value) => value !== userId)
+  const nextMessageReactions: Record<string, string[]> = {
+    ...messageReactions,
+  }
+  if (nextUsers.length > 0) {
+    nextMessageReactions[emoji] = nextUsers
+  } else {
+    delete nextMessageReactions[emoji]
+  }
+  const nextMap = {
+    ...prev,
+  }
+  if (Object.keys(nextMessageReactions).length > 0) {
+    nextMap[messageId] = nextMessageReactions
+  } else {
+    delete nextMap[messageId]
+  }
+  return nextMap
+}
+
+export function GlobalChatWidget({
+  currentUserId,
+  currentUsername,
+  userAgency,
+  isOwner,
+  leaderboardFirstSpotCounts,
+  mode = 'widget',
+}: Props) {
   const isFullMode = mode === 'full'
   const [isOpen, setIsOpen] = useState(() => {
     if (isFullMode) return true
@@ -59,22 +139,17 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
   const [selectedProfile, setSelectedProfile] = useState<UserProfileStats | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [reactionPicker, setReactionPicker] = useState<{ messageId: string; left: number; top: number } | null>(null)
-  const [localReactions, setLocalReactions] = useState<Record<string, Record<string, string[]>>>(() => {
-    if (typeof window === 'undefined') return {}
-    try {
-      const raw = window.localStorage.getItem('globalChatReactions')
-      return raw ? JSON.parse(raw) as Record<string, Record<string, string[]>> : {}
-    } catch {
-      return {}
-    }
-  })
+  const [messageReactions, setMessageReactions] = useState<Record<string, Record<string, string[]>>>({})
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<PublicMessage[]>([])
   const lastSentRef = useRef(0)
   const isNearBottomRef = useRef(true)
   const subscribedRef = useRef(false)
   const fullModeAutoScrolledRef = useRef(false)
+  const reactionActionGuardRef = useRef<Record<string, number>>({})
+  const reactionSyncInFlightRef = useRef(false)
   const supabaseClient = supabase
   const isOpenRef = useRef(isOpen)
 
@@ -86,6 +161,48 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     '😴', '😡', '🤯', '❤️', '💙', '💚', '🧡', '💛', '⭐', '🏆', '🥇', '🚀', '💥', '🎮', '📝', '📈',
   ]
   const quickInsertEmojis = ['👍', '🔥', '🚓', '📚', '✅', '💯', '😂', '😎']
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  const loadReactionsForMessageIds = useCallback(async (messageIds: string[]) => {
+    if (!supabaseClient) return {}
+    if (messageIds.length === 0) return {}
+    const { data, error } = await supabaseClient
+      .from('public_message_reactions')
+      .select('id,message_id,user_id,emoji,created_at')
+      .in('message_id', messageIds)
+      .order('created_at', { ascending: false })
+    if (error || !data) {
+      if (error) {
+        console.error('Failed to load message reactions:', error)
+      }
+      return null
+    }
+    return reactionsToMap(data as PublicMessageReaction[])
+  }, [supabaseClient])
+
+  const refreshVisibleReactions = useCallback(async () => {
+    if (!supabaseClient) return
+    if (reactionSyncInFlightRef.current) return
+
+    const visibleMessageIds = messagesRef.current.map((message) => message.id)
+    if (visibleMessageIds.length === 0) {
+      setMessageReactions({})
+      return
+    }
+
+    reactionSyncInFlightRef.current = true
+    try {
+      const reactionMap = await loadReactionsForMessageIds(visibleMessageIds)
+      if (reactionMap) {
+        setMessageReactions(reactionMap)
+      }
+    } finally {
+      reactionSyncInFlightRef.current = false
+    }
+  }, [loadReactionsForMessageIds, supabaseClient])
 
   useEffect(() => {
     if (!isFullMode) return
@@ -103,12 +220,14 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         .order('created_at', { ascending: false })
         .limit(MAX_MESSAGES)
       if (data) {
-        setMessages(data.reverse())
+        const latestMessages = (data as PublicMessage[]).reverse()
+        setMessages(latestMessages)
+        void refreshVisibleReactions()
       }
     }
 
-    loadMessages()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    void loadMessages()
+  }, [refreshVisibleReactions, supabaseClient])
 
   // Keep isOpenRef in sync
   useEffect(() => {
@@ -154,12 +273,56 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'public_messages' },
+        (payload) => {
+          const updatedMessage = payload.new as PublicMessage
+          setMessages((prev) => prev.map((message) => (message.id === updatedMessage.id ? updatedMessage : message)))
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'public_messages' },
+        (payload) => {
+          const deletedMessage = payload.old as PublicMessage
+          setMessages((prev) => prev.filter((message) => message.id !== deletedMessage.id))
+          setMessageReactions((prev) => {
+            if (!prev[deletedMessage.id]) return prev
+            const next = { ...prev }
+            delete next[deletedMessage.id]
+            return next
+          })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'public_message_reactions' },
+        (payload) => {
+          const row = payload.new as PublicMessageReaction
+          setMessageReactions((prev) => addReactionToMap(prev, row.message_id, row.emoji, row.user_id))
+          window.setTimeout(() => {
+            void refreshVisibleReactions()
+          }, 220)
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'public_message_reactions' },
+        (payload) => {
+          const row = payload.old as PublicMessageReaction
+          setMessageReactions((prev) => removeReactionFromMap(prev, row.message_id, row.emoji, row.user_id))
+          window.setTimeout(() => {
+            void refreshVisibleReactions()
+          }, 220)
+        },
+      )
       .subscribe(() => {})
 
     return () => {
       supabaseClient.removeChannel(channel)
     }
-  }, [supabaseClient])
+  }, [refreshVisibleReactions, supabaseClient])
 
   // Poll for new messages every 5 seconds (lightweight fallback)
   useEffect(() => {
@@ -172,12 +335,13 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
         .order('created_at', { ascending: false })
         .limit(MAX_MESSAGES)
       if (data) {
-        const latestMessages = data.reverse()
-        const existingIds = new Set(messages.map((m) => m.id))
+        const latestMessages = (data as PublicMessage[]).reverse()
+        const existingIds = new Set(messagesRef.current.map((message) => message.id))
         const newMessageDetected = latestMessages.some((m) => !existingIds.has(m.id))
-        
+
         setMessages(latestMessages)
-        
+        void refreshVisibleReactions()
+
         // Update unread indicator from polling too
         if (newMessageDetected) {
           if (isOpenRef.current && isNearBottomRef.current) {
@@ -193,7 +357,16 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
 
     const interval = setInterval(pollMessages, 5000)
     return () => clearInterval(interval)
-  }, [supabaseClient, messages])
+  }, [refreshVisibleReactions, supabaseClient])
+
+  // Extra reaction sync so users always see others' reactions quickly, even if realtime misses an event.
+  useEffect(() => {
+    if (!supabaseClient) return
+    const interval = window.setInterval(() => {
+      void refreshVisibleReactions()
+    }, 3200)
+    return () => window.clearInterval(interval)
+  }, [refreshVisibleReactions, supabaseClient])
 
   // Persist open state
   useEffect(() => {
@@ -208,11 +381,6 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
       }, 100)
     }
   }, [isOpen, isFullMode])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    window.localStorage.setItem('globalChatReactions', JSON.stringify(localReactions))
-  }, [localReactions])
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -333,27 +501,54 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     setInputValue((previous) => `${previous}${emoji}`)
   }, [])
 
-  const toggleReaction = useCallback((messageId: string, emoji: string) => {
-    setLocalReactions((previous) => {
-      const messageReactions = previous[messageId] || {}
-      const reactedUsers = messageReactions[emoji] || []
-      const hasReacted = reactedUsers.includes(currentUserId)
-      const nextUsers = hasReacted
-        ? reactedUsers.filter((userId) => userId !== currentUserId)
-        : [...reactedUsers, currentUserId]
-      const nextMessageReactions = {
-        ...messageReactions,
-        [emoji]: nextUsers,
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!supabaseClient || !isAuthenticated) return
+    const guardKey = `${messageId}|${emoji}|${currentUserId}`
+    const guardNow = Date.now()
+    const lastActionAt = reactionActionGuardRef.current[guardKey] || 0
+    if (guardNow - lastActionAt < 350) return
+    reactionActionGuardRef.current[guardKey] = guardNow
+
+    const currentUsers = messageReactions[messageId]?.[emoji] || []
+    const hasReacted = currentUsers.includes(currentUserId)
+
+    if (hasReacted) {
+      setMessageReactions((previous) => removeReactionFromMap(previous, messageId, emoji, currentUserId))
+    } else {
+      setMessageReactions((previous) => addReactionToMap(previous, messageId, emoji, currentUserId))
+    }
+
+    try {
+      if (hasReacted) {
+        const { error } = await supabaseClient
+          .from('public_message_reactions')
+          .delete()
+          .eq('message_id', messageId)
+          .eq('emoji', emoji)
+          .eq('user_id', currentUserId)
+        if (error) throw error
+      } else {
+        const { error } = await supabaseClient
+          .from('public_message_reactions')
+          .insert({
+            message_id: messageId,
+            user_id: currentUserId,
+            emoji,
+          })
+        if (error) throw error
       }
-      const cleanedMessageReactions = Object.fromEntries(
-        Object.entries(nextMessageReactions).filter(([, users]) => users.length > 0),
-      )
-      return {
-        ...previous,
-        [messageId]: cleanedMessageReactions,
-      }
-    })
-  }, [currentUserId])
+      window.setTimeout(() => {
+        void refreshVisibleReactions()
+      }, 120)
+    } catch (error) {
+      console.error('Failed to toggle reaction:', error)
+      await refreshVisibleReactions()
+    } finally {
+      window.setTimeout(() => {
+        delete reactionActionGuardRef.current[guardKey]
+      }, 360)
+    }
+  }, [currentUserId, isAuthenticated, messageReactions, refreshVisibleReactions, supabaseClient])
 
   // Handle report
   const handleReport = useCallback(async (messageId: string) => {
@@ -458,6 +653,8 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
           avatarUrl,
           agency: profile.agency || '',
           bio: profile.bio || '',
+          leaderboardFirstSpotsAllTime: leaderboardFirstSpotCounts?.allTime?.[userId] || 0,
+          leaderboardFirstSpotsWeekly: leaderboardFirstSpotCounts?.weekly?.[userId] || 0,
           studySeconds,
           studyDayStreak,
           masteredCodes,
@@ -472,7 +669,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
     } finally {
       setProfileLoading(false)
     }
-  }, [supabaseClient])
+  }, [leaderboardFirstSpotCounts, supabaseClient])
 
   // Format timestamp
   const formatTime = (dateStr: string) => {
@@ -543,7 +740,7 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
                 </div>
                 <p className="global-chat-text">{msg.message}</p>
                 <div className="global-chat-reactions">
-                  {Object.entries(localReactions[msg.id] || {})
+                  {Object.entries(messageReactions[msg.id] || {})
                     .filter(([, users]) => users.length > 0)
                     .sort((left, right) => right[1].length - left[1].length)
                     .map(([emoji, users]) => {
@@ -554,7 +751,11 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
                           key={`${msg.id}-${emoji}`}
                           type="button"
                           className={active ? 'global-chat-reaction active' : 'global-chat-reaction'}
-                          onClick={() => toggleReaction(msg.id, emoji)}
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            void toggleReaction(msg.id, emoji)
+                          }}
                         >
                           <span>{emoji}</span>
                           <small>{count}</small>
@@ -603,8 +804,14 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
                           key={`popular-${msg.id}-${emoji}`}
                           type="button"
                           className="global-chat-reaction-option"
-                          onClick={() => {
-                            toggleReaction(msg.id, emoji)
+                          onMouseDown={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                          }}
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            void toggleReaction(msg.id, emoji)
                             setReactionPicker(null)
                           }}
                         >
@@ -619,8 +826,14 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
                           key={`all-${msg.id}-${emoji}`}
                           type="button"
                           className="global-chat-reaction-option"
-                          onClick={() => {
-                            toggleReaction(msg.id, emoji)
+                          onMouseDown={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                          }}
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            void toggleReaction(msg.id, emoji)
                             setReactionPicker(null)
                           }}
                         >
@@ -761,12 +974,20 @@ export function GlobalChatWidget({ currentUserId, currentUsername, userAgency, i
                   <span className="profile-stat-label">Mastered</span>
                 </div>
                 <div className="profile-stat">
+                  <span className="profile-stat-value">{selectedProfile.leaderboardFirstSpotsAllTime}</span>
+                  <span className="profile-stat-label">#1 Spots</span>
+                </div>
+                <div className="profile-stat">
                   <span className="profile-stat-value">{formatStudyTime(selectedProfile.studySeconds)}</span>
                   <span className="profile-stat-label">Study Time</span>
                 </div>
                 <div className="profile-stat">
                   <span className="profile-stat-value fire">🔥 {selectedProfile.studyDayStreak}</span>
                   <span className="profile-stat-label">Day Streak</span>
+                </div>
+                <div className="profile-stat">
+                  <span className="profile-stat-value">{selectedProfile.leaderboardFirstSpotsWeekly}</span>
+                  <span className="profile-stat-label">Weekly #1s</span>
                 </div>
                 {selectedProfile.mostStudiedMode && (
                   <div className="profile-stat">

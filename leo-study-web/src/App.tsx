@@ -28,7 +28,7 @@ type HomeActionOptions = {
   gamePreset?: GameModeSelection
   forceAllTime?: boolean
 }
-type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'test' | 'warning' | 'chat' | 'leaderboards' | 'settings' | 'stats' | 'speed' | 'duel'
+type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'test' | 'warning' | 'chat' | 'leaderboards' | 'settings' | 'stats' | 'speed' | 'duel' | 'updates'
 type StatsIconName = 'overview' | 'time' | 'words' | 'penal' | 'flashcards' | 'scenarios' | 'streak' | 'game' | 'studyset'
 type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
 type StudyAnswerMode = 'multiple' | 'truefalse'
@@ -37,6 +37,12 @@ type PresenceStatus = 'active' | 'away'
 
 const studyTrackingTickMs = 5000
 const studyActivityWindowMs = 20000
+const leaderboardRefreshThrottleMs = 5000
+const homeLeaderboardRefreshThrottleMs = 7000
+const historyHydrateLimit = 4000
+const remoteTrackHistoryMaxPoints = 900
+const remoteTimelineMaxPoints = 2400
+const interactiveTrendMaxPoints = 96
 
 type HomeLeaderboardEntry = {
   userId: string
@@ -276,6 +282,7 @@ type DepartmentLeaderboardEntry = {
   agency: string
   totalScore: number
   averageScore: number
+  balancedScore: number
   playerCount: number
   attempts: number
 }
@@ -372,6 +379,18 @@ type PersistedAlgorithmStat = {
   status: MasteryStatus
 }
 
+type LeaderboardProfileSnapshot = {
+  bio: string
+  agency: string
+  themeId: string
+  nameStyle: NameStyle
+  homeLeaderboardRotationMs: number
+  studySeconds: number
+  studyDayStreak: number
+  studyModeCounts: Record<CodeFilter, number>
+  masteredCodes: number | null
+}
+
 type AppThemePreset = {
   id: string
   name: string
@@ -458,6 +477,56 @@ const homeEncouragementQuotes = [
   'Small wins stack fast. Keep your streak alive and protect momentum.',
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
+]
+const releaseNotesV03: Array<{ title: string; items: string[] }> = [
+  {
+    title: 'Profile Leaderboard Insight',
+    items: [
+      'Player profile popups now show how many #1 leaderboard spots each user currently holds.',
+      'The #1 spot count is visible from both leaderboard profile views and chat profile views.',
+      'Weekly #1 spot totals are also shown so users can compare current-week momentum.',
+    ],
+  },
+  {
+    title: 'Study Workflow Upgrade',
+    items: [
+      'Flashcards and Test now run on dedicated pages for cleaner, faster sessions.',
+      'Start controls are now placed at the top for quicker access.',
+      'Improved setup flow and visual consistency with the game pages.',
+    ],
+  },
+  {
+    title: 'Home + Leaderboard Controls',
+    items: [
+      'Home leaderboard visibility is fully customizable per account.',
+      'Added expanded leaderboard mode support for game and 1v1 views.',
+      'Improved action routing so “Go for #1” pre-selects the right mode and filters.',
+    ],
+  },
+  {
+    title: '1v1 + Multiplayer Improvements',
+    items: [
+      'Room and invite behavior is more reliable with better real-time updates.',
+      'Rematch flow was hardened for smoother restarts and cleaner state transitions.',
+      'Improved live room handling for mobile and smaller window sizes.',
+    ],
+  },
+  {
+    title: 'Chat and Presence',
+    items: [
+      'Public chat reactions are now visible to everyone in real time.',
+      'Reaction counts now aggregate properly for shared emoji reactions.',
+      'Presence indicators and online state handling were refined.',
+    ],
+  },
+  {
+    title: 'Polish + Stability',
+    items: [
+      'Large UI pass across home, games, and study surfaces for cleaner spacing.',
+      'Performance and graph rendering improvements for larger datasets.',
+      'General bug fixes to improve consistency across desktop and mobile.',
+    ],
+  },
 ]
 const studyStreakMilestones = [3, 7, 14, 21, 30]
 
@@ -632,6 +701,97 @@ function buildLeaderboardBoards(entries: LeaderboardEntry[], limit = 5): Leaderb
   }
 
   return boards
+}
+
+function buildLeaderboardFirstPlaceCountMap(boards: LeaderboardBoard[]) {
+  const counts: Record<string, number> = {}
+  for (const board of boards) {
+    const topUserId = board.entries[0]?.userId
+    if (!topUserId) continue
+    counts[topUserId] = (counts[topUserId] || 0) + 1
+  }
+  return counts
+}
+
+function buildDepartmentLeaders(entries: LeaderboardEntry[]): DepartmentLeaderboardEntry[] {
+  const buckets = new Map<
+    string,
+    {
+      key: string
+      agency: string
+      totalScore: number
+      attempts: number
+      players: Set<string>
+    }
+  >()
+
+  for (const entry of entries) {
+    const canonicalAgency = canonicalAgencyName(entry.agency || '')
+    if (!canonicalAgency) continue
+    const key = normalizeAgencyKey(canonicalAgency)
+    const current = buckets.get(key) || {
+      key,
+      agency: canonicalAgency,
+      totalScore: 0,
+      attempts: 0,
+      players: new Set<string>(),
+    }
+    current.totalScore += Math.max(0, entry.score)
+    current.attempts += 1
+    current.players.add(entry.userId)
+    buckets.set(key, current)
+  }
+
+  const departments = [...buckets.values()]
+    .map((entry) => ({
+      key: entry.key,
+      agency: entry.agency,
+      totalScore: entry.totalScore,
+      averageScore: entry.attempts > 0 ? Math.round(entry.totalScore / entry.attempts) : 0,
+      playerCount: entry.players.size,
+      attempts: entry.attempts,
+    }))
+
+  const globalAttempts = departments.reduce((sum, entry) => sum + entry.attempts, 0)
+  const globalAverage = globalAttempts > 0
+    ? departments.reduce((sum, entry) => sum + entry.totalScore, 0) / globalAttempts
+    : 0
+  const priorWeight = 4
+
+  return departments
+    .map(
+      (entry): DepartmentLeaderboardEntry => {
+        const balancedScore = Math.round(
+          ((entry.averageScore * entry.attempts) + (globalAverage * priorWeight)) /
+          (entry.attempts + priorWeight),
+        )
+        return {
+          ...entry,
+          balancedScore,
+        }
+      },
+    )
+    .sort(
+      (left, right) =>
+        right.balancedScore - left.balancedScore ||
+        right.averageScore - left.averageScore ||
+        right.totalScore - left.totalScore,
+    )
+}
+
+function topDepartmentEntryForScope(
+  entries: LeaderboardEntry[],
+  options: { scope: 'weekly' | 'alltime'; weeklyWindow?: { weekStartMs: number; nextWeekStartMs: number } },
+): DepartmentLeaderboardEntry | null {
+  const scoped = options.scope === 'weekly' && options.weeklyWindow
+    ? entries.filter(
+      (entry) =>
+        entry.createdAt >= options.weeklyWindow!.weekStartMs &&
+        entry.createdAt < options.weeklyWindow!.nextWeekStartMs,
+    )
+    : entries
+  const leaders = buildDepartmentLeaders(scoped)
+  return leaders[0] || null
 }
 
 async function createCroppedAvatarFile(sourceUrl: string, zoom: number, offsetX: number, offsetY: number, sourceName: string) {
@@ -1431,6 +1591,95 @@ function sanitizeLeaderboardRotationMs(input: unknown) {
   return Math.max(2000, Math.min(12000, Math.round(input)))
 }
 
+function countMasteredCodesFromSnapshot(snapshot: unknown): number | null {
+  if (!snapshot || typeof snapshot !== 'object') return null
+  const entries = Object.values(snapshot as Record<string, unknown>)
+  let masteredCount = 0
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue
+    const stat = entry as Partial<PersistedAlgorithmStat>
+    if (stat.status === 'Mastered') {
+      masteredCount += 1
+      continue
+    }
+    if (typeof stat.correctStreak === 'number' && stat.correctStreak >= 20) {
+      masteredCount += 1
+    }
+  }
+  return masteredCount
+}
+
+function countMasteredCodesFromPerformanceMap(performance: unknown): number {
+  if (!performance || typeof performance !== 'object') return 0
+  let masteredCount = 0
+  for (const entry of Object.values(performance as Record<string, unknown>)) {
+    if (!entry || typeof entry !== 'object') continue
+    const stats = entry as Partial<CodePerformance>
+    const candidate: CodePerformance = {
+      correctCount: typeof stats.correctCount === 'number' ? Math.max(0, Math.floor(stats.correctCount)) : 0,
+      incorrectCount: typeof stats.incorrectCount === 'number' ? Math.max(0, Math.floor(stats.incorrectCount)) : 0,
+      correctStreak: typeof stats.correctStreak === 'number' ? Math.max(0, Math.floor(stats.correctStreak)) : 0,
+    }
+    if (mastery(candidate) === 'Mastered') masteredCount += 1
+  }
+  return masteredCount
+}
+
+function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnapshot {
+  const fallback: LeaderboardProfileSnapshot = {
+    bio: '',
+    agency: defaultAgency,
+    themeId: appThemePresets[0].id,
+    nameStyle: { ...defaultNameStyle },
+    homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+    studySeconds: 0,
+    studyDayStreak: 0,
+    studyModeCounts: { ...defaultUserStats.studyModeCounts },
+    masteredCodes: null,
+  }
+  if (!input || typeof input !== 'object') return fallback
+
+  const value = input as Partial<ProfileDetails>
+  const statsRaw = value.stats && typeof value.stats === 'object' ? (value.stats as Record<string, unknown>) : {}
+  const studyModeCountsRaw =
+    statsRaw.studyModeCounts && typeof statsRaw.studyModeCounts === 'object'
+      ? (statsRaw.studyModeCounts as Record<string, unknown>)
+      : {}
+  const normalizeCount = (rawValue: unknown) =>
+    typeof rawValue === 'number' && Number.isFinite(rawValue) ? Math.max(0, Math.floor(rawValue)) : 0
+
+  return {
+    bio: typeof value.bio === 'string' ? value.bio : fallback.bio,
+    agency: typeof value.agency === 'string' && value.agency.trim().length > 0 ? value.agency : fallback.agency,
+    themeId: getThemePreset(typeof value.themeId === 'string' ? value.themeId : fallback.themeId).id,
+    nameStyle: sanitizeNameStyle(value.nameStyle),
+    homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs(value.homeLeaderboardRotationMs),
+    studySeconds: normalizeCount(statsRaw.studySeconds),
+    studyDayStreak: normalizeCount(statsRaw.studyDayStreak),
+    studyModeCounts: {
+      all: normalizeCount(studyModeCountsRaw.all),
+      penal: normalizeCount(studyModeCountsRaw.penal),
+      hs: normalizeCount(studyModeCountsRaw.hs),
+      vehicle: normalizeCount(studyModeCountsRaw.vehicle),
+    },
+    masteredCodes: countMasteredCodesFromSnapshot(value.algorithmSnapshot),
+  }
+}
+
+function mostStudiedModeFromCounts(studyModeCounts: Record<CodeFilter, number>): CodeFilter | null {
+  const ranked: CodeFilter[] = ['penal', 'hs', 'vehicle', 'all']
+  let winner: CodeFilter | null = null
+  let max = 0
+  for (const mode of ranked) {
+    const value = studyModeCounts[mode] || 0
+    if (value > max) {
+      max = value
+      winner = mode
+    }
+  }
+  return max > 0 ? winner : null
+}
+
 function sanitizeUserStats(input: unknown): UserStats {
   if (!input || typeof input !== 'object') return { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } }
   const value = input as Partial<UserStats>
@@ -1543,20 +1792,6 @@ function sanitizeUserStats(input: unknown): UserStats {
     sessionTracks: normalizedTracks,
     sessionTimeline,
   }
-}
-
-function mostStudiedModeFromStats(stats: UserStats): CodeFilter | null {
-  const ranked: CodeFilter[] = ['penal', 'hs', 'vehicle', 'all']
-  let winner: CodeFilter | null = null
-  let max = 0
-  for (const mode of ranked) {
-    const value = stats.studyModeCounts[mode] || 0
-    if (value > max) {
-      max = value
-      winner = mode
-    }
-  }
-  return max > 0 ? winner : null
 }
 
 function hexToRgba(hex: string, alpha: number) {
@@ -1935,6 +2170,21 @@ function AppIcon({ name, className = '' }: { name: AppIconName; className?: stri
       </svg>
     )
   }
+  if (name === 'updates') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M12 3.8v3.1" />
+        <path d="M12 17.1v3.1" />
+        <path d="m6.7 6.7 2.2 2.2" />
+        <path d="m15.1 15.1 2.2 2.2" />
+        <path d="M3.8 12h3.1" />
+        <path d="M17.1 12h3.1" />
+        <path d="m6.7 17.3 2.2-2.2" />
+        <path d="m15.1 8.9 2.2-2.2" />
+        <circle cx="12" cy="12" r="2.2" />
+      </svg>
+    )
+  }
   if (name === 'flashcards') {
     return (
       <svg {...commonProps} className={className} aria-hidden>
@@ -2049,9 +2299,19 @@ function buildTrendPath(points: number[]) {
   const usableWidth = width - paddingX * 2
   const usableHeight = height - paddingY * 2
   const safePoints = points.length > 1 ? points : [points[0] ?? 0, points[0] ?? 0]
-  const finitePoints = safePoints.map((value) => (Number.isFinite(value) ? value : 0))
-  const minValue = Math.min(...finitePoints)
-  const maxValue = Math.max(...finitePoints)
+  const finitePoints: number[] = []
+  let minValue = Number.POSITIVE_INFINITY
+  let maxValue = Number.NEGATIVE_INFINITY
+  for (const rawValue of safePoints) {
+    const value = Number.isFinite(rawValue) ? rawValue : 0
+    finitePoints.push(value)
+    if (value < minValue) minValue = value
+    if (value > maxValue) maxValue = value
+  }
+  if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
+    minValue = 0
+    maxValue = 0
+  }
   const spread = maxValue - minValue
   const padding = spread > 0 ? spread * 0.15 : Math.max(5, Math.abs(maxValue) * 0.2 + 2)
   const rangeMin = minValue - padding
@@ -2073,18 +2333,50 @@ function buildTrendPath(points: number[]) {
 }
 
 function compressTrendPoints(points: number[], maxPoints = 60) {
-  if (!Array.isArray(points) || points.length <= maxPoints) return points
-  const bucketSize = points.length / maxPoints
+  if (!Array.isArray(points) || points.length === 0) return []
+  if (!Number.isFinite(maxPoints) || maxPoints < 2) return [Math.round(Number(points[points.length - 1] || 0))]
+  const finitePoints = points.filter((value) => Number.isFinite(value))
+  if (finitePoints.length === 0) return []
+  if (finitePoints.length <= maxPoints) return finitePoints
+
+  const lastIndex = finitePoints.length - 1
+  const bucketTotals = new Array<number>(maxPoints).fill(0)
+  const bucketCounts = new Array<number>(maxPoints).fill(0)
+  for (let index = 0; index < finitePoints.length; index += 1) {
+    const bucket = lastIndex === 0
+      ? 0
+      : Math.min(maxPoints - 1, Math.floor((index / lastIndex) * (maxPoints - 1)))
+    bucketTotals[bucket] += finitePoints[index]
+    bucketCounts[bucket] += 1
+  }
+
   const compressed: number[] = []
+  for (let bucket = 0; bucket < maxPoints; bucket += 1) {
+    if (bucketCounts[bucket] <= 0) continue
+    compressed.push(Math.round(bucketTotals[bucket] / bucketCounts[bucket]))
+  }
+  return compressed.length > 0 ? compressed : finitePoints.slice(-maxPoints)
+}
+
+function compressTimelinePoints(points: ScoreTimelinePoint[], maxPoints = remoteTimelineMaxPoints) {
+  if (!Array.isArray(points) || points.length === 0) return []
+  if (!Number.isFinite(maxPoints) || maxPoints < 2) return [points[points.length - 1]]
+  if (points.length <= maxPoints) return points
+
+  const bucketSize = points.length / maxPoints
+  const compressed: ScoreTimelinePoint[] = []
   for (let bucket = 0; bucket < maxPoints; bucket += 1) {
     const start = Math.floor(bucket * bucketSize)
     const end = Math.max(start + 1, Math.floor((bucket + 1) * bucketSize))
-    const chunk = points.slice(start, end).filter((value) => Number.isFinite(value))
-    if (chunk.length === 0) continue
-    const average = chunk.reduce((sum, value) => sum + value, 0) / chunk.length
-    compressed.push(Math.round(average))
+    const sample = points[Math.min(points.length - 1, end - 1)] || points[start]
+    if (sample) compressed.push(sample)
   }
-  return compressed.length > 0 ? compressed : points.slice(-maxPoints)
+
+  const latest = points[points.length - 1]
+  if (compressed.length > 0 && latest && compressed[compressed.length - 1].at !== latest.at) {
+    compressed[compressed.length - 1] = latest
+  }
+  return compressed.slice(-maxPoints)
 }
 
 type InteractiveTrendChartProps = {
@@ -2113,22 +2405,30 @@ function InteractiveTrendChart({
   describeSuggestion,
 }: InteractiveTrendChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
-  const trend = values.length > 0 ? buildTrendPath(values) : null
-  const activeIndex = values.length === 0
+  const chartValues = useMemo(() => compressTrendPoints(values, interactiveTrendMaxPoints), [values])
+  const trend = useMemo(() => (chartValues.length > 0 ? buildTrendPath(chartValues) : null), [chartValues])
+
+  useEffect(() => {
+    if (hoveredIndex !== null && hoveredIndex >= chartValues.length) {
+      setHoveredIndex(null)
+    }
+  }, [chartValues.length, hoveredIndex])
+
+  const activeIndex = chartValues.length === 0
     ? -1
-    : hoveredIndex !== null && hoveredIndex >= 0 && hoveredIndex < values.length
+    : hoveredIndex !== null && hoveredIndex >= 0 && hoveredIndex < chartValues.length
       ? hoveredIndex
-      : values.length - 1
+      : chartValues.length - 1
   const activePoint = trend && activeIndex >= 0 ? trend.coords[activeIndex] : null
-  const activeValue = activeIndex >= 0 ? values[activeIndex] : null
-  const previousValue = activeIndex > 0 ? values[activeIndex - 1] : null
+  const activeValue = activeIndex >= 0 ? chartValues[activeIndex] : null
+  const previousValue = activeIndex > 0 ? chartValues[activeIndex - 1] : null
   const delta = activeValue !== null && previousValue !== null
     ? activeValue - previousValue
     : null
   const pointDescription = activeValue === null
     ? ''
     : describePoint
-      ? describePoint(activeIndex, values.length, activeValue)
+      ? describePoint(activeIndex, chartValues.length, activeValue)
       : `${pointLabel} ${activeIndex + 1}`
   const renderValue = (value: number) => {
     if (formatValue) return formatValue(value)
@@ -2177,7 +2477,7 @@ function InteractiveTrendChart({
               onMouseEnter={() => setHoveredIndex(index)}
               onFocus={() => setHoveredIndex(index)}
               onClick={() => setHoveredIndex(index)}
-              aria-label={`${pointLabel} ${index + 1}: ${renderValue(values[index])}`}
+              aria-label={`${pointLabel} ${index + 1}: ${renderValue(chartValues[index])}`}
             />
           </g>
         ))}
@@ -2215,7 +2515,10 @@ function InteractiveTrendChart({
 }
 
 function SessionPerformanceReportCard({ report }: { report: SessionPerformanceReport }) {
-  const trendValues = compressTrendPoints(report.scoreTrend.length > 0 ? report.scoreTrend : [report.score], 64)
+  const trendValues = useMemo(
+    () => compressTrendPoints(report.scoreTrend.length > 0 ? report.scoreTrend : [report.score], 64),
+    [report.scoreTrend, report.score],
+  )
   const improvedRank = report.currentRank !== null && report.previousRank !== null && report.currentRank < report.previousRank
   const movedCount =
     report.currentRank !== null && report.previousRank !== null && report.currentRank < report.previousRank
@@ -2326,13 +2629,18 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
     codeSetBreakdown,
   } = props
   const [hoveredTrendIndex, setHoveredTrendIndex] = useState<number | null>(null)
-  const trendValues = compressTrendPoints(sessionTrack.scoreHistory || [], 64)
-  const chartValues = trendValues.length > 0
-    ? trendValues
-    : sessionTrack.lastAttempt
-      ? [sessionTrack.lastAttempt.score]
-      : []
-  const trend = chartValues.length > 0 ? buildTrendPath(chartValues) : null
+  const trendValues = useMemo(() => compressTrendPoints(sessionTrack.scoreHistory || [], 64), [sessionTrack.scoreHistory])
+  const chartValues = useMemo(
+    () => (
+      trendValues.length > 0
+        ? trendValues
+        : sessionTrack.lastAttempt
+          ? [sessionTrack.lastAttempt.score]
+          : []
+    ),
+    [sessionTrack.lastAttempt, trendValues],
+  )
+  const trend = useMemo(() => (chartValues.length > 0 ? buildTrendPath(chartValues) : null), [chartValues])
   const activeTrendIndex = chartValues.length === 0
     ? -1
     : hoveredTrendIndex !== null && hoveredTrendIndex >= 0 && hoveredTrendIndex < chartValues.length
@@ -2703,6 +3011,7 @@ function App() {
   const [homeLeaderboardSettingsSaving, setHomeLeaderboardSettingsSaving] = useState(false)
   const [homeLeaderboardSettingsError, setHomeLeaderboardSettingsError] = useState('')
   const [homeMasteredInfoOpen, setHomeMasteredInfoOpen] = useState(false)
+  const [homeWhatsNewOpen, setHomeWhatsNewOpen] = useState(false)
   const [studyInsightWindowDays, setStudyInsightWindowDays] = useState<7 | 14 | 30>(14)
   const [assistedLearningEnabled, setAssistedLearningEnabled] = useState(true)
   const [showAssistedLearningInfo, setShowAssistedLearningInfo] = useState(false)
@@ -2733,8 +3042,6 @@ function App() {
   const [matchCorrectCount, setMatchCorrectCount] = useState(0)
   const [matchIncorrectCount, setMatchIncorrectCount] = useState(0)
   const [matchingReport, setMatchingReport] = useState<SessionPerformanceReport | null>(null)
-  const [matchSessionDuration, setMatchSessionDuration] = useState(30)
-  const [matchSessionFilter, setMatchSessionFilter] = useState<CodeFilter>('all')
   const [showMatchSetupModal, setShowMatchSetupModal] = useState(false)
 
   const [speedRemaining, setSpeedRemaining] = useState(30)
@@ -2748,8 +3055,6 @@ function App() {
   const [speedCurrentQuestion, setSpeedCurrentQuestion] = useState<QuizQuestion | null>(null)
   const [speedDeck, setSpeedDeck] = useState<QuizQuestion[]>([])
   const [speedSessionQuestions, setSpeedSessionQuestions] = useState<QuizQuestion[]>([])
-  const [speedSessionDuration, setSpeedSessionDuration] = useState(30)
-  const [speedSessionFilter, setSpeedSessionFilter] = useState<CodeFilter>('all')
   const [showSpeedSetupModal, setShowSpeedSetupModal] = useState(false)
   const [speedFeedback, setSpeedFeedback] = useState('')
   const [speedAnswerLocked, setSpeedAnswerLocked] = useState(false)
@@ -2764,10 +3069,17 @@ function App() {
   const lastAppStateUpdateRef = useRef(0)
   const highScoresRef = useRef(gameHighScoreSeed)
   const leaderboardRef = useRef<LeaderboardEntry[]>([])
+  const leaderboardAnnouncementDedupRef = useRef<Map<string, number>>(new Map())
+  const leaderboardRefreshMetaRef = useRef<{ lastAt: number; promise: Promise<LeaderboardEntry[]> | null }>({ lastAt: 0, promise: null })
+  const homeLeaderboardRefreshMetaRef = useRef<{ lastAt: number; promise: Promise<void> | null }>({ lastAt: 0, promise: null })
   const matchScoreRef = useRef(0)
   const matchRoundRef = useRef(1)
+  const matchSessionDurationRef = useRef(30)
+  const matchSessionFilterRef = useRef<CodeFilter>('all')
   const speedScoreRef = useRef(0)
   const speedAnsweredCountRef = useRef(0)
+  const speedSessionDurationRef = useRef(30)
+  const speedSessionFilterRef = useRef<CodeFilter>('all')
   const matchCorrectCountRef = useRef(0)
   const matchIncorrectCountRef = useRef(0)
   const speedCorrectCountRef = useRef(0)
@@ -3220,410 +3532,517 @@ function App() {
     speedIncorrectCountRef.current = speedIncorrectCount
   }, [speedIncorrectCount])
 
-  const refreshLeaderboard = async () => {
+  const refreshLeaderboard = async (options: { force?: boolean } = {}) => {
     if (!supabase) return []
-
-    const { data: rows, error } = await supabase
-      .from('leaderboard')
-      .select('id,user_id,game,score,round,created_at,match_duration,match_filter')
-      .order('score', { ascending: false })
-      .limit(300)
-
-    if (error || !rows) {
-      setLeaderboardError(error?.message || 'Could not load leaderboard.')
-      return []
-    }
-    setLeaderboardError('')
-
-    const userIds = [...new Set(rows.map((entry) => String(entry.user_id)))]
-    let profilesByUserId: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
-    let detailsByUserId: Record<string, ProfileDetails> = {}
-    const masteredCodesByUserId: Record<string, number> = {}
-    const studySecondsByUserId: Record<string, number> = {}
-    const studyDayStreakByUserId: Record<string, number> = {}
-    const mostStudiedModeByUserId: Record<string, CodeFilter | null> = {}
-    let duelStatsByUserId: Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>> = {}
-    let ownerUserIds = new Set<string>()
-
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id,username,avatar_path,supporter_tier,bio,agency')
-        .in('user_id', userIds)
-      profilesByUserId = (profiles || []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }>>(
-        (accumulator, entry) => {
-          accumulator[String(entry.user_id)] = {
-            username: String(entry.username || ''),
-            avatarUrl: toPublicAvatarUrl(String(entry.avatar_path || '')) || defaultAvatarUrl,
-            supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String(entry.supporter_tier))
-              ? String(entry.supporter_tier)
-              : 'free') as SupporterTier,
-          }
-          return accumulator
-        },
-        {},
-      )
-      detailsByUserId = (profiles || []).reduce<Record<string, ProfileDetails>>((accumulator, entry) => {
-        accumulator[String(entry.user_id)] = {
-          bio: String(entry.bio || ''),
-          agency: String(entry.agency || defaultAgency),
-          displayMode: 'dark',
-          homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
-          homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
-          themeId: appThemePresets[0].id,
-          nameStyle: { ...defaultNameStyle },
-          namePresets: [],
-          stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
-        }
-        return accumulator
-      }, {})
-
-      const { data: appStates } = await supabase
-        .from('app_state')
-        .select('user_id,profile_details,performance')
-        .in('user_id', userIds)
-      for (const row of appStates || []) {
-        const userId = String(row.user_id || '')
-        if (!userId) continue
-        const parsed = sanitizeState({ profileDetails: row.profile_details, performance: row.performance })
-        const details = parsed.profileDetails
-        const existing = detailsByUserId[userId] ?? {
-          bio: '',
-          agency: defaultAgency,
-          displayMode: 'dark',
-          homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
-          homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
-          themeId: appThemePresets[0].id,
-          nameStyle: { ...defaultNameStyle },
-          namePresets: [],
-          stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
-        }
-        detailsByUserId[userId] = {
-          bio: existing.bio || details.bio,
-          agency: existing.agency || details.agency,
-          displayMode: sanitizeDisplayMode(details.displayMode || existing.displayMode),
-          homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs(details.homeLeaderboardRotationMs || existing.homeLeaderboardRotationMs),
-          homeLeaderboardPreferences: sanitizeHomeLeaderboardPreferences(details.homeLeaderboardPreferences || existing.homeLeaderboardPreferences),
-          themeId: details.themeId || existing.themeId,
-          nameStyle: details.nameStyle,
-          namePresets: details.namePresets,
-          stats: details.stats,
-        }
-        masteredCodesByUserId[userId] = Object.values(parsed.performance).filter((item) => mastery(item) === 'Mastered').length
-        studySecondsByUserId[userId] = details.stats.studySeconds
-        studyDayStreakByUserId[userId] = details.stats.studyDayStreak
-        mostStudiedModeByUserId[userId] = mostStudiedModeFromStats(details.stats)
+    const { force = false } = options
+    const now = Date.now()
+    const refreshMeta = leaderboardRefreshMetaRef.current
+    if (!force) {
+      if (refreshMeta.promise) return refreshMeta.promise
+      if (now - refreshMeta.lastAt < leaderboardRefreshThrottleMs && leaderboardRef.current.length > 0) {
+        return leaderboardRef.current
       }
+    }
 
-      const { data: roleRows } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'owner')
-        .in('user_id', userIds)
-      ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
+    const refreshPromise = (async () => {
+      const { data: rows, error } = await supabase
+        .from('leaderboard')
+        .select('id,user_id,game,score,round,created_at,match_duration,match_filter')
+        .order('score', { ascending: false })
+        .limit(300)
 
-      const { data: duelRows, error: duelError } = await supabase
-        .from('duel_player_stats')
-        .select('user_id,game_type,wins,losses,current_win_streak')
-        .in('game_type', duelLeaderboardModeOrder)
-        .in('user_id', userIds)
-      if (!duelError) {
-        duelStatsByUserId = (duelRows || []).reduce<Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>>>((accumulator, entry) => {
-          const userId = String(entry.user_id || '')
-          const gameType = String((entry as Record<string, unknown>).game_type || 'all') as DuelLeaderboardMode
-          if (!userId) return accumulator
-          if (!duelLeaderboardModeOrder.includes(gameType)) return accumulator
-          const current = accumulator[userId] || {
-            all: { wins: 0, losses: 0, currentWinStreak: 0 },
-            matching: { wins: 0, losses: 0, currentWinStreak: 0 },
-            quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+      if (error || !rows) {
+        setLeaderboardError(error?.message || 'Could not load leaderboard.')
+        return [] as LeaderboardEntry[]
+      }
+      setLeaderboardError('')
+
+      const userIds = [...new Set(rows.map((entry) => String(entry.user_id)).filter(Boolean))]
+      let profilesByUserId: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
+      let detailsByUserId: Record<string, LeaderboardProfileSnapshot> = {}
+      const masteredCodesByUserId: Record<string, number> = {}
+      const studySecondsByUserId: Record<string, number> = {}
+      const studyDayStreakByUserId: Record<string, number> = {}
+      const mostStudiedModeByUserId: Record<string, CodeFilter | null> = {}
+      let duelStatsByUserId: Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>> = {}
+      let ownerUserIds = new Set<string>()
+
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id,username,avatar_path,supporter_tier,bio,agency')
+          .in('user_id', userIds)
+        profilesByUserId = (profiles || []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }>>(
+          (accumulator, entry) => {
+            accumulator[String(entry.user_id)] = {
+              username: String(entry.username || ''),
+              avatarUrl: toPublicAvatarUrl(String(entry.avatar_path || '')) || defaultAvatarUrl,
+              supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String(entry.supporter_tier))
+                ? String(entry.supporter_tier)
+                : 'free') as SupporterTier,
+            }
+            return accumulator
+          },
+          {},
+        )
+        detailsByUserId = (profiles || []).reduce<Record<string, LeaderboardProfileSnapshot>>((accumulator, entry) => {
+          accumulator[String(entry.user_id)] = {
+            bio: String(entry.bio || ''),
+            agency: String(entry.agency || defaultAgency),
+            themeId: appThemePresets[0].id,
+            nameStyle: { ...defaultNameStyle },
+            homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+            studySeconds: 0,
+            studyDayStreak: 0,
+            studyModeCounts: { ...defaultUserStats.studyModeCounts },
+            masteredCodes: null,
           }
-          current[gameType] = {
-            wins: Number(entry.wins || 0),
-            losses: Number(entry.losses || 0),
-            currentWinStreak: Number(entry.current_win_streak || 0),
-          }
-          accumulator[userId] = current
           return accumulator
         }, {})
+
+        const { data: appStates } = await supabase
+          .from('app_state')
+          .select('user_id,profile_details')
+          .in('user_id', userIds)
+
+        const fallbackMasteryUserIds: string[] = []
+        for (const row of appStates || []) {
+          const userId = String(row.user_id || '')
+          if (!userId) continue
+          const parsedDetails = parseLeaderboardProfileSnapshot(row.profile_details)
+          const existing = detailsByUserId[userId] ?? {
+            bio: '',
+            agency: defaultAgency,
+            themeId: appThemePresets[0].id,
+            nameStyle: { ...defaultNameStyle },
+            homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+            studySeconds: 0,
+            studyDayStreak: 0,
+            studyModeCounts: { ...defaultUserStats.studyModeCounts },
+            masteredCodes: null,
+          }
+          detailsByUserId[userId] = {
+            ...existing,
+            bio: parsedDetails.bio || existing.bio,
+            agency: existing.agency && existing.agency !== defaultAgency ? existing.agency : parsedDetails.agency,
+            themeId: parsedDetails.themeId || existing.themeId,
+            nameStyle: parsedDetails.nameStyle,
+            homeLeaderboardRotationMs: parsedDetails.homeLeaderboardRotationMs,
+            studySeconds: parsedDetails.studySeconds,
+            studyDayStreak: parsedDetails.studyDayStreak,
+            studyModeCounts: parsedDetails.studyModeCounts,
+            masteredCodes: parsedDetails.masteredCodes,
+          }
+          if (parsedDetails.masteredCodes === null) {
+            fallbackMasteryUserIds.push(userId)
+          } else {
+            masteredCodesByUserId[userId] = parsedDetails.masteredCodes
+          }
+          studySecondsByUserId[userId] = parsedDetails.studySeconds
+          studyDayStreakByUserId[userId] = parsedDetails.studyDayStreak
+          mostStudiedModeByUserId[userId] = mostStudiedModeFromCounts(parsedDetails.studyModeCounts)
+        }
+
+        const uniqueFallbackMasteryUserIds = [...new Set(fallbackMasteryUserIds)]
+        if (uniqueFallbackMasteryUserIds.length > 0) {
+          const { data: fallbackRows } = await supabase
+            .from('app_state')
+            .select('user_id,performance')
+            .in('user_id', uniqueFallbackMasteryUserIds)
+          for (const row of fallbackRows || []) {
+            const userId = String(row.user_id || '')
+            if (!userId) continue
+            masteredCodesByUserId[userId] = countMasteredCodesFromPerformanceMap((row as Record<string, unknown>).performance)
+          }
+          for (const userId of uniqueFallbackMasteryUserIds) {
+            if (typeof masteredCodesByUserId[userId] !== 'number') masteredCodesByUserId[userId] = 0
+          }
+        }
+
+        const { data: roleRows } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'owner')
+          .in('user_id', userIds)
+        ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
+
+        const { data: duelRows, error: duelError } = await supabase
+          .from('duel_player_stats')
+          .select('user_id,game_type,wins,losses,current_win_streak')
+          .in('game_type', duelLeaderboardModeOrder)
+          .in('user_id', userIds)
+        if (!duelError) {
+          duelStatsByUserId = (duelRows || []).reduce<Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>>>((accumulator, entry) => {
+            const userId = String(entry.user_id || '')
+            const gameType = String((entry as Record<string, unknown>).game_type || 'all') as DuelLeaderboardMode
+            if (!userId) return accumulator
+            if (!duelLeaderboardModeOrder.includes(gameType)) return accumulator
+            const current = accumulator[userId] || {
+              all: { wins: 0, losses: 0, currentWinStreak: 0 },
+              matching: { wins: 0, losses: 0, currentWinStreak: 0 },
+              quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+            }
+            current[gameType] = {
+              wins: Number(entry.wins || 0),
+              losses: Number(entry.losses || 0),
+              currentWinStreak: Number(entry.current_win_streak || 0),
+            }
+            accumulator[userId] = current
+            return accumulator
+          }, {})
+        }
+      }
+
+      const mapped = rows.map(
+        (entry): LeaderboardEntry => {
+          const userId = String(entry.user_id || '')
+          const duelStats = duelStatsByUserId[userId]?.all
+          return ({
+            id: String(entry.id),
+            userId,
+            game: String(entry.game),
+            playerName: profilesByUserId[userId]?.username || 'Player',
+            avatarUrl: profilesByUserId[userId]?.avatarUrl || defaultAvatarUrl,
+            supporterTier: profilesByUserId[userId]?.supporterTier || 'free',
+            bio: detailsByUserId[userId]?.bio || '',
+            agency: detailsByUserId[userId]?.agency || '',
+            nameStyle: detailsByUserId[userId]?.nameStyle || { ...defaultNameStyle },
+            themeId: detailsByUserId[userId]?.themeId || appThemePresets[0].id,
+            isOwner: ownerUserIds.has(userId),
+            matchDuration: typeof entry.match_duration === 'number' ? entry.match_duration : null,
+            matchFilter: (['all', 'penal', 'hs', 'vehicle'].includes(String(entry.match_filter))
+              ? String(entry.match_filter)
+              : null) as CodeFilter | null,
+            score: Number(entry.score || 0),
+            round: Number(entry.round || 0),
+            createdAt: Date.parse(String(entry.created_at || '')) || Date.now(),
+            masteredCodes: masteredCodesByUserId[userId] || 0,
+            studySeconds: studySecondsByUserId[userId] || 0,
+            studyDayStreak: studyDayStreakByUserId[userId] || 0,
+            mostStudiedMode: mostStudiedModeByUserId[userId] || null,
+            duelWins: duelStats?.wins || 0,
+            duelLosses: duelStats?.losses || 0,
+            duelCurrentWinStreak: duelStats?.currentWinStreak || 0,
+          })
+        },
+      )
+
+      const deduped = Array.from(
+        mapped
+          .reduce<Map<string, LeaderboardEntry>>((accumulator, entry) => {
+            const key = `${entry.userId.toLowerCase()}|${entry.game.toLowerCase()}|${entry.matchDuration ?? 0}|${entry.matchFilter ?? 'all'}`
+            const current = accumulator.get(key)
+            if (!current || entry.score > current.score || (entry.score === current.score && entry.round > current.round)) {
+              accumulator.set(key, entry)
+            }
+            return accumulator
+          }, new Map<string, LeaderboardEntry>())
+          .values(),
+      ).sort((left, right) => right.score - left.score || right.round - left.round)
+
+      setLeaderboard(deduped)
+      leaderboardRef.current = deduped
+      return deduped
+    })()
+
+    leaderboardRefreshMetaRef.current.promise = refreshPromise
+    try {
+      const result = await refreshPromise
+      leaderboardRefreshMetaRef.current.lastAt = Date.now()
+      return result
+    } finally {
+      if (leaderboardRefreshMetaRef.current.promise === refreshPromise) {
+        leaderboardRefreshMetaRef.current.promise = null
       }
     }
-
-    const mapped = rows.map(
-      (entry): LeaderboardEntry => {
-        const duelStats = duelStatsByUserId[String(entry.user_id)]?.all
-        return ({
-        id: String(entry.id),
-        userId: String(entry.user_id || ''),
-        game: String(entry.game),
-        playerName: profilesByUserId[String(entry.user_id)]?.username || 'Player',
-        avatarUrl: profilesByUserId[String(entry.user_id)]?.avatarUrl || defaultAvatarUrl,
-        supporterTier: profilesByUserId[String(entry.user_id)]?.supporterTier || 'free',
-        bio: detailsByUserId[String(entry.user_id)]?.bio || '',
-        agency: detailsByUserId[String(entry.user_id)]?.agency || '',
-        nameStyle: detailsByUserId[String(entry.user_id)]?.nameStyle || { ...defaultNameStyle },
-        themeId: detailsByUserId[String(entry.user_id)]?.themeId || appThemePresets[0].id,
-        isOwner: ownerUserIds.has(String(entry.user_id || '')),
-        matchDuration: typeof entry.match_duration === 'number' ? entry.match_duration : null,
-        matchFilter: (['all', 'penal', 'hs', 'vehicle'].includes(String(entry.match_filter))
-          ? String(entry.match_filter)
-          : null) as CodeFilter | null,
-        score: Number(entry.score || 0),
-        round: Number(entry.round || 0),
-        createdAt: Date.parse(String(entry.created_at || '')) || Date.now(),
-        masteredCodes: masteredCodesByUserId[String(entry.user_id)] || 0,
-        studySeconds: studySecondsByUserId[String(entry.user_id)] || 0,
-        studyDayStreak: studyDayStreakByUserId[String(entry.user_id)] || 0,
-        mostStudiedMode: mostStudiedModeByUserId[String(entry.user_id)] || null,
-        duelWins: duelStats?.wins || 0,
-        duelLosses: duelStats?.losses || 0,
-        duelCurrentWinStreak: duelStats?.currentWinStreak || 0,
-      })
-    },
-    )
-
-    const deduped = Array.from(
-      mapped
-        .reduce<Map<string, LeaderboardEntry>>((accumulator, entry) => {
-          const key = `${entry.userId.toLowerCase()}|${entry.game.toLowerCase()}|${entry.matchDuration ?? 0}|${entry.matchFilter ?? 'all'}`
-          const current = accumulator.get(key)
-          if (!current || entry.score > current.score || (entry.score === current.score && entry.round > current.round)) {
-            accumulator.set(key, entry)
-          }
-          return accumulator
-        }, new Map<string, LeaderboardEntry>())
-        .values(),
-    ).sort((left, right) => right.score - left.score || right.round - left.round)
-
-    setLeaderboard(deduped)
-    leaderboardRef.current = deduped
-    return deduped
   }
 
-  const refreshHomeLeaderboards = async () => {
+  const refreshHomeLeaderboards = async (options: { force?: boolean } = {}) => {
     if (!supabase) return
-    const { data: states, error } = await supabase
-      .from('app_state')
-      .select('user_id,performance,profile_details')
-      .limit(400)
-    if (error || !states) return
+    const { force = false } = options
+    const now = Date.now()
+    const refreshMeta = homeLeaderboardRefreshMetaRef.current
+    if (!force) {
+      if (refreshMeta.promise) return refreshMeta.promise
+      if (now - refreshMeta.lastAt < homeLeaderboardRefreshThrottleMs) return
+    }
 
-    const userIds = [...new Set(states.map((entry) => String(entry.user_id || '')))].filter(Boolean)
-    let profileMap: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
-    let duelStatsByUserId: Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>> = {}
-    let ownerUserIds = new Set<string>()
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id,username,avatar_path,supporter_tier')
-        .in('user_id', userIds)
-      profileMap = (profiles || []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }>>((accumulator, entry) => {
-        accumulator[String(entry.user_id)] = {
-          username: String(entry.username || 'Player'),
-          avatarUrl: toPublicAvatarUrl(String(entry.avatar_path || '')) || defaultAvatarUrl,
-          supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String(entry.supporter_tier)) ? String(entry.supporter_tier) : 'free') as SupporterTier,
-        }
-        return accumulator
-      }, {})
+    const refreshPromise = (async () => {
+      const { data: states, error } = await supabase
+        .from('app_state')
+        .select('user_id,profile_details')
+        .limit(400)
+      if (error || !states) return
 
-      const { data: roleRows } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'owner')
-        .in('user_id', userIds)
-      ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
+      const userIds = [...new Set(states.map((entry) => String(entry.user_id || '')))].filter(Boolean)
+      let profileMap: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
+      let duelStatsByUserId: Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>> = {}
+      let ownerUserIds = new Set<string>()
+      const detailsByUserId: Record<string, LeaderboardProfileSnapshot> = {}
+      const masteredCodesByUserId: Record<string, number> = {}
 
-      const { data: duelRows, error: duelError } = await supabase
-        .from('duel_player_stats')
-        .select('user_id,game_type,wins,losses,current_win_streak')
-        .in('game_type', duelLeaderboardModeOrder)
-        .in('user_id', userIds)
-      if (!duelError) {
-        duelStatsByUserId = (duelRows || []).reduce<Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>>>((accumulator, entry) => {
-          const userId = String(entry.user_id || '')
-          const gameType = String((entry as Record<string, unknown>).game_type || 'all') as DuelLeaderboardMode
-          if (!userId) return accumulator
-          if (!duelLeaderboardModeOrder.includes(gameType)) return accumulator
-          const current = accumulator[userId] || {
-            all: { wins: 0, losses: 0, currentWinStreak: 0 },
-            matching: { wins: 0, losses: 0, currentWinStreak: 0 },
-            quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id,username,avatar_path,supporter_tier')
+          .in('user_id', userIds)
+        profileMap = (profiles || []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }>>((accumulator, entry) => {
+          accumulator[String(entry.user_id)] = {
+            username: String(entry.username || 'Player'),
+            avatarUrl: toPublicAvatarUrl(String(entry.avatar_path || '')) || defaultAvatarUrl,
+            supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String(entry.supporter_tier)) ? String(entry.supporter_tier) : 'free') as SupporterTier,
           }
-          current[gameType] = {
-            wins: Number(entry.wins || 0),
-            losses: Number(entry.losses || 0),
-            currentWinStreak: Number(entry.current_win_streak || 0),
-          }
-          accumulator[userId] = current
           return accumulator
         }, {})
-      }
-    }
 
-    const studyRows: HomeLeaderboardEntry[] = []
-    const studyStreakRows: HomeLeaderboardEntry[] = []
-    const masteredRows: HomeLeaderboardEntry[] = []
-    const duelWinsRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
-      all: [],
-      matching: [],
-      quiz: [],
-    }
-    const duelStreakRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
-      all: [],
-      matching: [],
-      quiz: [],
-    }
-    let ownerRotationMs: number | null = null
-    for (const row of states) {
-      const userId = String(row.user_id || '')
-      if (!userId) continue
-      const parsed = sanitizeState({ profileDetails: row.profile_details, performance: row.performance })
-      if (ownerRotationMs === null && ownerUserIds.has(userId)) {
-        ownerRotationMs = sanitizeLeaderboardRotationMs(parsed.profileDetails.homeLeaderboardRotationMs)
-      }
-      const profile = profileMap[userId] || { username: 'Player', avatarUrl: defaultAvatarUrl, supporterTier: 'free' as SupporterTier }
-      const masteredCount = Object.values(parsed.performance).filter((item) => mastery(item) === 'Mastered').length
-      const studySeconds = parsed.profileDetails.stats.studySeconds
-      const studyDayStreak = parsed.profileDetails.stats.studyDayStreak
-      const mostStudiedMode = mostStudiedModeFromStats(parsed.profileDetails.stats)
-      const duelStatsByMode = duelStatsByUserId[userId] || {
-        all: { wins: 0, losses: 0, currentWinStreak: 0 },
-        matching: { wins: 0, losses: 0, currentWinStreak: 0 },
-        quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
-      }
-      const duelStats = duelStatsByMode.all
-      studyRows.push({
-        userId,
-        playerName: profile.username,
-        avatarUrl: profile.avatarUrl,
-        supporterTier: profile.supporterTier,
-        themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
-        nameStyle: parsed.profileDetails.nameStyle,
-        bio: parsed.profileDetails.bio,
-        agency: parsed.profileDetails.agency,
-        isOwner: ownerUserIds.has(userId),
-        value: studySeconds,
-        masteredCodes: masteredCount,
-        studySeconds,
-        studyDayStreak,
-        mostStudiedMode,
-        duelWins: duelStats.wins,
-        duelLosses: duelStats.losses,
-        duelCurrentWinStreak: duelStats.currentWinStreak,
-      })
-      studyStreakRows.push({
-        userId,
-        playerName: profile.username,
-        avatarUrl: profile.avatarUrl,
-        supporterTier: profile.supporterTier,
-        themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
-        nameStyle: parsed.profileDetails.nameStyle,
-        bio: parsed.profileDetails.bio,
-        agency: parsed.profileDetails.agency,
-        isOwner: ownerUserIds.has(userId),
-        value: studyDayStreak,
-        masteredCodes: masteredCount,
-        studySeconds,
-        studyDayStreak,
-        mostStudiedMode,
-        duelWins: duelStats.wins,
-        duelLosses: duelStats.losses,
-        duelCurrentWinStreak: duelStats.currentWinStreak,
-      })
-      masteredRows.push({
-        userId,
-        playerName: profile.username,
-        avatarUrl: profile.avatarUrl,
-        supporterTier: profile.supporterTier,
-        themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
-        nameStyle: parsed.profileDetails.nameStyle,
-        bio: parsed.profileDetails.bio,
-        agency: parsed.profileDetails.agency,
-        isOwner: ownerUserIds.has(userId),
-        value: masteredCount,
-        masteredCodes: masteredCount,
-        studySeconds,
-        studyDayStreak,
-        mostStudiedMode,
-        duelWins: duelStats.wins,
-        duelLosses: duelStats.losses,
-        duelCurrentWinStreak: duelStats.currentWinStreak,
-      })
+        const { data: roleRows } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'owner')
+          .in('user_id', userIds)
+        ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
 
-      for (const mode of duelLeaderboardModeOrder) {
-        const duelModeStats = duelStatsByMode[mode]
-        if (duelModeStats.wins > 0) {
-          duelWinsRowsByMode[mode].push({
-            userId,
-            playerName: profile.username,
-            avatarUrl: profile.avatarUrl,
-            supporterTier: profile.supporterTier,
-            themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
-            nameStyle: parsed.profileDetails.nameStyle,
-            bio: parsed.profileDetails.bio,
-            agency: parsed.profileDetails.agency,
-            isOwner: ownerUserIds.has(userId),
-            value: duelModeStats.wins,
-            masteredCodes: masteredCount,
-            studySeconds,
-            studyDayStreak,
-            mostStudiedMode,
-            duelWins: duelModeStats.wins,
-            duelLosses: duelModeStats.losses,
-            duelCurrentWinStreak: duelModeStats.currentWinStreak,
-          })
-        }
-        if (duelModeStats.currentWinStreak > 0) {
-          duelStreakRowsByMode[mode].push({
-            userId,
-            playerName: profile.username,
-            avatarUrl: profile.avatarUrl,
-            supporterTier: profile.supporterTier,
-            themeId: parsed.profileDetails.themeId || appThemePresets[0].id,
-            nameStyle: parsed.profileDetails.nameStyle,
-            bio: parsed.profileDetails.bio,
-            agency: parsed.profileDetails.agency,
-            isOwner: ownerUserIds.has(userId),
-            value: duelModeStats.currentWinStreak,
-            masteredCodes: masteredCount,
-            studySeconds,
-            studyDayStreak,
-            mostStudiedMode,
-            duelWins: duelModeStats.wins,
-            duelLosses: duelModeStats.losses,
-            duelCurrentWinStreak: duelModeStats.currentWinStreak,
-          })
+        const { data: duelRows, error: duelError } = await supabase
+          .from('duel_player_stats')
+          .select('user_id,game_type,wins,losses,current_win_streak')
+          .in('game_type', duelLeaderboardModeOrder)
+          .in('user_id', userIds)
+        if (!duelError) {
+          duelStatsByUserId = (duelRows || []).reduce<Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>>>((accumulator, entry) => {
+            const userId = String(entry.user_id || '')
+            const gameType = String((entry as Record<string, unknown>).game_type || 'all') as DuelLeaderboardMode
+            if (!userId) return accumulator
+            if (!duelLeaderboardModeOrder.includes(gameType)) return accumulator
+            const current = accumulator[userId] || {
+              all: { wins: 0, losses: 0, currentWinStreak: 0 },
+              matching: { wins: 0, losses: 0, currentWinStreak: 0 },
+              quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+            }
+            current[gameType] = {
+              wins: Number(entry.wins || 0),
+              losses: Number(entry.losses || 0),
+              currentWinStreak: Number(entry.current_win_streak || 0),
+            }
+            accumulator[userId] = current
+            return accumulator
+          }, {})
         }
       }
-    }
 
-    setHomeStudyTimeLeaders(studyRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
-    setHomeStudyStreakLeaders(studyStreakRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
-    setHomeMostMasteredLeaders(masteredRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
-    setHomeDuelWinsLeadersByMode({
-      all: duelWinsRowsByMode.all
-        .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
-        .slice(0, 5),
-      matching: duelWinsRowsByMode.matching
-        .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
-        .slice(0, 5),
-      quiz: duelWinsRowsByMode.quiz
-        .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
-        .slice(0, 5),
-    })
-    setHomeDuelStreakLeadersByMode({
-      all: duelStreakRowsByMode.all
-        .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
-        .slice(0, 5),
-      matching: duelStreakRowsByMode.matching
-        .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
-        .slice(0, 5),
-      quiz: duelStreakRowsByMode.quiz
-        .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
-        .slice(0, 5),
-    })
-    if (ownerRotationMs !== null) {
-      setLeaderboardRotateMs(ownerRotationMs)
+      const fallbackMasteryUserIds: string[] = []
+      for (const row of states) {
+        const userId = String(row.user_id || '')
+        if (!userId) continue
+        const parsedDetails = parseLeaderboardProfileSnapshot((row as Record<string, unknown>).profile_details)
+        detailsByUserId[userId] = parsedDetails
+        if (parsedDetails.masteredCodes === null) {
+          fallbackMasteryUserIds.push(userId)
+        } else {
+          masteredCodesByUserId[userId] = parsedDetails.masteredCodes
+        }
+      }
+
+      const uniqueFallbackMasteryUserIds = [...new Set(fallbackMasteryUserIds)]
+      if (uniqueFallbackMasteryUserIds.length > 0) {
+        const { data: fallbackRows } = await supabase
+          .from('app_state')
+          .select('user_id,performance')
+          .in('user_id', uniqueFallbackMasteryUserIds)
+        for (const row of fallbackRows || []) {
+          const userId = String(row.user_id || '')
+          if (!userId) continue
+          masteredCodesByUserId[userId] = countMasteredCodesFromPerformanceMap((row as Record<string, unknown>).performance)
+        }
+        for (const userId of uniqueFallbackMasteryUserIds) {
+          if (typeof masteredCodesByUserId[userId] !== 'number') masteredCodesByUserId[userId] = 0
+        }
+      }
+
+      const studyRows: HomeLeaderboardEntry[] = []
+      const studyStreakRows: HomeLeaderboardEntry[] = []
+      const masteredRows: HomeLeaderboardEntry[] = []
+      const duelWinsRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
+        all: [],
+        matching: [],
+        quiz: [],
+      }
+      const duelStreakRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
+        all: [],
+        matching: [],
+        quiz: [],
+      }
+      let ownerRotationMs: number | null = null
+      for (const row of states) {
+        const userId = String(row.user_id || '')
+        if (!userId) continue
+        const details = detailsByUserId[userId] || {
+          bio: '',
+          agency: defaultAgency,
+          themeId: appThemePresets[0].id,
+          nameStyle: { ...defaultNameStyle },
+          homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+          studySeconds: 0,
+          studyDayStreak: 0,
+          studyModeCounts: { ...defaultUserStats.studyModeCounts },
+          masteredCodes: null,
+        }
+        if (ownerRotationMs === null && ownerUserIds.has(userId)) {
+          ownerRotationMs = details.homeLeaderboardRotationMs
+        }
+        const profile = profileMap[userId] || { username: 'Player', avatarUrl: defaultAvatarUrl, supporterTier: 'free' as SupporterTier }
+        const masteredCount = masteredCodesByUserId[userId] || 0
+        const studySeconds = details.studySeconds
+        const studyDayStreak = details.studyDayStreak
+        const mostStudiedMode = mostStudiedModeFromCounts(details.studyModeCounts)
+        const duelStatsByMode = duelStatsByUserId[userId] || {
+          all: { wins: 0, losses: 0, currentWinStreak: 0 },
+          matching: { wins: 0, losses: 0, currentWinStreak: 0 },
+          quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+        }
+        const duelStats = duelStatsByMode.all
+        studyRows.push({
+          userId,
+          playerName: profile.username,
+          avatarUrl: profile.avatarUrl,
+          supporterTier: profile.supporterTier,
+          themeId: details.themeId || appThemePresets[0].id,
+          nameStyle: details.nameStyle,
+          bio: details.bio,
+          agency: details.agency,
+          isOwner: ownerUserIds.has(userId),
+          value: studySeconds,
+          masteredCodes: masteredCount,
+          studySeconds,
+          studyDayStreak,
+          mostStudiedMode,
+          duelWins: duelStats.wins,
+          duelLosses: duelStats.losses,
+          duelCurrentWinStreak: duelStats.currentWinStreak,
+        })
+        studyStreakRows.push({
+          userId,
+          playerName: profile.username,
+          avatarUrl: profile.avatarUrl,
+          supporterTier: profile.supporterTier,
+          themeId: details.themeId || appThemePresets[0].id,
+          nameStyle: details.nameStyle,
+          bio: details.bio,
+          agency: details.agency,
+          isOwner: ownerUserIds.has(userId),
+          value: studyDayStreak,
+          masteredCodes: masteredCount,
+          studySeconds,
+          studyDayStreak,
+          mostStudiedMode,
+          duelWins: duelStats.wins,
+          duelLosses: duelStats.losses,
+          duelCurrentWinStreak: duelStats.currentWinStreak,
+        })
+        masteredRows.push({
+          userId,
+          playerName: profile.username,
+          avatarUrl: profile.avatarUrl,
+          supporterTier: profile.supporterTier,
+          themeId: details.themeId || appThemePresets[0].id,
+          nameStyle: details.nameStyle,
+          bio: details.bio,
+          agency: details.agency,
+          isOwner: ownerUserIds.has(userId),
+          value: masteredCount,
+          masteredCodes: masteredCount,
+          studySeconds,
+          studyDayStreak,
+          mostStudiedMode,
+          duelWins: duelStats.wins,
+          duelLosses: duelStats.losses,
+          duelCurrentWinStreak: duelStats.currentWinStreak,
+        })
+
+        for (const mode of duelLeaderboardModeOrder) {
+          const duelModeStats = duelStatsByMode[mode]
+          if (duelModeStats.wins > 0) {
+            duelWinsRowsByMode[mode].push({
+              userId,
+              playerName: profile.username,
+              avatarUrl: profile.avatarUrl,
+              supporterTier: profile.supporterTier,
+              themeId: details.themeId || appThemePresets[0].id,
+              nameStyle: details.nameStyle,
+              bio: details.bio,
+              agency: details.agency,
+              isOwner: ownerUserIds.has(userId),
+              value: duelModeStats.wins,
+              masteredCodes: masteredCount,
+              studySeconds,
+              studyDayStreak,
+              mostStudiedMode,
+              duelWins: duelModeStats.wins,
+              duelLosses: duelModeStats.losses,
+              duelCurrentWinStreak: duelModeStats.currentWinStreak,
+            })
+          }
+          if (duelModeStats.currentWinStreak > 0) {
+            duelStreakRowsByMode[mode].push({
+              userId,
+              playerName: profile.username,
+              avatarUrl: profile.avatarUrl,
+              supporterTier: profile.supporterTier,
+              themeId: details.themeId || appThemePresets[0].id,
+              nameStyle: details.nameStyle,
+              bio: details.bio,
+              agency: details.agency,
+              isOwner: ownerUserIds.has(userId),
+              value: duelModeStats.currentWinStreak,
+              masteredCodes: masteredCount,
+              studySeconds,
+              studyDayStreak,
+              mostStudiedMode,
+              duelWins: duelModeStats.wins,
+              duelLosses: duelModeStats.losses,
+              duelCurrentWinStreak: duelModeStats.currentWinStreak,
+            })
+          }
+        }
+      }
+
+      setHomeStudyTimeLeaders(studyRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
+      setHomeStudyStreakLeaders(studyStreakRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
+      setHomeMostMasteredLeaders(masteredRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
+      setHomeDuelWinsLeadersByMode({
+        all: duelWinsRowsByMode.all
+          .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
+        matching: duelWinsRowsByMode.matching
+          .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
+        quiz: duelWinsRowsByMode.quiz
+          .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
+      })
+      setHomeDuelStreakLeadersByMode({
+        all: duelStreakRowsByMode.all
+          .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
+        matching: duelStreakRowsByMode.matching
+          .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
+        quiz: duelStreakRowsByMode.quiz
+          .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
+      })
+      if (ownerRotationMs !== null) {
+        setLeaderboardRotateMs(ownerRotationMs)
+      }
+    })()
+
+    homeLeaderboardRefreshMetaRef.current.promise = refreshPromise
+    try {
+      await refreshPromise
+      homeLeaderboardRefreshMetaRef.current.lastAt = Date.now()
+    } finally {
+      if (homeLeaderboardRefreshMetaRef.current.promise === refreshPromise) {
+        homeLeaderboardRefreshMetaRef.current.promise = null
+      }
     }
   }
 
@@ -3761,7 +4180,7 @@ function App() {
         .select('track_key,score,created_at')
         .eq('user_id', currentUserId)
         .order('created_at', { ascending: true })
-        .limit(6000)
+        .limit(historyHydrateLimit)
 
       if (!historyError && Array.isArray(historyRows)) {
         const nextTrackHistory: Record<string, number[]> = {}
@@ -3776,8 +4195,12 @@ function App() {
           nextTrackHistory[trackKey].push(score)
           nextTimeline.push({ at, score })
         }
-        setRemoteTrackScoreHistory(nextTrackHistory)
-        setRemoteScoreTimeline(nextTimeline)
+        const compactTrackHistory = Object.entries(nextTrackHistory).reduce<Record<string, number[]>>((accumulator, [trackKey, scores]) => {
+          accumulator[trackKey] = compressTrendPoints(scores, remoteTrackHistoryMaxPoints)
+          return accumulator
+        }, {})
+        setRemoteTrackScoreHistory(compactTrackHistory)
+        setRemoteScoreTimeline(compressTimelinePoints(nextTimeline, remoteTimelineMaxPoints))
       } else {
         setRemoteTrackScoreHistory({})
         setRemoteScoreTimeline([])
@@ -3786,8 +4209,8 @@ function App() {
       lastAppStateUpdateRef.current = Date.parse(String(stateRow?.updated_at || '')) || Date.now()
       setStateHydrated(true)
 
-      await refreshLeaderboard()
-      await refreshHomeLeaderboards()
+      await refreshLeaderboard({ force: true })
+      await refreshHomeLeaderboards({ force: true })
     }
 
     hydrate().catch(() => undefined)
@@ -3885,10 +4308,14 @@ function App() {
           const at = Date.parse(String(row.created_at || '')) || Date.now()
           setRemoteTrackScoreHistory((previous) => {
             const next = { ...previous }
-            next[trackKey] = [...(next[trackKey] || []), score].slice(-2000)
+            const appended = [...(next[trackKey] || []), score]
+            next[trackKey] =
+              appended.length > remoteTrackHistoryMaxPoints
+                ? compressTrendPoints(appended, remoteTrackHistoryMaxPoints)
+                : appended
             return next
           })
-          setRemoteScoreTimeline((previous) => [...previous, { at, score }].slice(-8000))
+          setRemoteScoreTimeline((previous) => compressTimelinePoints([...previous, { at, score }], remoteTimelineMaxPoints))
         },
       )
       .subscribe()
@@ -4096,6 +4523,14 @@ function App() {
     () => buildLeaderboardBoards(weeklyLeaderboardEntries),
     [weeklyLeaderboardEntries],
   )
+  const allTimeFirstSpotCountsByUser = useMemo(
+    () => buildLeaderboardFirstPlaceCountMap(allTimeLeaderboardBoards),
+    [allTimeLeaderboardBoards],
+  )
+  const weeklyFirstSpotCountsByUser = useMemo(
+    () => buildLeaderboardFirstPlaceCountMap(weeklyLeaderboardBoards),
+    [weeklyLeaderboardBoards],
+  )
   const weeklyLeaderboardBoardsFull = useMemo(
     () => buildLeaderboardBoards(weeklyLeaderboardEntries, 0),
     [weeklyLeaderboardEntries],
@@ -4147,46 +4582,7 @@ function App() {
     if (sorted.length === 0) return null
     return sorted[0]
   }, [weeklyLeaderboardBoardsFull])
-  const weeklyDepartmentLeaders = useMemo(() => {
-    const buckets = new Map<
-      string,
-      {
-        key: string
-        agency: string
-        totalScore: number
-        attempts: number
-        players: Set<string>
-      }
-    >()
-    for (const entry of weeklyLeaderboardEntries) {
-      const canonicalAgency = canonicalAgencyName(entry.agency || '')
-      if (!canonicalAgency) continue
-      const key = normalizeAgencyKey(canonicalAgency)
-      const current = buckets.get(key) || {
-        key,
-        agency: canonicalAgency,
-        totalScore: 0,
-        attempts: 0,
-        players: new Set<string>(),
-      }
-      current.totalScore += Math.max(0, entry.score)
-      current.attempts += 1
-      current.players.add(entry.userId)
-      buckets.set(key, current)
-    }
-    return [...buckets.values()]
-      .map(
-        (entry): DepartmentLeaderboardEntry => ({
-          key: entry.key,
-          agency: entry.agency,
-          totalScore: entry.totalScore,
-          averageScore: entry.attempts > 0 ? Math.round(entry.totalScore / entry.attempts) : 0,
-          playerCount: entry.players.size,
-          attempts: entry.attempts,
-        }),
-      )
-      .sort((left, right) => right.averageScore - left.averageScore || right.totalScore - left.totalScore)
-  }, [weeklyLeaderboardEntries])
+  const weeklyDepartmentLeaders = useMemo(() => buildDepartmentLeaders(weeklyLeaderboardEntries), [weeklyLeaderboardEntries])
   const bestWeeklyDepartment = weeklyDepartmentLeaders[0] || null
   const visibleLeaderboardBoards = leaderboardsScope === 'weekly' ? weeklyLeaderboardBoards : allTimeLeaderboardBoards
   const visibleMatchingBoards = useMemo(
@@ -4478,6 +4874,22 @@ function App() {
     }
   }, [currentUserEmail, currentUserId, profile?.username, profileDetails.agency])
 
+  const shouldPostLeaderboardAnnouncement = useCallback((key: string) => {
+    const now = Date.now()
+    const cache = leaderboardAnnouncementDedupRef.current
+    for (const [entryKey, timestamp] of cache) {
+      if (now - timestamp > 2 * 60 * 60 * 1000) {
+        cache.delete(entryKey)
+      }
+    }
+    const lastPosted = cache.get(key)
+    if (typeof lastPosted === 'number' && now - lastPosted < 10 * 60 * 1000) {
+      return false
+    }
+    cache.set(key, now)
+    return true
+  }, [])
+
   const handleLeaderboardTopMilestones = useCallback(async (options: {
     game: 'Matching' | 'Speed Test'
     duration: number
@@ -4514,6 +4926,14 @@ function App() {
       scope: 'weekly',
       weeklyWindow,
     })
+    const beforeWeeklyDepartmentTop = topDepartmentEntryForScope(options.beforeEntries, {
+      scope: 'weekly',
+      weeklyWindow,
+    })
+    const afterWeeklyDepartmentTop = topDepartmentEntryForScope(options.afterEntries, {
+      scope: 'weekly',
+      weeklyWindow,
+    })
 
     const becameAllTimeTop =
       Boolean(afterAllTimeTop) &&
@@ -4537,24 +4957,81 @@ function App() {
     const weeklyKnockOff = becameWeeklyTop && beforeWeeklyTop && beforeWeeklyTop.userId !== currentUserId ? beforeWeeklyTop : null
     const allTimeKnockOff = becameAllTimeTop && beforeAllTimeTop && beforeAllTimeTop.userId !== currentUserId ? beforeAllTimeTop : null
     if (weeklyKnockOff && allTimeKnockOff && weeklyKnockOff.userId === allTimeKnockOff.userId) {
-      await postPublicChatAnnouncement(
-        `🔥 @${weeklyKnockOff.playerName} was knocked off #1 Weekly + All-Time (${leaderboardLabel}) by @${actorName}.`,
-      )
-    } else {
-      if (weeklyKnockOff) {
+      const combinedAnnouncementKey = [
+        'weekly+alltime',
+        options.game,
+        String(options.duration),
+        options.filter,
+        currentUserId,
+        weeklyKnockOff.userId,
+        String(afterWeeklyTop?.createdAt || 0),
+        String(afterAllTimeTop?.createdAt || 0),
+        String(afterWeeklyTop?.score || 0),
+        String(afterAllTimeTop?.score || 0),
+      ].join('|')
+      if (shouldPostLeaderboardAnnouncement(combinedAnnouncementKey)) {
         await postPublicChatAnnouncement(
-          `🔥 @${weeklyKnockOff.playerName} was knocked off #1 Weekly (${leaderboardLabel}) by @${actorName}.`,
+          `🔥 @${weeklyKnockOff.playerName} was knocked off #1 Weekly + All-Time (${leaderboardLabel}) by @${actorName}.`,
         )
       }
+    } else {
+      if (weeklyKnockOff) {
+        const weeklyAnnouncementKey = [
+          'weekly',
+          options.game,
+          String(options.duration),
+          options.filter,
+          currentUserId,
+          weeklyKnockOff.userId,
+          String(afterWeeklyTop?.createdAt || 0),
+          String(afterWeeklyTop?.score || 0),
+        ].join('|')
+        if (shouldPostLeaderboardAnnouncement(weeklyAnnouncementKey)) {
+          await postPublicChatAnnouncement(
+            `🔥 @${weeklyKnockOff.playerName} was knocked off #1 Weekly (${leaderboardLabel}) by @${actorName}.`,
+          )
+        }
+      }
       if (allTimeKnockOff) {
+        const allTimeAnnouncementKey = [
+          'alltime',
+          options.game,
+          String(options.duration),
+          options.filter,
+          currentUserId,
+          allTimeKnockOff.userId,
+          String(afterAllTimeTop?.createdAt || 0),
+          String(afterAllTimeTop?.score || 0),
+        ].join('|')
+        if (shouldPostLeaderboardAnnouncement(allTimeAnnouncementKey)) {
+          await postPublicChatAnnouncement(
+            `🏆 @${allTimeKnockOff.playerName} was knocked off #1 All-Time (${leaderboardLabel}) by @${actorName}.`,
+          )
+        }
+      }
+    }
+
+    if (
+      beforeWeeklyDepartmentTop &&
+      afterWeeklyDepartmentTop &&
+      beforeWeeklyDepartmentTop.key !== afterWeeklyDepartmentTop.key
+    ) {
+      const departmentAnnouncementKey = [
+        'department_weekly',
+        afterWeeklyDepartmentTop.key,
+        beforeWeeklyDepartmentTop.key,
+        String(weeklyWindow.weekStartMs),
+        currentUserId,
+      ].join('|')
+      if (shouldPostLeaderboardAnnouncement(departmentAnnouncementKey)) {
         await postPublicChatAnnouncement(
-          `🏆 @${allTimeKnockOff.playerName} was knocked off #1 All-Time (${leaderboardLabel}) by @${actorName}.`,
+          `🏢 ${afterWeeklyDepartmentTop.agency} took #1 Weekly Department from ${beforeWeeklyDepartmentTop.agency} (by @${actorName}).`,
         )
       }
     }
 
     return { becameWeeklyTop, becameAllTimeTop }
-  }, [currentUserEmail, currentUserId, postPublicChatAnnouncement, profile?.username, triggerCelebration])
+  }, [currentUserEmail, currentUserId, postPublicChatAnnouncement, profile?.username, shouldPostLeaderboardAnnouncement, triggerCelebration])
 
   const saveSessionAttempt = useCallback((trackKey: string, snapshot: SessionAttemptSnapshot) => {
     const mode: SessionMode = trackKey.startsWith('study_test|')
@@ -4601,10 +5078,14 @@ function App() {
 
     setRemoteTrackScoreHistory((previous) => {
       const next = { ...previous }
-      next[trackKey] = [...(next[trackKey] || []), snapshot.score].slice(-2000)
+      const appended = [...(next[trackKey] || []), snapshot.score]
+      next[trackKey] =
+        appended.length > remoteTrackHistoryMaxPoints
+          ? compressTrendPoints(appended, remoteTrackHistoryMaxPoints)
+          : appended
       return next
     })
-    setRemoteScoreTimeline((previous) => [...previous, { at: snapshot.at, score: snapshot.score }].slice(-8000))
+    setRemoteScoreTimeline((previous) => compressTimelinePoints([...previous, { at: snapshot.at, score: snapshot.score }], remoteTimelineMaxPoints))
 
     if (supabase && currentUserId) {
       void supabase
@@ -4748,7 +5229,9 @@ function App() {
           const finalIncorrect = matchIncorrectCountRef.current
           const finalAttempts = finalCorrect + finalIncorrect
           const finalAccuracy = finalAttempts > 0 ? Math.round((finalCorrect / finalAttempts) * 100) : 0
-          const trackKey = sessionTrackKey({ mode: 'matching', duration: matchSessionDuration, filter: matchSessionFilter })
+          const sessionDuration = matchSessionDurationRef.current
+          const sessionFilter = matchSessionFilterRef.current
+          const trackKey = sessionTrackKey({ mode: 'matching', duration: sessionDuration, filter: sessionFilter })
           const track = getSessionTrack(profileDetails.stats, trackKey)
           const previousAttempt = track.lastAttempt
           const trend = [...track.accuracyHistory, finalAccuracy].slice(-8)
@@ -4761,7 +5244,7 @@ function App() {
                 ? [previousAttempt.score]
                 : []
           const scoreTrend = [...baseScoreTrend, finalMatchScore]
-          const focusTips = getFocusTips(matchSessionFilter, 'matching')
+          const focusTips = getFocusTips(sessionFilter, 'matching')
           const previousBest = highScoresRef.current.matching
           const isPersonalBest = finalMatchScore > previousBest
           setHighScores((previous) => ({ ...previous, matching: Math.max(previous.matching, finalMatchScore) }))
@@ -4773,8 +5256,8 @@ function App() {
               const existingMatch = leaderboardRef.current.find(
                 (e) => e.userId === currentUserId && 
                        e.game === 'Matching' && 
-                       e.matchDuration === matchSessionDuration && 
-                       e.matchFilter === matchSessionFilter
+                       e.matchDuration === sessionDuration && 
+                       e.matchFilter === sessionFilter
               )
               
               if (!(existingMatch && existingMatch.score >= finalMatchScore)) {
@@ -4785,8 +5268,8 @@ function App() {
                     score: finalMatchScore,
                     round: finalMatchRound,
                     user_id: currentUserId,
-                    match_duration: matchSessionDuration,
-                    match_filter: matchSessionFilter,
+                    match_duration: sessionDuration,
+                    match_filter: sessionFilter,
                     created_at: new Date().toISOString(),
                   }, {
                     onConflict: 'user_id,game,match_duration,match_filter',
@@ -4798,13 +5281,13 @@ function App() {
                 }
               }
 
-              const refreshed = await refreshLeaderboard()
-              await refreshHomeLeaderboards()
+              const refreshed = await refreshLeaderboard({ force: true })
+              await refreshHomeLeaderboards({ force: true })
               const leaderboardAfterSave = refreshed.length > 0 ? refreshed : leaderboardRef.current
               const milestone = await handleLeaderboardTopMilestones({
                 game: 'Matching',
-                duration: matchSessionDuration,
-                filter: matchSessionFilter,
+                duration: sessionDuration,
+                filter: sessionFilter,
                 beforeEntries: leaderboardBeforeSave,
                 afterEntries: leaderboardAfterSave,
               })
@@ -4815,14 +5298,14 @@ function App() {
               const { preview, currentRank } = getLeaderboardPreview(
                 leaderboardAfterSave,
                 'Matching',
-                matchSessionDuration,
-                matchSessionFilter,
+                sessionDuration,
+                sessionFilter,
                 currentUserId,
               )
               setMatchingReport({
                 mode: 'matching',
                 title: 'Matching',
-                contextLabel: `${matchSessionDuration}s • ${leaderboardCodeSetLabel(matchSessionFilter)}`,
+                contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
                 accuracy: finalAccuracy,
                 correct: finalCorrect,
                 incorrect: finalIncorrect,
@@ -4842,8 +5325,8 @@ function App() {
                 correct: finalCorrect,
                 incorrect: finalIncorrect,
                 rank: currentRank,
-                duration: matchSessionDuration,
-                filter: matchSessionFilter,
+                duration: sessionDuration,
+                filter: sessionFilter,
                 at: Date.now(),
               })
             })()
@@ -4851,7 +5334,7 @@ function App() {
             setMatchingReport({
               mode: 'matching',
               title: 'Matching',
-              contextLabel: `${matchSessionDuration}s • ${leaderboardCodeSetLabel(matchSessionFilter)}`,
+              contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
               accuracy: finalAccuracy,
               correct: finalCorrect,
               incorrect: finalIncorrect,
@@ -4871,8 +5354,8 @@ function App() {
               correct: finalCorrect,
               incorrect: finalIncorrect,
               rank: null,
-              duration: matchSessionDuration,
-              filter: matchSessionFilter,
+              duration: sessionDuration,
+              filter: sessionFilter,
               at: Date.now(),
             })
           }
@@ -4890,8 +5373,6 @@ function App() {
     getFocusTips,
     handleLeaderboardTopMilestones,
     matchRunning,
-    matchSessionDuration,
-    matchSessionFilter,
     profileDetails.stats,
     remoteTrackScoreHistory,
     saveSessionAttempt,
@@ -5011,8 +5492,8 @@ function App() {
   const startMatching = () => {
     const selectedDuration = gamesSelection.duration
     const selectedFilter = gamesSelection.filter
-    setMatchSessionDuration(selectedDuration)
-    setMatchSessionFilter(selectedFilter)
+    matchSessionDurationRef.current = selectedDuration
+    matchSessionFilterRef.current = selectedFilter
     setMatchDone(false)
     setMatchScore(0)
     setMatchRound(1)
@@ -5091,8 +5572,8 @@ function App() {
       return
     }
     setSpeedSessionQuestions(pool)
-    setSpeedSessionDuration(selectedDuration)
-    setSpeedSessionFilter(selectedFilter)
+    speedSessionDurationRef.current = selectedDuration
+    speedSessionFilterRef.current = selectedFilter
     setSpeedRemaining(selectedDuration)
     setSpeedScore(0)
     setSpeedAnsweredCount(0)
@@ -5306,8 +5787,8 @@ function App() {
     if (matchedPairIds.length !== uniquePairs.size) return
     setMatchRound((round) => round + 1)
     setMatchScore((score) => score + 20)
-    makeRoundCards(matchSessionFilter)
-  }, [makeRoundCards, matchCards, matchRunning, matchSessionFilter, matchedPairIds])
+    makeRoundCards(matchSessionFilterRef.current)
+  }, [makeRoundCards, matchCards, matchRunning, matchedPairIds])
 
   useEffect(() => {
     if (!speedRunning) return
@@ -5328,7 +5809,9 @@ function App() {
           const finalCorrect = speedCorrectCountRef.current
           const finalIncorrect = speedIncorrectCountRef.current
           const finalAccuracy = finalAnswered > 0 ? Math.round((finalCorrect / finalAnswered) * 100) : 0
-          const trackKey = sessionTrackKey({ mode: 'speed', duration: speedSessionDuration, filter: speedSessionFilter })
+          const sessionDuration = speedSessionDurationRef.current
+          const sessionFilter = speedSessionFilterRef.current
+          const trackKey = sessionTrackKey({ mode: 'speed', duration: sessionDuration, filter: sessionFilter })
           const track = getSessionTrack(profileDetails.stats, trackKey)
           const previousAttempt = track.lastAttempt
           const trend = [...track.accuracyHistory, finalAccuracy].slice(-8)
@@ -5341,7 +5824,7 @@ function App() {
                 ? [previousAttempt.score]
                 : []
           const scoreTrend = [...baseScoreTrend, finalSpeedScore]
-          const focusTips = getFocusTips(speedSessionFilter, 'speed')
+          const focusTips = getFocusTips(sessionFilter, 'speed')
           const previousBest = highScoresRef.current.rapidFire
           const isPersonalBest = finalSpeedScore > previousBest
           setHighScores((previous) => ({ ...previous, rapidFire: Math.max(previous.rapidFire, finalSpeedScore) }))
@@ -5353,8 +5836,8 @@ function App() {
               const existing = leaderboardRef.current.find(
                 (e) => e.userId === currentUserId && 
                        e.game === 'Speed Test' && 
-                       e.matchDuration === speedSessionDuration && 
-                       e.matchFilter === speedSessionFilter
+                       e.matchDuration === sessionDuration && 
+                       e.matchFilter === sessionFilter
               )
               
               if (!(existing && existing.score >= finalSpeedScore)) {
@@ -5365,8 +5848,8 @@ function App() {
                     score: finalSpeedScore,
                     round: finalAnswered,
                     user_id: currentUserId,
-                    match_duration: speedSessionDuration,
-                    match_filter: speedSessionFilter,
+                    match_duration: sessionDuration,
+                    match_filter: sessionFilter,
                     created_at: new Date().toISOString(),
                   }, {
                     onConflict: 'user_id,game,match_duration,match_filter',
@@ -5380,13 +5863,13 @@ function App() {
                 }
               }
 
-              const refreshed = await refreshLeaderboard()
-              await refreshHomeLeaderboards()
+              const refreshed = await refreshLeaderboard({ force: true })
+              await refreshHomeLeaderboards({ force: true })
               const leaderboardAfterSave = refreshed.length > 0 ? refreshed : leaderboardRef.current
               const milestone = await handleLeaderboardTopMilestones({
                 game: 'Speed Test',
-                duration: speedSessionDuration,
-                filter: speedSessionFilter,
+                duration: sessionDuration,
+                filter: sessionFilter,
                 beforeEntries: leaderboardBeforeSave,
                 afterEntries: leaderboardAfterSave,
               })
@@ -5397,14 +5880,14 @@ function App() {
               const { preview, currentRank } = getLeaderboardPreview(
                 leaderboardAfterSave,
                 'Speed Test',
-                speedSessionDuration,
-                speedSessionFilter,
+                sessionDuration,
+                sessionFilter,
                 currentUserId,
               )
               setSpeedReport({
                 mode: 'speed',
                 title: 'Speed Test',
-                contextLabel: `${speedSessionDuration}s • ${leaderboardCodeSetLabel(speedSessionFilter)}`,
+                contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
                 accuracy: finalAccuracy,
                 correct: finalCorrect,
                 incorrect: finalIncorrect,
@@ -5424,8 +5907,8 @@ function App() {
                 correct: finalCorrect,
                 incorrect: finalIncorrect,
                 rank: currentRank,
-                duration: speedSessionDuration,
-                filter: speedSessionFilter,
+                duration: sessionDuration,
+                filter: sessionFilter,
                 at: Date.now(),
               })
             })()
@@ -5433,7 +5916,7 @@ function App() {
             setSpeedReport({
               mode: 'speed',
               title: 'Speed Test',
-              contextLabel: `${speedSessionDuration}s • ${leaderboardCodeSetLabel(speedSessionFilter)}`,
+              contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
               accuracy: finalAccuracy,
               correct: finalCorrect,
               incorrect: finalIncorrect,
@@ -5453,8 +5936,8 @@ function App() {
               correct: finalCorrect,
               incorrect: finalIncorrect,
               rank: null,
-              duration: speedSessionDuration,
-              filter: speedSessionFilter,
+              duration: sessionDuration,
+              filter: sessionFilter,
               at: Date.now(),
             })
           }
@@ -5473,8 +5956,6 @@ function App() {
     remoteTrackScoreHistory,
     saveSessionAttempt,
     speedRunning,
-    speedSessionDuration,
-    speedSessionFilter,
     triggerCelebration,
   ])
 
@@ -5715,8 +6196,8 @@ function App() {
     }
     const nextUpdatedAt = Date.parse(String(appStateRow?.updated_at || '')) || Date.now()
     lastAppStateUpdateRef.current = Math.max(lastAppStateUpdateRef.current, nextUpdatedAt)
-    await refreshLeaderboard()
-    await refreshHomeLeaderboards()
+    await refreshLeaderboard({ force: true })
+    await refreshHomeLeaderboards({ force: true })
     setAuthSuccess('All changes saved')
     setTimeout(() => setAuthSuccess(''), 1600)
     setAuthLoading(false)
@@ -5934,8 +6415,8 @@ function App() {
       stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
     }))
     recentSpeedSectionsRef.current = []
-    await refreshLeaderboard()
-    await refreshHomeLeaderboards()
+    await refreshLeaderboard({ force: true })
+    await refreshHomeLeaderboards({ force: true })
     setAuthSuccess('All scores and progress were reset.')
     setTimeout(() => setAuthSuccess(''), 1800)
     setShowResetConfirmModal(false)
@@ -6793,6 +7274,12 @@ function App() {
       textShadow: 'none',
     }
     : undefined
+  const selectedLeaderboardAllTimeFirstSpots = selectedLeaderboardEntry
+    ? allTimeFirstSpotCountsByUser[selectedLeaderboardEntry.userId] || 0
+    : 0
+  const selectedLeaderboardWeeklyFirstSpots = selectedLeaderboardEntry
+    ? weeklyFirstSpotCountsByUser[selectedLeaderboardEntry.userId] || 0
+    : 0
   const leaderAvatarFrameClass = (userId?: string, extraClassName?: string) => {
     const classes = ['leader-avatar-frame']
     if (extraClassName) classes.push(extraClassName)
@@ -7513,15 +8000,15 @@ function App() {
   }, [studyNeedsSummary])
   const effectiveScoreTimeline = useMemo<ScoreTimelinePoint[]>(() => {
     if (remoteScoreTimeline.length > 0) {
-      return [...remoteScoreTimeline].sort((left, right) => left.at - right.at)
+      return remoteScoreTimeline
     }
-    return profileDetails.stats.sessionTimeline
+    const mapped = profileDetails.stats.sessionTimeline
       .filter((point) => Number.isFinite(point.at))
       .map((point) => ({
         at: point.at,
         score: Math.max(0, Math.round(typeof point.score === 'number' ? point.score : point.accuracy)),
       }))
-      .sort((left, right) => left.at - right.at)
+    return compressTimelinePoints(mapped, remoteTimelineMaxPoints)
   }, [profileDetails.stats.sessionTimeline, remoteScoreTimeline])
   const statsAnalytics = useMemo(() => {
     const analyzed = sections.map((section) => {
@@ -7759,6 +8246,14 @@ function App() {
       recommendation,
     }
   }, [clockNowMs, effectiveScoreTimeline, statsAnalytics, studyInsightWindowDays])
+  const studyMomentumTrendValues = useMemo(
+    () => compressTrendPoints(studyHubInsights.trendValues, 42),
+    [studyHubInsights.trendValues],
+  )
+  const statsRecentTrendValues = useMemo(
+    () => compressTrendPoints(statsAnalytics.recentScoreTrend, 72),
+    [statsAnalytics.recentScoreTrend],
+  )
 
   const matchingTrackKey = useMemo(
     () => sessionTrackKey({ mode: 'matching', duration: gamesSelection.duration, filter: gamesSelection.filter }),
@@ -8348,14 +8843,24 @@ function App() {
                     {profileDetails.stats.studyDayStreak >= 7 ? <span className="day-streak-fire" aria-hidden>🔥</span> : null}
                   </div>
                 </div>
-                <button
-                  className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
-                  onClick={() => setHomeLeaderboardSettingsOpen((value) => !value)}
-                  aria-label="Customize home leaderboards"
-                  aria-expanded={homeLeaderboardSettingsOpen}
-                >
-                  <AppIcon name="settings" className="button-icon" />
-                </button>
+                <div className="home-hero-actions">
+                  <button
+                    className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
+                    onClick={() => setHomeWhatsNewOpen(true)}
+                    aria-label="Open what's new for version 0.3"
+                  >
+                    <AppIcon name="updates" className="button-icon" />
+                    What's New · v0.3
+                  </button>
+                  <button
+                    className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
+                    onClick={() => setHomeLeaderboardSettingsOpen((value) => !value)}
+                    aria-label="Customize home leaderboards"
+                    aria-expanded={homeLeaderboardSettingsOpen}
+                  >
+                    <AppIcon name="settings" className="button-icon" />
+                  </button>
+                </div>
               </div>
               <div className="home-actions">
                 <button className="primary" onClick={() => { setActiveTab('study'); navigate('/study') }}>
@@ -8873,7 +9378,7 @@ function App() {
               <article className="card leaderboard-summary-card">
                 <div className="leaderboard-card-head">
                   <h3>Best Department This Week</h3>
-                  <p className="leaderboard-card-subtitle">Ranked by average score across weekly attempts</p>
+                  <p className="leaderboard-card-subtitle">Ranked by balanced weekly department rating</p>
                 </div>
                 {!bestWeeklyDepartment ? (
                   <p className="muted">No department data yet.</p>
@@ -8883,7 +9388,9 @@ function App() {
                       <div key={`weekly-department-${entry.key}`} className="leaderboard-department-item">
                         <span className="leader-rank">#{index + 1}</span>
                         <span>{entry.agency}</span>
-                        <small>{entry.averageScore} avg • {entry.playerCount} player{entry.playerCount === 1 ? '' : 's'}</small>
+                        <small>
+                          {entry.balancedScore} rating • {entry.averageScore} avg • {entry.playerCount} player{entry.playerCount === 1 ? '' : 's'}
+                        </small>
                       </div>
                     ))}
                   </div>
@@ -9035,6 +9542,10 @@ function App() {
                 currentUsername={profileUsername}
                 userAgency={profileDetails?.agency}
                 isOwner={isOwner}
+                leaderboardFirstSpotCounts={{
+                  allTime: allTimeFirstSpotCountsByUser,
+                  weekly: weeklyFirstSpotCountsByUser,
+                }}
                 mode="full"
               />
             </div>
@@ -9196,7 +9707,7 @@ function App() {
               </div>
               <InteractiveTrendChart
                 chartId={`study-momentum-${studyInsightWindowDays}`}
-                values={compressTrendPoints(studyHubInsights.trendValues, 42)}
+                values={studyMomentumTrendValues}
                 ariaLabel="Study momentum trend"
                 pointLabel="Day"
                 valueSuffix=" pts"
@@ -9302,13 +9813,15 @@ function App() {
         {isStudyFlashcardsPage ? (
           <section className="study-session-page">
             <div className="study-session-shell study-session-shell-page">
-              <div className={`study-session-top study-session-top-compact ${studyFlashSessionOpen ? 'study-session-top-flash-open' : ''}`}>
-                <span>{studyFlashSessionOpen ? (studyFlashSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyFlashSessionFilter]) : 'Flashcards Setup'}</span>
-                <span>
-                  {studyFlashSessionOpen
-                    ? `${orderedStudyFlashSessionCards.length > 0 ? studyFlashSessionIndex + 1 : 0}/${orderedStudyFlashSessionCards.length}`
-                    : `${studyFlashSelectionCount} cards`}
-                </span>
+              <div className={`study-session-top study-session-top-compact study-session-top-rich ${studyFlashSessionOpen ? 'study-session-top-flash-open' : ''}`}>
+                <div className="study-session-top-copy">
+                  <strong>{studyFlashSessionOpen ? 'Flashcards Session' : 'Flashcards Setup'}</strong>
+                  <small>
+                    {studyFlashSessionOpen
+                      ? `${studyFlashSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyFlashSessionFilter]} • ${orderedStudyFlashSessionCards.length > 0 ? studyFlashSessionIndex + 1 : 0}/${orderedStudyFlashSessionCards.length}`
+                      : `${studyFlashSelectionCount} cards available • ${(studyFlashFilter === 'all' ? 'All Codes' : codeSetLabel[studyFlashFilter])}`}
+                  </small>
+                </div>
                 {studyFlashSessionOpen ? (
                   <button
                     className="secondary study-session-exit-btn"
@@ -9320,10 +9833,17 @@ function App() {
                   >
                     Exit
                   </button>
-                ) : null}
+                ) : (
+                  <div className="study-session-top-actions study-session-top-actions-centered">
+                    <button className="secondary study-session-top-action study-session-top-action-back" onClick={() => navigate('/study')}>Back</button>
+                    <button className="primary study-session-top-action study-session-top-action-start" onClick={beginStudyFlashcards} disabled={studyFlashSelectionCount === 0}>
+                      Start Flashcards
+                    </button>
+                  </div>
+                )}
               </div>
               {!studyFlashSessionOpen ? (
-                <article className="card study-priority-card study-setup-card">
+                <article className="card study-priority-card study-setup-card study-setup-card-rich">
                   <h3>Choose flashcard set</h3>
                   <label className="game-control">
                     Subject
@@ -9376,10 +9896,6 @@ function App() {
                       </div>
                     )}
                     <p className="study-priority-recommendation">{flashcardSetupInsights.recommendation}</p>
-                  </div>
-                  <div className="actions-row">
-                    <button className="secondary" onClick={() => navigate('/study')}>Back</button>
-                    <button className="primary" onClick={beginStudyFlashcards} disabled={studyFlashSelectionCount === 0}>Start Flashcards</button>
                   </div>
                 </article>
               ) : orderedStudyFlashSessionCards.length === 0 ? (
@@ -9455,13 +9971,27 @@ function App() {
         {isStudyTestPage ? (
           <section className="study-session-page">
             <div className="study-session-shell study-session-shell-page study-test-shell">
-              <div className="study-session-top study-session-top-compact">
-                <span>{studyTestSessionOpen ? (studyTestSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyTestSessionFilter]) : 'Test Setup'}</span>
-                <span>{studyTestSessionOpen ? `${studyTestSessionAnswered}/${studyTestSessionTotal}` : `${studyTestSelectionCount} source questions`}</span>
+              <div className="study-session-top study-session-top-compact study-session-top-rich">
+                <div className="study-session-top-copy">
+                  <strong>{studyTestSessionOpen ? 'Study Test Session' : 'Test Setup'}</strong>
+                  <small>
+                    {studyTestSessionOpen
+                      ? `${studyTestSessionFilter === 'all' ? 'All Codes' : codeSetLabel[studyTestSessionFilter]} • ${studyTestSessionAnswered}/${studyTestSessionTotal}`
+                      : `${studyTestSelectionCount} source questions • ${studyTestQuestionCount} target`}
+                  </small>
+                </div>
+                {!studyTestSessionOpen ? (
+                  <div className="study-session-top-actions study-session-top-actions-centered">
+                    <button className="secondary study-session-top-action study-session-top-action-back" onClick={() => navigate('/study')}>Back</button>
+                    <button className="primary study-session-top-action study-session-top-action-start" onClick={beginStudyTest} disabled={studyTestSelectionCount === 0}>
+                      Start Test
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               {!studyTestSessionOpen ? (
-                <article className="card study-priority-card study-setup-card">
+                <article className="card study-priority-card study-setup-card study-setup-card-rich">
                   <h3>Build your test</h3>
                   <label className="game-control">
                     Subject
@@ -9543,10 +10073,6 @@ function App() {
                       <small>Average accuracy</small>
                       <strong>{Math.round(algorithmInsights.averageAccuracy * 100)}%</strong>
                     </div>
-                  </div>
-                  <div className="actions-row">
-                    <button className="secondary" onClick={() => navigate('/study')}>Back</button>
-                    <button className="primary" onClick={beginStudyTest} disabled={studyTestSelectionCount === 0}>Start Test</button>
                   </div>
                 </article>
               ) : !studyTestSessionDone && currentQuestion ? (
@@ -10421,7 +10947,7 @@ function App() {
                   </div>
                   <InteractiveTrendChart
                     chartId="stats-recent-accuracy"
-                    values={compressTrendPoints(statsAnalytics.recentScoreTrend, 72)}
+                    values={statsRecentTrendValues}
                     ariaLabel="Recent score trend"
                     pointLabel="Attempt"
                     valueSuffix=" pts"
@@ -11414,6 +11940,34 @@ function App() {
         </div>
       ) : null}
 
+      {homeWhatsNewOpen ? (
+        <div className="profile-modal-overlay home-whats-new-overlay" onClick={() => setHomeWhatsNewOpen(false)}>
+          <div className="card home-whats-new-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="home-whats-new-head">
+              <div className="home-whats-new-title-wrap">
+                <p className="eyebrow">Release Notes</p>
+                <h3>What’s New · v0.3</h3>
+              </div>
+              <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="home-whats-new-list">
+              {releaseNotesV03.map((group) => (
+                <article key={`v03-note-${group.title}`} className="home-whats-new-card">
+                  <h4>{group.title}</h4>
+                  <ul>
+                    {group.items.map((item) => (
+                      <li key={`${group.title}-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showResetConfirmModal ? (
         <div
           className="profile-modal-overlay"
@@ -11604,6 +12158,11 @@ function App() {
                     </span>
                   ) : null}
                 </strong>
+              </div>
+              <div className="leader-profile-stat">
+                <p className="leader-profile-label">#1 Spots</p>
+                <strong>{selectedLeaderboardAllTimeFirstSpots}</strong>
+                <span className="leader-profile-substat">Weekly: {selectedLeaderboardWeeklyFirstSpots}</span>
               </div>
             </div>
             <div className="leader-profile-footer">
@@ -11865,6 +12424,10 @@ function App() {
           currentUsername={profileUsername}
           userAgency={profileDetails?.agency}
           isOwner={isOwner}
+          leaderboardFirstSpotCounts={{
+            allTime: allTimeFirstSpotCountsByUser,
+            weekly: weeklyFirstSpotCountsByUser,
+          }}
         />
       ) : null}
       <SpeedInsights />
