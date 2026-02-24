@@ -1,16 +1,63 @@
 [
   {
-    "id": "pc-pc-37-treason",
+    "id": "262dd684-b0e1-4057-80f7-94c96a5d909e",
     "category": "pc",
-    "title": "Treason",
-    "question": "Which section number matches: Treason?",
-    "answer": "PC 37",
-    "tags": [
-      "state crimes"
-    ],
-    "difficulty": "medium",
-    "codeSection": "PC 37",
-    "explanation": "Giving aid and comfort while owing allegiance to the state."
+    "title": "Extortion",
+    "question": "Which section number matches: Extortion?",
+    "answer": "PC 518",
+    "tags": [],
+    "codeSection": "PC 518",
+    "explanation": "obtaining property, money, or official acts from someone through coerced consent, typically via threats of force, fear, or exposing secrets"
+  },
+  {
+    "id": "4cac9a5b-718e-4cb7-bb62-f2959e86f78f",
+    "category": "pc",
+    "title": "Child Stealing",
+    "question": "Which section number matches: Child Stealing?",
+    "answer": "PC 278",
+    "tags": [],
+    "codeSection": "PC 278",
+    "explanation": "child abduction as maliciously taking, enticing away, keeping, withholding, or concealing a child under 18 from their lawful custodian by someone without legal custody rights."
+  },
+  {
+    "id": "a4d4cfc4-1913-42a0-89d7-c406eb9e9797",
+    "category": "pc",
+    "title": "forged or counterfeit driver's license",
+    "question": "Which section number matches: forged or counterfeit driver's license?",
+    "answer": "PC 470a",
+    "tags": [],
+    "codeSection": "PC 470a",
+    "explanation": "Every person who alters, falsifies, forges, duplicates or in any manner reproduces or counterfeits any driver’s license or identification card issued by a governmental agency with the intent that such driver’s license or identification card be used to facilitate the commission of any forgery, is punishable by imprisonment in a county jail for not more than one year, or by imprisonment pursuant to subdivision (h) of Section 1170."
+  },
+  {
+    "id": "afd206ec-468b-4404-8909-c8e8974c3c2a",
+    "category": "pc",
+    "title": "Child Abuse",
+    "question": "Which section number matches: Child Abuse?",
+    "answer": "PC 273d",
+    "tags": [],
+    "codeSection": "PC 273d",
+    "explanation": "child abuse as the willful, unreasonable infliction of corporal punishment or injury on a child, resulting in a traumatic condition."
+  },
+  {
+    "id": "52b40030-f0d3-4d16-9b6a-c7cafe95bd59",
+    "category": "pc",
+    "title": "Shooting at Unoccupied Vehicle or Dwelling",
+    "question": "Which section number matches: Shooting at Unoccupied Vehicle or Dwelling?",
+    "answer": "PC 247",
+    "tags": [],
+    "codeSection": "PC 247",
+    "explanation": "willfully and maliciously discharge a firearm at an unoccupied aircraft, motor vehicle, or uninhabited building/dwelling."
+  },
+  {
+    "id": "ce6e6aa9-a70d-424e-a4fb-3f22a3bda833",
+    "category": "pc",
+    "title": "Mayhem",
+    "question": "Which section number matches: Mayhem?",
+    "answer": "PC 203",
+    "tags": [],
+    "codeSection": "PC 203",
+    "explanation": "unlawfully and maliciously depriving a human being of a body member, disabling/disfiguring them, or cutting a tongue, lip, nose, or ear."
   },
   {
     "id": "pc-pc-69-resisting-or-obstructing-an-executiv",
@@ -25,6 +72,19 @@
     "difficulty": "easy",
     "codeSection": "PC 69",
     "explanation": "Attempting by threats or violence to deter or prevent an executive officer from performing a lawful duty."
+  },
+  {
+    "id": "pc-pc-37-treason",
+    "category": "pc",
+    "title": "Treason",
+    "question": "Which section number matches: Treason?",
+    "answer": "PC 37",
+    "tags": [
+      "state crimes"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 37",
+    "explanation": "Giving aid and comfort while owing allegiance to the state."
   },
   {
     "id": "pc-pc-148-resisting-obstructing-or-delaying-an",
@@ -52,19 +112,6 @@
     "difficulty": "easy",
     "codeSection": "PC 187",
     "explanation": "Unlawful killing of a human being or fetus with malice aforethought."
-  },
-  {
-    "id": "pc-pc-192-manslaughter",
-    "category": "pc",
-    "title": "Manslaughter",
-    "question": "Which section number matches: Manslaughter?",
-    "answer": "PC 192",
-    "tags": [
-      "homicide"
-    ],
-    "difficulty": "easy",
-    "codeSection": "PC 192",
-    "explanation": "Killing a human being without malice aforethought."
   },
   {
     "id": "pc-pc-207-kidnapping",
@@ -105,6 +152,19 @@
     "difficulty": "easy",
     "codeSection": "PC 215",
     "explanation": "Taking a motor vehicle in another's possession by force or fear."
+  },
+  {
+    "id": "pc-pc-192-manslaughter",
+    "category": "pc",
+    "title": "Manslaughter",
+    "question": "Which section number matches: Manslaughter?",
+    "answer": "PC 192",
+    "tags": [
+      "homicide"
+    ],
+    "difficulty": "easy",
+    "codeSection": "PC 192",
+    "explanation": "Killing a human being without malice aforethought."
   },
   {
     "id": "pc-pc-236-false-imprisonment",

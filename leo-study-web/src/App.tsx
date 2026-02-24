@@ -9835,7 +9835,6 @@ function App() {
                   </button>
                 ) : (
                   <div className="study-session-top-actions study-session-top-actions-centered">
-                    <button className="secondary study-session-top-action study-session-top-action-back" onClick={() => navigate('/study')}>Back</button>
                     <button className="primary study-session-top-action study-session-top-action-start" onClick={beginStudyFlashcards} disabled={studyFlashSelectionCount === 0}>
                       Start Flashcards
                     </button>
@@ -9901,7 +9900,6 @@ function App() {
               ) : orderedStudyFlashSessionCards.length === 0 ? (
                 <div className="card study-session-empty">
                   <p>No flashcards found for this selection.</p>
-                  <button className="primary" onClick={() => navigate('/study')}>Back</button>
                 </div>
               ) : (
                 <>
@@ -9982,7 +9980,6 @@ function App() {
                 </div>
                 {!studyTestSessionOpen ? (
                   <div className="study-session-top-actions study-session-top-actions-centered">
-                    <button className="secondary study-session-top-action study-session-top-action-back" onClick={() => navigate('/study')}>Back</button>
                     <button className="primary study-session-top-action study-session-top-action-start" onClick={beginStudyTest} disabled={studyTestSelectionCount === 0}>
                       Start Test
                     </button>

@@ -4893,7 +4893,7 @@ textarea {
   grid-column: 1 / -1;
   position: relative;
   min-height: 40px;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .study-session-top-action {
@@ -4904,10 +4904,18 @@ textarea {
 }
 
 .study-session-top-action-start {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  position: static;
+  left: auto;
+  transform: none;
   min-width: 220px;
+}
+
+button.study-session-top-action-start:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button.study-session-top-action-start:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .study-session-top-flash-open {
