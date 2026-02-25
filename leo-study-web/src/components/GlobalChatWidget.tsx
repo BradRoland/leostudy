@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, type SyntheticEvent } from 'react'
 import { supabase } from '../lib/supabase'
 
 type PublicMessage = {
@@ -18,6 +18,8 @@ type PublicMessageReaction = {
   emoji: string
   created_at: string
 }
+
+type MessageReactionMap = Record<string, Record<string, string[]>>
 
 type UserProfileStats = {
   user_id: string
@@ -53,9 +55,51 @@ type Props = {
 const MAX_MESSAGES = 100
 const MESSAGE_MAX_LENGTH = 280
 const RATE_LIMIT_MS = 2000
+const CHAT_CACHE_KEY = 'leo_global_chat_cache_v1'
+const CHAT_CACHE_TTL_MS = 5 * 60 * 1000
+
+let hotMessageCache: PublicMessage[] = []
+let hotReactionCache: MessageReactionMap = {}
+let hotChatCacheAt = 0
+
+function readChatCache() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(CHAT_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as {
+      at?: number
+      messages?: PublicMessage[]
+      reactions?: MessageReactionMap
+    }
+    if (!parsed || typeof parsed !== 'object') return null
+    const at = Number(parsed.at || 0)
+    if (!Number.isFinite(at) || at <= 0) return null
+    if (Date.now() - at > CHAT_CACHE_TTL_MS) return null
+    const messages = Array.isArray(parsed.messages) ? parsed.messages.slice(-MAX_MESSAGES) : []
+    const reactions = parsed.reactions && typeof parsed.reactions === 'object' ? parsed.reactions : {}
+    return { at, messages, reactions }
+  } catch {
+    return null
+  }
+}
+
+function writeChatCache(messages: PublicMessage[], reactions: MessageReactionMap) {
+  if (typeof window === 'undefined') return
+  try {
+    const payload = {
+      at: Date.now(),
+      messages: messages.slice(-MAX_MESSAGES),
+      reactions,
+    }
+    window.sessionStorage.setItem(CHAT_CACHE_KEY, JSON.stringify(payload))
+  } catch {
+    // ignore cache write failures
+  }
+}
 
 function reactionsToMap(rows: PublicMessageReaction[]) {
-  const map: Record<string, Record<string, string[]>> = {}
+  const map: MessageReactionMap = {}
   for (const row of rows) {
     if (!map[row.message_id]) map[row.message_id] = {}
     if (!map[row.message_id][row.emoji]) map[row.message_id][row.emoji] = []
@@ -67,7 +111,7 @@ function reactionsToMap(rows: PublicMessageReaction[]) {
 }
 
 function addReactionToMap(
-  prev: Record<string, Record<string, string[]>>,
+  prev: MessageReactionMap,
   messageId: string,
   emoji: string,
   userId: string,
@@ -85,7 +129,7 @@ function addReactionToMap(
 }
 
 function removeReactionFromMap(
-  prev: Record<string, Record<string, string[]>>,
+  prev: MessageReactionMap,
   messageId: string,
   emoji: string,
   userId: string,
@@ -139,7 +183,16 @@ export function GlobalChatWidget({
   const [selectedProfile, setSelectedProfile] = useState<UserProfileStats | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [reactionPicker, setReactionPicker] = useState<{ messageId: string; left: number; top: number } | null>(null)
-  const [messageReactions, setMessageReactions] = useState<Record<string, Record<string, string[]>>>({})
+  const [reactionHover, setReactionHover] = useState<{
+    messageId: string
+    emoji: string
+    users: string[]
+    left: number
+    top: number
+    originX: number
+  } | null>(null)
+  const [messageReactions, setMessageReactions] = useState<MessageReactionMap>({})
+  const [reactionUserNames, setReactionUserNames] = useState<Record<string, string>>({})
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -150,6 +203,8 @@ export function GlobalChatWidget({
   const fullModeAutoScrolledRef = useRef(false)
   const reactionActionGuardRef = useRef<Record<string, number>>({})
   const reactionSyncInFlightRef = useRef(false)
+  const cacheHydratedRef = useRef(false)
+  const reactionUserNamesRef = useRef<Record<string, string>>({})
   const supabaseClient = supabase
   const isOpenRef = useRef(isOpen)
 
@@ -165,6 +220,90 @@ export function GlobalChatWidget({
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  useEffect(() => {
+    reactionUserNamesRef.current = reactionUserNames
+  }, [reactionUserNames])
+
+  const ensureReactionUserNames = useCallback(async (userIds: string[]) => {
+    if (!supabaseClient || userIds.length === 0) return
+
+    const uniqueIds = Array.from(new Set(userIds.filter(Boolean)))
+    if (uniqueIds.length === 0) return
+
+    const namesFromMessages: Record<string, string> = {}
+    for (const message of messagesRef.current) {
+      if (message.user_id && message.display_name) {
+        namesFromMessages[message.user_id] = message.display_name
+      }
+    }
+
+    if (Object.keys(namesFromMessages).length > 0) {
+      setReactionUserNames((prev) => {
+        const next = { ...prev }
+        let changed = false
+        for (const [userId, name] of Object.entries(namesFromMessages)) {
+          if (!next[userId] && name) {
+            next[userId] = name
+            changed = true
+          }
+        }
+        return changed ? next : prev
+      })
+    }
+
+    const knownNames = {
+      ...reactionUserNamesRef.current,
+      ...namesFromMessages,
+    }
+    const unknownIds = uniqueIds.filter((userId) => !knownNames[userId])
+    if (unknownIds.length === 0) return
+
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('user_id,username')
+      .in('user_id', unknownIds)
+
+    if (error || !data) {
+      if (error) {
+        console.error('Failed to load reaction user names:', error)
+      }
+      return
+    }
+
+    const fetchedNames: Record<string, string> = {}
+    for (const row of data as Array<{ user_id: string | null; username: string | null }>) {
+      if (!row.user_id) continue
+      fetchedNames[row.user_id] = row.username?.trim() || `User ${row.user_id.slice(0, 6)}`
+    }
+
+    if (Object.keys(fetchedNames).length === 0) return
+
+    setReactionUserNames((prev) => ({
+      ...prev,
+      ...fetchedNames,
+    }))
+  }, [supabaseClient])
+
+  useEffect(() => {
+    const userIds = Array.from(
+      new Set(
+        Object.values(messageReactions).flatMap((reactionsByEmoji) =>
+          Object.values(reactionsByEmoji).flatMap((users) => users),
+        ),
+      ),
+    )
+    if (userIds.length === 0) return
+    void ensureReactionUserNames(userIds)
+  }, [messageReactions, ensureReactionUserNames])
+
+  useEffect(() => {
+    if (!cacheHydratedRef.current) return
+    hotMessageCache = messages
+    hotReactionCache = messageReactions
+    hotChatCacheAt = Date.now()
+    writeChatCache(messages, messageReactions)
+  }, [messageReactions, messages])
 
   const loadReactionsForMessageIds = useCallback(async (messageIds: string[]) => {
     if (!supabaseClient) return {}
@@ -183,13 +322,16 @@ export function GlobalChatWidget({
     return reactionsToMap(data as PublicMessageReaction[])
   }, [supabaseClient])
 
-  const refreshVisibleReactions = useCallback(async () => {
+  const refreshVisibleReactions = useCallback(async (messageIdsOverride?: string[]) => {
     if (!supabaseClient) return
     if (reactionSyncInFlightRef.current) return
 
-    const visibleMessageIds = messagesRef.current.map((message) => message.id)
+    const visibleMessageIds = (messageIdsOverride && messageIdsOverride.length > 0
+      ? messageIdsOverride
+      : messagesRef.current.map((message) => message.id))
     if (visibleMessageIds.length === 0) {
       setMessageReactions({})
+      hotReactionCache = {}
       return
     }
 
@@ -198,6 +340,9 @@ export function GlobalChatWidget({
       const reactionMap = await loadReactionsForMessageIds(visibleMessageIds)
       if (reactionMap) {
         setMessageReactions(reactionMap)
+        hotReactionCache = reactionMap
+        hotChatCacheAt = Date.now()
+        writeChatCache(messagesRef.current, reactionMap)
       }
     } finally {
       reactionSyncInFlightRef.current = false
@@ -208,6 +353,28 @@ export function GlobalChatWidget({
     if (!isFullMode) return
     setIsOpen(true)
   }, [isFullMode])
+
+  useEffect(() => {
+    const isHotCacheFresh = hotMessageCache.length > 0 && Date.now() - hotChatCacheAt <= CHAT_CACHE_TTL_MS
+    if (isHotCacheFresh) {
+      setMessages(hotMessageCache)
+      messagesRef.current = hotMessageCache
+      setMessageReactions(hotReactionCache)
+      cacheHydratedRef.current = true
+      return
+    }
+
+    const sessionCache = readChatCache()
+    if (sessionCache && sessionCache.messages.length > 0) {
+      setMessages(sessionCache.messages)
+      messagesRef.current = sessionCache.messages
+      setMessageReactions(sessionCache.reactions)
+      hotMessageCache = sessionCache.messages
+      hotReactionCache = sessionCache.reactions
+      hotChatCacheAt = sessionCache.at
+    }
+    cacheHydratedRef.current = true
+  }, [])
 
   // Load initial messages once on mount
   useEffect(() => {
@@ -222,7 +389,17 @@ export function GlobalChatWidget({
       if (data) {
         const latestMessages = (data as PublicMessage[]).reverse()
         setMessages(latestMessages)
-        void refreshVisibleReactions()
+        messagesRef.current = latestMessages
+        hotMessageCache = latestMessages
+        hotChatCacheAt = Date.now()
+        const ids = latestMessages.map((message) => message.id)
+        if (ids.length > 0) {
+          await refreshVisibleReactions(ids)
+        } else {
+          setMessageReactions({})
+          hotReactionCache = {}
+          writeChatCache(latestMessages, {})
+        }
       }
     }
 
@@ -300,6 +477,7 @@ export function GlobalChatWidget({
         { event: 'INSERT', schema: 'public', table: 'public_message_reactions' },
         (payload) => {
           const row = payload.new as PublicMessageReaction
+          void ensureReactionUserNames([row.user_id])
           setMessageReactions((prev) => addReactionToMap(prev, row.message_id, row.emoji, row.user_id))
           window.setTimeout(() => {
             void refreshVisibleReactions()
@@ -322,7 +500,7 @@ export function GlobalChatWidget({
     return () => {
       supabaseClient.removeChannel(channel)
     }
-  }, [refreshVisibleReactions, supabaseClient])
+  }, [ensureReactionUserNames, refreshVisibleReactions, supabaseClient])
 
   // Poll for new messages every 5 seconds (lightweight fallback)
   useEffect(() => {
@@ -340,7 +518,10 @@ export function GlobalChatWidget({
         const newMessageDetected = latestMessages.some((m) => !existingIds.has(m.id))
 
         setMessages(latestMessages)
-        void refreshVisibleReactions()
+        messagesRef.current = latestMessages
+        hotMessageCache = latestMessages
+        hotChatCacheAt = Date.now()
+        void refreshVisibleReactions(latestMessages.map((message) => message.id))
 
         // Update unread indicator from polling too
         if (newMessageDetected) {
@@ -388,6 +569,9 @@ export function GlobalChatWidget({
       if (!target) return
       if (target.closest('.global-chat-reaction-picker') || target.closest('.global-chat-reaction-add')) return
       setReactionPicker(null)
+      if (!target.closest('.global-chat-reaction') && !target.closest('.global-chat-reaction-tooltip')) {
+        setReactionHover(null)
+      }
     }
     document.addEventListener('mousedown', onPointerDown)
     return () => document.removeEventListener('mousedown', onPointerDown)
@@ -400,6 +584,7 @@ export function GlobalChatWidget({
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight
     isNearBottomRef.current = distanceFromBottom < 100
     setReactionPicker(null)
+    setReactionHover(null)
     
     if (isNearBottomRef.current) {
       setHasNewMessages(false)
@@ -484,7 +669,12 @@ export function GlobalChatWidget({
         .order('created_at', { ascending: false })
         .limit(MAX_MESSAGES)
       if (data) {
-        setMessages(data.reverse())
+        const latestMessages = (data as PublicMessage[]).reverse()
+        setMessages(latestMessages)
+        messagesRef.current = latestMessages
+        hotMessageCache = latestMessages
+        hotChatCacheAt = Date.now()
+        void refreshVisibleReactions(latestMessages.map((message) => message.id))
         // Scroll to bottom after sending
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -495,10 +685,49 @@ export function GlobalChatWidget({
     } finally {
       setSending(false)
     }
-  }, [inputValue, currentUserId, currentUsername, userAgency, supabaseClient, isAuthenticated])
+  }, [inputValue, currentUserId, currentUsername, userAgency, supabaseClient, isAuthenticated, refreshVisibleReactions])
 
   const addEmojiToInput = useCallback((emoji: string) => {
     setInputValue((previous) => `${previous}${emoji}`)
+  }, [])
+
+  const formatReactionHoverText = useCallback((users: string[]) => {
+    if (users.length === 0) return 'No reactions yet'
+    return users
+      .map((userId) => {
+        if (userId === currentUserId) return 'You'
+        return reactionUserNames[userId] || `User ${userId.slice(0, 6)}`
+      })
+      .join(', ')
+  }, [currentUserId, reactionUserNames])
+
+  const showReactionHover = useCallback(
+    (event: SyntheticEvent<HTMLElement>, messageId: string, emoji: string, users: string[]) => {
+      const target = event.currentTarget
+      const rect = target.getBoundingClientRect()
+      const estimatedChars = users.reduce((total, userId) => {
+        const label = userId === currentUserId ? 'You' : (reactionUserNames[userId] || `User ${userId.slice(0, 6)}`)
+        return total + label.length + 2
+      }, 0)
+      const tooltipWidth = Math.min(Math.max(64, estimatedChars * 6.8), Math.min(460, window.innerWidth - 24))
+      const left = Math.max(
+        12,
+        Math.min(rect.left + rect.width / 2 - tooltipWidth / 2, window.innerWidth - tooltipWidth - 12),
+      )
+      const top = Math.max(12, rect.top - 12)
+      const originX = Math.max(8, Math.min(rect.left + rect.width / 2 - left, tooltipWidth - 8))
+      setReactionHover({ messageId, emoji, users: [...users], left, top, originX })
+      void ensureReactionUserNames(users)
+    },
+    [currentUserId, ensureReactionUserNames, reactionUserNames],
+  )
+
+  const hideReactionHover = useCallback((messageId: string, emoji: string) => {
+    setReactionHover((previous) => {
+      if (!previous) return previous
+      if (previous.messageId !== messageId || previous.emoji !== emoji) return previous
+      return null
+    })
   }, [])
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
@@ -746,11 +975,18 @@ export function GlobalChatWidget({
                     .map(([emoji, users]) => {
                       const count = users.length
                       const active = users.includes(currentUserId)
+                      const hoverLabel = formatReactionHoverText(users)
                       return (
                         <button
                           key={`${msg.id}-${emoji}`}
                           type="button"
                           className={active ? 'global-chat-reaction active' : 'global-chat-reaction'}
+                          title={hoverLabel}
+                          aria-label={`${emoji} reaction • ${count} ${count === 1 ? 'person' : 'people'} • ${hoverLabel}`}
+                          onMouseEnter={(event) => showReactionHover(event, msg.id, emoji, users)}
+                          onMouseLeave={() => hideReactionHover(msg.id, emoji)}
+                          onFocus={(event) => showReactionHover(event, msg.id, emoji, users)}
+                          onBlur={() => hideReactionHover(msg.id, emoji)}
                           onClick={(event) => {
                             event.preventDefault()
                             event.stopPropagation()
@@ -767,6 +1003,7 @@ export function GlobalChatWidget({
                       type="button"
                       className="global-chat-reaction-add"
                       onClick={(event) => {
+                        setReactionHover(null)
                         const button = event.currentTarget
                         const buttonRect = button.getBoundingClientRect()
                         const estimatedWidth = Math.min(320, window.innerWidth - 24)
@@ -865,6 +1102,18 @@ export function GlobalChatWidget({
             ))}
             <div ref={messagesEndRef} />
           </div>
+          {reactionHover ? (
+            <div
+              className="global-chat-reaction-tooltip"
+              style={{
+                left: `${reactionHover.left}px`,
+                top: `${reactionHover.top}px`,
+                transformOrigin: `${reactionHover.originX}px calc(100% + 10px)`,
+              }}
+            >
+              {formatReactionHoverText(reactionHover.users)}
+            </div>
+          ) : null}
 
           {hasNewMessages && (
             <button className="global-chat-new-indicator" onClick={scrollToBottom}>
