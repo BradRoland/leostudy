@@ -180,6 +180,12 @@
   color: #4ba4ff;
 }
 
+.global-chat-name-system {
+  color: var(--text-secondary, #aab6dc);
+  cursor: default;
+  letter-spacing: 0.02em;
+}
+
 .global-chat-agency {
   font-size: 10px;
   color: var(--muted, #b3bedf);
@@ -799,6 +805,12 @@
 .global-chat-name,
 .global-chat-name:hover {
   color: var(--accent, #4a63ff) !important;
+}
+
+.global-chat-name-system,
+.global-chat-name-system:hover {
+  color: var(--text-secondary, #aab6dc) !important;
+  text-decoration: none !important;
 }
 
 .global-chat-send {

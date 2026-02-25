@@ -1881,11 +1881,24 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`
 }
 
+function glowNormalization(style: NameStyle) {
+  const fontKey = style.fontFamily.toLowerCase()
+  let multiplier = 1
+  if (fontKey.includes('pacifico')) multiplier *= 0.46
+  if (fontKey.includes('caveat')) multiplier *= 0.62
+  if (fontKey.includes('bebas')) multiplier *= 0.54
+  if (fontKey.includes('playfair') || fontKey.includes('merriweather')) multiplier *= 0.9
+  if (style.fontWeight >= 700) multiplier *= 0.9
+  if (style.fontStyle === 'italic') multiplier *= 0.94
+  return Math.max(0.5, Math.min(1, multiplier))
+}
+
 function displayNameStyle(nameStyle: NameStyle | undefined, tier: SupporterTier): CSSProperties | undefined {
   if (!nameStyle || tier !== 'tier10') return undefined
   const style = sanitizeNameStyle(nameStyle)
-  const glowAlpha = Math.min(0.95, 0.12 + style.glowIntensity / 140)
-  const glowRadius = 4 + style.glowIntensity / 2.4
+  const normalized = glowNormalization(style)
+  const glowAlpha = Math.min(0.9, (0.12 + style.glowIntensity / 140) * normalized)
+  const glowRadius = (4 + style.glowIntensity / 2.4) * normalized
   const glowColor = hexToRgba(style.color, glowAlpha)
   return {
     color: style.color,
@@ -1893,7 +1906,9 @@ function displayNameStyle(nameStyle: NameStyle | undefined, tier: SupporterTier)
     fontFamily: style.fontFamily,
     fontWeight: style.fontWeight,
     fontStyle: style.fontStyle,
-    textShadow: style.glowEnabled ? `0 0 ${glowRadius}px ${glowColor}, 0 0 ${Math.max(2, glowRadius * 0.45)}px ${glowColor}` : undefined,
+    textShadow: style.glowEnabled
+      ? `0 0 ${glowRadius}px ${glowColor}, 0 0 ${Math.max(1.8, glowRadius * 0.42)}px ${glowColor}`
+      : undefined,
   }
 }
 
@@ -3010,7 +3025,7 @@ function App() {
     fetchOnlinePresence()
 
     return () => clearInterval(interval)
-  }, [currentUserId])
+  }, [currentUserId, supabase])
 
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
@@ -3361,7 +3376,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [currentUserId])
+  }, [currentUserId, supabase])
 
   useEffect(() => {
     setProfileDetails((previous) => {
@@ -4941,18 +4956,17 @@ function App() {
     if (!supabase || !currentUserId) return
     const trimmed = message.trim()
     if (!trimmed) return
-    const displayName = String(profile?.username || currentUserEmail || 'Player').trim() || 'Player'
     try {
       await supabase.from('public_messages').insert({
         user_id: currentUserId,
-        display_name: displayName.slice(0, 80),
-        agency: profileDetails.agency || null,
+        display_name: '🔔 System',
+        agency: null,
         message: trimmed.slice(0, 260),
       })
     } catch (error) {
       console.error('Could not post leaderboard announcement:', error)
     }
-  }, [currentUserEmail, currentUserId, profile?.username, profileDetails.agency])
+  }, [currentUserId])
 
   const shouldPostLeaderboardAnnouncement = useCallback((key: string) => {
     const now = Date.now()

@@ -952,154 +952,150 @@ export function GlobalChatWidget({
           </div>
 
           <div className="global-chat-messages" ref={containerRef} onScroll={handleScroll}>
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`global-chat-message ${msg.user_id === currentUserId ? 'own' : ''} ${msg.is_deleted ? 'deleted' : ''}`}
-              >
-                <div className="global-chat-message-header">
-                  <button 
-                    className="global-chat-name" 
-                    onClick={() => void fetchUserProfile(msg.user_id)}
-                  >
-                    {msg.display_name}
-                  </button>
-                  {msg.agency && <span className="global-chat-agency">{msg.agency}</span>}
-                  <span className="global-chat-time">{formatTime(msg.created_at)}</span>
-                </div>
-                <p className="global-chat-text">{msg.message}</p>
-                <div className="global-chat-reactions">
-                  {Object.entries(messageReactions[msg.id] || {})
-                    .filter(([, users]) => users.length > 0)
-                    .sort((left, right) => right[1].length - left[1].length)
-                    .map(([emoji, users]) => {
-                      const count = users.length
-                      const active = users.includes(currentUserId)
-                      const hoverLabel = formatReactionHoverText(users)
-                      return (
-                        <button
-                          key={`${msg.id}-${emoji}`}
-                          type="button"
-                          className={active ? 'global-chat-reaction active' : 'global-chat-reaction'}
-                          title={hoverLabel}
-                          aria-label={`${emoji} reaction • ${count} ${count === 1 ? 'person' : 'people'} • ${hoverLabel}`}
-                          onMouseEnter={(event) => showReactionHover(event, msg.id, emoji, users)}
-                          onMouseLeave={() => hideReactionHover(msg.id, emoji)}
-                          onFocus={(event) => showReactionHover(event, msg.id, emoji, users)}
-                          onBlur={() => hideReactionHover(msg.id, emoji)}
-                          onClick={(event) => {
-                            event.preventDefault()
-                            event.stopPropagation()
-                            void toggleReaction(msg.id, emoji)
-                          }}
-                        >
-                          <span>{emoji}</span>
-                          <small>{count}</small>
-                        </button>
-                      )
-                    })}
-                  {!msg.is_deleted ? (
-                    <button
-                      type="button"
-                      className="global-chat-reaction-add"
-                      onClick={(event) => {
-                        setReactionHover(null)
-                        const button = event.currentTarget
-                        const buttonRect = button.getBoundingClientRect()
-                        const estimatedWidth = Math.min(320, window.innerWidth - 24)
-                        const left = Math.max(
-                          12,
-                          Math.min(
-                            buttonRect.left + buttonRect.width / 2 - estimatedWidth / 2,
-                            window.innerWidth - estimatedWidth - 12,
-                          ),
-                        )
-                        const top = Math.max(12, buttonRect.top)
-                        setReactionPicker((previous) =>
-                          previous?.messageId === msg.id ? null : { messageId: msg.id, left, top },
-                        )
-                      }}
-                      aria-label="Add reaction"
-                    >
-                      <span className="global-chat-reaction-add-plus">+</span>
-                      <span className="global-chat-reaction-add-emoji">😊</span>
-                    </button>
-                  ) : null}
-                </div>
-                {reactionPicker?.messageId === msg.id ? (
-                  <div
-                    className="global-chat-reaction-picker"
-                    style={{
-                      left: `${reactionPicker.left}px`,
-                      top: `${reactionPicker.top}px`,
-                    }}
-                  >
-                    <p className="global-chat-reaction-picker-title">Popular</p>
-                    <div className="global-chat-reaction-picker-row">
-                      {popularReactionEmojis.map((emoji) => (
-                        <button
-                          key={`popular-${msg.id}-${emoji}`}
-                          type="button"
-                          className="global-chat-reaction-option"
-                          onMouseDown={(event) => {
-                            event.preventDefault()
-                            event.stopPropagation()
-                          }}
-                          onClick={(event) => {
-                            event.preventDefault()
-                            event.stopPropagation()
-                            void toggleReaction(msg.id, emoji)
-                            setReactionPicker(null)
-                          }}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="global-chat-reaction-picker-title">All emojis</p>
-                    <div className="global-chat-reaction-picker-grid">
-                      {allReactionEmojis.map((emoji) => (
-                        <button
-                          key={`all-${msg.id}-${emoji}`}
-                          type="button"
-                          className="global-chat-reaction-option"
-                          onMouseDown={(event) => {
-                            event.preventDefault()
-                            event.stopPropagation()
-                          }}
-                          onClick={(event) => {
-                            event.preventDefault()
-                            event.stopPropagation()
-                            void toggleReaction(msg.id, emoji)
-                            setReactionPicker(null)
-                          }}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
+            {messages.map((msg) => {
+              const messageDisplayName = String(msg.display_name || '').trim().toLowerCase()
+              const isSystemMessage = messageDisplayName === 'system' || messageDisplayName === '🔔 system'
+              const isOwnMessage = msg.user_id === currentUserId && !isSystemMessage
+
+              return (
+                <div key={msg.id} className={`global-chat-message ${isOwnMessage ? 'own' : ''} ${msg.is_deleted ? 'deleted' : ''}`}>
+                  <div className="global-chat-message-header">
+                    {isSystemMessage ? (
+                      <span className="global-chat-name global-chat-name-system">{msg.display_name}</span>
+                    ) : (
+                      <button className="global-chat-name" onClick={() => void fetchUserProfile(msg.user_id)}>
+                        {msg.display_name}
+                      </button>
+                    )}
+                    {msg.agency && <span className="global-chat-agency">{msg.agency}</span>}
+                    <span className="global-chat-time">{formatTime(msg.created_at)}</span>
                   </div>
-                ) : null}
-                {!msg.is_deleted && msg.user_id !== currentUserId && (
-                  <button
-                    className="global-chat-report"
-                    onClick={() => setReportModalOpen(msg.id)}
-                    aria-label="Report message"
-                  >
-                    ⋯
-                  </button>
-                )}
-                {isOwner && !msg.is_deleted && (
-                  <button
-                    className="global-chat-delete"
-                    onClick={() => handleDelete(msg.id)}
-                    aria-label="Delete message"
-                  >
-                    🗑
-                  </button>
-                )}
-              </div>
-            ))}
+                  <p className="global-chat-text">{msg.message}</p>
+                  <div className="global-chat-reactions">
+                    {Object.entries(messageReactions[msg.id] || {})
+                      .filter(([, users]) => users.length > 0)
+                      .sort((left, right) => right[1].length - left[1].length)
+                      .map(([emoji, users]) => {
+                        const count = users.length
+                        const active = users.includes(currentUserId)
+                        const hoverLabel = formatReactionHoverText(users)
+                        return (
+                          <button
+                            key={`${msg.id}-${emoji}`}
+                            type="button"
+                            className={active ? 'global-chat-reaction active' : 'global-chat-reaction'}
+                            title={hoverLabel}
+                            aria-label={`${emoji} reaction • ${count} ${count === 1 ? 'person' : 'people'} • ${hoverLabel}`}
+                            onMouseEnter={(event) => showReactionHover(event, msg.id, emoji, users)}
+                            onMouseLeave={() => hideReactionHover(msg.id, emoji)}
+                            onFocus={(event) => showReactionHover(event, msg.id, emoji, users)}
+                            onBlur={() => hideReactionHover(msg.id, emoji)}
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              void toggleReaction(msg.id, emoji)
+                            }}
+                          >
+                            <span>{emoji}</span>
+                            <small>{count}</small>
+                          </button>
+                        )
+                      })}
+                    {!msg.is_deleted ? (
+                      <button
+                        type="button"
+                        className="global-chat-reaction-add"
+                        onClick={(event) => {
+                          setReactionHover(null)
+                          const button = event.currentTarget
+                          const buttonRect = button.getBoundingClientRect()
+                          const estimatedWidth = Math.min(320, window.innerWidth - 24)
+                          const left = Math.max(
+                            12,
+                            Math.min(
+                              buttonRect.left + buttonRect.width / 2 - estimatedWidth / 2,
+                              window.innerWidth - estimatedWidth - 12,
+                            ),
+                          )
+                          const top = Math.max(12, buttonRect.top)
+                          setReactionPicker((previous) =>
+                            previous?.messageId === msg.id ? null : { messageId: msg.id, left, top },
+                          )
+                        }}
+                        aria-label="Add reaction"
+                      >
+                        <span className="global-chat-reaction-add-plus">+</span>
+                        <span className="global-chat-reaction-add-emoji">😊</span>
+                      </button>
+                    ) : null}
+                  </div>
+                  {reactionPicker?.messageId === msg.id ? (
+                    <div
+                      className="global-chat-reaction-picker"
+                      style={{
+                        left: `${reactionPicker.left}px`,
+                        top: `${reactionPicker.top}px`,
+                      }}
+                    >
+                      <p className="global-chat-reaction-picker-title">Popular</p>
+                      <div className="global-chat-reaction-picker-row">
+                        {popularReactionEmojis.map((emoji) => (
+                          <button
+                            key={`popular-${msg.id}-${emoji}`}
+                            type="button"
+                            className="global-chat-reaction-option"
+                            onMouseDown={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                            }}
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              void toggleReaction(msg.id, emoji)
+                              setReactionPicker(null)
+                            }}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="global-chat-reaction-picker-title">All emojis</p>
+                      <div className="global-chat-reaction-picker-grid">
+                        {allReactionEmojis.map((emoji) => (
+                          <button
+                            key={`all-${msg.id}-${emoji}`}
+                            type="button"
+                            className="global-chat-reaction-option"
+                            onMouseDown={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                            }}
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              void toggleReaction(msg.id, emoji)
+                              setReactionPicker(null)
+                            }}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {!msg.is_deleted && msg.user_id !== currentUserId && (
+                    <button className="global-chat-report" onClick={() => setReportModalOpen(msg.id)} aria-label="Report message">
+                      ⋯
+                    </button>
+                  )}
+                  {isOwner && !msg.is_deleted && (
+                    <button className="global-chat-delete" onClick={() => handleDelete(msg.id)} aria-label="Delete message">
+                      🗑
+                    </button>
+                  )}
+                </div>
+              )
+            })}
             <div ref={messagesEndRef} />
           </div>
           {reactionHover ? (
