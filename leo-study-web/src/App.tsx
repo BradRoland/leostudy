@@ -3183,6 +3183,9 @@ function App() {
   const speedAdvanceTimerRef = useRef<number | null>(null)
   const performanceRef = useRef<Record<string, CodePerformance>>({})
   const matchWrongResetTimerRef = useRef<number | null>(null)
+  const matchTimerDeadlineRef = useRef(0)
+  const matchTimerFinishedRef = useRef(false)
+  const finalizeMatchingSessionRef = useRef<() => void>(() => {})
   const recentSpeedSectionsRef = useRef<string[]>([])
   const scenarioDeckRef = useRef<ScenarioQuestion[]>([])
   const quizFireHostRef = useRef<HTMLDivElement | null>(null)
@@ -5309,169 +5312,186 @@ function App() {
     studyTestWrongness,
   ])
 
-  useEffect(() => {
-    if (!matchRunning) return
-    const timer = setInterval(() => {
-      setMatchRemaining((remaining) => {
-        if (remaining <= 1) {
-          clearInterval(timer)
-          setMatchRunning(false)
-          setMatchDone(true)
-          const finalMatchScore = matchScoreRef.current
-          const finalMatchRound = matchRoundRef.current
-          const finalCorrect = matchCorrectCountRef.current
-          const finalIncorrect = matchIncorrectCountRef.current
-          const finalAttempts = finalCorrect + finalIncorrect
-          const finalAccuracy = finalAttempts > 0 ? Math.round((finalCorrect / finalAttempts) * 100) : 0
-          const sessionDuration = matchSessionDurationRef.current
-          const sessionFilter = matchSessionFilterRef.current
-          const trackKey = sessionTrackKey({ mode: 'matching', duration: sessionDuration, filter: sessionFilter })
-          const track = getSessionTrack(profileDetails.stats, trackKey)
-          const previousAttempt = track.lastAttempt
-          const trend = [...track.accuracyHistory, finalAccuracy].slice(-8)
-          const remoteTrend = remoteTrackScoreHistory[trackKey] || []
-          const baseScoreTrend = remoteTrend.length > 0
-            ? remoteTrend
-            : track.scoreHistory && track.scoreHistory.length > 0
-              ? track.scoreHistory
-              : previousAttempt
-                ? [previousAttempt.score]
-                : []
-          const scoreTrend = [...baseScoreTrend, finalMatchScore]
-          const focusTips = getFocusTips(sessionFilter, 'matching')
-          const previousBest = highScoresRef.current.matching
-          const isPersonalBest = finalMatchScore > previousBest
-          setHighScores((previous) => ({ ...previous, matching: Math.max(previous.matching, finalMatchScore) }))
+  const finalizeMatchingSession = useCallback(() => {
+    const finalMatchScore = matchScoreRef.current
+    const finalMatchRound = matchRoundRef.current
+    const finalCorrect = matchCorrectCountRef.current
+    const finalIncorrect = matchIncorrectCountRef.current
+    const finalAttempts = finalCorrect + finalIncorrect
+    const finalAccuracy = finalAttempts > 0 ? Math.round((finalCorrect / finalAttempts) * 100) : 0
+    const sessionDuration = matchSessionDurationRef.current
+    const sessionFilter = matchSessionFilterRef.current
+    const trackKey = sessionTrackKey({ mode: 'matching', duration: sessionDuration, filter: sessionFilter })
+    const track = getSessionTrack(profileDetails.stats, trackKey)
+    const previousAttempt = track.lastAttempt
+    const trend = [...track.accuracyHistory, finalAccuracy].slice(-8)
+    const remoteTrend = remoteTrackScoreHistory[trackKey] || []
+    const baseScoreTrend = remoteTrend.length > 0
+      ? remoteTrend
+      : track.scoreHistory && track.scoreHistory.length > 0
+        ? track.scoreHistory
+        : previousAttempt
+          ? [previousAttempt.score]
+          : []
+    const scoreTrend = [...baseScoreTrend, finalMatchScore]
+    const focusTips = getFocusTips(sessionFilter, 'matching')
+    const previousBest = highScoresRef.current.matching
+    const isPersonalBest = finalMatchScore > previousBest
+    setHighScores((previous) => ({ ...previous, matching: Math.max(previous.matching, finalMatchScore) }))
 
-          if (supabase && currentUserId) {
-            void (async () => {
-              const leaderboardBeforeSave = [...leaderboardRef.current]
-              // Only save if it's a personal best for this category
-              const existingMatch = leaderboardRef.current.find(
-                (e) => e.userId === currentUserId && 
-                       e.game === 'Matching' && 
-                       e.matchDuration === sessionDuration && 
-                       e.matchFilter === sessionFilter
-              )
-              
-              if (!(existingMatch && existingMatch.score >= finalMatchScore)) {
-                const { error: insertError } = await supabase
-                  .from('leaderboard')
-                  .upsert({
-                    game: 'Matching',
-                    score: finalMatchScore,
-                    round: finalMatchRound,
-                    user_id: currentUserId,
-                    match_duration: sessionDuration,
-                    match_filter: sessionFilter,
-                    created_at: new Date().toISOString(),
-                  }, {
-                    onConflict: 'user_id,game,match_duration,match_filter',
-                    ignoreDuplicates: false,
-                  })
+    if (supabase && currentUserId) {
+      void (async () => {
+        const leaderboardBeforeSave = [...leaderboardRef.current]
+        const existingMatch = leaderboardRef.current.find(
+          (e) => e.userId === currentUserId &&
+            e.game === 'Matching' &&
+            e.matchDuration === sessionDuration &&
+            e.matchFilter === sessionFilter,
+        )
 
-                if (insertError) {
-                  console.error('Matching leaderboard save failed:', insertError)
-                }
-              }
-
-              const refreshed = await refreshLeaderboard({ force: true })
-              await refreshHomeLeaderboards({ force: true })
-              const leaderboardAfterSave = refreshed.length > 0 ? refreshed : leaderboardRef.current
-              const milestone = await handleLeaderboardTopMilestones({
-                game: 'Matching',
-                duration: sessionDuration,
-                filter: sessionFilter,
-                beforeEntries: leaderboardBeforeSave,
-                afterEntries: leaderboardAfterSave,
-              })
-              if (!milestone.becameWeeklyTop && !milestone.becameAllTimeTop && isPersonalBest) {
-                triggerCelebration('🎉 New Personal Best', `Matching: ${finalMatchScore} points`)
-              }
-
-              const { preview, currentRank } = getLeaderboardPreview(
-                leaderboardAfterSave,
-                'Matching',
-                sessionDuration,
-                sessionFilter,
-                currentUserId,
-              )
-              setMatchingReport({
-                mode: 'matching',
-                title: 'Matching',
-                contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
-                accuracy: finalAccuracy,
-                correct: finalCorrect,
-                incorrect: finalIncorrect,
-                score: finalMatchScore,
-                deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
-                deltaScore: previousAttempt ? finalMatchScore - previousAttempt.score : null,
-                trend,
-                scoreTrend,
-                focusTips,
-                leaderboardPreview: preview,
-                currentRank,
-                previousRank: previousAttempt?.rank ?? null,
-              })
-              saveSessionAttempt(trackKey, {
-                accuracy: finalAccuracy,
-                score: finalMatchScore,
-                correct: finalCorrect,
-                incorrect: finalIncorrect,
-                rank: currentRank,
-                duration: sessionDuration,
-                filter: sessionFilter,
-                at: Date.now(),
-              })
-            })()
-          } else {
-            setMatchingReport({
-              mode: 'matching',
-              title: 'Matching',
-              contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
-              accuracy: finalAccuracy,
-              correct: finalCorrect,
-              incorrect: finalIncorrect,
+        if (!(existingMatch && existingMatch.score >= finalMatchScore)) {
+          const { error: insertError } = await supabase
+            .from('leaderboard')
+            .upsert({
+              game: 'Matching',
               score: finalMatchScore,
-              deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
-              deltaScore: previousAttempt ? finalMatchScore - previousAttempt.score : null,
-              trend,
-              scoreTrend,
-              focusTips,
-              leaderboardPreview: [],
-              currentRank: null,
-              previousRank: previousAttempt?.rank ?? null,
+              round: finalMatchRound,
+              user_id: currentUserId,
+              match_duration: sessionDuration,
+              match_filter: sessionFilter,
+              created_at: new Date().toISOString(),
+            }, {
+              onConflict: 'user_id,game,match_duration,match_filter',
+              ignoreDuplicates: false,
             })
-            saveSessionAttempt(trackKey, {
-              accuracy: finalAccuracy,
-              score: finalMatchScore,
-              correct: finalCorrect,
-              incorrect: finalIncorrect,
-              rank: null,
-              duration: sessionDuration,
-              filter: sessionFilter,
-              at: Date.now(),
-            })
+
+          if (insertError) {
+            console.error('Matching leaderboard save failed:', insertError)
           }
-
-          return 0
         }
 
-        return remaining - 1
-      })
-    }, 1000)
+        const refreshed = await refreshLeaderboard({ force: true })
+        await refreshHomeLeaderboards({ force: true })
+        const leaderboardAfterSave = refreshed.length > 0 ? refreshed : leaderboardRef.current
+        const milestone = await handleLeaderboardTopMilestones({
+          game: 'Matching',
+          duration: sessionDuration,
+          filter: sessionFilter,
+          beforeEntries: leaderboardBeforeSave,
+          afterEntries: leaderboardAfterSave,
+        })
+        if (!milestone.becameWeeklyTop && !milestone.becameAllTimeTop && isPersonalBest) {
+          triggerCelebration('🎉 New Personal Best', `Matching: ${finalMatchScore} points`)
+        }
 
-    return () => clearInterval(timer)
+        const { preview, currentRank } = getLeaderboardPreview(
+          leaderboardAfterSave,
+          'Matching',
+          sessionDuration,
+          sessionFilter,
+          currentUserId,
+        )
+        setMatchingReport({
+          mode: 'matching',
+          title: 'Matching',
+          contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
+          accuracy: finalAccuracy,
+          correct: finalCorrect,
+          incorrect: finalIncorrect,
+          score: finalMatchScore,
+          deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+          deltaScore: previousAttempt ? finalMatchScore - previousAttempt.score : null,
+          trend,
+          scoreTrend,
+          focusTips,
+          leaderboardPreview: preview,
+          currentRank,
+          previousRank: previousAttempt?.rank ?? null,
+        })
+        saveSessionAttempt(trackKey, {
+          accuracy: finalAccuracy,
+          score: finalMatchScore,
+          correct: finalCorrect,
+          incorrect: finalIncorrect,
+          rank: currentRank,
+          duration: sessionDuration,
+          filter: sessionFilter,
+          at: Date.now(),
+        })
+      })()
+    } else {
+      setMatchingReport({
+        mode: 'matching',
+        title: 'Matching',
+        contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
+        accuracy: finalAccuracy,
+        correct: finalCorrect,
+        incorrect: finalIncorrect,
+        score: finalMatchScore,
+        deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+        deltaScore: previousAttempt ? finalMatchScore - previousAttempt.score : null,
+        trend,
+        scoreTrend,
+        focusTips,
+        leaderboardPreview: [],
+        currentRank: null,
+        previousRank: previousAttempt?.rank ?? null,
+      })
+      saveSessionAttempt(trackKey, {
+        accuracy: finalAccuracy,
+        score: finalMatchScore,
+        correct: finalCorrect,
+        incorrect: finalIncorrect,
+        rank: null,
+        duration: sessionDuration,
+        filter: sessionFilter,
+        at: Date.now(),
+      })
+    }
   }, [
     currentUserId,
     getFocusTips,
     handleLeaderboardTopMilestones,
-    matchRunning,
     profileDetails.stats,
     remoteTrackScoreHistory,
     saveSessionAttempt,
+    supabase,
     triggerCelebration,
   ])
+
+  useEffect(() => {
+    finalizeMatchingSessionRef.current = finalizeMatchingSession
+  }, [finalizeMatchingSession])
+
+  useEffect(() => {
+    if (!matchRunning) return
+    if (matchTimerDeadlineRef.current <= 0) {
+      matchTimerDeadlineRef.current = Date.now() + Math.max(0, matchSessionDurationRef.current) * 1000
+    }
+    matchTimerFinishedRef.current = false
+
+    const tick = () => {
+      if (!matchRunning) return
+      const deadline = matchTimerDeadlineRef.current
+      if (deadline <= 0) return
+
+      const remainingMs = deadline - Date.now()
+      const nextRemaining = Math.max(0, Math.ceil(remainingMs / 1000))
+      setMatchRemaining((current) => (current === nextRemaining ? current : nextRemaining))
+
+      if (remainingMs <= 0 && !matchTimerFinishedRef.current) {
+        matchTimerFinishedRef.current = true
+        matchTimerDeadlineRef.current = 0
+        setMatchRunning(false)
+        setMatchDone(true)
+        finalizeMatchingSessionRef.current()
+      }
+    }
+
+    tick()
+    const timer = window.setInterval(tick, 120)
+    return () => window.clearInterval(timer)
+  }, [matchRunning])
 
   const markPerformance = useCallback((codeSet: CodeSet, sectionNumber: string, correct: boolean) => {
     const key = performanceKey(codeSet, sectionNumber)
@@ -5588,6 +5608,8 @@ function App() {
     const selectedFilter = gamesSelection.filter
     matchSessionDurationRef.current = selectedDuration
     matchSessionFilterRef.current = selectedFilter
+    matchTimerDeadlineRef.current = Date.now() + selectedDuration * 1000
+    matchTimerFinishedRef.current = false
     setMatchDone(false)
     setMatchScore(0)
     setMatchRound(1)
@@ -5619,6 +5641,8 @@ function App() {
   const exitMatchingSession = () => {
     setMatchRunning(false)
     setMatchDone(false)
+    matchTimerDeadlineRef.current = 0
+    matchTimerFinishedRef.current = false
     setSelectedCards([])
     setWrongCardIds([])
     setMatchedPairIds([])
@@ -10584,7 +10608,15 @@ function App() {
 
             {(matchRunning || matchDone) ? (
               <div className="match-session-overlay">
-                <div className={matchDone && !matchRunning ? 'match-session-shell match-session-shell-done' : 'match-session-shell'}>
+                <div
+                  className={[
+                    'match-session-shell',
+                    matchRunning ? 'match-session-shell-running' : '',
+                    matchDone && !matchRunning ? 'match-session-shell-done' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
                   {matchRunning ? (
                     <>
                   <div className="match-session-top">
