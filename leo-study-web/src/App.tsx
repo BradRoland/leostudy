@@ -479,7 +479,7 @@ const homeEncouragementQuotes = [
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
 ]
-const releaseNotesV31: Array<{ title: string; items: string[] }> = [
+const releaseNotesV031: Array<{ title: string; items: string[] }> = [
   {
     title: 'Profile Leaderboard Insight',
     items: [
@@ -529,7 +529,7 @@ const releaseNotesV31: Array<{ title: string; items: string[] }> = [
     ],
   },
   {
-    title: 'Department Ranking System (v3.1)',
+    title: 'Department Ranking System (v0.31)',
     items: [
       'Department scoring now uses normalized percentile performance per game mode so all modes carry equal weight.',
       'Each player contributes via top-mode performance, and each department is ranked by a Top-K player average for fair size balancing.',
@@ -3090,6 +3090,7 @@ function App() {
   const [homeLeaderboardSettingsSaving, setHomeLeaderboardSettingsSaving] = useState(false)
   const [homeLeaderboardSettingsError, setHomeLeaderboardSettingsError] = useState('')
   const [homeMasteredInfoOpen, setHomeMasteredInfoOpen] = useState(false)
+  const [departmentRankingInfoOpen, setDepartmentRankingInfoOpen] = useState(false)
   const [homeWhatsNewOpen, setHomeWhatsNewOpen] = useState(false)
   const [studyInsightWindowDays, setStudyInsightWindowDays] = useState<7 | 14 | 30>(14)
   const [assistedLearningEnabled, setAssistedLearningEnabled] = useState(true)
@@ -8926,10 +8927,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 3.1"
+                    aria-label="Open what's new for version 0.31"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v3.1
+                    What's New · v0.31
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -9455,10 +9456,30 @@ function App() {
               </article>
 
               <article className="card leaderboard-summary-card">
-                <div className="leaderboard-card-head">
-                  <h3>Best Department This Week</h3>
-                  <p className="leaderboard-card-subtitle">Ranked by normalized Top-K player performance (fair by department size)</p>
+                <div className="card-menu-head">
+                  <div className="leaderboard-card-head">
+                    <h3>Best Department This Week</h3>
+                    <p className="leaderboard-card-subtitle">Ranked by normalized Top-K player performance (fair by department size)</p>
+                  </div>
+                  <button
+                    className="assisted-learning-info-button"
+                    onClick={() => setDepartmentRankingInfoOpen((value) => !value)}
+                    aria-label="Department ranking info"
+                  >
+                    ⓘ
+                  </button>
                 </div>
+                {departmentRankingInfoOpen ? (
+                  <div className="home-mastery-help">
+                    <strong>How department ranking works:</strong>
+                    <ul>
+                      <li>Each game mode is normalized independently using percentile rank, so high-scoring modes do not outweigh others.</li>
+                      <li>Each player gets a performance score from their top mode results.</li>
+                      <li>Departments are ranked by averaging only their Top-K players, which prevents larger departments from winning by size alone.</li>
+                      <li>The displayed Top N value shows how many players were used for that department&apos;s average (up to K).</li>
+                    </ul>
+                  </div>
+                ) : null}
                 {!bestWeeklyDepartment ? (
                   <p className="muted">No department data yet.</p>
                 ) : (
@@ -12022,15 +12043,15 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v3.1</h3>
+                <h3>What’s New · v0.31</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV31.map((group) => (
-                <article key={`v31-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV031.map((group) => (
+                <article key={`v031-note-${group.title}`} className="home-whats-new-card">
                   <h4>{group.title}</h4>
                   <ul>
                     {group.items.map((item) => (
