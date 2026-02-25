@@ -207,6 +207,7 @@ const supporterTierLabel: Record<SupporterTier, string> = {
 
 const duelQuizRoundOptions = [5, 10, 20, 30]
 const duelQuizRoundTimeLimitMs = 30_000
+const duelScenarioQuizRoundTimeLimitMs = 120_000
 const duelCategoryOptions: Array<{ value: DuelCategory; label: string; quizOnly?: boolean }> = [
   { value: 'all', label: 'ALL' },
   { value: 'pc', label: 'PC' },
@@ -588,7 +589,7 @@ export function OneVsOnePanel(props: {
   const [selectedMatchingCards, setSelectedMatchingCards] = useState<string[]>([])
   const [wrongMatchingCardIds, setWrongMatchingCardIds] = useState<string[]>([])
   const [matchedPairIds, setMatchedPairIds] = useState<string[]>([])
-  const [matchingMistakes, setMatchingMistakes] = useState(0)
+  const [, setMatchingMistakes] = useState(0)
   const [matchingRoundPoints, setMatchingRoundPoints] = useState(0)
   const [matchingSubmitted, setMatchingSubmitted] = useState(false)
   const previousPlayersRef = useRef<DuelRoomPlayerRow[]>([])
@@ -1361,15 +1362,10 @@ export function OneVsOnePanel(props: {
     ? `${room.id}:${room.game_type}:${room.status}:${room.started_at || ''}:${myPlayer.current_round}:${currentRoundPayloadNumber}`
     : ''
   const countdownSeconds = 3
-  const hasCountdownAnchor = useMemo(() => {
-    if (!room || room.status !== 'in_progress') return false
-    if (!room.started_at) return false
-    return Number.isFinite(Date.parse(room.started_at))
-  }, [room])
   const countdownRemaining = useMemo(() => {
     if (!room || room.status !== 'in_progress') return 0
     const startedAtMs = room.started_at ? Date.parse(room.started_at) : NaN
-    if (!Number.isFinite(startedAtMs)) return countdownSeconds
+    if (!Number.isFinite(startedAtMs)) return 0
     const remainingMs = countdownSeconds * 1000 - Math.max(0, hudNow - startedAtMs)
     if (remainingMs <= 0) return 0
     return Math.ceil(remainingMs / 1000)
@@ -1381,27 +1377,52 @@ export function OneVsOnePanel(props: {
     && myPlayer
     && room.status === 'in_progress'
     && myPlayer.current_round <= room.rounds
-    && hasCountdownAnchor
     && !countdownActive,
   )
+  const quizRoundTimeLimitMs = useMemo(() => {
+    if (!room || room.game_type !== 'quiz') return duelQuizRoundTimeLimitMs
+    return room.category === 'scenarios' ? duelScenarioQuizRoundTimeLimitMs : duelQuizRoundTimeLimitMs
+  }, [room])
+  const quizRoundTimeLimitLabel = `${Math.round(quizRoundTimeLimitMs / 1000)}-second`
 
   const submitRound = useCallback(async (params: { round: number; correct: boolean; elapsedMs: number; points?: number }) => {
     if (!supabase || !roomId || submittingRound) return
     setSubmittingRound(true)
     setError('')
-    const { error: rpcError } = await supabase.rpc('submit_1v1_round', {
-      p_room_id: roomId,
-      p_round: params.round,
-      p_correct: params.correct,
-      p_elapsed_ms: params.elapsedMs,
-      p_points: typeof params.points === 'number' ? params.points : null,
-    })
-    setSubmittingRound(false)
-    if (rpcError) {
-      setError(rpcError.message || 'Could not submit round.')
-      return
+    try {
+      const { error: rpcError } = await supabase.rpc('submit_1v1_round', {
+        p_room_id: roomId,
+        p_round: params.round,
+        p_correct: params.correct,
+        p_elapsed_ms: params.elapsedMs,
+        p_points: typeof params.points === 'number' ? params.points : null,
+      })
+
+      if (rpcError) {
+        setError(rpcError.message || 'Could not submit round.')
+        if (room?.status === 'in_progress' && room.game_type === 'quiz') {
+          setQuizLocked(false)
+          setQuizChoice(null)
+        }
+        if (room?.status === 'in_progress' && room.game_type === 'matching') {
+          setMatchingSubmitted(false)
+        }
+        return
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not submit round.'
+      setError(message)
+      if (room?.status === 'in_progress' && room.game_type === 'quiz') {
+        setQuizLocked(false)
+        setQuizChoice(null)
+      }
+      if (room?.status === 'in_progress' && room.game_type === 'matching') {
+        setMatchingSubmitted(false)
+      }
+    } finally {
+      setSubmittingRound(false)
     }
-  }, [roomId, submittingRound])
+  }, [room?.game_type, room?.status, roomId, submittingRound])
 
   const triggerAutoForfeit = useCallback(async (roundKey: string, reason: 'question' | 'matching' = 'question') => {
     if (!supabase || !roomId || !roundKey) return
@@ -1411,7 +1432,7 @@ export function OneVsOnePanel(props: {
     setNotice(
       reason === 'matching'
         ? '30-second round limit reached. You forfeited the match.'
-        : '30-second question limit reached. You forfeited the match.',
+        : `${quizRoundTimeLimitLabel} question limit reached. You forfeited the match.`,
     )
 
     const { error: rpcError } = await supabase.rpc('forfeit_1v1_match', { p_room_id: roomId })
@@ -1424,7 +1445,7 @@ export function OneVsOnePanel(props: {
     }
 
     void refreshRoomSnapshot()
-  }, [refreshRoomSnapshot, roomId])
+  }, [quizRoundTimeLimitLabel, refreshRoomSnapshot, roomId])
 
   const submitQuizAnswer = useCallback((choiceIndex: number) => {
     if (!room || room.status !== 'in_progress' || room.game_type !== 'quiz') return
@@ -1748,7 +1769,7 @@ export function OneVsOnePanel(props: {
 
     const roundKey = `${room.id}:${myPlayer.user_id}:${currentRound.round}`
     const elapsedMs = Math.max(0, Date.now() - roundStartedAt)
-    const remainingMs = duelQuizRoundTimeLimitMs - elapsedMs
+    const remainingMs = quizRoundTimeLimitMs - elapsedMs
 
     if (remainingMs <= 0) {
       void triggerAutoForfeit(roundKey, 'question')
@@ -1770,6 +1791,7 @@ export function OneVsOnePanel(props: {
     roundStartedAt,
     submittingRound,
     triggerAutoForfeit,
+    quizRoundTimeLimitMs,
   ])
 
   useEffect(() => {
@@ -1893,6 +1915,23 @@ export function OneVsOnePanel(props: {
     leaveRoom()
   }
 
+  const cancelOutgoingPendingInviteForRoom = useCallback(async (targetRoomId: string) => {
+    if (!supabase || !targetRoomId || !currentUserId) return
+    const { error: inviteCancelError } = await supabase
+      .from('duel_invites')
+      .update({
+        status: 'cancelled',
+        responded_at: new Date().toISOString(),
+      })
+      .eq('room_id', targetRoomId)
+      .eq('sender_user_id', currentUserId)
+      .eq('status', 'pending')
+
+    if (inviteCancelError) {
+      console.warn('[1v1] Could not cancel pending invites for room leave:', inviteCancelError.message)
+    }
+  }, [currentUserId])
+
   const leaveCurrentRoom = async () => {
     if (!room || !roomId) {
       leaveRoom()
@@ -1903,6 +1942,8 @@ export function OneVsOnePanel(props: {
       await confirmLeaveMatch()
       return
     }
+
+    await cancelOutgoingPendingInviteForRoom(roomId)
 
     if (supabase) {
       const { error: rpcError } = await supabase.rpc('leave_1v1_room', { p_room_id: roomId })
@@ -2002,8 +2043,6 @@ export function OneVsOnePanel(props: {
   //     ? 'Both players joined. Waiting for both players to ready up.'
   //     : 'Both players are ready. Match countdown starting…'
 
-  const matchingPairCount = room?.game_type === 'matching' && isMatchingRound(currentRound) ? currentRound.pairs.length : 0
-  const matchingProgressText = matchingPairCount > 0 ? `${matchedPairIds.length}/${matchingPairCount} pairs` : '0/0 pairs'
   const matchingStatusText = matchingSubmitted
     ? 'Set complete. Waiting for next set…'
     : 'Match all 3 pairs to auto-submit this set.'
@@ -2035,8 +2074,8 @@ export function OneVsOnePanel(props: {
   const quizRoundRemainingMs = useMemo(() => {
     if (!room || room.status !== 'in_progress' || room.game_type !== 'quiz') return 0
     if (!canStartRound || !isQuizRound(currentRound) || roundStartedAt <= 0) return 0
-    return Math.max(0, duelQuizRoundTimeLimitMs - Math.max(0, hudNow - roundStartedAt))
-  }, [canStartRound, currentRound, hudNow, room, roundStartedAt])
+    return Math.max(0, quizRoundTimeLimitMs - Math.max(0, hudNow - roundStartedAt))
+  }, [canStartRound, currentRound, hudNow, room, roundStartedAt, quizRoundTimeLimitMs])
 
   const quizRoundRemainingSeconds = quizRoundRemainingMs > 0 ? Math.ceil(quizRoundRemainingMs / 1000) : 0
   const matchingRoundRemainingMs = useMemo(() => {
@@ -3047,22 +3086,7 @@ export function OneVsOnePanel(props: {
                   </div>
                 ) : null}
                 {canStartRound && isMatchingRound(currentRound) ? (
-                  <div className="onevone-round">
-                    <div className="onevone-match-meta">
-                      <p className="muted">{isSpectator ? 'Watching both players compete on the same tiles' : 'Both players get the exact same 6 tiles each set. First to complete all 5 sets wins.'}</p>
-                      {isSpectator ? (
-                        <div className="onevone-hud">
-                          <span>{getPlayerName(players[0]?.user_id, 'P1')}: {players[0]?.score ?? 0} pts</span>
-                          <span>{getPlayerName(players[1]?.user_id, 'P2')}: {players[1]?.score ?? 0} pts</span>
-                        </div>
-                      ) : (
-                      <div className="onevone-hud">
-                        <span>Matched: {matchingProgressText}</span>
-                        <span>Mistakes: {matchingMistakes}</span>
-                        <span>Round Points: {matchingRoundPoints}</span>
-                      </div>
-                      )}
-                    </div>
+                  <div className="onevone-round onevone-match-round">
                     {isSpectator ? (
                       <div className="match-grid match-grid-session">
                         {matchingCards.map((card) => (
@@ -3070,8 +3094,9 @@ export function OneVsOnePanel(props: {
                             key={`spectate-match-card-${currentRound.round}-${card.id}`}
                             className={`match-card match-spectating`}
                           >
-                            <small>{card.kind === 'code' ? 'Code section' : 'Definition'}</small>
-                            <strong>{card.text}</strong>
+                            <strong className={card.kind === 'code' ? 'match-card-code' : 'match-card-definition'}>
+                              {card.text}
+                            </strong>
                           </div>
                         ))}
                       </div>
@@ -3088,14 +3113,15 @@ export function OneVsOnePanel(props: {
                             disabled={matchingSubmitted || submittingRound || matched || (!selected && selectedMatchingCards.length >= 2)}
                             onClick={() => handleMatchingCardClick(card.id)}
                           >
-                            <small>{card.kind === 'code' ? 'Code section' : 'Definition'}</small>
-                            <strong>{card.text}</strong>
+                            <strong className={card.kind === 'code' ? 'match-card-code' : 'match-card-definition'}>
+                              {card.text}
+                            </strong>
                           </button>
                         )
                       })}
                     </div>
                     )}
-                    <p className="muted tiny">{isSpectator ? '👁️ Spectating both players' : matchingStatusText}</p>
+                    {!isSpectator ? <p className="muted tiny onevone-match-status">{matchingStatusText}</p> : null}
                   </div>
                 ) : (
                   <p className="muted">{countdownActive ? 'Countdown in progress…' : 'Waiting for round sync...'}</p>
