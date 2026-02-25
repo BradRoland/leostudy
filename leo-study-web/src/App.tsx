@@ -285,6 +285,7 @@ type DepartmentLeaderboardEntry = {
   balancedScore: number
   playerCount: number
   attempts: number
+  topKUsed: number
 }
 
 type WeeklyPerformanceLeader = {
@@ -478,7 +479,7 @@ const homeEncouragementQuotes = [
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
 ]
-const releaseNotesV03: Array<{ title: string; items: string[] }> = [
+const releaseNotesV31: Array<{ title: string; items: string[] }> = [
   {
     title: 'Profile Leaderboard Insight',
     items: [
@@ -517,6 +518,22 @@ const releaseNotesV03: Array<{ title: string; items: string[] }> = [
       'Public chat reactions are now visible to everyone in real time.',
       'Reaction counts now aggregate properly for shared emoji reactions.',
       'Presence indicators and online state handling were refined.',
+    ],
+  },
+  {
+    title: 'Reaction Hover Details',
+    items: [
+      'Hovering a chat reaction now shows exactly who reacted.',
+      'The hover tooltip auto-sizes for short and long reaction lists.',
+      'Reaction hover animation now opens smoothly from the selected reaction chip.',
+    ],
+  },
+  {
+    title: 'Department Ranking System (v3.1)',
+    items: [
+      'Department scoring now uses normalized percentile performance per game mode so all modes carry equal weight.',
+      'Each player contributes via top-mode performance, and each department is ranked by a Top-K player average for fair size balancing.',
+      'Leaderboard copy now reflects the normalized Top-K model so departments with fewer users can still compete fairly.',
     ],
   },
   {
@@ -714,68 +731,130 @@ function buildLeaderboardFirstPlaceCountMap(boards: LeaderboardBoard[]) {
 }
 
 function buildDepartmentLeaders(entries: LeaderboardEntry[]): DepartmentLeaderboardEntry[] {
-  const buckets = new Map<
+  const leaderboardModeKey = (entry: LeaderboardEntry) =>
+    `${entry.game.toLowerCase()}|${entry.matchDuration ?? 0}|${entry.matchFilter ?? 'all'}`
+
+  const validEntries = entries.filter((entry) => {
+    const canonicalAgency = canonicalAgencyName(entry.agency || '')
+    if (!canonicalAgency) return false
+    return Number.isFinite(entry.score) && entry.score >= 0
+  })
+
+  if (validEntries.length === 0) return []
+
+  const modeScores = new Map<string, number[]>()
+  for (const entry of validEntries) {
+    const modeKey = leaderboardModeKey(entry)
+    const list = modeScores.get(modeKey) || []
+    list.push(Math.max(0, entry.score))
+    modeScores.set(modeKey, list)
+  }
+
+  const modeSortedScores = new Map<string, number[]>()
+  for (const [modeKey, scores] of modeScores.entries()) {
+    modeSortedScores.set(modeKey, [...scores].sort((left, right) => left - right))
+  }
+
+  const percentileRank = (sortedScores: number[], score: number) => {
+    const n = sortedScores.length
+    if (n <= 1) return 1
+    let lower = 0
+    while (lower < n && sortedScores[lower] < score) lower += 1
+    let upper = lower
+    while (upper < n && sortedScores[upper] <= score) upper += 1
+    const lessCount = lower
+    const equalCount = upper - lower
+    const percentile = (lessCount + (equalCount * 0.5)) / n
+    return Math.max(0, Math.min(1, percentile))
+  }
+
+  const playerModePercentiles = new Map<
+    string,
+    {
+      userId: string
+      agency: string
+      agencyKey: string
+      perMode: number[]
+      modeCount: number
+    }
+  >()
+
+  for (const entry of validEntries) {
+    const agency = canonicalAgencyName(entry.agency || '')
+    if (!agency) continue
+    const agencyKey = normalizeAgencyKey(agency)
+    const modeKey = leaderboardModeKey(entry)
+    const sortedScores = modeSortedScores.get(modeKey)
+    if (!sortedScores || sortedScores.length === 0) continue
+    const percentile = percentileRank(sortedScores, Math.max(0, entry.score))
+    const playerKey = `${entry.userId}|${agencyKey}`
+    const current = playerModePercentiles.get(playerKey) || {
+      userId: entry.userId,
+      agency,
+      agencyKey,
+      perMode: [],
+      modeCount: 0,
+    }
+    current.perMode.push(percentile)
+    current.modeCount += 1
+    playerModePercentiles.set(playerKey, current)
+  }
+
+  const topModesPerPlayer = 3
+  const departments = new Map<
     string,
     {
       key: string
       agency: string
-      totalScore: number
+      playerScores: number[]
       attempts: number
       players: Set<string>
     }
   >()
 
-  for (const entry of entries) {
-    const canonicalAgency = canonicalAgencyName(entry.agency || '')
-    if (!canonicalAgency) continue
-    const key = normalizeAgencyKey(canonicalAgency)
-    const current = buckets.get(key) || {
-      key,
-      agency: canonicalAgency,
-      totalScore: 0,
+  for (const player of playerModePercentiles.values()) {
+    if (player.perMode.length === 0) continue
+    const topModes = [...player.perMode].sort((left, right) => right - left).slice(0, topModesPerPlayer)
+    const basePlayerScore = topModes.reduce((sum, value) => sum + value, 0) / topModes.length
+    const modeCoverage = Math.min(1, player.modeCount / topModesPerPlayer)
+    const coverageFloor = 0.85
+    const playerScore = basePlayerScore * (coverageFloor + ((1 - coverageFloor) * modeCoverage))
+
+    const current = departments.get(player.agencyKey) || {
+      key: player.agencyKey,
+      agency: player.agency,
+      playerScores: [],
       attempts: 0,
       players: new Set<string>(),
     }
-    current.totalScore += Math.max(0, entry.score)
-    current.attempts += 1
-    current.players.add(entry.userId)
-    buckets.set(key, current)
+    current.playerScores.push(playerScore)
+    current.attempts += player.modeCount
+    current.players.add(player.userId)
+    departments.set(player.agencyKey, current)
   }
 
-  const departments = [...buckets.values()]
-    .map((entry) => ({
-      key: entry.key,
-      agency: entry.agency,
-      totalScore: entry.totalScore,
-      averageScore: entry.attempts > 0 ? Math.round(entry.totalScore / entry.attempts) : 0,
-      playerCount: entry.players.size,
-      attempts: entry.attempts,
-    }))
-
-  const globalAttempts = departments.reduce((sum, entry) => sum + entry.attempts, 0)
-  const globalAverage = globalAttempts > 0
-    ? departments.reduce((sum, entry) => sum + entry.totalScore, 0) / globalAttempts
-    : 0
-  const priorWeight = 4
-
-  return departments
-    .map(
-      (entry): DepartmentLeaderboardEntry => {
-        const balancedScore = Math.round(
-          ((entry.averageScore * entry.attempts) + (globalAverage * priorWeight)) /
-          (entry.attempts + priorWeight),
-        )
-        return {
-          ...entry,
-          balancedScore,
-        }
-      },
-    )
-    .sort(
-      (left, right) =>
-        right.balancedScore - left.balancedScore ||
-        right.averageScore - left.averageScore ||
-        right.totalScore - left.totalScore,
+  const topK = 6
+  return [...departments.values()]
+    .map((entry): DepartmentLeaderboardEntry => {
+      const topPlayers = [...entry.playerScores].sort((left, right) => right - left).slice(0, topK)
+      const topKUsed = Math.max(1, topPlayers.length)
+      const normalizedScore = topPlayers.reduce((sum, value) => sum + value, 0) / topKUsed
+      return {
+        key: entry.key,
+        agency: entry.agency,
+        totalScore: Math.round(normalizedScore * 1000),
+        averageScore: Math.round((normalizedScore * 1000) / 10),
+        balancedScore: Math.round(normalizedScore * 1000),
+        playerCount: entry.players.size,
+        attempts: entry.attempts,
+        topKUsed,
+      }
+    })
+    .sort((left, right) =>
+      right.balancedScore - left.balancedScore ||
+      right.averageScore - left.averageScore ||
+      right.playerCount - left.playerCount ||
+      left.agency.localeCompare(right.agency),
     )
 }
 
@@ -8847,10 +8926,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 0.3"
+                    aria-label="Open what's new for version 3.1"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v0.3
+                    What's New · v3.1
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -9378,7 +9457,7 @@ function App() {
               <article className="card leaderboard-summary-card">
                 <div className="leaderboard-card-head">
                   <h3>Best Department This Week</h3>
-                  <p className="leaderboard-card-subtitle">Ranked by balanced weekly department rating</p>
+                  <p className="leaderboard-card-subtitle">Ranked by normalized Top-K player performance (fair by department size)</p>
                 </div>
                 {!bestWeeklyDepartment ? (
                   <p className="muted">No department data yet.</p>
@@ -9389,7 +9468,7 @@ function App() {
                         <span className="leader-rank">#{index + 1}</span>
                         <span>{entry.agency}</span>
                         <small>
-                          {entry.balancedScore} rating • {entry.averageScore} avg • {entry.playerCount} player{entry.playerCount === 1 ? '' : 's'}
+                          {entry.balancedScore} rating • Top {entry.topKUsed} avg • {entry.playerCount} player{entry.playerCount === 1 ? '' : 's'}
                         </small>
                       </div>
                     ))}
@@ -11943,15 +12022,15 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v0.3</h3>
+                <h3>What’s New · v3.1</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV03.map((group) => (
-                <article key={`v03-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV31.map((group) => (
+                <article key={`v31-note-${group.title}`} className="home-whats-new-card">
                   <h4>{group.title}</h4>
                   <ul>
                     {group.items.map((item) => (
