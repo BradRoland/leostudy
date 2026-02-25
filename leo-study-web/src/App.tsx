@@ -3181,6 +3181,9 @@ function App() {
   const speedIncorrectCountRef = useRef(0)
   const speedAnswerLockRef = useRef(false)
   const speedAdvanceTimerRef = useRef<number | null>(null)
+  const speedSpamFeedbackTimerRef = useRef<number | null>(null)
+  const speedSpamAttemptsRef = useRef<Array<{ at: number; choice: number }>>([])
+  const speedSpamCooldownUntilRef = useRef(0)
   const performanceRef = useRef<Record<string, CodePerformance>>({})
   const matchWrongResetTimerRef = useRef<number | null>(null)
   const matchTimerDeadlineRef = useRef(0)
@@ -3208,11 +3211,61 @@ function App() {
     studyActivityBySourceRef.current[source] = Date.now()
   }, [])
 
+  const resetSpeedSpamState = useCallback(() => {
+    speedSpamAttemptsRef.current = []
+    speedSpamCooldownUntilRef.current = 0
+    if (speedSpamFeedbackTimerRef.current !== null) {
+      window.clearTimeout(speedSpamFeedbackTimerRef.current)
+      speedSpamFeedbackTimerRef.current = null
+    }
+  }, [])
+
+  const triggerSpeedSpamPenalty = useCallback(() => {
+    const penaltyAmount = 8
+    speedSpamCooldownUntilRef.current = Date.now() + 900
+    setSpeedScore((score) => Math.max(0, score - penaltyAmount))
+    setSpeedFeedback(`Spam penalty: -${penaltyAmount}`)
+    if (speedSpamFeedbackTimerRef.current !== null) {
+      window.clearTimeout(speedSpamFeedbackTimerRef.current)
+      speedSpamFeedbackTimerRef.current = null
+    }
+    speedSpamFeedbackTimerRef.current = window.setTimeout(() => {
+      setSpeedFeedback((current) => (current.startsWith('Spam penalty:') ? '' : current))
+      speedSpamFeedbackTimerRef.current = null
+    }, 700)
+  }, [])
+
+  const isSpeedSpamAttempt = useCallback((choiceIndex: number) => {
+    const now = Date.now()
+    if (now < speedSpamCooldownUntilRef.current) return true
+    const recentAttempts = speedSpamAttemptsRef.current
+      .filter((attempt) => now - attempt.at <= 2400)
+      .concat({ at: now, choice: choiceIndex })
+    speedSpamAttemptsRef.current = recentAttempts
+
+    const recentFive = recentAttempts.slice(-5)
+    const ultraFastIntervals = recentFive.slice(1).filter((attempt, index) => attempt.at - recentFive[index].at <= 260).length
+    const recentFour = recentAttempts.slice(-4)
+    const sameChoiceRapidBurst = recentFour.length === 4 &&
+      recentFour.every((attempt) => attempt.choice === choiceIndex) &&
+      recentFour.slice(1).every((attempt, index) => attempt.at - recentFour[index].at <= 700)
+
+    if (ultraFastIntervals >= 4 || sameChoiceRapidBurst) {
+      triggerSpeedSpamPenalty()
+      return true
+    }
+    return false
+  }, [triggerSpeedSpamPenalty])
+
   useEffect(() => {
     return () => {
       if (speedAdvanceTimerRef.current !== null) {
         window.clearTimeout(speedAdvanceTimerRef.current)
         speedAdvanceTimerRef.current = null
+      }
+      if (speedSpamFeedbackTimerRef.current !== null) {
+        window.clearTimeout(speedSpamFeedbackTimerRef.current)
+        speedSpamFeedbackTimerRef.current = null
       }
     }
   }, [])
@@ -5675,6 +5728,7 @@ function App() {
     const pool = selectedFilter === 'all'
       ? speedQuestionBank
       : speedQuestionBank.filter((question) => question.codeSet === selectedFilter)
+    resetSpeedSpamState()
     if (speedAdvanceTimerRef.current !== null) {
       window.clearTimeout(speedAdvanceTimerRef.current)
       speedAdvanceTimerRef.current = null
@@ -5722,6 +5776,7 @@ function App() {
   }
 
   const exitSpeedSession = () => {
+    resetSpeedSpamState()
     if (speedAdvanceTimerRef.current !== null) {
       window.clearTimeout(speedAdvanceTimerRef.current)
       speedAdvanceTimerRef.current = null
@@ -5735,6 +5790,7 @@ function App() {
 
   const answerSpeedQuestion = useCallback((choiceIndex: number) => {
     if (!speedRunning || !speedCurrentQuestion || speedAnswerLockRef.current) return
+    if (isSpeedSpamAttempt(choiceIndex)) return
     speedAnswerLockRef.current = true
     setSpeedAnswerLocked(true)
     markStudyActivity('speed')
@@ -5769,7 +5825,7 @@ function App() {
       setSpeedAnswerLocked(false)
       speedAdvanceTimerRef.current = null
     }, 150)
-  }, [nextSpeedQuestion, speedCurrentQuestion, speedRunning, markStudyActivity])
+  }, [isSpeedSpamAttempt, nextSpeedQuestion, speedCurrentQuestion, speedRunning, markStudyActivity])
 
   const nextScenarioQuestion = useCallback((candidateDeck?: ScenarioQuestion[], previousId?: string) => {
     let deck = candidateDeck ? [...candidateDeck] : [...scenarioDeckRef.current]
@@ -5916,6 +5972,7 @@ function App() {
           clearInterval(timer)
           setSpeedRunning(false)
           setSpeedDone(true)
+          resetSpeedSpamState()
           if (speedAdvanceTimerRef.current !== null) {
             window.clearTimeout(speedAdvanceTimerRef.current)
             speedAdvanceTimerRef.current = null
@@ -6073,6 +6130,7 @@ function App() {
     profileDetails.stats,
     remoteTrackScoreHistory,
     saveSessionAttempt,
+    resetSpeedSpamState,
     speedRunning,
     triggerCelebration,
   ])
@@ -6745,10 +6803,6 @@ function App() {
   useEffect(() => {
     if (!speedCurrentQuestion || speedFeedback || speedAnswerLocked) return
 
-    // Spam detection: track recent keypresses
-    const lastKeyPress = { key: '', time: 0 }
-    const SPAM_THRESHOLD_MS = 250 // Same key within 250ms = spam
-
     const handleSpeedAnswerKeyDown = (event: KeyboardEvent) => {
       // Don't trigger when typing in input fields
       const target = event.target as HTMLElement
@@ -6759,16 +6813,10 @@ function App() {
       // Check for number keys 1-4
       const key = event.key
       if (key >= '1' && key <= '4') {
-        const now = Date.now()
-        
-        // Detect spam: same key pressed within threshold
-        if (key === lastKeyPress.key && now - lastKeyPress.time < SPAM_THRESHOLD_MS) {
-          // Penalty for spamming - ignore the input
+        if (event.repeat) {
+          event.preventDefault()
           return
         }
-        
-        lastKeyPress.key = key
-        lastKeyPress.time = now
 
         const index = parseInt(key) - 1
         if (speedCurrentQuestion.choices && index < speedCurrentQuestion.choices.length) {
