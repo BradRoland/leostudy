@@ -169,6 +169,7 @@ type UserProfile = {
   avatarUrl: string
   supporterTier: SupporterTier
   isOwner: boolean
+  createdAt: string
 }
 
 type ContentEditorItem = {
@@ -198,6 +199,7 @@ type ProfileDetails = {
   themeId: string
   nameStyle: NameStyle
   namePresets: NameStylePreset[]
+  systemNoticesSeen: string[]
   stats: UserStats
   algorithmSnapshot?: Record<string, PersistedAlgorithmStat>
 }
@@ -546,6 +548,8 @@ const releaseNotesV031: Array<{ title: string; items: string[] }> = [
   },
 ]
 const studyStreakMilestones = [3, 7, 14, 21, 30]
+const leaderboardResetNoticeId = 'leaderboard-reset-2026-02-26-balance'
+const leaderboardResetCutoverAtMs = Date.parse('2026-02-26T00:00:00.000Z')
 
 const defaultGamesModeSelection: GameModeSelection = { duration: 30, filter: 'all' }
 const gamesModeStorageKey = 'leo_study_games_mode_selection'
@@ -1665,6 +1669,11 @@ function sanitizeNamePresets(input: unknown): NameStylePreset[] {
     .slice(0, 8)
 }
 
+function sanitizeSystemNoticesSeen(input: unknown): string[] {
+  if (!Array.isArray(input)) return []
+  return [...new Set(input.map((entry) => String(entry || '').trim()).filter(Boolean))].slice(-24)
+}
+
 function sanitizeLeaderboardRotationMs(input: unknown) {
   if (typeof input !== 'number' || Number.isNaN(input)) return defaultLeaderboardRotationMs
   return Math.max(2000, Math.min(12000, Math.round(input)))
@@ -1932,6 +1941,7 @@ function sanitizeState(input: unknown): PersistedState {
       themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
+      systemNoticesSeen: [],
       stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
     },
   }
@@ -1959,6 +1969,7 @@ function sanitizeState(input: unknown): PersistedState {
             themeId: getThemePreset(String((state.profileDetails as Partial<ProfileDetails>).themeId || appThemePresets[0].id)).id,
             nameStyle: sanitizeNameStyle((state.profileDetails as Partial<ProfileDetails>).nameStyle),
             namePresets: sanitizeNamePresets((state.profileDetails as Partial<ProfileDetails>).namePresets),
+            systemNoticesSeen: sanitizeSystemNoticesSeen((state.profileDetails as Partial<ProfileDetails>).systemNoticesSeen),
             stats: sanitizeUserStats((state.profileDetails as Partial<ProfileDetails>).stats),
             algorithmSnapshot:
               (state.profileDetails as Partial<ProfileDetails>).algorithmSnapshot &&
@@ -1975,6 +1986,7 @@ function sanitizeState(input: unknown): PersistedState {
             themeId: appThemePresets[0].id,
             nameStyle: { ...defaultNameStyle },
             namePresets: [],
+            systemNoticesSeen: [],
             stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
           },
   }
@@ -2029,6 +2041,7 @@ function mapProfileRow(row: Record<string, unknown>, userId: string): UserProfil
       ? String(row.supporter_tier)
       : 'free') as SupporterTier,
     isOwner: Boolean(row.is_owner),
+    createdAt: String(row.created_at || ''),
   }
 }
 
@@ -3049,6 +3062,7 @@ function App() {
     themeId: appThemePresets[0].id,
     nameStyle: { ...defaultNameStyle },
     namePresets: [],
+    systemNoticesSeen: [],
     stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
   })
   const [leaderboardRotateMs, setLeaderboardRotateMs] = useState(defaultLeaderboardRotationMs)
@@ -3111,6 +3125,7 @@ function App() {
   const [assistedLearningEnabled, setAssistedLearningEnabled] = useState(true)
   const [showAssistedLearningInfo, setShowAssistedLearningInfo] = useState(false)
   const [showDevNotice, setShowDevNotice] = useState(false)
+  const [showLeaderboardResetNotice, setShowLeaderboardResetNotice] = useState(false)
   const [reduceVisualEffects, setReduceVisualEffects] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [mobileNavMenuOpen, setMobileNavMenuOpen] = useState(false)
@@ -4277,7 +4292,7 @@ function App() {
 
       const { data: profileRow } = await client
         .from('profiles')
-        .select('user_id,username,avatar_path,supporter_tier,bio,agency')
+        .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')
         .eq('user_id', currentUserId)
         .maybeSingle()
 
@@ -4287,7 +4302,7 @@ function App() {
         setProfileUsername(mapped.username)
         setForceProfileSetup(false)
       } else {
-        setProfile({ userId: currentUserId, username: '', avatarPath: '', avatarUrl: defaultAvatarUrl, supporterTier: 'free', isOwner: false })
+        setProfile({ userId: currentUserId, username: '', avatarPath: '', avatarUrl: defaultAvatarUrl, supporterTier: 'free', isOwner: false, createdAt: '' })
         setProfileUsername('')
         setForceProfileSetup(true)
       }
@@ -4323,6 +4338,7 @@ function App() {
         themeId: nextState.profileDetails.themeId,
         nameStyle: nextState.profileDetails.nameStyle,
         namePresets: nextState.profileDetails.namePresets,
+        systemNoticesSeen: nextState.profileDetails.systemNoticesSeen,
         stats: nextState.profileDetails.stats,
       })
 
@@ -4444,6 +4460,7 @@ function App() {
             themeId: previous.themeId,
             nameStyle: previous.nameStyle,
             namePresets: previous.namePresets,
+            systemNoticesSeen: previous.systemNoticesSeen,
             stats: previous.stats,
           }))
         },
@@ -4482,7 +4499,7 @@ function App() {
     const timer = setInterval(async () => {
       const { data: profileRow } = await client
         .from('profiles')
-        .select('user_id,username,avatar_path,supporter_tier,bio,agency')
+        .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')
         .eq('user_id', currentUserId)
         .maybeSingle()
       if (!profileRow) return
@@ -4979,6 +4996,17 @@ function App() {
     }, 2200)
   }, [])
 
+  const dismissLeaderboardResetNotice = useCallback(() => {
+    setShowLeaderboardResetNotice(false)
+    setProfileDetails((previous) => {
+      if (previous.systemNoticesSeen.includes(leaderboardResetNoticeId)) return previous
+      return {
+        ...previous,
+        systemNoticesSeen: [...previous.systemNoticesSeen, leaderboardResetNoticeId].slice(-24),
+      }
+    })
+  }, [])
+
   useEffect(() => {
     if (!stateHydrated || !currentUserId) return
     const lapse = studyStreakLapseInfo(profileDetails.stats)
@@ -5006,6 +5034,20 @@ function App() {
     profileDetails.stats,
     stateHydrated,
     triggerCelebration,
+  ])
+
+  useEffect(() => {
+    if (!authReady || !stateHydrated || !currentUserId || !profile) return
+    if (profileDetails.systemNoticesSeen.includes(leaderboardResetNoticeId)) return
+    const createdAtMs = Date.parse(profile.createdAt || '')
+    if (Number.isFinite(createdAtMs) && createdAtMs > leaderboardResetCutoverAtMs) return
+    setShowLeaderboardResetNotice(true)
+  }, [
+    authReady,
+    currentUserId,
+    profile,
+    profileDetails.systemNoticesSeen,
+    stateHydrated,
   ])
 
   const postPublicChatAnnouncement = useCallback(async (message: string) => {
@@ -6311,7 +6353,7 @@ function App() {
         },
         { onConflict: 'user_id' },
       )
-      .select('user_id,username,avatar_path,supporter_tier,bio,agency')
+      .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')
       .single()
 
     if (error) {
@@ -6495,6 +6537,7 @@ function App() {
       themeId: appThemePresets[0].id,
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
+      systemNoticesSeen: [],
       stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
     })
     setNewPresetName('')
@@ -7069,7 +7112,7 @@ function App() {
     if (!supabase || !currentUserId || !profile) return
     const { data: profileRow } = await supabase
       .from('profiles')
-      .select('user_id,username,avatar_path,supporter_tier,bio,agency')
+      .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')
       .eq('user_id', currentUserId)
       .maybeSingle()
 
@@ -12262,6 +12305,31 @@ function App() {
             >
               Got it
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {showLeaderboardResetNotice ? (
+        <div className="profile-modal-overlay dev-notice-overlay" onClick={dismissLeaderboardResetNotice}>
+          <div className="card profile-modal-card dev-notice-card" onClick={(event) => event.stopPropagation()}>
+            <div className="quiz-top">
+              <div className="dev-notice-heading">
+                <AppIcon name="warning" className="dev-notice-icon" />
+                <h3>Leaderboard Reset Notice</h3>
+              </div>
+              <button className="secondary" onClick={dismissLeaderboardResetNotice}>
+                Close
+              </button>
+            </div>
+            <p className="muted">
+              Leaderboards were reset after balancing updates and a bug fix.
+            </p>
+            <p className="muted">
+              We found and patched a bug that allowed unfair high scores that could not be beaten under normal play. Scores are now recalculated on the fixed logic.
+            </p>
+            <div className="actions-row">
+              <button className="primary" onClick={dismissLeaderboardResetNotice}>Got it</button>
+            </div>
           </div>
         </div>
       ) : null}
