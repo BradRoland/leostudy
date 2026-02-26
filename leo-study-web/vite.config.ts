@@ -4,9 +4,22 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  clearScreen: false,
   server: {
     host: '0.0.0.0',
     port: 5173,
     allowedHosts: ['180.academy', 'test.180.academy', 'testt.180.academy', 'dev.180.academy', 'localhost', '127.0.0.1', '10.0.0.225', '10.0.0.42'],
+    hmr: {
+      protocol: 'wss',
+      host: 'dev.180.academy',
+      clientPort: 443,
+    },
+    watch: {
+      awaitWriteFinish: {
+        stabilityThreshold: 300,
+        pollInterval: 80,
+      },
+      ignored: ['**/.DS_Store', '**/.AppleDouble', '**/.LSOverride', '**/._*'],
+    },
   },
 })

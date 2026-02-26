@@ -10,7 +10,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 2800.1",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Willfully fleeing or attempting to elude a pursuing peace officer in a marked vehicle with red lamp and siren activated while the officer is in uniform."
   },
   {
     "id": "vc-vc-2800-2-evade-peace-officer-with-reckless-dr",
@@ -24,7 +24,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 2800.2(a)",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Committing VC 2800.1 while driving with willful or wanton disregard for the safety of persons or property."
   },
   {
     "id": "vc-vc-2800-3-evade-peace-officer-causing-serious",
@@ -38,7 +38,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 2800.3(a)",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Violating VC 2800.1 or VC 2800.2 and proximately causing serious bodily injury to another person."
   },
   {
     "id": "vc-vc-2800-3-evade-peace-officer-causing-death",
@@ -52,7 +52,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 2800.3(b)",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Violating VC 2800.1 or VC 2800.2 and proximately causing the death of another person."
   },
   {
     "id": "vc-vc-2800-4-evade-officer-driving-opposite-traff",
@@ -65,7 +65,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 2800.4",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "While fleeing a pursuing peace officer, driving a vehicle against the lawful direction of traffic."
   },
   {
     "id": "vc-vc-2803-unsafe-load",
@@ -78,7 +78,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 2803",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving or moving a vehicle with an unsafe or unsecured load likely to spill, drop, blow, or endanger roadway users."
   },
   {
     "id": "vc-vc-4000-unregistered-vehicle",
@@ -91,7 +91,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 4000(a)(1)",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving, moving, parking, or leaving a motor vehicle on a highway or public parking area without current valid registration."
   },
   {
     "id": "vc-vc-4463-false-registration-license-plate-pla",
@@ -104,7 +104,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 4463",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Forging, counterfeiting, altering, possessing, displaying, or using false registration documents, plates, placards, stickers, or permits with fraudulent intent."
   },
   {
     "id": "vc-vc-5201-1-obscure-license-plate",
@@ -117,7 +117,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 5201.1",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Placing or using any covering, coating, device, or material that obstructs, impairs, or defeats clear recognition of a license plate."
   },
   {
     "id": "vc-vc-10501-false-report-of-vehicle-theft",
@@ -130,7 +130,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 10501",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Knowingly making a false report to law enforcement that a vehicle has been stolen or embezzled."
   },
   {
     "id": "vc-vc-10851-vehicle-theft",
@@ -143,7 +143,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 10851(a)",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving or taking a vehicle without the owner's consent, with intent to temporarily or permanently deprive the owner of possession or title."
   },
   {
     "id": "vc-vc-10852-tamper-with-vehicle",
@@ -156,7 +156,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 10852",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Willfully tampering with or injuring a vehicle or its contents without the owner's consent."
   },
   {
     "id": "vc-vc-12500-unlicensed-driver",
@@ -169,7 +169,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 12500",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving a motor vehicle on a highway without holding a valid California driver license for that class of vehicle."
   },
   {
     "id": "vc-vc-12951-driver-s-license-not-in-possession",
@@ -182,7 +182,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 12951",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Failure to present a valid driver license upon lawful demand by a peace officer while operating a motor vehicle."
   },
   {
     "id": "vc-vc-14601-driving-privilege-suspended-or-revok",
@@ -195,7 +195,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 14601",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving a motor vehicle while driving privilege is suspended or revoked, with knowledge of the suspension or revocation."
   },
   {
     "id": "vc-vc-14601-4-driving-privilege-suspended-or-revok",
@@ -209,7 +209,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 14601.4",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving with a DUI-related suspension or revocation and concurrently committing a moving violation that causes bodily injury to another person."
   },
   {
     "id": "vc-vc-20001-hit-and-run-with-injury-or-death",
@@ -222,7 +222,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 20001",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Being involved in an accident causing injury or death and willfully failing to stop and perform the required identification and aid duties."
   },
   {
     "id": "vc-vc-20002-accident-with-vehicle-or-property-da",
@@ -235,7 +235,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 20002",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Being involved in an accident causing property damage only and failing to immediately stop and provide required identifying information."
   },
   {
     "id": "vc-vc-21202-bicyclist-on-roadway",
@@ -248,7 +248,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 21202",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "A bicyclist moving slower than normal traffic must ride as close as practicable to the right curb or edge, except statutory exceptions."
   },
   {
     "id": "vc-vc-21658-unsafe-lane-change",
@@ -261,7 +261,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 21658",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Moving from a lane without first determining that the movement can be made with reasonable safety."
   },
   {
     "id": "vc-vc-21701-interfere-with-driver-s-control-of-v",
@@ -274,7 +274,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 21701",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Interfering with or obstructing the driver's control of a vehicle while the vehicle is in operation."
   },
   {
     "id": "vc-vc-21703-following-too-closely",
@@ -287,7 +287,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 21703",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Following another vehicle more closely than is reasonable and prudent for speed, traffic, and roadway conditions."
   },
   {
     "id": "vc-vc-21750-overtaking-and-passing",
@@ -300,7 +300,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 21750(a)",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Passing another vehicle on the left only when safe and returning to the right side only after safely clear of the overtaken vehicle."
   },
   {
     "id": "vc-vc-21955-jaywalking",
@@ -313,7 +313,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 21955",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Crossing a roadway between adjacent intersections controlled by traffic signals outside of a marked crosswalk."
   },
   {
     "id": "vc-vc-21957-hitchhiking-on-roadway",
@@ -326,7 +326,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 21957",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Standing in a roadway to solicit a ride, business, or employment from an occupant of any vehicle."
   },
   {
     "id": "vc-vc-22109-stopping-suddenly",
@@ -339,7 +339,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 22109",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Stopping or suddenly decreasing speed without first giving an appropriate signal when there is opportunity to do so safely."
   },
   {
     "id": "vc-vc-22348-excessive-speed",
@@ -352,7 +352,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 22348",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving at a speed in excess of the maximum speed permitted by statute or posted lawful limit."
   },
   {
     "id": "vc-vc-23103-reckless-driving",
@@ -365,7 +365,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 23103",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving a vehicle on a highway in willful or wanton disregard for the safety of persons or property."
   },
   {
     "id": "vc-vc-23104-reckless-driving-and-bodily-injury",
@@ -379,7 +379,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 23104",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Committing reckless driving and thereby proximately causing bodily injury to a person other than the driver."
   },
   {
     "id": "vc-vc-23110-throw-substance-at-vehicle",
@@ -392,7 +392,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 23110",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Throwing any substance or object at a vehicle or at an occupant of a vehicle on a highway."
   },
   {
     "id": "vc-vc-23123-wireless-telephone-use-while-driving",
@@ -405,7 +405,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 23123",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving while using a handheld wireless telephone, except for lawful emergency use or authorized hands-free operation."
   },
   {
     "id": "vc-vc-23152-dui",
@@ -418,7 +418,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 23152(a)",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving a vehicle while under the influence of alcohol, drugs, or a combination that impairs the ability to drive with ordinary care."
   },
   {
     "id": "vc-vc-23152-dui-0-08-bac-or-more",
@@ -431,7 +431,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 23152(b)",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving a vehicle with 0.08 percent or more blood alcohol concentration."
   },
   {
     "id": "vc-vc-23153-dui-with-injury",
@@ -445,7 +445,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 23153",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving under the influence and, while doing so, committing an unlawful act or neglecting a lawful duty, which proximately causes bodily injury."
   },
   {
     "id": "vc-vc-23153-dui-0-08-bac-or-more-with-injury",
@@ -459,7 +459,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 23153(b)",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving with 0.08 percent or more blood alcohol concentration and committing an unlawful act or negligence that proximately causes bodily injury."
   },
   {
     "id": "vc-vc-23222-open-container-or-cannabis",
@@ -472,7 +472,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 23222",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving while carrying an open container of alcohol or possessing usable cannabis in a motor vehicle as prohibited by statute."
   },
   {
     "id": "vc-vc-26708-material-obstructing-driver-s-view",
@@ -485,7 +485,7 @@
     ],
     "difficulty": "easy",
     "codeSection": "VC 26708",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driving with any object or material placed, displayed, installed, affixed, or applied that obstructs or reduces the driver's clear view."
   },
   {
     "id": "vc-vc-27151-exhaust-system-modification",
@@ -498,7 +498,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 27151",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Operating a vehicle with an altered or modified exhaust system that increases noise beyond legal limits or bypasses required muffler function."
   },
   {
     "id": "vc-vc-27315-seat-belt-violation",
@@ -511,7 +511,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 27315",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Driver and passengers failing to wear a properly adjusted and fastened safety belt when required."
   },
   {
     "id": "vc-vc-27360-child-seat-restraint-under-age-8",
@@ -524,7 +524,7 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 27360",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Transporting a child under 8 years old without securing the child in an appropriate child passenger restraint system as required."
   },
   {
     "id": "vc-vc-27360-5-child-seat-restraint-age-8-or-older",
@@ -537,6 +537,6 @@
     ],
     "difficulty": "medium",
     "codeSection": "VC 27360.5",
-    "explanation": "Imported from provided study list. Replace with official statute text for production."
+    "explanation": "Failing to properly restrain a child 8 years or older (or meeting height criteria) with a safety belt or required restraint system."
   }
 ]

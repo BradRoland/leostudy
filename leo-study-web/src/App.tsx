@@ -34,6 +34,7 @@ type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
 type StudyAnswerMode = 'multiple' | 'truefalse'
 type StudyActivitySource = 'flashcards' | 'study_test' | 'matching' | 'speed' | 'duel'
 type PresenceStatus = 'active' | 'away'
+type BannerTone = 'courteous' | 'notice' | 'urgent'
 
 const studyTrackingTickMs = 5000
 const studyActivityWindowMs = 20000
@@ -316,12 +317,34 @@ type SessionPerformanceReport = {
   previousRank: number | null
 }
 
-type SettingsTab = 'profile' | 'customization' | 'support' | 'security' | 'editor' | 'agencies'
+type SettingsTab = 'profile' | 'customization' | 'support' | 'security' | 'editor' | 'agencies' | 'banner'
+
+type AppBannerSettings = {
+  enabled: boolean
+  tone: BannerTone
+  message: string
+  scroll: boolean
+  scrollSpeed: number
+  scrollRepeat: number
+}
 
 const defaultLeaderboardRotationMs = 3600
 
 const defaultAgency = 'Unaffiliated'
 const appSettingsRowId = 'global'
+const defaultAppBannerSettings: AppBannerSettings = {
+  enabled: false,
+  tone: 'notice',
+  message: '',
+  scroll: false,
+  scrollSpeed: 20,
+  scrollRepeat: 2,
+}
+const bannerToneLabel: Record<BannerTone, string> = {
+  courteous: 'Courteous',
+  notice: 'Notice',
+  urgent: 'Urgent',
+}
 const fallbackAgencyOptions = [
   'Fresno Police Department',
   'Fresno Sheriffs Office',
@@ -365,6 +388,56 @@ function normalizeAgency(value: unknown, options: string[]): string {
   if (raw.includes('clovis')) return safeOptions.find((a) => a.toLowerCase() === 'clovis pd') || safeOptions[0]
   if (raw.includes('mariposa') && raw.includes('sheriff')) return safeOptions.find((a) => a.toLowerCase() === 'mariposa sheriffs office') || safeOptions[0]
   return safeOptions.find((agency) => agency.toLowerCase() === defaultAgency.toLowerCase()) || safeOptions[0] || defaultAgency
+}
+
+function sanitizeBannerTone(value: unknown): BannerTone {
+  const tone = String(value || '').trim().toLowerCase()
+  if (tone === 'courteous' || tone === 'urgent') return tone
+  return 'notice'
+}
+
+function sanitizeAppBannerSettings(input: unknown): AppBannerSettings {
+  if (!input || typeof input !== 'object') return { ...defaultAppBannerSettings }
+  const value = input as Partial<AppBannerSettings> & {
+    banner_enabled?: unknown
+    banner_level?: unknown
+    banner_message?: unknown
+    banner_scroll?: unknown
+    banner_scroll_speed?: unknown
+    banner_scroll_repeat?: unknown
+  }
+  const rawMessage = typeof value.message === 'string'
+    ? value.message
+    : typeof value.banner_message === 'string'
+      ? value.banner_message
+      : ''
+  const message = rawMessage.replace(/\s+/g, ' ').trim().slice(0, 320)
+  const enabled = typeof value.enabled === 'boolean'
+    ? value.enabled
+    : Boolean(value.banner_enabled)
+  const scroll = typeof value.scroll === 'boolean'
+    ? value.scroll
+    : Boolean(value.banner_scroll)
+  const tone = sanitizeBannerTone(value.tone ?? value.banner_level)
+  const rawScrollSpeed = Number(value.scrollSpeed ?? value.banner_scroll_speed)
+  const rawScrollRepeat = Number(value.scrollRepeat ?? value.banner_scroll_repeat)
+  const scrollSpeed = Number.isFinite(rawScrollSpeed) ? Math.min(60, Math.max(6, Math.round(rawScrollSpeed))) : defaultAppBannerSettings.scrollSpeed
+  const scrollRepeat = Number.isFinite(rawScrollRepeat) ? Math.min(8, Math.max(1, Math.round(rawScrollRepeat))) : defaultAppBannerSettings.scrollRepeat
+  return {
+    enabled,
+    tone,
+    message,
+    scroll,
+    scrollSpeed,
+    scrollRepeat,
+  }
+}
+
+function buildBannerMarqueeSegments(message: string, repeatCount: number): string[] {
+  const trimmed = message.trim()
+  if (!trimmed) return []
+  const count = Math.min(8, Math.max(1, Math.round(repeatCount || 1)))
+  return Array.from({ length: count }, () => trimmed)
 }
 
 type MasteryStatus = '' | 'Needs Work' | 'Getting There' | 'On Track' | 'Almost Mastered' | 'Mastered'
@@ -3052,6 +3125,11 @@ function App() {
   const [agencySaving, setAgencySaving] = useState(false)
   const [agencyError, setAgencyError] = useState('')
   const [agencySuccess, setAgencySuccess] = useState('')
+  const [appBannerSettings, setAppBannerSettings] = useState<AppBannerSettings>({ ...defaultAppBannerSettings })
+  const [ownerBannerDraft, setOwnerBannerDraft] = useState<AppBannerSettings>({ ...defaultAppBannerSettings })
+  const [ownerBannerSaving, setOwnerBannerSaving] = useState(false)
+  const [ownerBannerError, setOwnerBannerError] = useState('')
+  const [ownerBannerSuccess, setOwnerBannerSuccess] = useState('')
   const [forceProfileSetup, setForceProfileSetup] = useState(false)
   const [profileDetails, setProfileDetails] = useState<ProfileDetails>({
     bio: '',
@@ -3079,6 +3157,7 @@ function App() {
   const [scenarioOptionInputs, setScenarioOptionInputs] = useState<string[]>(['', '', '', ''])
   const [scenarioCorrectChoice, setScenarioCorrectChoice] = useState('')
   const [contentWarning, setContentWarning] = useState('')
+  const [contentLoadRetryToken, setContentLoadRetryToken] = useState(0)
 
   const [performance, setPerformance] = useState<Record<string, CodePerformance>>({})
   const [highScores, setHighScores] = useState(gameHighScoreSeed)
@@ -3406,6 +3485,56 @@ function App() {
     }
   }
 
+  const saveOwnerBannerSettings = async () => {
+    if (!supabase || !isOwner) return false
+    setOwnerBannerSaving(true)
+    setOwnerBannerError('')
+    setOwnerBannerSuccess('')
+    const sanitized = sanitizeAppBannerSettings(ownerBannerDraft)
+
+    if (sanitized.enabled && sanitized.message.trim().length === 0) {
+      setOwnerBannerError('Message text is required when banner is enabled.')
+      setOwnerBannerSaving(false)
+      return false
+    }
+
+    const { data, error } = await supabase
+      .from('app_settings')
+      .upsert(
+        {
+          id: agencySettingsId || appSettingsRowId,
+          banner_enabled: sanitized.enabled,
+          banner_level: sanitized.tone,
+          banner_message: sanitized.message,
+          banner_scroll: sanitized.scroll,
+          banner_scroll_speed: sanitized.scrollSpeed,
+          banner_scroll_repeat: sanitized.scrollRepeat,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+      .select('id,banner_enabled,banner_level,banner_message,banner_scroll,banner_scroll_speed,banner_scroll_repeat')
+      .single()
+
+    if (error) {
+      const message = String(error.message || 'Could not save banner settings.')
+      const migrationHint = message.toLowerCase().includes('banner_') || message.toLowerCase().includes('app_settings')
+        ? ' Run /supabase/migrations/20260226_app_settings_global_banner.sql and /supabase/migrations/20260226_app_settings_global_banner_scroll_controls.sql first.'
+        : ''
+      setOwnerBannerError(`${message}${migrationHint}`)
+      setOwnerBannerSaving(false)
+      return false
+    }
+
+    const nextSettings = sanitizeAppBannerSettings(data || sanitized)
+    setAppBannerSettings(nextSettings)
+    setOwnerBannerDraft(nextSettings)
+    setAgencySettingsId(String(data?.id || appSettingsRowId))
+    setOwnerBannerSaving(false)
+    setOwnerBannerSuccess('Banner settings saved.')
+    return true
+  }
+
   const applyLoadedContentToRuntime = (codeItems: ContentBankItem[], scenarios: ScenarioBankItem[]) => {
     const sectionsFromItems = codeItems
       .map((item) => {
@@ -3430,22 +3559,54 @@ function App() {
     if (!supabase || !currentUserId) return
     const client = supabase
     let cancelled = false
+    const applyAppSettingsRow = (row: Record<string, unknown> | null | undefined) => {
+      const savedAgencies = sanitizeAgencyOptions(row?.agencies)
+      setAgencyOptions(savedAgencies)
+      setAgencySettingsId(String(row?.id || appSettingsRowId))
+      const nextBanner = sanitizeAppBannerSettings({
+        banner_enabled: row?.banner_enabled,
+        banner_level: row?.banner_level,
+        banner_message: row?.banner_message,
+        banner_scroll: row?.banner_scroll,
+        banner_scroll_speed: row?.banner_scroll_speed,
+        banner_scroll_repeat: row?.banner_scroll_repeat,
+      })
+      setAppBannerSettings(nextBanner)
+      setOwnerBannerDraft(nextBanner)
+    }
+
     const loadAppSettings = async () => {
-      const { data, error } = await client.from('app_settings').select('id,agencies').eq('id', appSettingsRowId).maybeSingle()
+      const { data, error } = await client
+        .from('app_settings')
+        .select('id,agencies,banner_enabled,banner_level,banner_message,banner_scroll,banner_scroll_speed,banner_scroll_repeat')
+        .eq('id', appSettingsRowId)
+        .maybeSingle()
       if (cancelled) return
       if (error) {
         console.warn('[app_settings] failed loading agency settings:', error.message)
         return
       }
-      const savedAgencies = sanitizeAgencyOptions(data?.agencies)
-      setAgencyOptions(savedAgencies)
-      setAgencySettingsId(String(data?.id || appSettingsRowId))
+      applyAppSettingsRow((data || null) as Record<string, unknown> | null)
     }
     loadAppSettings().catch((error) => {
       console.warn('[app_settings] load crashed:', error)
     })
+
+    const channel = client
+      .channel(`app-settings-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings', filter: `id=eq.${appSettingsRowId}` },
+        (payload) => {
+          if (cancelled) return
+          applyAppSettingsRow((payload.new || null) as Record<string, unknown> | null)
+        },
+      )
+      .subscribe()
+
     return () => {
       cancelled = true
+      client.removeChannel(channel)
     }
   }, [currentUserId, supabase])
 
@@ -3459,7 +3620,7 @@ function App() {
 
   useEffect(() => {
     if (isOwner) return
-    if (settingsTab === 'editor' || settingsTab === 'agencies') {
+    if (settingsTab === 'editor' || settingsTab === 'agencies' || settingsTab === 'banner') {
       setSettingsTab('profile')
     }
   }, [isOwner, settingsTab])
@@ -3530,6 +3691,16 @@ function App() {
   }, [profileMenuOpen])
 
   useEffect(() => {
+    let cancelled = false
+    let retryTimer: number | null = null
+    const queueRetry = () => {
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
+      retryTimer = window.setTimeout(() => {
+        if (cancelled) return
+        setContentLoadRetryToken((current) => current + 1)
+      }, 15_000)
+    }
+
     const loadFromSupabase = async () => {
       if (!supabase) throw new Error('supabase client is not configured')
       const { data: rows, error } = await supabase
@@ -3609,6 +3780,11 @@ function App() {
 
     const loadContent = async () => {
       if (appContentSource === 'supabase') {
+        if (!authReady) return
+        if (!currentUserId) {
+          setContentWarning('')
+          return
+        }
         try {
           const supabaseContent = await loadFromSupabase()
           setContentWarning('')
@@ -3616,12 +3792,17 @@ function App() {
           return
         } catch (error) {
           console.warn('[content] supabase content unavailable, falling back to local content.', error)
-          setContentWarning('Content editor source unavailable, using local content fallback.')
+          setContentWarning('Content editor source unavailable, retrying Supabase. Showing local content for now.')
         }
-      } else {
-        setContentWarning('')
+
+        const localBundle = loadLocalContentBundle()
+        for (const warning of localBundle.warnings) console.warn(warning)
+        applyLoadedContentToRuntime(localBundle.codeItems, localBundle.scenarioItems)
+        queueRetry()
+        return
       }
 
+      setContentWarning('')
       const localBundle = loadLocalContentBundle()
       for (const warning of localBundle.warnings) console.warn(warning)
       applyLoadedContentToRuntime(localBundle.codeItems, localBundle.scenarioItems)
@@ -3634,7 +3815,11 @@ function App() {
       setScenarioItems([])
       setContentWarning('Could not load content source. Check local content files.')
     })
-  }, [])
+    return () => {
+      cancelled = true
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
+    }
+  }, [authReady, currentUserId, contentLoadRetryToken])
 
   useEffect(() => {
     const measure = () => {
@@ -8897,6 +9082,32 @@ function App() {
 
       {authReady && currentUserId ? (
         <>
+        {appBannerSettings.enabled && appBannerSettings.message ? (
+          <section
+            className={`global-owner-banner global-owner-banner-${appBannerSettings.tone} global-owner-banner-live${
+              appBannerSettings.scroll ? ' global-owner-banner-scrolling' : ''
+            }`}
+            role={appBannerSettings.tone === 'urgent' ? 'alert' : 'status'}
+            aria-live={appBannerSettings.tone === 'urgent' ? 'assertive' : 'polite'}
+          >
+            <span className="global-owner-banner-label">{bannerToneLabel[appBannerSettings.tone]}</span>
+            {appBannerSettings.scroll ? (
+              <div className="global-owner-banner-marquee" aria-label={appBannerSettings.message}>
+                <div
+                  className="global-owner-banner-marquee-track"
+                  style={{ ['--banner-scroll-duration' as string]: `${appBannerSettings.scrollSpeed}s` } as CSSProperties}
+                >
+                  {buildBannerMarqueeSegments(appBannerSettings.message, appBannerSettings.scrollRepeat).map((segment, index) => (
+                    <span key={`banner-live-${index}`}>{segment}</span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="global-owner-banner-text">{appBannerSettings.message}</p>
+            )}
+            <span className="global-owner-banner-spacer" aria-hidden />
+          </section>
+        ) : null}
         <div className="workspace-layout">
           <aside className="left-taskbar">
             <div className="taskbar-section">
@@ -11388,6 +11599,11 @@ function App() {
                     Agencies
                   </button>
                 ) : null}
+                {isOwner ? (
+                  <button className={settingsTab === 'banner' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('banner')}>
+                    Site Banner
+                  </button>
+                ) : null}
                 <button className={settingsTab === 'support' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('support')}>
                   Support
                 </button>
@@ -11952,6 +12168,165 @@ function App() {
                 ) : (
                   <div className="settings-section-card">
                     <p className="muted">Agency settings are available to owner accounts only.</p>
+                  </div>
+                )
+              ) : null}
+
+              {settingsTab === 'banner' ? (
+                isOwner ? (
+                  <div className="settings-section-card">
+                    <h3>Global Site Banner</h3>
+                    <p className="muted tiny">This banner appears at the top of the website for all users.</p>
+
+                    <label className="switch-row">
+                      <input
+                        type="checkbox"
+                        checked={ownerBannerDraft.enabled}
+                        onChange={(event) => {
+                          const enabled = event.target.checked
+                          setOwnerBannerDraft((previous) => ({
+                            ...previous,
+                            enabled,
+                          }))
+                        }}
+                      />
+                      Show banner
+                    </label>
+
+                    <div className="content-editor-filters">
+                      <label>
+                        Message type
+                        <select
+                          value={ownerBannerDraft.tone}
+                          onChange={(event) => {
+                            const tone = sanitizeBannerTone(event.target.value)
+                            setOwnerBannerDraft((previous) => ({
+                              ...previous,
+                              tone,
+                            }))
+                          }}
+                        >
+                          <option value="courteous">Courteous</option>
+                          <option value="notice">Notice</option>
+                          <option value="urgent">Urgent</option>
+                        </select>
+                      </label>
+                      <label className="switch-row">
+                        <input
+                          type="checkbox"
+                          checked={ownerBannerDraft.scroll}
+                          onChange={(event) => {
+                            const scroll = event.target.checked
+                            setOwnerBannerDraft((previous) => ({
+                              ...previous,
+                              scroll,
+                            }))
+                          }}
+                        />
+                        Scroll text
+                      </label>
+                      {ownerBannerDraft.scroll ? (
+                        <>
+                          <label>
+                            Scroll speed
+                            <select
+                              value={ownerBannerDraft.scrollSpeed}
+                              onChange={(event) => {
+                                const nextSpeed = Number(event.target.value)
+                                setOwnerBannerDraft((previous) => ({
+                                  ...previous,
+                                  scrollSpeed: Number.isFinite(nextSpeed)
+                                    ? Math.min(60, Math.max(6, Math.round(nextSpeed)))
+                                    : previous.scrollSpeed,
+                                }))
+                              }}
+                            >
+                              <option value={12}>Very fast</option>
+                              <option value={16}>Fast</option>
+                              <option value={20}>Normal</option>
+                              <option value={26}>Slow</option>
+                              <option value={34}>Very slow</option>
+                            </select>
+                          </label>
+                          <label>
+                            Repeats per cycle
+                            <select
+                              value={ownerBannerDraft.scrollRepeat}
+                              onChange={(event) => {
+                                const nextRepeat = Number(event.target.value)
+                                setOwnerBannerDraft((previous) => ({
+                                  ...previous,
+                                  scrollRepeat: Number.isFinite(nextRepeat)
+                                    ? Math.min(8, Math.max(1, Math.round(nextRepeat)))
+                                    : previous.scrollRepeat,
+                                }))
+                              }}
+                            >
+                              {Array.from({ length: 8 }, (_, index) => index + 1).map((count) => (
+                                <option key={count} value={count}>
+                                  {count === 1 ? '1 time' : `${count} times`}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </>
+                      ) : null}
+                    </div>
+
+                    <label>
+                      Banner message
+                      <textarea
+                        rows={3}
+                        maxLength={320}
+                        placeholder="Enter the message you want shown across the site."
+                        value={ownerBannerDraft.message}
+                        onChange={(event) =>
+                          setOwnerBannerDraft((previous) => ({
+                            ...previous,
+                            message: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <p className="tiny muted">{ownerBannerDraft.message.trim().length}/320</p>
+
+                    <div
+                      className={`global-owner-banner global-owner-banner-${ownerBannerDraft.tone} global-owner-banner-preview${
+                        ownerBannerDraft.scroll ? ' global-owner-banner-scrolling' : ''
+                      }`}
+                    >
+                      <span className="global-owner-banner-label">{bannerToneLabel[ownerBannerDraft.tone]}</span>
+                      {ownerBannerDraft.scroll && ownerBannerDraft.message.trim().length > 0 ? (
+                        <div className="global-owner-banner-marquee" aria-label={ownerBannerDraft.message.trim()}>
+                          <div
+                            className="global-owner-banner-marquee-track"
+                            style={{ ['--banner-scroll-duration' as string]: `${ownerBannerDraft.scrollSpeed}s` } as CSSProperties}
+                          >
+                            {buildBannerMarqueeSegments(ownerBannerDraft.message, ownerBannerDraft.scrollRepeat).map((segment, index) => (
+                              <span key={`banner-preview-${index}`}>{segment}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="global-owner-banner-text">
+                          {ownerBannerDraft.message.trim() || 'Banner preview text will appear here.'}
+                        </p>
+                      )}
+                      <span className="global-owner-banner-spacer" aria-hidden />
+                    </div>
+
+                    <div className="actions-row">
+                      <button className="primary" type="button" onClick={() => void saveOwnerBannerSettings()} disabled={ownerBannerSaving}>
+                        {ownerBannerSaving ? 'Saving...' : 'Save Banner'}
+                      </button>
+                    </div>
+
+                    {ownerBannerError ? <p className="bad">{ownerBannerError}</p> : null}
+                    {ownerBannerSuccess ? <p className="saved-pill">{ownerBannerSuccess}</p> : null}
+                  </div>
+                ) : (
+                  <div className="settings-section-card">
+                    <p className="muted">Global banner controls are available to owner accounts only.</p>
                   </div>
                 )
               ) : null}

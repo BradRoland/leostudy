@@ -1,43 +1,419 @@
 [
-  { "codeSet": "vehicle", "sectionNumber": "VC 4000(a)(1)", "title": "Unregistered vehicle", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["registration"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 2800.1", "title": "Evade peace officer", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["evading"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 2800.2(a)", "title": "Evade peace officer with reckless driving", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["evading", "reckless"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 2800.3(a)", "title": "Evade peace officer causing serious injury", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["evading", "injury"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 2800.3(b)", "title": "Evade peace officer causing death", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["evading", "death"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 2800.4", "title": "Evade officer driving opposite traffic flow", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["evading"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 2803", "title": "Unsafe load", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["equipment"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 5201.1", "title": "Obscure license plate", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["license plate"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 10501", "title": "False report of vehicle theft", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["false report"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 10851(a)", "title": "Vehicle theft", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["vehicle theft"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 10852", "title": "Tamper with vehicle", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["tampering"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 12500", "title": "Unlicensed driver", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["licensing"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 4463", "title": "False registration, license plate, placard, or permits", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["fraud"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 12951", "title": "Driver's license not in possession", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["licensing"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 14601", "title": "Driving privilege suspended or revoked", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["licensing"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 14601.4", "title": "Driving privilege suspended or revoked with bodily injury", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["licensing", "injury"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 20001", "title": "Hit and run with injury or death", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["hit and run"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 20002", "title": "Accident with vehicle or property damage", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["hit and run"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 21202", "title": "Bicyclist on roadway", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["bicycle"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 21658", "title": "Unsafe lane change", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["lane"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 21701", "title": "Interfere with driver's control of vehicle", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["driver safety"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 21703", "title": "Following too closely", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["following"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 21750(a)", "title": "Overtaking and passing", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["passing"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 21955", "title": "Jaywalking", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["pedestrian"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 21957", "title": "Hitchhiking on roadway", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["pedestrian"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 22109", "title": "Stopping suddenly", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["stopping"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 22348", "title": "Excessive speed", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["speed"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 23103", "title": "Reckless driving", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["reckless"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 23104", "title": "Reckless driving and bodily injury", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["reckless", "injury"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 23110", "title": "Throw substance at vehicle", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["projectile"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 23123", "title": "Wireless telephone use while driving", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["distraction"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 23152(a)", "title": "DUI", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["dui"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 23152(b)", "title": "DUI 0.08% BAC or more", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["dui"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 23153", "title": "DUI with injury", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["dui", "injury"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 23153(b)", "title": "DUI 0.08% BAC or more with injury", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["dui", "injury"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 23222", "title": "Open container or cannabis", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["open container"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 26708", "title": "Material obstructing driver's view", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["equipment"], "frequentlyTested": true },
-  { "codeSet": "vehicle", "sectionNumber": "VC 27151", "title": "Exhaust system modification", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["equipment"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 27315", "title": "Seat belt violation", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["safety"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 27360", "title": "Child seat restraint under age 8", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["child safety"], "frequentlyTested": false },
-  { "codeSet": "vehicle", "sectionNumber": "VC 27360.5", "title": "Child seat restraint age 8 or older", "text": "Imported from provided study list. Replace with official statute text for production.", "tags": ["child safety"], "frequentlyTested": false }
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 4000(a)(1)",
+    "title": "Unregistered vehicle",
+    "text": "Driving, moving, parking, or leaving a motor vehicle on a highway or public parking area without current valid registration.",
+    "tags": [
+      "registration"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 2800.1",
+    "title": "Evade peace officer",
+    "text": "Willfully fleeing or attempting to elude a pursuing peace officer in a marked vehicle with red lamp and siren activated while the officer is in uniform.",
+    "tags": [
+      "evading"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 2800.2(a)",
+    "title": "Evade peace officer with reckless driving",
+    "text": "Committing VC 2800.1 while driving with willful or wanton disregard for the safety of persons or property.",
+    "tags": [
+      "evading",
+      "reckless"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 2800.3(a)",
+    "title": "Evade peace officer causing serious injury",
+    "text": "Violating VC 2800.1 or VC 2800.2 and proximately causing serious bodily injury to another person.",
+    "tags": [
+      "evading",
+      "injury"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 2800.3(b)",
+    "title": "Evade peace officer causing death",
+    "text": "Violating VC 2800.1 or VC 2800.2 and proximately causing the death of another person.",
+    "tags": [
+      "evading",
+      "death"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 2800.4",
+    "title": "Evade officer driving opposite traffic flow",
+    "text": "While fleeing a pursuing peace officer, driving a vehicle against the lawful direction of traffic.",
+    "tags": [
+      "evading"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 2803",
+    "title": "Unsafe load",
+    "text": "Driving or moving a vehicle with an unsafe or unsecured load likely to spill, drop, blow, or endanger roadway users.",
+    "tags": [
+      "equipment"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 5201.1",
+    "title": "Obscure license plate",
+    "text": "Placing or using any covering, coating, device, or material that obstructs, impairs, or defeats clear recognition of a license plate.",
+    "tags": [
+      "license plate"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 10501",
+    "title": "False report of vehicle theft",
+    "text": "Knowingly making a false report to law enforcement that a vehicle has been stolen or embezzled.",
+    "tags": [
+      "false report"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 10851(a)",
+    "title": "Vehicle theft",
+    "text": "Driving or taking a vehicle without the owner's consent, with intent to temporarily or permanently deprive the owner of possession or title.",
+    "tags": [
+      "vehicle theft"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 10852",
+    "title": "Tamper with vehicle",
+    "text": "Willfully tampering with or injuring a vehicle or its contents without the owner's consent.",
+    "tags": [
+      "tampering"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 12500",
+    "title": "Unlicensed driver",
+    "text": "Driving a motor vehicle on a highway without holding a valid California driver license for that class of vehicle.",
+    "tags": [
+      "licensing"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 4463",
+    "title": "False registration, license plate, placard, or permits",
+    "text": "Forging, counterfeiting, altering, possessing, displaying, or using false registration documents, plates, placards, stickers, or permits with fraudulent intent.",
+    "tags": [
+      "fraud"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 12951",
+    "title": "Driver's license not in possession",
+    "text": "Failure to present a valid driver license upon lawful demand by a peace officer while operating a motor vehicle.",
+    "tags": [
+      "licensing"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 14601",
+    "title": "Driving privilege suspended or revoked",
+    "text": "Driving a motor vehicle while driving privilege is suspended or revoked, with knowledge of the suspension or revocation.",
+    "tags": [
+      "licensing"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 14601.4",
+    "title": "Driving privilege suspended or revoked with bodily injury",
+    "text": "Driving with a DUI-related suspension or revocation and concurrently committing a moving violation that causes bodily injury to another person.",
+    "tags": [
+      "licensing",
+      "injury"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 20001",
+    "title": "Hit and run with injury or death",
+    "text": "Being involved in an accident causing injury or death and willfully failing to stop and perform the required identification and aid duties.",
+    "tags": [
+      "hit and run"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 20002",
+    "title": "Accident with vehicle or property damage",
+    "text": "Being involved in an accident causing property damage only and failing to immediately stop and provide required identifying information.",
+    "tags": [
+      "hit and run"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 21202",
+    "title": "Bicyclist on roadway",
+    "text": "A bicyclist moving slower than normal traffic must ride as close as practicable to the right curb or edge, except statutory exceptions.",
+    "tags": [
+      "bicycle"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 21658",
+    "title": "Unsafe lane change",
+    "text": "Moving from a lane without first determining that the movement can be made with reasonable safety.",
+    "tags": [
+      "lane"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 21701",
+    "title": "Interfere with driver's control of vehicle",
+    "text": "Interfering with or obstructing the driver's control of a vehicle while the vehicle is in operation.",
+    "tags": [
+      "driver safety"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 21703",
+    "title": "Following too closely",
+    "text": "Following another vehicle more closely than is reasonable and prudent for speed, traffic, and roadway conditions.",
+    "tags": [
+      "following"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 21750(a)",
+    "title": "Overtaking and passing",
+    "text": "Passing another vehicle on the left only when safe and returning to the right side only after safely clear of the overtaken vehicle.",
+    "tags": [
+      "passing"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 21955",
+    "title": "Jaywalking",
+    "text": "Crossing a roadway between adjacent intersections controlled by traffic signals outside of a marked crosswalk.",
+    "tags": [
+      "pedestrian"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 21957",
+    "title": "Hitchhiking on roadway",
+    "text": "Standing in a roadway to solicit a ride, business, or employment from an occupant of any vehicle.",
+    "tags": [
+      "pedestrian"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 22109",
+    "title": "Stopping suddenly",
+    "text": "Stopping or suddenly decreasing speed without first giving an appropriate signal when there is opportunity to do so safely.",
+    "tags": [
+      "stopping"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 22348",
+    "title": "Excessive speed",
+    "text": "Driving at a speed in excess of the maximum speed permitted by statute or posted lawful limit.",
+    "tags": [
+      "speed"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 23103",
+    "title": "Reckless driving",
+    "text": "Driving a vehicle on a highway in willful or wanton disregard for the safety of persons or property.",
+    "tags": [
+      "reckless"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 23104",
+    "title": "Reckless driving and bodily injury",
+    "text": "Committing reckless driving and thereby proximately causing bodily injury to a person other than the driver.",
+    "tags": [
+      "reckless",
+      "injury"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 23110",
+    "title": "Throw substance at vehicle",
+    "text": "Throwing any substance or object at a vehicle or at an occupant of a vehicle on a highway.",
+    "tags": [
+      "projectile"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 23123",
+    "title": "Wireless telephone use while driving",
+    "text": "Driving while using a handheld wireless telephone, except for lawful emergency use or authorized hands-free operation.",
+    "tags": [
+      "distraction"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 23152(a)",
+    "title": "DUI",
+    "text": "Driving a vehicle while under the influence of alcohol, drugs, or a combination that impairs the ability to drive with ordinary care.",
+    "tags": [
+      "dui"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 23152(b)",
+    "title": "DUI 0.08% BAC or more",
+    "text": "Driving a vehicle with 0.08 percent or more blood alcohol concentration.",
+    "tags": [
+      "dui"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 23153",
+    "title": "DUI with injury",
+    "text": "Driving under the influence and, while doing so, committing an unlawful act or neglecting a lawful duty, which proximately causes bodily injury.",
+    "tags": [
+      "dui",
+      "injury"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 23153(b)",
+    "title": "DUI 0.08% BAC or more with injury",
+    "text": "Driving with 0.08 percent or more blood alcohol concentration and committing an unlawful act or negligence that proximately causes bodily injury.",
+    "tags": [
+      "dui",
+      "injury"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 23222",
+    "title": "Open container or cannabis",
+    "text": "Driving while carrying an open container of alcohol or possessing usable cannabis in a motor vehicle as prohibited by statute.",
+    "tags": [
+      "open container"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 26708",
+    "title": "Material obstructing driver's view",
+    "text": "Driving with any object or material placed, displayed, installed, affixed, or applied that obstructs or reduces the driver's clear view.",
+    "tags": [
+      "equipment"
+    ],
+    "frequentlyTested": true
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 27151",
+    "title": "Exhaust system modification",
+    "text": "Operating a vehicle with an altered or modified exhaust system that increases noise beyond legal limits or bypasses required muffler function.",
+    "tags": [
+      "equipment"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 27315",
+    "title": "Seat belt violation",
+    "text": "Driver and passengers failing to wear a properly adjusted and fastened safety belt when required.",
+    "tags": [
+      "safety"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 27360",
+    "title": "Child seat restraint under age 8",
+    "text": "Transporting a child under 8 years old without securing the child in an appropriate child passenger restraint system as required.",
+    "tags": [
+      "child safety"
+    ],
+    "frequentlyTested": false
+  },
+  {
+    "codeSet": "vehicle",
+    "sectionNumber": "VC 27360.5",
+    "title": "Child seat restraint age 8 or older",
+    "text": "Failing to properly restrain a child 8 years or older (or meeting height criteria) with a safety belt or required restraint system.",
+    "tags": [
+      "child safety"
+    ],
+    "frequentlyTested": false
+  }
 ]

@@ -49,6 +49,14 @@ Required vars:
   - Adds owner ban/delete account tools, removes banned users from leaderboards, and blocks banned users from writing progress/scores.
 - `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_account_moderation_rpc_hotfix.sql`
   - Adds a stable owner moderation RPC (`owner_moderate_account_json`) and refreshes PostgREST schema cache.
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260226_leaderboard_only_reset.sql`
+  - Adds owner-only `reset_global_leaderboard_only()` so global leaderboard resets do not wipe user progress stats.
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260226_leaderboard_only_reset_sql_editor_fix.sql`
+  - Allows the same reset function to run from Supabase SQL editor (`postgres`) while keeping owner checks for normal app users.
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260226_leaderboard_only_reset_include_high_scores.sql`
+  - Extends the reset function to clear `leaderboard` + `app_state.high_scores` while preserving study progress and profile stats.
+- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260226_app_state_clobber_guard.sql`
+  - Adds a DB trigger that prevents accidental overwrite of non-empty `app_state` progress with empty/default values.
 
 4. Run app:
 
@@ -57,6 +65,23 @@ npm run dev
 ```
 
 - Local: `http://localhost:5173`
+
+## Safe leaderboard reset (no user stat wipe)
+
+Run this in Supabase SQL editor when you only want to clear leaderboard rankings:
+
+```sql
+select public.reset_global_leaderboard_only();
+```
+
+This preserves:
+- `app_state` (study progress + mastery stats)
+- `duel_player_stats` (1v1 W/L + streak stats)
+- `game_attempt_history`
+
+And it clears:
+- `leaderboard` rows
+- `app_state.high_scores` for all users
 
 ## How to add/edit questions locally
 
