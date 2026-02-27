@@ -807,6 +807,55 @@ function buildLeaderboardFirstPlaceCountMap(boards: LeaderboardBoard[]) {
   return counts
 }
 
+function buildWeeklyTopPerformer(entries: LeaderboardEntry[]): WeeklyPerformanceLeader | null {
+  const boards = buildLeaderboardBoards(entries, 0)
+  if (boards.length === 0) return null
+
+  const byUser = new Map<
+    string,
+    {
+      entry: LeaderboardEntry
+      firstPlaceCount: number
+      leaderboardAppearances: number
+      totalScore: number
+      bestSingleScore: number
+    }
+  >()
+
+  for (const board of boards) {
+    for (let index = 0; index < board.entries.length; index += 1) {
+      const entry = board.entries[index]
+      const current = byUser.get(entry.userId)
+      if (!current) {
+        byUser.set(entry.userId, {
+          entry,
+          firstPlaceCount: index === 0 ? 1 : 0,
+          leaderboardAppearances: 1,
+          totalScore: entry.score,
+          bestSingleScore: entry.score,
+        })
+        continue
+      }
+      current.firstPlaceCount += index === 0 ? 1 : 0
+      current.leaderboardAppearances += 1
+      current.totalScore += entry.score
+      current.bestSingleScore = Math.max(current.bestSingleScore, entry.score)
+      if (entry.score > current.entry.score || (entry.score === current.entry.score && entry.round > current.entry.round)) {
+        current.entry = entry
+      }
+    }
+  }
+
+  const sorted = [...byUser.values()].sort((left, right) =>
+    right.firstPlaceCount - left.firstPlaceCount ||
+    right.totalScore - left.totalScore ||
+    right.bestSingleScore - left.bestSingleScore ||
+    right.leaderboardAppearances - left.leaderboardAppearances,
+  )
+
+  return sorted[0] || null
+}
+
 function buildDepartmentLeaders(entries: LeaderboardEntry[]): DepartmentLeaderboardEntry[] {
   const leaderboardModeKey = (entry: LeaderboardEntry) =>
     `${entry.game.toLowerCase()}|${entry.matchDuration ?? 0}|${entry.matchFilter ?? 'all'}`
@@ -818,6 +867,24 @@ function buildDepartmentLeaders(entries: LeaderboardEntry[]): DepartmentLeaderbo
   })
 
   if (validEntries.length === 0) return []
+
+  const latestAgencyByUser = new Map<string, { agency: string; agencyKey: string; createdAt: number }>()
+  for (const entry of validEntries) {
+    const agency = canonicalAgencyName(entry.agency || '')
+    if (!agency) continue
+    const agencyKey = normalizeAgencyKey(agency)
+    const current = latestAgencyByUser.get(entry.userId)
+    if (!current) {
+      latestAgencyByUser.set(entry.userId, { agency, agencyKey, createdAt: entry.createdAt })
+      continue
+    }
+    const shouldReplace =
+      entry.createdAt > current.createdAt ||
+      (entry.createdAt === current.createdAt && current.agencyKey === 'unaffiliated' && agencyKey !== 'unaffiliated')
+    if (shouldReplace) {
+      latestAgencyByUser.set(entry.userId, { agency, agencyKey, createdAt: entry.createdAt })
+    }
+  }
 
   const modeScores = new Map<string, number[]>()
   for (const entry of validEntries) {
@@ -851,30 +918,32 @@ function buildDepartmentLeaders(entries: LeaderboardEntry[]): DepartmentLeaderbo
       userId: string
       agency: string
       agencyKey: string
-      perMode: number[]
-      modeCount: number
+      modePercentiles: Map<string, number>
     }
   >()
 
   for (const entry of validEntries) {
+    const userAgency = latestAgencyByUser.get(entry.userId)
+    if (!userAgency) continue
     const agency = canonicalAgencyName(entry.agency || '')
     if (!agency) continue
     const agencyKey = normalizeAgencyKey(agency)
+    if (agencyKey !== userAgency.agencyKey) continue
     const modeKey = leaderboardModeKey(entry)
     const sortedScores = modeSortedScores.get(modeKey)
     if (!sortedScores || sortedScores.length === 0) continue
     const percentile = percentileRank(sortedScores, Math.max(0, entry.score))
-    const playerKey = `${entry.userId}|${agencyKey}`
-    const current = playerModePercentiles.get(playerKey) || {
+    const current = playerModePercentiles.get(entry.userId) || {
       userId: entry.userId,
-      agency,
-      agencyKey,
-      perMode: [],
-      modeCount: 0,
+      agency: userAgency.agency,
+      agencyKey: userAgency.agencyKey,
+      modePercentiles: new Map<string, number>(),
     }
-    current.perMode.push(percentile)
-    current.modeCount += 1
-    playerModePercentiles.set(playerKey, current)
+    const existing = current.modePercentiles.get(modeKey)
+    if (typeof existing !== 'number' || percentile > existing) {
+      current.modePercentiles.set(modeKey, percentile)
+    }
+    playerModePercentiles.set(entry.userId, current)
   }
 
   const topModesPerPlayer = 3
@@ -890,10 +959,11 @@ function buildDepartmentLeaders(entries: LeaderboardEntry[]): DepartmentLeaderbo
   >()
 
   for (const player of playerModePercentiles.values()) {
-    if (player.perMode.length === 0) continue
-    const topModes = [...player.perMode].sort((left, right) => right - left).slice(0, topModesPerPlayer)
+    const perModeScores = [...player.modePercentiles.values()]
+    if (perModeScores.length === 0) continue
+    const topModes = [...perModeScores].sort((left, right) => right - left).slice(0, topModesPerPlayer)
     const basePlayerScore = topModes.reduce((sum, value) => sum + value, 0) / topModes.length
-    const modeCoverage = Math.min(1, player.modeCount / topModesPerPlayer)
+    const modeCoverage = Math.min(1, perModeScores.length / topModesPerPlayer)
     const coverageFloor = 0.85
     const playerScore = basePlayerScore * (coverageFloor + ((1 - coverageFloor) * modeCoverage))
 
@@ -905,7 +975,7 @@ function buildDepartmentLeaders(entries: LeaderboardEntry[]): DepartmentLeaderbo
       players: new Set<string>(),
     }
     current.playerScores.push(playerScore)
-    current.attempts += player.modeCount
+    current.attempts += perModeScores.length
     current.players.add(player.userId)
     departments.set(player.agencyKey, current)
   }
@@ -3158,6 +3228,7 @@ function App() {
   const [scenarioCorrectChoice, setScenarioCorrectChoice] = useState('')
   const [contentWarning, setContentWarning] = useState('')
   const [contentLoadRetryToken, setContentLoadRetryToken] = useState(0)
+  const [globalBannerOffset, setGlobalBannerOffset] = useState(0)
 
   const [performance, setPerformance] = useState<Record<string, CodePerformance>>({})
   const [highScores, setHighScores] = useState(gameHighScoreSeed)
@@ -3285,6 +3356,7 @@ function App() {
   const finalizeMatchingSessionRef = useRef<() => void>(() => {})
   const recentSpeedSectionsRef = useRef<string[]>([])
   const scenarioDeckRef = useRef<ScenarioQuestion[]>([])
+  const globalBannerRef = useRef<HTMLElement | null>(null)
   const quizFireHostRef = useRef<HTMLDivElement | null>(null)
   const scenarioFireHostRef = useRef<HTMLDivElement | null>(null)
   const scenarioNextRef = useRef<HTMLDivElement | null>(null)
@@ -3689,6 +3761,41 @@ function App() {
     window.addEventListener('mousedown', handleOutside)
     return () => window.removeEventListener('mousedown', handleOutside)
   }, [profileMenuOpen])
+
+  useEffect(() => {
+    if (!appBannerSettings.enabled || !appBannerSettings.message) {
+      setGlobalBannerOffset(0)
+      return
+    }
+    const banner = globalBannerRef.current
+    if (!banner) {
+      setGlobalBannerOffset(0)
+      return
+    }
+
+    const measure = () => {
+      const styles = window.getComputedStyle(banner)
+      const marginBottom = Number.parseFloat(styles.marginBottom || '0') || 0
+      const nextOffset = Math.ceil(banner.getBoundingClientRect().height + marginBottom)
+      setGlobalBannerOffset(nextOffset)
+    }
+
+    measure()
+    const resizeObserver = new ResizeObserver(measure)
+    resizeObserver.observe(banner)
+    window.addEventListener('resize', measure)
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [
+    appBannerSettings.enabled,
+    appBannerSettings.message,
+    appBannerSettings.scroll,
+    appBannerSettings.scrollRepeat,
+    appBannerSettings.scrollSpeed,
+    appBannerSettings.tone,
+  ])
 
   useEffect(() => {
     let cancelled = false
@@ -4884,57 +4991,9 @@ function App() {
     () => buildLeaderboardFirstPlaceCountMap(weeklyLeaderboardBoards),
     [weeklyLeaderboardBoards],
   )
-  const weeklyLeaderboardBoardsFull = useMemo(
-    () => buildLeaderboardBoards(weeklyLeaderboardEntries, 0),
-    [weeklyLeaderboardEntries],
-  )
   const weeklyTopPerformer = useMemo<WeeklyPerformanceLeader | null>(() => {
-    if (weeklyLeaderboardBoardsFull.length === 0) return null
-    const byUser = new Map<
-      string,
-      {
-        entry: LeaderboardEntry
-        firstPlaceCount: number
-        leaderboardAppearances: number
-        totalScore: number
-        bestSingleScore: number
-      }
-    >()
-
-    for (const board of weeklyLeaderboardBoardsFull) {
-      for (let index = 0; index < board.entries.length; index += 1) {
-        const entry = board.entries[index]
-        const current = byUser.get(entry.userId)
-        if (!current) {
-          byUser.set(entry.userId, {
-            entry,
-            firstPlaceCount: index === 0 ? 1 : 0,
-            leaderboardAppearances: 1,
-            totalScore: entry.score,
-            bestSingleScore: entry.score,
-          })
-          continue
-        }
-        current.firstPlaceCount += index === 0 ? 1 : 0
-        current.leaderboardAppearances += 1
-        current.totalScore += entry.score
-        current.bestSingleScore = Math.max(current.bestSingleScore, entry.score)
-        if (entry.score > current.entry.score || (entry.score === current.entry.score && entry.round > current.entry.round)) {
-          current.entry = entry
-        }
-      }
-    }
-
-    const sorted = [...byUser.values()].sort((left, right) =>
-      right.firstPlaceCount - left.firstPlaceCount ||
-      right.totalScore - left.totalScore ||
-      right.bestSingleScore - left.bestSingleScore ||
-      right.leaderboardAppearances - left.leaderboardAppearances,
-    )
-
-    if (sorted.length === 0) return null
-    return sorted[0]
-  }, [weeklyLeaderboardBoardsFull])
+    return buildWeeklyTopPerformer(weeklyLeaderboardEntries)
+  }, [weeklyLeaderboardEntries])
   const weeklyDepartmentLeaders = useMemo(() => buildDepartmentLeaders(weeklyLeaderboardEntries), [weeklyLeaderboardEntries])
   const bestWeeklyDepartment = weeklyDepartmentLeaders[0] || null
   const visibleLeaderboardBoards = leaderboardsScope === 'weekly' ? weeklyLeaderboardBoards : allTimeLeaderboardBoards
@@ -5277,6 +5336,8 @@ function App() {
     if (!currentUserId) return { becameWeeklyTop: false, becameAllTimeTop: false }
 
     const weeklyWindow = getCurrentWeeklyWindowMs(Date.now())
+    const inCurrentWeek = (entry: LeaderboardEntry) =>
+      entry.createdAt >= weeklyWindow.weekStartMs && entry.createdAt < weeklyWindow.nextWeekStartMs
     const beforeAllTimeTop = topLeaderboardEntryForMode(options.beforeEntries, {
       game: options.game,
       duration: options.duration,
@@ -5311,6 +5372,8 @@ function App() {
       scope: 'weekly',
       weeklyWindow,
     })
+    const beforeWeeklyTopPerformer = buildWeeklyTopPerformer(options.beforeEntries.filter(inCurrentWeek))
+    const afterWeeklyTopPerformer = buildWeeklyTopPerformer(options.afterEntries.filter(inCurrentWeek))
 
     const becameAllTimeTop =
       Boolean(afterAllTimeTop) &&
@@ -5331,6 +5394,7 @@ function App() {
     }
 
     const actorName = String(profile?.username || currentUserEmail || 'Player').trim() || 'Player'
+    const actorAgencyKey = normalizeAgencyKey(canonicalAgencyName(profileDetails.agency || '') || '')
     const weeklyKnockOff = becameWeeklyTop && beforeWeeklyTop && beforeWeeklyTop.userId !== currentUserId ? beforeWeeklyTop : null
     const allTimeKnockOff = becameAllTimeTop && beforeAllTimeTop && beforeAllTimeTop.userId !== currentUserId ? beforeAllTimeTop : null
     if (weeklyKnockOff && allTimeKnockOff && weeklyKnockOff.userId === allTimeKnockOff.userId) {
@@ -5388,10 +5452,32 @@ function App() {
       }
     }
 
+    const weeklyTopPerformerKnockOff =
+      afterWeeklyTopPerformer &&
+      beforeWeeklyTopPerformer &&
+      afterWeeklyTopPerformer.entry.userId === currentUserId &&
+      beforeWeeklyTopPerformer.entry.userId !== currentUserId
+        ? beforeWeeklyTopPerformer
+        : null
+    if (weeklyTopPerformerKnockOff) {
+      const topPerformerAnnouncementKey = [
+        'top_performer_weekly',
+        String(weeklyWindow.weekStartMs),
+        currentUserId,
+        weeklyTopPerformerKnockOff.entry.userId,
+      ].join('|')
+      if (shouldPostLeaderboardAnnouncement(topPerformerAnnouncementKey)) {
+        await postPublicChatAnnouncement(
+          `🌟 Top Performer of the Week: @${actorName} took #1 from @${weeklyTopPerformerKnockOff.entry.playerName}.`,
+        )
+      }
+    }
+
     if (
       beforeWeeklyDepartmentTop &&
       afterWeeklyDepartmentTop &&
-      beforeWeeklyDepartmentTop.key !== afterWeeklyDepartmentTop.key
+      beforeWeeklyDepartmentTop.key !== afterWeeklyDepartmentTop.key &&
+      actorAgencyKey === afterWeeklyDepartmentTop.key
     ) {
       const departmentAnnouncementKey = [
         'department_weekly',
@@ -5408,7 +5494,7 @@ function App() {
     }
 
     return { becameWeeklyTop, becameAllTimeTop }
-  }, [currentUserEmail, currentUserId, postPublicChatAnnouncement, profile?.username, shouldPostLeaderboardAnnouncement, triggerCelebration])
+  }, [currentUserEmail, currentUserId, postPublicChatAnnouncement, profile?.username, profileDetails.agency, shouldPostLeaderboardAnnouncement, triggerCelebration])
 
   const saveSessionAttempt = useCallback((trackKey: string, snapshot: SessionAttemptSnapshot) => {
     const mode: SessionMode = trackKey.startsWith('study_test|')
@@ -8849,6 +8935,7 @@ function App() {
   return (
     <div
       className={`app-shell ${isHomePage ? 'home-page' : ''} ${isUiLightMode ? 'ui-light-mode theme-light theme-glass' : ''} ${!isUiLightMode && selectedTheme.id === 'golden' ? 'theme-gold' : ''} ${reduceVisualEffects ? 'reduced-effects' : ''}`}
+      style={{ ['--global-banner-offset' as string]: `${globalBannerOffset}px` } as CSSProperties}
     >
       {!isSupabaseConfigured ? (
         <div className="onboarding-overlay">
@@ -9084,6 +9171,7 @@ function App() {
         <>
         {appBannerSettings.enabled && appBannerSettings.message ? (
           <section
+            ref={globalBannerRef}
             className={`global-owner-banner global-owner-banner-${appBannerSettings.tone} global-owner-banner-live${
               appBannerSettings.scroll ? ' global-owner-banner-scrolling' : ''
             }`}

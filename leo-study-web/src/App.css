@@ -43,6 +43,7 @@ body {
 }
 
 .app-shell {
+  --global-banner-offset: 0px;
   width: 100%;
   max-width: none;
   margin: 0;
@@ -199,7 +200,7 @@ body {
   display: grid;
   grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
   gap: 14px;
-  min-height: calc(100vh - 28px);
+  min-height: calc(100vh - 28px - var(--global-banner-offset, 0px));
 }
 
 .workspace-main {
@@ -216,7 +217,7 @@ body {
 .left-taskbar {
   position: sticky;
   top: 14px;
-  height: calc(100vh - 28px);
+  height: calc(100vh - 28px - var(--global-banner-offset, 0px));
   border: 1px solid var(--border);
   border-radius: 20px;
   background: color-mix(in srgb, var(--panel-strong) 88%, transparent);
