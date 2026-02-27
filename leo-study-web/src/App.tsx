@@ -173,6 +173,26 @@ type UserProfile = {
   createdAt: string
 }
 
+type BugSeverity = 'low' | 'medium' | 'high' | 'urgent'
+type BugStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+
+type BugReport = {
+  id: string
+  reporterUserId: string
+  reporterName: string
+  reporterEmail: string
+  pagePath: string
+  severity: BugSeverity
+  summary: string
+  details: string
+  status: BugStatus
+  ownerNote: string
+  userAgent: string
+  viewport: string
+  createdAt: number
+  updatedAt: number
+}
+
 type ContentEditorItem = {
   id: string
   category: string
@@ -317,7 +337,16 @@ type SessionPerformanceReport = {
   previousRank: number | null
 }
 
-type SettingsTab = 'profile' | 'customization' | 'support' | 'security' | 'editor' | 'agencies' | 'banner'
+type SettingsTab =
+  | 'profile'
+  | 'customization'
+  | 'support'
+  | 'security'
+  | 'editor'
+  | 'agencies'
+  | 'banner'
+  | 'bug_report'
+  | 'bug_inbox'
 
 type AppBannerSettings = {
   enabled: boolean
@@ -345,6 +374,19 @@ const bannerToneLabel: Record<BannerTone, string> = {
   notice: 'Notice',
   urgent: 'Urgent',
 }
+const bugSeverityLabel: Record<BugSeverity, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  urgent: 'Urgent',
+}
+const bugStatusLabel: Record<BugStatus, string> = {
+  open: 'Open',
+  in_progress: 'In Progress',
+  resolved: 'Resolved',
+  closed: 'Closed',
+}
+const bugStatusOrder: BugStatus[] = ['open', 'in_progress', 'resolved', 'closed']
 const fallbackAgencyOptions = [
   'Fresno Police Department',
   'Fresno Sheriffs Office',
@@ -394,6 +436,18 @@ function sanitizeBannerTone(value: unknown): BannerTone {
   const tone = String(value || '').trim().toLowerCase()
   if (tone === 'courteous' || tone === 'urgent') return tone
   return 'notice'
+}
+
+function sanitizeBugSeverity(value: unknown): BugSeverity {
+  const severity = String(value || '').trim().toLowerCase()
+  if (severity === 'low' || severity === 'high' || severity === 'urgent') return severity
+  return 'medium'
+}
+
+function sanitizeBugStatus(value: unknown): BugStatus {
+  const status = String(value || '').trim().toLowerCase()
+  if (status === 'in_progress' || status === 'resolved' || status === 'closed') return status
+  return 'open'
 }
 
 function sanitizeAppBannerSettings(input: unknown): AppBannerSettings {
@@ -2188,6 +2242,34 @@ function mapProfileRow(row: Record<string, unknown>, userId: string): UserProfil
   }
 }
 
+function rowToBugReport(row: Record<string, unknown>): BugReport | null {
+  const id = String(row.id || '').trim()
+  const reporterUserId = String(row.reporter_user_id || '').trim()
+  const summary = String(row.summary || '').trim()
+  const details = String(row.details || '').trim()
+  if (!id || !reporterUserId || !summary || !details) return null
+
+  const createdAtRaw = Date.parse(String(row.created_at || ''))
+  const updatedAtRaw = Date.parse(String(row.updated_at || ''))
+
+  return {
+    id,
+    reporterUserId,
+    reporterName: String(row.reporter_name || 'User').trim() || 'User',
+    reporterEmail: String(row.reporter_email || '').trim(),
+    pagePath: String(row.page_path || '').trim() || '/home',
+    severity: sanitizeBugSeverity(row.severity),
+    summary,
+    details,
+    status: sanitizeBugStatus(row.status),
+    ownerNote: String(row.owner_note || '').trim(),
+    userAgent: String(row.user_agent || '').trim(),
+    viewport: String(row.viewport || '').trim(),
+    createdAt: Number.isFinite(createdAtRaw) ? createdAtRaw : Date.now(),
+    updatedAt: Number.isFinite(updatedAtRaw) ? updatedAtRaw : Date.now(),
+  }
+}
+
 function rowToEditorItem(row: Record<string, unknown>): ContentEditorItem | null {
   const id = String(row.id || '').trim()
   const category = String(row.category || '').trim().toLowerCase()
@@ -3200,6 +3282,17 @@ function App() {
   const [ownerBannerSaving, setOwnerBannerSaving] = useState(false)
   const [ownerBannerError, setOwnerBannerError] = useState('')
   const [ownerBannerSuccess, setOwnerBannerSuccess] = useState('')
+  const [bugReportPagePath, setBugReportPagePath] = useState('/home')
+  const [bugReportSeverity, setBugReportSeverity] = useState<BugSeverity>('medium')
+  const [bugReportSummary, setBugReportSummary] = useState('')
+  const [bugReportDetails, setBugReportDetails] = useState('')
+  const [bugReportSending, setBugReportSending] = useState(false)
+  const [bugReportError, setBugReportError] = useState('')
+  const [bugReportSuccess, setBugReportSuccess] = useState('')
+  const [ownerBugReports, setOwnerBugReports] = useState<BugReport[]>([])
+  const [ownerBugReportsLoading, setOwnerBugReportsLoading] = useState(false)
+  const [ownerBugReportsError, setOwnerBugReportsError] = useState('')
+  const [ownerBugReportsSuccess, setOwnerBugReportsSuccess] = useState('')
   const [forceProfileSetup, setForceProfileSetup] = useState(false)
   const [profileDetails, setProfileDetails] = useState<ProfileDetails>({
     bio: '',
@@ -3607,6 +3700,159 @@ function App() {
     return true
   }
 
+  const loadOwnerBugReports = useCallback(async () => {
+    if (!supabase || !isOwner) {
+      setOwnerBugReports([])
+      setOwnerBugReportsLoading(false)
+      setOwnerBugReportsError('')
+      return
+    }
+    setOwnerBugReportsLoading(true)
+    setOwnerBugReportsError('')
+    const { data, error } = await supabase
+      .from('bug_reports')
+      .select(
+        'id,reporter_user_id,reporter_name,reporter_email,page_path,severity,summary,details,status,owner_note,user_agent,viewport,created_at,updated_at',
+      )
+      .order('created_at', { ascending: false })
+      .limit(250)
+
+    if (error) {
+      const message = String(error.message || 'Could not load bug reports.')
+      const migrationHint = message.toLowerCase().includes('bug_reports')
+        ? ' Run /supabase/migrations/20260227_bug_reports.sql first.'
+        : ''
+      setOwnerBugReports([])
+      setOwnerBugReportsError(`${message}${migrationHint}`)
+      setOwnerBugReportsLoading(false)
+      return
+    }
+
+    const mapped = (data || [])
+      .map((row) => rowToBugReport((row || {}) as Record<string, unknown>))
+      .filter((row): row is BugReport => Boolean(row))
+    setOwnerBugReports(mapped)
+    setOwnerBugReportsLoading(false)
+  }, [isOwner])
+
+  const submitBugReport = useCallback(async () => {
+    if (!supabase || !currentUserId) {
+      setBugReportError('Sign in is required to submit a bug report.')
+      setBugReportSuccess('')
+      return
+    }
+
+    const summary = bugReportSummary.trim()
+    const details = bugReportDetails.trim()
+    const pagePath = bugReportPagePath.trim() || routePath || '/home'
+
+    if (summary.length < 6) {
+      setBugReportError('Add a short summary (at least 6 characters).')
+      setBugReportSuccess('')
+      return
+    }
+    if (details.length < 12) {
+      setBugReportError('Add a little more detail so we can reproduce it.')
+      setBugReportSuccess('')
+      return
+    }
+
+    setBugReportSending(true)
+    setBugReportError('')
+    setBugReportSuccess('')
+    try {
+      const { error } = await supabase
+        .from('bug_reports')
+        .insert({
+          reporter_user_id: currentUserId,
+          reporter_name: String(profile?.username || 'User').trim() || 'User',
+          reporter_email: currentUserEmail || null,
+          page_path: pagePath.slice(0, 120),
+          severity: bugReportSeverity,
+          summary: summary.slice(0, 160),
+          details: details.slice(0, 5000),
+          user_agent: typeof navigator !== 'undefined' ? String(navigator.userAgent || '').slice(0, 500) : null,
+          viewport: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : null,
+        })
+        .select('id')
+        .single()
+
+      if (error) throw error
+
+      setBugReportSummary('')
+      setBugReportDetails('')
+      setBugReportSuccess('Thanks — your bug report was sent.')
+      if (isOwner) {
+        void loadOwnerBugReports()
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not submit bug report.'
+      const migrationHint = message.toLowerCase().includes('bug_reports')
+        ? ' Run /supabase/migrations/20260227_bug_reports.sql first.'
+        : ''
+      setBugReportError(`${message}${migrationHint}`)
+    } finally {
+      setBugReportSending(false)
+    }
+  }, [
+    bugReportDetails,
+    bugReportPagePath,
+    bugReportSeverity,
+    bugReportSummary,
+    currentUserEmail,
+    currentUserId,
+    isOwner,
+    loadOwnerBugReports,
+    profile?.username,
+    routePath,
+  ])
+
+  const updateOwnerBugReport = useCallback(async (reportId: string, updates: Partial<Pick<BugReport, 'status' | 'ownerNote'>>) => {
+    if (!supabase || !isOwner || !reportId) return
+    setOwnerBugReportsError('')
+    setOwnerBugReportsSuccess('')
+    const payload: Record<string, unknown> = {}
+    if (updates.status) payload.status = sanitizeBugStatus(updates.status)
+    if (typeof updates.ownerNote === 'string') payload.owner_note = updates.ownerNote.trim().slice(0, 2000)
+    if (Object.keys(payload).length === 0) return
+
+    const { data, error } = await supabase
+      .from('bug_reports')
+      .update(payload)
+      .eq('id', reportId)
+      .select(
+        'id,reporter_user_id,reporter_name,reporter_email,page_path,severity,summary,details,status,owner_note,user_agent,viewport,created_at,updated_at',
+      )
+      .maybeSingle()
+
+    if (error) {
+      setOwnerBugReportsError(error.message || 'Could not update bug report.')
+      return
+    }
+    const mapped = data ? rowToBugReport(data as Record<string, unknown>) : null
+    if (mapped) {
+      setOwnerBugReports((previous) => previous.map((report) => (report.id === reportId ? mapped : report)))
+      setOwnerBugReportsSuccess('Bug report updated.')
+    }
+  }, [isOwner])
+
+  const deleteOwnerBugReport = useCallback(async (reportId: string) => {
+    if (!supabase || !isOwner || !reportId) return
+    if (!window.confirm('Delete this bug report?')) return
+    setOwnerBugReportsError('')
+    setOwnerBugReportsSuccess('')
+    const { error } = await supabase
+      .from('bug_reports')
+      .delete()
+      .eq('id', reportId)
+    if (error) {
+      setOwnerBugReportsError(error.message || 'Could not delete bug report.')
+      return
+    }
+    setOwnerBugReports((previous) => previous.filter((report) => report.id !== reportId))
+    setOwnerBugReportsSuccess('Bug report deleted.')
+  }, [isOwner])
+
   const applyLoadedContentToRuntime = (codeItems: ContentBankItem[], scenarios: ScenarioBankItem[]) => {
     const sectionsFromItems = codeItems
       .map((item) => {
@@ -3692,10 +3938,34 @@ function App() {
 
   useEffect(() => {
     if (isOwner) return
-    if (settingsTab === 'editor' || settingsTab === 'agencies' || settingsTab === 'banner') {
+    if (settingsTab === 'editor' || settingsTab === 'agencies' || settingsTab === 'banner' || settingsTab === 'bug_inbox') {
       setSettingsTab('profile')
     }
   }, [isOwner, settingsTab])
+
+  useEffect(() => {
+    if (!isOwner || settingsTab !== 'bug_inbox') return
+    void loadOwnerBugReports()
+  }, [isOwner, loadOwnerBugReports, settingsTab])
+
+  useEffect(() => {
+    if (!supabase || !currentUserId || !isOwner) return
+    const client = supabase
+    const channel = client
+      .channel(`bug-reports-owner-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bug_reports' },
+        () => {
+          void loadOwnerBugReports()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      client.removeChannel(channel)
+    }
+  }, [currentUserId, isOwner, loadOwnerBugReports])
 
   useEffect(() => {
     try {
@@ -6954,6 +7224,10 @@ function App() {
   const isSupportPage = currentPath === '/support'
   const isProfilePage = currentPath === '/profile'
   const isStatsPage = currentPath === '/stats'
+  useEffect(() => {
+    if (isProfilePage) return
+    setBugReportPagePath(currentPath)
+  }, [currentPath, isProfilePage])
   const activeStudyActivitySource: StudyActivitySource | null =
     isStudyFlashcardsPage && studyFlashSessionOpen && orderedStudyFlashSessionCards.length > 0
       ? 'flashcards'
@@ -6990,6 +7264,11 @@ function App() {
     },
     [navigate],
   )
+
+  const openSettingsTab = useCallback((nextTab: SettingsTab) => {
+    setSettingsTab(nextTab)
+    goToPath('/profile')
+  }, [goToPath])
 
   // Flashcard keyboard controls: Space to flip, Arrow keys to navigate
   useEffect(() => {
@@ -9305,7 +9584,8 @@ function App() {
                 </button>
                 {profileMenuOpen ? (
                   <div className="profile-menu profile-menu-sidebar">
-                    <button className="profile-menu-item" onClick={() => { setProfileMenuOpen(false); goToPath('/profile') }}>Settings</button>
+                    <button className="profile-menu-item" onClick={() => { setProfileMenuOpen(false); openSettingsTab('profile') }}>Settings</button>
+                    <button className="profile-menu-item" onClick={() => { setProfileMenuOpen(false); openSettingsTab('bug_report') }}>Report Bug</button>
                     <button className="profile-menu-item" onClick={() => { setProfileMenuOpen(false); goToPath('/support') }}>Support</button>
                     <button
                       className="profile-menu-item"
@@ -11677,6 +11957,9 @@ function App() {
                 <button className={settingsTab === 'customization' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('customization')}>
                   Customization
                 </button>
+                <button className={settingsTab === 'bug_report' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('bug_report')}>
+                  Report Bug
+                </button>
                 {isOwner ? (
                   <button className={settingsTab === 'editor' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('editor')}>
                     Content Editor
@@ -11690,6 +11973,11 @@ function App() {
                 {isOwner ? (
                   <button className={settingsTab === 'banner' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('banner')}>
                     Site Banner
+                  </button>
+                ) : null}
+                {isOwner ? (
+                  <button className={settingsTab === 'bug_inbox' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('bug_inbox')}>
+                    Bug Inbox
                   </button>
                 ) : null}
                 <button className={settingsTab === 'support' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('support')}>
@@ -11989,6 +12277,144 @@ function App() {
                   {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
                   {authError ? <p className="bad">{authError}</p> : null}
                 </div>
+              ) : null}
+
+              {settingsTab === 'bug_report' ? (
+                <div className="settings-section-card">
+                  <h3>Report a Bug</h3>
+                  <p className="muted tiny">Share what happened and we will review it in the owner bug inbox.</p>
+                  <label>
+                    Where it happened
+                    <input
+                      value={bugReportPagePath}
+                      placeholder="/study/test"
+                      onChange={(event) => setBugReportPagePath(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Severity
+                    <select value={bugReportSeverity} onChange={(event) => setBugReportSeverity(sanitizeBugSeverity(event.target.value))}>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </label>
+                  <label>
+                    Short summary
+                    <input
+                      value={bugReportSummary}
+                      maxLength={160}
+                      placeholder="Example: Matching timer stops while clicking fast"
+                      onChange={(event) => setBugReportSummary(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    What happened?
+                    <textarea
+                      rows={5}
+                      value={bugReportDetails}
+                      maxLength={5000}
+                      placeholder="Include steps to reproduce, expected result, and what actually happened."
+                      onChange={(event) => setBugReportDetails(event.target.value)}
+                    />
+                  </label>
+                  <div className="actions-row">
+                    <button
+                      className="primary"
+                      type="button"
+                      onClick={() => void submitBugReport()}
+                      disabled={bugReportSending || bugReportSummary.trim().length < 6 || bugReportDetails.trim().length < 12}
+                    >
+                      {bugReportSending ? 'Sending...' : 'Submit Bug Report'}
+                    </button>
+                  </div>
+                  {bugReportError ? <p className="bad">{bugReportError}</p> : null}
+                  {bugReportSuccess ? <p className="saved-pill">{bugReportSuccess}</p> : null}
+                </div>
+              ) : null}
+
+              {settingsTab === 'bug_inbox' ? (
+                isOwner ? (
+                  <div className="settings-section-card">
+                    <h3>Bug Inbox</h3>
+                    <p className="muted tiny">Owner-only list of submitted bug reports.</p>
+                    <div className="actions-row">
+                      <button className="secondary" type="button" onClick={() => void loadOwnerBugReports()} disabled={ownerBugReportsLoading}>
+                        {ownerBugReportsLoading ? 'Refreshing...' : 'Refresh'}
+                      </button>
+                    </div>
+                    {ownerBugReportsError ? <p className="bad">{ownerBugReportsError}</p> : null}
+                    {ownerBugReportsSuccess ? <p className="saved-pill">{ownerBugReportsSuccess}</p> : null}
+                    <div className="bug-report-list">
+                      {ownerBugReports.length === 0 ? (
+                        <p className="muted">No bug reports yet.</p>
+                      ) : (
+                        ownerBugReports.map((report) => (
+                          <article key={report.id} className={`bug-report-item status-${report.status}`}>
+                            <div className="bug-report-head">
+                              <div>
+                                <p className="bug-report-summary">{report.summary}</p>
+                                <p className="tiny muted">
+                                  {new Date(report.createdAt).toLocaleString()} • @{report.reporterName} • {report.pagePath}
+                                </p>
+                              </div>
+                              <div className="bug-report-meta">
+                                <span className={`badge bug-severity-${report.severity}`}>{bugSeverityLabel[report.severity]}</span>
+                                <select
+                                  value={report.status}
+                                  onChange={(event) => {
+                                    const nextStatus = sanitizeBugStatus(event.target.value)
+                                    setOwnerBugReports((previous) =>
+                                      previous.map((entry) => (entry.id === report.id ? { ...entry, status: nextStatus } : entry)),
+                                    )
+                                    void updateOwnerBugReport(report.id, { status: nextStatus })
+                                  }}
+                                >
+                                  {bugStatusOrder.map((status) => (
+                                    <option key={`${report.id}-status-${status}`} value={status}>
+                                      {bugStatusLabel[status]}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <p className="bug-report-details">{report.details}</p>
+                            <p className="tiny muted">
+                              Reporter email: {report.reporterEmail || 'Not provided'} • Viewport: {report.viewport || 'Unknown'}
+                            </p>
+                            <label>
+                              Owner note
+                              <textarea
+                                rows={2}
+                                value={report.ownerNote}
+                                placeholder="Add internal note for follow-up."
+                                onChange={(event) => {
+                                  const value = event.target.value
+                                  setOwnerBugReports((previous) =>
+                                    previous.map((entry) => (entry.id === report.id ? { ...entry, ownerNote: value } : entry)),
+                                  )
+                                }}
+                                onBlur={(event) => {
+                                  void updateOwnerBugReport(report.id, { ownerNote: event.target.value })
+                                }}
+                              />
+                            </label>
+                            <div className="actions-row">
+                              <button className="danger" type="button" onClick={() => void deleteOwnerBugReport(report.id)}>
+                                Delete
+                              </button>
+                            </div>
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="settings-section-card">
+                    <p className="muted">Bug inbox is available to owner accounts only.</p>
+                  </div>
+                )
               ) : null}
 
               {settingsTab === 'editor' ? (

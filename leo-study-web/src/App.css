@@ -4336,6 +4336,83 @@ textarea {
   padding: 10px;
 }
 
+.bug-report-list {
+  display: grid;
+  gap: 10px;
+  max-height: 58vh;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.bug-report-item {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 14px;
+  background: var(--panel-strong);
+  padding: 12px;
+}
+
+.bug-report-item.status-open {
+  border-left-color: #f59e0b;
+}
+
+.bug-report-item.status-in_progress {
+  border-left-color: #60a5fa;
+}
+
+.bug-report-item.status-resolved,
+.bug-report-item.status-closed {
+  border-left-color: var(--good);
+}
+
+.bug-report-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.bug-report-summary {
+  margin: 0;
+  font-weight: 700;
+}
+
+.bug-report-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bug-report-details {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.bug-report-item .badge {
+  margin: 0;
+}
+
+.bug-severity-low {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.bug-severity-medium {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.bug-severity-high {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.bug-severity-urgent {
+  background: rgba(239, 68, 68, 0.32);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
 @media (max-width: 960px) {
   .content-editor-main {
     grid-template-columns: 1fr;
@@ -4343,6 +4420,10 @@ textarea {
 
   .content-editor-list {
     max-height: 260px;
+  }
+
+  .bug-report-head {
+    flex-direction: column;
   }
 }
 
