@@ -148,6 +148,11 @@ type LeaderboardEntry = {
   duelCurrentWinStreak: number
 }
 
+type LeaderboardRefreshResult = {
+  allTimeEntries: LeaderboardEntry[]
+  weeklyEntries: LeaderboardEntry[]
+}
+
 type LeaderNameEntry = Pick<LeaderboardEntry, 'playerName' | 'supporterTier' | 'nameStyle' | 'duelCurrentWinStreak'>
 
 type PersistedState = {
@@ -675,8 +680,6 @@ const releaseNotesV031: Array<{ title: string; items: string[] }> = [
   },
 ]
 const studyStreakMilestones = [3, 7, 14, 21, 30]
-const leaderboardResetNoticeId = 'leaderboard-reset-2026-02-26-balance'
-const leaderboardResetCutoverAtMs = Date.parse('2026-02-26T00:00:00.000Z')
 
 const defaultGamesModeSelection: GameModeSelection = { duration: 30, filter: 'all' }
 const gamesModeStorageKey = 'leo_study_games_mode_selection'
@@ -784,10 +787,11 @@ function getLeaderboardPreview(
   filter: CodeFilter,
   currentUserId: string,
 ) {
-  const scoped = entries
-    .filter((entry) => entry.game === game)
-    .filter((entry) => entry.matchDuration === duration && entry.matchFilter === filter)
-    .sort((left, right) => right.score - left.score || right.round - left.round)
+  const scoped = topEntryPerUser(
+    entries
+      .filter((entry) => entry.game === game)
+      .filter((entry) => entry.matchDuration === duration && entry.matchFilter === filter),
+  )
   const preview = scoped.slice(0, 5).map(
     (entry, index): LeaderPreviewItem => ({
       rank: index + 1,
@@ -810,15 +814,16 @@ function topLeaderboardEntryForMode(
     weeklyWindow?: { weekStartMs: number; nextWeekStartMs: number }
   },
 ) {
-  const scoped = entries
-    .filter((entry) => entry.game === options.game)
-    .filter((entry) => entry.matchDuration === options.duration && entry.matchFilter === options.filter)
-    .filter((entry) => {
-      if (options.scope !== 'weekly') return true
-      if (!options.weeklyWindow) return false
-      return entry.createdAt >= options.weeklyWindow.weekStartMs && entry.createdAt < options.weeklyWindow.nextWeekStartMs
-    })
-    .sort((left, right) => right.score - left.score || right.round - left.round)
+  const scoped = topEntryPerUser(
+    entries
+      .filter((entry) => entry.game === options.game)
+      .filter((entry) => entry.matchDuration === options.duration && entry.matchFilter === options.filter)
+      .filter((entry) => {
+        if (options.scope !== 'weekly') return true
+        if (!options.weeklyWindow) return false
+        return entry.createdAt >= options.weeklyWindow.weekStartMs && entry.createdAt < options.weeklyWindow.nextWeekStartMs
+      }),
+  )
   return scoped[0] || null
 }
 
@@ -834,8 +839,8 @@ function buildLeaderboardBoards(entries: LeaderboardEntry[], limit = 5): Leaderb
         const scoped = entries
           .filter((entry) => entry.game === game)
           .filter((entry) => entry.matchDuration === duration && entry.matchFilter === filter)
-          .sort((left, right) => right.score - left.score || right.round - left.round)
-        const trimmed = limit > 0 ? scoped.slice(0, limit) : scoped
+        const deduped = topEntryPerUser(scoped)
+        const trimmed = limit > 0 ? deduped.slice(0, limit) : deduped
         if (trimmed.length === 0) continue
         boards.push({
           key: `${game.toLowerCase()}-${duration}-${filter}`,
@@ -914,7 +919,7 @@ function buildDepartmentLeaders(entries: LeaderboardEntry[]): DepartmentLeaderbo
   const leaderboardModeKey = (entry: LeaderboardEntry) =>
     `${entry.game.toLowerCase()}|${entry.matchDuration ?? 0}|${entry.matchFilter ?? 'all'}`
 
-  const validEntries = entries.filter((entry) => {
+  const validEntries = topEntryPerUserMode(entries).filter((entry) => {
     const canonicalAgency = canonicalAgencyName(entry.agency || '')
     if (!canonicalAgency) return false
     return Number.isFinite(entry.score) && entry.score >= 0
@@ -1544,6 +1549,36 @@ function topEntryPerUser(entries: LeaderboardEntry[]) {
   )
     .map(([, entry]) => entry)
     .sort((left, right) => right.score - left.score || right.round - left.round)
+}
+
+function topEntryPerUserMode(entries: LeaderboardEntry[]) {
+  return Array.from(
+    entries.reduce<Map<string, LeaderboardEntry>>((accumulator, entry) => {
+      const key = `${entry.userId.toLowerCase()}|${entry.game.toLowerCase()}|${entry.matchDuration ?? 0}|${entry.matchFilter ?? 'all'}`
+      const current = accumulator.get(key)
+      if (
+        !current ||
+        entry.score > current.score ||
+        (entry.score === current.score && entry.round > current.round) ||
+        (entry.score === current.score && entry.round === current.round && entry.createdAt > current.createdAt)
+      ) {
+        accumulator.set(key, entry)
+      }
+      return accumulator
+    }, new Map<string, LeaderboardEntry>()),
+  )
+    .map(([, entry]) => entry)
+    .sort((left, right) => right.score - left.score || right.round - left.round || right.createdAt - left.createdAt)
+}
+
+function isLeaderboardScoreImprovement(
+  score: number,
+  round: number,
+  current: Pick<LeaderboardEntry, 'score' | 'round'> | null | undefined,
+) {
+  if (!current) return true
+  if (score > current.score) return true
+  return score === current.score && round > current.round
 }
 
 function shuffle<T>(array: T[]) {
@@ -3329,6 +3364,7 @@ function App() {
   const [remoteTrackScoreHistory, setRemoteTrackScoreHistory] = useState<Record<string, number[]>>({})
   const [remoteScoreTimeline, setRemoteScoreTimeline] = useState<ScoreTimelinePoint[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [weeklyLeaderboard, setWeeklyLeaderboard] = useState<LeaderboardEntry[]>([])
   const [leaderboardError, setLeaderboardError] = useState('')
   const [selectedLeaderboardEntry, setSelectedLeaderboardEntry] = useState<LeaderboardEntry | null>(null)
   const [selectedLeaderboardIsTop, setSelectedLeaderboardIsTop] = useState(false)
@@ -3368,7 +3404,6 @@ function App() {
   const [assistedLearningEnabled, setAssistedLearningEnabled] = useState(true)
   const [showAssistedLearningInfo, setShowAssistedLearningInfo] = useState(false)
   const [showDevNotice, setShowDevNotice] = useState(false)
-  const [showLeaderboardResetNotice, setShowLeaderboardResetNotice] = useState(false)
   const [reduceVisualEffects, setReduceVisualEffects] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [mobileNavMenuOpen, setMobileNavMenuOpen] = useState(false)
@@ -3422,8 +3457,9 @@ function App() {
   const lastAppStateUpdateRef = useRef(0)
   const highScoresRef = useRef(gameHighScoreSeed)
   const leaderboardRef = useRef<LeaderboardEntry[]>([])
+  const weeklyLeaderboardRef = useRef<LeaderboardEntry[]>([])
   const leaderboardAnnouncementDedupRef = useRef<Map<string, number>>(new Map())
-  const leaderboardRefreshMetaRef = useRef<{ lastAt: number; promise: Promise<LeaderboardEntry[]> | null }>({ lastAt: 0, promise: null })
+  const leaderboardRefreshMetaRef = useRef<{ lastAt: number; promise: Promise<LeaderboardRefreshResult> | null }>({ lastAt: 0, promise: null })
   const homeLeaderboardRefreshMetaRef = useRef<{ lastAt: number; promise: Promise<void> | null }>({ lastAt: 0, promise: null })
   const matchScoreRef = useRef(0)
   const matchRoundRef = useRef(1)
@@ -4233,6 +4269,10 @@ function App() {
   }, [leaderboard])
 
   useEffect(() => {
+    weeklyLeaderboardRef.current = weeklyLeaderboard
+  }, [weeklyLeaderboard])
+
+  useEffect(() => {
     matchRoundRef.current = matchRound
   }, [matchRound])
 
@@ -4260,32 +4300,57 @@ function App() {
     speedIncorrectCountRef.current = speedIncorrectCount
   }, [speedIncorrectCount])
 
-  const refreshLeaderboard = async (options: { force?: boolean } = {}) => {
-    if (!supabase) return []
+  const refreshLeaderboard = async (options: { force?: boolean } = {}): Promise<LeaderboardRefreshResult> => {
+    if (!supabase) return { allTimeEntries: [], weeklyEntries: [] }
     const { force = false } = options
     const now = Date.now()
     const refreshMeta = leaderboardRefreshMetaRef.current
     if (!force) {
       if (refreshMeta.promise) return refreshMeta.promise
       if (now - refreshMeta.lastAt < leaderboardRefreshThrottleMs && leaderboardRef.current.length > 0) {
-        return leaderboardRef.current
+        return {
+          allTimeEntries: leaderboardRef.current,
+          weeklyEntries: weeklyLeaderboardRef.current,
+        }
       }
     }
 
-    const refreshPromise = (async () => {
-      const { data: rows, error } = await supabase
-        .from('leaderboard')
-        .select('id,user_id,game,score,round,created_at,match_duration,match_filter')
-        .order('score', { ascending: false })
-        .limit(300)
+    const refreshPromise = (async (): Promise<LeaderboardRefreshResult> => {
+      const weeklyWindow = getCurrentWeeklyWindowMs(Date.now())
+      const currentWeekStartIso = new Date(weeklyWindow.weekStartMs).toISOString()
 
-      if (error || !rows) {
-        setLeaderboardError(error?.message || 'Could not load leaderboard.')
-        return [] as LeaderboardEntry[]
+      const [{ data: allTimeRows, error: allTimeError }, { data: weeklyRows, error: weeklyError }] = await Promise.all([
+        supabase
+          .from('leaderboard')
+          .select('id,user_id,game,score,round,created_at,match_duration,match_filter')
+          .order('score', { ascending: false })
+          .limit(300),
+        supabase
+          .from('weekly_leaderboard')
+          .select('id,user_id,game,score,round,created_at,updated_at,match_duration,match_filter,week_start')
+          .eq('week_start', currentWeekStartIso)
+          .order('score', { ascending: false })
+          .limit(300),
+      ])
+
+      const weeklyTableMissing =
+        Boolean(weeklyError) &&
+        ['42P01', 'PGRST205'].includes(String((weeklyError as { code?: string } | null)?.code || ''))
+      if (allTimeError || !allTimeRows || (weeklyError && !weeklyTableMissing)) {
+        setLeaderboardError(allTimeError?.message || weeklyError?.message || 'Could not load leaderboard.')
+        return { allTimeEntries: [], weeklyEntries: [] }
       }
       setLeaderboardError('')
 
-      const userIds = [...new Set(rows.map((entry) => String(entry.user_id)).filter(Boolean))]
+      const effectiveWeeklyRows = weeklyTableMissing
+        ? allTimeRows.filter((entry) => {
+            const createdAt = Date.parse(String(entry.created_at || '')) || 0
+            return createdAt >= weeklyWindow.weekStartMs && createdAt < weeklyWindow.nextWeekStartMs
+          })
+        : (weeklyRows || [])
+
+      const combinedRows = [...allTimeRows, ...effectiveWeeklyRows]
+      const userIds = [...new Set(combinedRows.map((entry) => String(entry.user_id)).filter(Boolean))]
       let profilesByUserId: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
       let detailsByUserId: Record<string, LeaderboardProfileSnapshot> = {}
       const masteredCodesByUserId: Record<string, number> = {}
@@ -4421,56 +4486,52 @@ function App() {
         }
       }
 
-      const mapped = rows.map(
-        (entry): LeaderboardEntry => {
-          const userId = String(entry.user_id || '')
-          const duelStats = duelStatsByUserId[userId]?.all
-          return ({
-            id: String(entry.id),
-            userId,
-            game: String(entry.game),
-            playerName: profilesByUserId[userId]?.username || 'Player',
-            avatarUrl: profilesByUserId[userId]?.avatarUrl || defaultAvatarUrl,
-            supporterTier: profilesByUserId[userId]?.supporterTier || 'free',
-            bio: detailsByUserId[userId]?.bio || '',
-            agency: detailsByUserId[userId]?.agency || '',
-            nameStyle: detailsByUserId[userId]?.nameStyle || { ...defaultNameStyle },
-            themeId: detailsByUserId[userId]?.themeId || appThemePresets[0].id,
-            isOwner: ownerUserIds.has(userId),
-            matchDuration: typeof entry.match_duration === 'number' ? entry.match_duration : null,
-            matchFilter: (['all', 'penal', 'hs', 'vehicle'].includes(String(entry.match_filter))
-              ? String(entry.match_filter)
-              : null) as CodeFilter | null,
-            score: Number(entry.score || 0),
-            round: Number(entry.round || 0),
-            createdAt: Date.parse(String(entry.created_at || '')) || Date.now(),
-            masteredCodes: masteredCodesByUserId[userId] || 0,
-            studySeconds: studySecondsByUserId[userId] || 0,
-            studyDayStreak: studyDayStreakByUserId[userId] || 0,
-            mostStudiedMode: mostStudiedModeByUserId[userId] || null,
-            duelWins: duelStats?.wins || 0,
-            duelLosses: duelStats?.losses || 0,
-            duelCurrentWinStreak: duelStats?.currentWinStreak || 0,
-          })
-        },
+      const mapEntries = (rows: Array<Record<string, unknown>>, useUpdatedAt = false) =>
+        rows.map(
+          (entry): LeaderboardEntry => {
+            const userId = String(entry.user_id || '')
+            const duelStats = duelStatsByUserId[userId]?.all
+            const timestampSource = useUpdatedAt ? entry.updated_at || entry.created_at : entry.created_at
+            return {
+              id: String(entry.id),
+              userId,
+              game: String(entry.game),
+              playerName: profilesByUserId[userId]?.username || 'Player',
+              avatarUrl: profilesByUserId[userId]?.avatarUrl || defaultAvatarUrl,
+              supporterTier: profilesByUserId[userId]?.supporterTier || 'free',
+              bio: detailsByUserId[userId]?.bio || '',
+              agency: detailsByUserId[userId]?.agency || '',
+              nameStyle: detailsByUserId[userId]?.nameStyle || { ...defaultNameStyle },
+              themeId: detailsByUserId[userId]?.themeId || appThemePresets[0].id,
+              isOwner: ownerUserIds.has(userId),
+              matchDuration: typeof entry.match_duration === 'number' ? entry.match_duration : null,
+              matchFilter: (['all', 'penal', 'hs', 'vehicle'].includes(String(entry.match_filter))
+                ? String(entry.match_filter)
+                : null) as CodeFilter | null,
+              score: Number(entry.score || 0),
+              round: Number(entry.round || 0),
+              createdAt: Date.parse(String(timestampSource || '')) || Date.now(),
+              masteredCodes: masteredCodesByUserId[userId] || 0,
+              studySeconds: studySecondsByUserId[userId] || 0,
+              studyDayStreak: studyDayStreakByUserId[userId] || 0,
+              mostStudiedMode: mostStudiedModeByUserId[userId] || null,
+              duelWins: duelStats?.wins || 0,
+              duelLosses: duelStats?.losses || 0,
+              duelCurrentWinStreak: duelStats?.currentWinStreak || 0,
+            }
+          },
+        )
+
+      const allTimeEntries = topEntryPerUserMode(mapEntries(allTimeRows as Array<Record<string, unknown>>))
+      const weeklyEntries = topEntryPerUserMode(
+        mapEntries(effectiveWeeklyRows as Array<Record<string, unknown>>, !weeklyTableMissing),
       )
 
-      const deduped = Array.from(
-        mapped
-          .reduce<Map<string, LeaderboardEntry>>((accumulator, entry) => {
-            const key = `${entry.userId.toLowerCase()}|${entry.game.toLowerCase()}|${entry.matchDuration ?? 0}|${entry.matchFilter ?? 'all'}`
-            const current = accumulator.get(key)
-            if (!current || entry.score > current.score || (entry.score === current.score && entry.round > current.round)) {
-              accumulator.set(key, entry)
-            }
-            return accumulator
-          }, new Map<string, LeaderboardEntry>())
-          .values(),
-      ).sort((left, right) => right.score - left.score || right.round - left.round)
-
-      setLeaderboard(deduped)
-      leaderboardRef.current = deduped
-      return deduped
+      setLeaderboard(allTimeEntries)
+      setWeeklyLeaderboard(weeklyEntries)
+      leaderboardRef.current = allTimeEntries
+      weeklyLeaderboardRef.current = weeklyEntries
+      return { allTimeEntries, weeklyEntries }
     })()
 
     leaderboardRefreshMetaRef.current.promise = refreshPromise
@@ -5053,7 +5114,7 @@ function App() {
     return () => {
       client.removeChannel(channel)
     }
-  }, [currentUserId])
+  }, [currentUserId, supabase])
 
   useEffect(() => {
     if (!supabase || !currentUserId) return
@@ -5070,7 +5131,33 @@ function App() {
     }, 20000)
 
     return () => clearInterval(timer)
-  }, [currentUserId])
+  }, [currentUserId, supabase])
+
+  useEffect(() => {
+    if (!supabase) return
+    const client = supabase
+    let refreshTimer: number | null = null
+
+    const queueRefresh = () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null
+        void refreshLeaderboard({ force: true })
+        void refreshHomeLeaderboards({ force: true })
+      }, 140)
+    }
+
+    const channel = client
+      .channel('leaderboard-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_leaderboard' }, queueRefresh)
+      .subscribe()
+
+    return () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer)
+      client.removeChannel(channel)
+    }
+  }, [currentUserId, supabase])
 
   const filteredSections = useMemo(
     () => sections.filter((section) => section.codeSet === libraryFilter),
@@ -5220,12 +5307,7 @@ function App() {
   const homeDuelStreakMode = effectiveHomeLeaderboardPreferences.duelStreakMode
   const homeDuelWinsLeaders = homeDuelWinsLeadersByMode[homeDuelWinsMode] || []
   const homeDuelStreakLeaders = homeDuelStreakLeadersByMode[homeDuelStreakMode] || []
-  const currentWeeklyWindow = useMemo(() => getCurrentWeeklyWindowMs(clockNowMs), [clockNowMs])
-  const weeklyLeaderboardEntries = useMemo(() => {
-    return leaderboard.filter(
-      (entry) => entry.createdAt >= currentWeeklyWindow.weekStartMs && entry.createdAt < currentWeeklyWindow.nextWeekStartMs,
-    )
-  }, [leaderboard, currentWeeklyWindow.weekStartMs, currentWeeklyWindow.nextWeekStartMs])
+  const weeklyLeaderboardEntries = weeklyLeaderboard
   const gamesModeLeaderboardSource = useMemo(
     () => (gameModeLeaderboardsScope === 'weekly' ? weeklyLeaderboardEntries : leaderboard),
     [gameModeLeaderboardsScope, weeklyLeaderboardEntries, leaderboard],
@@ -5510,17 +5592,6 @@ function App() {
     }, 2200)
   }, [])
 
-  const dismissLeaderboardResetNotice = useCallback(() => {
-    setShowLeaderboardResetNotice(false)
-    setProfileDetails((previous) => {
-      if (previous.systemNoticesSeen.includes(leaderboardResetNoticeId)) return previous
-      return {
-        ...previous,
-        systemNoticesSeen: [...previous.systemNoticesSeen, leaderboardResetNoticeId].slice(-24),
-      }
-    })
-  }, [])
-
   useEffect(() => {
     if (!stateHydrated || !currentUserId) return
     const lapse = studyStreakLapseInfo(profileDetails.stats)
@@ -5550,20 +5621,6 @@ function App() {
     triggerCelebration,
   ])
 
-  useEffect(() => {
-    if (!authReady || !stateHydrated || !currentUserId || !profile) return
-    if (profileDetails.systemNoticesSeen.includes(leaderboardResetNoticeId)) return
-    const createdAtMs = Date.parse(profile.createdAt || '')
-    if (Number.isFinite(createdAtMs) && createdAtMs > leaderboardResetCutoverAtMs) return
-    setShowLeaderboardResetNotice(true)
-  }, [
-    authReady,
-    currentUserId,
-    profile,
-    profileDetails.systemNoticesSeen,
-    stateHydrated,
-  ])
-
   const postPublicChatAnnouncement = useCallback(async (message: string) => {
     if (!supabase || !currentUserId) return
     const trimmed = message.trim()
@@ -5578,7 +5635,7 @@ function App() {
     } catch (error) {
       console.error('Could not post leaderboard announcement:', error)
     }
-  }, [currentUserId])
+  }, [currentUserId, supabase])
 
   const shouldPostLeaderboardAnnouncement = useCallback((key: string) => {
     const now = Date.now()
@@ -5600,50 +5657,42 @@ function App() {
     game: 'Matching' | 'Speed Test'
     duration: number
     filter: CodeFilter
-    beforeEntries: LeaderboardEntry[]
-    afterEntries: LeaderboardEntry[]
+    beforeAllTimeEntries: LeaderboardEntry[]
+    afterAllTimeEntries: LeaderboardEntry[]
+    beforeWeeklyEntries: LeaderboardEntry[]
+    afterWeeklyEntries: LeaderboardEntry[]
   }) => {
     if (!currentUserId) return { becameWeeklyTop: false, becameAllTimeTop: false }
 
     const weeklyWindow = getCurrentWeeklyWindowMs(Date.now())
-    const inCurrentWeek = (entry: LeaderboardEntry) =>
-      entry.createdAt >= weeklyWindow.weekStartMs && entry.createdAt < weeklyWindow.nextWeekStartMs
-    const beforeAllTimeTop = topLeaderboardEntryForMode(options.beforeEntries, {
+    const beforeAllTimeTop = topLeaderboardEntryForMode(options.beforeAllTimeEntries, {
       game: options.game,
       duration: options.duration,
       filter: options.filter,
       scope: 'alltime',
     })
-    const beforeWeeklyTop = topLeaderboardEntryForMode(options.beforeEntries, {
-      game: options.game,
-      duration: options.duration,
-      filter: options.filter,
-      scope: 'weekly',
-      weeklyWindow,
-    })
-    const afterAllTimeTop = topLeaderboardEntryForMode(options.afterEntries, {
+    const beforeWeeklyTop = topLeaderboardEntryForMode(options.beforeWeeklyEntries, {
       game: options.game,
       duration: options.duration,
       filter: options.filter,
       scope: 'alltime',
     })
-    const afterWeeklyTop = topLeaderboardEntryForMode(options.afterEntries, {
+    const afterAllTimeTop = topLeaderboardEntryForMode(options.afterAllTimeEntries, {
       game: options.game,
       duration: options.duration,
       filter: options.filter,
-      scope: 'weekly',
-      weeklyWindow,
+      scope: 'alltime',
     })
-    const beforeWeeklyDepartmentTop = topDepartmentEntryForScope(options.beforeEntries, {
-      scope: 'weekly',
-      weeklyWindow,
+    const afterWeeklyTop = topLeaderboardEntryForMode(options.afterWeeklyEntries, {
+      game: options.game,
+      duration: options.duration,
+      filter: options.filter,
+      scope: 'alltime',
     })
-    const afterWeeklyDepartmentTop = topDepartmentEntryForScope(options.afterEntries, {
-      scope: 'weekly',
-      weeklyWindow,
-    })
-    const beforeWeeklyTopPerformer = buildWeeklyTopPerformer(options.beforeEntries.filter(inCurrentWeek))
-    const afterWeeklyTopPerformer = buildWeeklyTopPerformer(options.afterEntries.filter(inCurrentWeek))
+    const beforeWeeklyDepartmentTop = buildDepartmentLeaders(options.beforeWeeklyEntries)[0] || null
+    const afterWeeklyDepartmentTop = buildDepartmentLeaders(options.afterWeeklyEntries)[0] || null
+    const beforeWeeklyTopPerformer = buildWeeklyTopPerformer(options.beforeWeeklyEntries)
+    const afterWeeklyTopPerformer = buildWeeklyTopPerformer(options.afterWeeklyEntries)
 
     const becameAllTimeTop =
       Boolean(afterAllTimeTop) &&
@@ -5842,6 +5891,32 @@ function App() {
           }
         })
     }
+  }, [currentUserId, supabase])
+
+  const syncWeeklyLeaderboardEntry = useCallback(async (options: {
+    game: 'Matching' | 'Speed Test'
+    score: number
+    round: number
+    duration: number
+    filter: CodeFilter
+    attemptedAtMs?: number
+  }) => {
+    if (!supabase || !currentUserId) return
+    const attemptedAtMs = options.attemptedAtMs ?? Date.now()
+    const weeklyWindow = getCurrentWeeklyWindowMs(attemptedAtMs)
+    const { error } = await supabase.rpc('upsert_weekly_leaderboard', {
+      p_user_id: currentUserId,
+      p_game: options.game,
+      p_week_start: new Date(weeklyWindow.weekStartMs).toISOString(),
+      p_match_duration: options.duration,
+      p_match_filter: options.filter,
+      p_score: options.score,
+      p_round: options.round,
+      p_attempted_at: new Date(attemptedAtMs).toISOString(),
+    })
+    if (error) {
+      console.error('Weekly leaderboard save failed:', error)
+    }
   }, [currentUserId])
 
   const getFocusTips = useCallback((filter: CodeFilter, mode: SessionMode) => {
@@ -5978,6 +6053,7 @@ function App() {
     if (supabase && currentUserId) {
       void (async () => {
         const leaderboardBeforeSave = [...leaderboardRef.current]
+        const weeklyLeaderboardBeforeSave = [...weeklyLeaderboardRef.current]
         const existingMatch = leaderboardRef.current.find(
           (e) => e.userId === currentUserId &&
             e.game === 'Matching' &&
@@ -5985,7 +6061,7 @@ function App() {
             e.matchFilter === sessionFilter,
         )
 
-        if (!(existingMatch && existingMatch.score >= finalMatchScore)) {
+        if (isLeaderboardScoreImprovement(finalMatchScore, finalMatchRound, existingMatch)) {
           const { error: insertError } = await supabase
             .from('leaderboard')
             .upsert({
@@ -6006,15 +6082,26 @@ function App() {
           }
         }
 
+        await syncWeeklyLeaderboardEntry({
+          game: 'Matching',
+          score: finalMatchScore,
+          round: finalMatchRound,
+          duration: sessionDuration,
+          filter: sessionFilter,
+        })
+
         const refreshed = await refreshLeaderboard({ force: true })
         await refreshHomeLeaderboards({ force: true })
-        const leaderboardAfterSave = refreshed.length > 0 ? refreshed : leaderboardRef.current
+        const leaderboardAfterSave = refreshed.allTimeEntries.length > 0 ? refreshed.allTimeEntries : leaderboardRef.current
+        const weeklyLeaderboardAfterSave = refreshed.weeklyEntries.length > 0 ? refreshed.weeklyEntries : weeklyLeaderboardRef.current
         const milestone = await handleLeaderboardTopMilestones({
           game: 'Matching',
           duration: sessionDuration,
           filter: sessionFilter,
-          beforeEntries: leaderboardBeforeSave,
-          afterEntries: leaderboardAfterSave,
+          beforeAllTimeEntries: leaderboardBeforeSave,
+          afterAllTimeEntries: leaderboardAfterSave,
+          beforeWeeklyEntries: weeklyLeaderboardBeforeSave,
+          afterWeeklyEntries: weeklyLeaderboardAfterSave,
         })
         if (!milestone.becameWeeklyTop && !milestone.becameAllTimeTop && isPersonalBest) {
           triggerCelebration('🎉 New Personal Best', `Matching: ${finalMatchScore} points`)
@@ -6091,6 +6178,7 @@ function App() {
     profileDetails.stats,
     remoteTrackScoreHistory,
     saveSessionAttempt,
+    syncWeeklyLeaderboardEntry,
     supabase,
     triggerCelebration,
   ])
@@ -6590,7 +6678,7 @@ function App() {
           if (supabase && currentUserId) {
             void (async () => {
               const leaderboardBeforeSave = [...leaderboardRef.current]
-              // Only save if it's a personal best for this category
+              const weeklyLeaderboardBeforeSave = [...weeklyLeaderboardRef.current]
               const existing = leaderboardRef.current.find(
                 (e) => e.userId === currentUserId && 
                        e.game === 'Speed Test' && 
@@ -6598,7 +6686,7 @@ function App() {
                        e.matchFilter === sessionFilter
               )
               
-              if (!(existing && existing.score >= finalSpeedScore)) {
+              if (isLeaderboardScoreImprovement(finalSpeedScore, finalAnswered, existing)) {
                 const { error: insertError } = await supabase
                   .from('leaderboard')
                   .upsert({
@@ -6616,20 +6704,29 @@ function App() {
 
                 if (insertError) {
                   console.error('Leaderboard save failed:', insertError)
-                } else {
-                  console.log('High score saved!')
                 }
               }
 
+              await syncWeeklyLeaderboardEntry({
+                game: 'Speed Test',
+                score: finalSpeedScore,
+                round: finalAnswered,
+                duration: sessionDuration,
+                filter: sessionFilter,
+              })
+
               const refreshed = await refreshLeaderboard({ force: true })
               await refreshHomeLeaderboards({ force: true })
-              const leaderboardAfterSave = refreshed.length > 0 ? refreshed : leaderboardRef.current
+              const leaderboardAfterSave = refreshed.allTimeEntries.length > 0 ? refreshed.allTimeEntries : leaderboardRef.current
+              const weeklyLeaderboardAfterSave = refreshed.weeklyEntries.length > 0 ? refreshed.weeklyEntries : weeklyLeaderboardRef.current
               const milestone = await handleLeaderboardTopMilestones({
                 game: 'Speed Test',
                 duration: sessionDuration,
                 filter: sessionFilter,
-                beforeEntries: leaderboardBeforeSave,
-                afterEntries: leaderboardAfterSave,
+                beforeAllTimeEntries: leaderboardBeforeSave,
+                afterAllTimeEntries: leaderboardAfterSave,
+                beforeWeeklyEntries: weeklyLeaderboardBeforeSave,
+                afterWeeklyEntries: weeklyLeaderboardAfterSave,
               })
               if (!milestone.becameWeeklyTop && !milestone.becameAllTimeTop && isPersonalBest) {
                 triggerCelebration('🎉 New Personal Best', `Speed: ${finalSpeedScore} points`)
@@ -6714,6 +6811,7 @@ function App() {
     remoteTrackScoreHistory,
     saveSessionAttempt,
     resetSpeedSpamState,
+    syncWeeklyLeaderboardEntry,
     speedRunning,
     triggerCelebration,
   ])
@@ -7110,17 +7208,28 @@ function App() {
       }
 
       if (rpcMissing) {
-        const [{ error: stateError }, { error: leaderboardError }, { error: historyErrorRaw }] = await Promise.all([
+        const [{ error: stateError }, { error: leaderboardError }, { error: weeklyLeaderboardErrorRaw }, { error: historyErrorRaw }] = await Promise.all([
           supabase.from('app_state').delete().eq('user_id', currentUserId),
           supabase.from('leaderboard').delete().eq('user_id', currentUserId),
+          supabase.from('weekly_leaderboard').delete().eq('user_id', currentUserId),
           supabase.from('game_attempt_history').delete().eq('user_id', currentUserId),
         ])
+        const weeklyLeaderboardError =
+          weeklyLeaderboardErrorRaw && String((weeklyLeaderboardErrorRaw as { code?: string }).code || '') !== '42P01'
+            ? weeklyLeaderboardErrorRaw
+            : null
         const historyError = historyErrorRaw && String((historyErrorRaw as { code?: string }).code || '') !== '42P01'
           ? historyErrorRaw
           : null
 
-        if (stateError || leaderboardError || historyError) {
-          setAuthError(stateError?.message || leaderboardError?.message || historyError?.message || 'Could not reset data.')
+        if (stateError || leaderboardError || weeklyLeaderboardError || historyError) {
+          setAuthError(
+            stateError?.message ||
+            leaderboardError?.message ||
+            weeklyLeaderboardError?.message ||
+            historyError?.message ||
+            'Could not reset data.',
+          )
           setAuthLoading(false)
           return
         }
@@ -7132,6 +7241,8 @@ function App() {
     setBestStreak(0)
     setRemoteTrackScoreHistory({})
     setRemoteScoreTimeline([])
+    setLeaderboard([])
+    setWeeklyLeaderboard([])
     setQuizDeck([])
     setCurrentQuestion(null)
     setSelectedChoice(null)
@@ -13194,31 +13305,6 @@ function App() {
             >
               Got it
             </button>
-          </div>
-        </div>
-      ) : null}
-
-      {showLeaderboardResetNotice ? (
-        <div className="profile-modal-overlay dev-notice-overlay" onClick={dismissLeaderboardResetNotice}>
-          <div className="card profile-modal-card dev-notice-card" onClick={(event) => event.stopPropagation()}>
-            <div className="quiz-top">
-              <div className="dev-notice-heading">
-                <AppIcon name="warning" className="dev-notice-icon" />
-                <h3>Leaderboard Reset Notice</h3>
-              </div>
-              <button className="secondary" onClick={dismissLeaderboardResetNotice}>
-                Close
-              </button>
-            </div>
-            <p className="muted">
-              Leaderboards were reset after balancing updates and a bug fix.
-            </p>
-            <p className="muted">
-              We found and patched a bug that allowed unfair high scores that could not be beaten under normal play. Scores are now recalculated on the fixed logic.
-            </p>
-            <div className="actions-row">
-              <button className="primary" onClick={dismissLeaderboardResetNotice}>Got it</button>
-            </div>
           </div>
         </div>
       ) : null}
