@@ -4,7 +4,7 @@ import { FireFlame, type FireFlameOption } from '@9am/fire-flame-react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { Analytics } from '@vercel/analytics/react'
 import './App.css'
-import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem } from './content'
+import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem, type ScenarioBankSubQuestion, type ScenarioTrainingSection } from './content'
 import { useOwner } from './hooks/useOwner'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { OneVsOnePanel } from './components/OneVsOnePanel'
@@ -101,6 +101,12 @@ type Flashcard = {
 type ScenarioQuestion = {
   id: string
   codeSet: CodeSet
+  tmasSet: ScenarioTrainingSection
+  scenarioGroupId: string
+  scenarioTitle: string
+  scenarioStem: string
+  questionNumber: number
+  questionCount: number
   prompt: string
   choices: string[]
   correctIndex: number
@@ -613,69 +619,29 @@ const homeEncouragementQuotes = [
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
 ]
-const releaseNotesV031: Array<{ title: string; items: string[] }> = [
+const releaseNotesV032: Array<{ title: string; items: string[] }> = [
   {
-    title: 'Profile Leaderboard Insight',
+    title: 'TMAS Scenario Expansion (v0.32)',
     items: [
-      'Player profile popups now show how many #1 leaderboard spots each user currently holds.',
-      'The #1 spot count is visible from both leaderboard profile views and chat profile views.',
-      'Weekly #1 spot totals are also shown so users can compare current-week momentum.',
+      'Added a dedicated TMAS 2 section inside Scenarios so users can switch between TMAS 1 and TMAS 2 directly on the scenarios page.',
+      'The current website scenarios now live under TMAS 1, and TMAS 2 has been added as a separate training section.',
+      'Imported 100 TMAS 2 scenarios from the PDF and keyed each scenario with 4 questions for a full 400-question scenario bank.',
     ],
   },
   {
-    title: 'Study Workflow Upgrade',
+    title: 'Scenario Flow Improvements',
     items: [
-      'Flashcards and Test now run on dedicated pages for cleaner, faster sessions.',
-      'Start controls are now placed at the top for quicker access.',
-      'Improved setup flow and visual consistency with the game pages.',
+      'TMAS 2 scenarios now run as one scenario stem with four sequential questions so each scenario stays grouped correctly.',
+      'Scenario cards now show TMAS section, scenario title, question progress, and total counts for the selected section.',
+      'Scenario progression was updated so TMAS 2 randomizes by scenario group while keeping all four questions together.',
     ],
   },
   {
-    title: 'Home + Leaderboard Controls',
+    title: 'Content Loading Reliability',
     items: [
-      'Home leaderboard visibility is fully customizable per account.',
-      'Added expanded leaderboard mode support for game and 1v1 views.',
-      'Improved action routing so “Go for #1” pre-selects the right mode and filters.',
-    ],
-  },
-  {
-    title: '1v1 + Multiplayer Improvements',
-    items: [
-      'Room and invite behavior is more reliable with better real-time updates.',
-      'Rematch flow was hardened for smoother restarts and cleaner state transitions.',
-      'Improved live room handling for mobile and smaller window sizes.',
-    ],
-  },
-  {
-    title: 'Chat and Presence',
-    items: [
-      'Public chat reactions are now visible to everyone in real time.',
-      'Reaction counts now aggregate properly for shared emoji reactions.',
-      'Presence indicators and online state handling were refined.',
-    ],
-  },
-  {
-    title: 'Reaction Hover Details',
-    items: [
-      'Hovering a chat reaction now shows exactly who reacted.',
-      'The hover tooltip auto-sizes for short and long reaction lists.',
-      'Reaction hover animation now opens smoothly from the selected reaction chip.',
-    ],
-  },
-  {
-    title: 'Department Ranking System (v0.31)',
-    items: [
-      'Department scoring now uses normalized percentile performance per game mode so all modes carry equal weight.',
-      'Each player contributes via top-mode performance, and each department is ranked by a Top-K player average for fair size balancing.',
-      'Leaderboard copy now reflects the normalized Top-K model so departments with fewer users can still compete fairly.',
-    ],
-  },
-  {
-    title: 'Polish + Stability',
-    items: [
-      'Large UI pass across home, games, and study surfaces for cleaner spacing.',
-      'Performance and graph rendering improvements for larger datasets.',
-      'General bug fixes to improve consistency across desktop and mobile.',
+      'TMAS 2 content now loads even when the app is running in Supabase content mode.',
+      'Local TMAS scenario files are merged into the runtime content source so scenario sections do not disappear when Supabase content is enabled.',
+      'The scenarios page now stays aligned with your shipped local training packs while still using Supabase for editable content.',
     ],
   },
 ]
@@ -1708,50 +1674,116 @@ function categoryToCodeSet(category: string, codeSection = ''): CodeSet | null {
   return null
 }
 
-function buildScenarioQuestions(rows: ScenarioBankItem[]) {
+function normalizeScenarioSection(value: ScenarioBankItem['tmasSet'] | null | undefined): ScenarioTrainingSection {
+  return value === 'tmas2' ? 'tmas2' : 'tmas1'
+}
+
+function buildScenarioChoices(choices: string[], correctChoice: string) {
+  const randomizedChoices = shuffle([...choices])
+  return {
+    choices: randomizedChoices,
+    correctIndex: Math.max(0, randomizedChoices.indexOf(correctChoice)),
+  }
+}
+
+function buildLegacyScenarioQuestion(row: ScenarioBankItem): ScenarioQuestion[] {
   const fallbackDistractors = [
     'Document observations only and continue routine contact',
     'Investigate further using articulable facts and legal authority',
     'Insufficient facts for immediate enforcement action',
     'Reassess scene safety and gather additional witness evidence',
   ]
+  const codeSet = categoryToCodeSet(row.category, row.codeSection || '') || 'penal'
+  const prompt = row.scenario.trim()
+  const providedChoices = row.questions.map((item) => item.trim()).filter(Boolean).slice(0, 4)
+  const correctChoice = (row.expectedAnswer || '').trim()
+  const tmasSet = normalizeScenarioSection(row.tmasSet)
+
+  if (providedChoices.length >= 2 && correctChoice && providedChoices.includes(correctChoice)) {
+    const { choices, correctIndex } = buildScenarioChoices(providedChoices, correctChoice)
+    return [
+      {
+        id: row.id,
+        codeSet,
+        tmasSet,
+        scenarioGroupId: row.id,
+        scenarioTitle: row.title.trim() || 'Scenario',
+        scenarioStem: prompt,
+        questionNumber: 1,
+        questionCount: 1,
+        prompt,
+        choices,
+        correctIndex,
+        explanation: row.explanation?.trim() || (row.keyPoints || []).join(' '),
+      },
+    ]
+  }
+
+  const fallback = correctChoice || row.keyPoints?.[0] || row.title || 'Use the best lawful response.'
+  const distractors = fallbackDistractors
+    .filter((item) => item !== fallback)
+    .slice(0, 3)
+  const { choices, correctIndex } = buildScenarioChoices([fallback, ...distractors].slice(0, 4), fallback)
+
+  return [
+    {
+      id: row.id,
+      codeSet,
+      tmasSet,
+      scenarioGroupId: row.id,
+      scenarioTitle: row.title.trim() || 'Scenario',
+      scenarioStem: prompt,
+      questionNumber: 1,
+      questionCount: 1,
+      prompt,
+      choices,
+      correctIndex,
+      explanation: row.explanation?.trim() || (row.keyPoints || []).join(' '),
+    },
+  ]
+}
+
+function buildGroupedScenarioQuestions(row: ScenarioBankItem, subQuestions: ScenarioBankSubQuestion[]): ScenarioQuestion[] {
+  const codeSet = categoryToCodeSet(row.category, row.codeSection || '') || 'penal'
+  const scenarioStem = row.scenario.trim()
+  const scenarioTitle = row.title.trim() || 'Scenario'
+  const tmasSet = normalizeScenarioSection(row.tmasSet)
+
+  return subQuestions.map((subQuestion, index) => {
+    const { choices, correctIndex } = buildScenarioChoices(subQuestion.choices, subQuestion.expectedAnswer)
+    return {
+      id: subQuestion.id,
+      codeSet,
+      tmasSet,
+      scenarioGroupId: row.id,
+      scenarioTitle,
+      scenarioStem,
+      questionNumber: index + 1,
+      questionCount: subQuestions.length,
+      prompt: subQuestion.prompt,
+      choices,
+      correctIndex,
+      explanation: subQuestion.explanation?.trim() || row.explanation?.trim() || '',
+    }
+  })
+}
+
+function buildScenarioDeck(rows: ScenarioBankItem[], section: ScenarioTrainingSection) {
+  const filteredRows = rows.filter((row) => normalizeScenarioSection(row.tmasSet) === section)
+
+  if (section === 'tmas2') {
+    return shuffle(filteredRows).flatMap((row) => {
+      const subQuestions = (row.subQuestions || []).filter((subQuestion) => subQuestion.choices.length >= 2)
+      if (subQuestions.length === 0) return []
+      return buildGroupedScenarioQuestions(row, subQuestions)
+    })
+  }
 
   return shuffle(
-    rows.flatMap<ScenarioQuestion>((row) => {
-      const codeSet = categoryToCodeSet(row.category, row.codeSection || '') || 'penal'
-      const prompt = row.scenario.trim()
-      const providedChoices = row.questions.map((item) => item.trim()).filter(Boolean).slice(0, 4)
-      const correctChoice = (row.expectedAnswer || '').trim()
-
-      if (providedChoices.length >= 2 && correctChoice && providedChoices.includes(correctChoice)) {
-        const randomizedChoices = shuffle([...providedChoices])
-        return [
-          {
-            id: row.id,
-            codeSet,
-            prompt,
-            choices: randomizedChoices,
-            correctIndex: Math.max(0, randomizedChoices.indexOf(correctChoice)),
-            explanation: row.explanation?.trim() || (row.keyPoints || []).join(' '),
-          },
-        ]
-      }
-
-      const fallback = correctChoice || row.keyPoints?.[0] || row.title || 'Use the best lawful response.'
-      const distractors = fallbackDistractors
-        .filter((item) => item !== fallback)
-        .slice(0, 3)
-      const choices = shuffle([fallback, ...distractors]).slice(0, 4)
-      return [
-        {
-          id: row.id,
-          codeSet,
-          prompt,
-          choices,
-          correctIndex: Math.max(0, choices.indexOf(fallback)),
-          explanation: row.explanation?.trim() || (row.keyPoints || []).join(' '),
-        },
-      ]
+    filteredRows.flatMap((row) => {
+      const subQuestions = (row.subQuestions || []).filter((subQuestion) => subQuestion.choices.length >= 2)
+      if (subQuestions.length > 0) return buildGroupedScenarioQuestions(row, subQuestions)
+      return buildLegacyScenarioQuestion(row)
     }),
   )
 }
@@ -2377,6 +2409,15 @@ function localBundleToEditorItems(): ContentEditorItem[] {
   )
 
   return [...codeItems, ...scenarioEditorItems]
+}
+
+function mergeContentById<T extends { id: string }>(primary: T[], fallback: T[]) {
+  const merged = new Map<string, T>()
+  for (const item of primary) merged.set(item.id, item)
+  for (const item of fallback) {
+    if (!merged.has(item.id)) merged.set(item.id, item)
+  }
+  return [...merged.values()]
 }
 
 function tierNameClass(tier: SupporterTier) {
@@ -3446,6 +3487,7 @@ function App() {
   const [showSpeedSetupModal, setShowSpeedSetupModal] = useState(false)
   const [speedFeedback, setSpeedFeedback] = useState('')
   const [speedAnswerLocked, setSpeedAnswerLocked] = useState(false)
+  const [scenarioTrainingSection, setScenarioTrainingSection] = useState<ScenarioTrainingSection>('tmas1')
   const [scenarioDeck, setScenarioDeck] = useState<ScenarioQuestion[]>([])
   const [scenarioCurrentQuestion, setScenarioCurrentQuestion] = useState<ScenarioQuestion | null>(null)
   const [scenarioResult, setScenarioResult] = useState<string>('')
@@ -4200,8 +4242,12 @@ function App() {
         }
         try {
           const supabaseContent = await loadFromSupabase()
+          const localBundle = loadLocalContentBundle()
+          for (const warning of localBundle.warnings) console.warn(warning)
+          const mergedCodeItems = mergeContentById(supabaseContent.codeItems, localBundle.codeItems)
+          const mergedScenarios = mergeContentById(supabaseContent.scenarios, localBundle.scenarioItems)
           setContentWarning('')
-          applyLoadedContentToRuntime(supabaseContent.codeItems, supabaseContent.scenarios)
+          applyLoadedContentToRuntime(mergedCodeItems, mergedScenarios)
           return
         } catch (error) {
           console.warn('[content] supabase content unavailable, falling back to local content.', error)
@@ -5422,7 +5468,36 @@ function App() {
     const base = questions.filter((question) => question.prompt.startsWith('Which section number matches:'))
     return gamesSelection.filter === 'all' ? base : base.filter((question) => question.codeSet === gamesSelection.filter)
   }, [questions, gamesSelection.filter])
-  const scenarioQuestionBank = useMemo(() => buildScenarioQuestions(scenarioItems), [scenarioItems])
+  const scenarioSectionStats = useMemo(
+    () =>
+      scenarioItems.reduce<Record<ScenarioTrainingSection, { scenarios: number; questions: number }>>(
+        (accumulator, item) => {
+          const section = normalizeScenarioSection(item.tmasSet)
+          accumulator[section].scenarios += 1
+          accumulator[section].questions += item.subQuestions?.length || 1
+          return accumulator
+        },
+        {
+          tmas1: { scenarios: 0, questions: 0 },
+          tmas2: { scenarios: 0, questions: 0 },
+        },
+      ),
+    [scenarioItems],
+  )
+  const activeScenarioSectionStats = scenarioSectionStats[scenarioTrainingSection]
+  const buildScenarioDeckForCurrentSection = useCallback(
+    () => buildScenarioDeck(scenarioItems, scenarioTrainingSection),
+    [scenarioItems, scenarioTrainingSection],
+  )
+  const scenarioChoiceHint = useMemo(() => {
+    if (!scenarioCurrentQuestion) return 'Press 1–4 to answer'
+    return `Press 1–${scenarioCurrentQuestion.choices.length} to answer`
+  }, [scenarioCurrentQuestion])
+  const scenarioNextButtonLabel = useMemo(() => {
+    if (!scenarioCurrentQuestion) return 'Next Scenario'
+    if (scenarioCurrentQuestion.questionNumber < scenarioCurrentQuestion.questionCount) return 'Next Question'
+    return 'Next Scenario'
+  }, [scenarioCurrentQuestion])
 
   const buildStudyTestDeck = (
     filter: CodeFilter,
@@ -6501,7 +6576,7 @@ function App() {
   const nextScenarioQuestion = useCallback((candidateDeck?: ScenarioQuestion[], previousId?: string) => {
     let deck = candidateDeck ? [...candidateDeck] : [...scenarioDeckRef.current]
     if (deck.length === 0) {
-      deck = shuffle(scenarioQuestionBank)
+      deck = buildScenarioDeckForCurrentSection()
     }
     if (deck.length === 0) {
       setScenarioCurrentQuestion(null)
@@ -6526,7 +6601,7 @@ function App() {
       const targetTop = Math.max(0, rect.top + window.scrollY - topOffset)
       window.scrollTo({ top: targetTop, behavior: 'smooth' })
     }, 40)
-  }, [scenarioQuestionBank])
+  }, [buildScenarioDeckForCurrentSection])
 
   const answerScenario = useCallback((choiceIndex: number) => {
     if (!scenarioCurrentQuestion) return
@@ -6817,10 +6892,14 @@ function App() {
   ])
 
   useEffect(() => {
+    scenarioDeckRef.current = []
     setScenarioDeck([])
+    setScenarioCurrentQuestion(null)
+    setScenarioResult('')
+    setScenarioSelectedChoice(null)
     setScenarioStreak(0)
     nextScenarioQuestion([])
-  }, [nextScenarioQuestion, scenarioQuestionBank])
+  }, [nextScenarioQuestion, scenarioTrainingSection, scenarioItems])
 
   const submitSignIn = async () => {
     if (!supabase) return
@@ -9746,10 +9825,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 0.31"
+                    aria-label="Open what's new for version 0.32"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v0.31
+                    What's New · v0.32
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -11669,6 +11748,25 @@ function App() {
 
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isScenariosPage && (
           <section className="scenario-section">
+            <div className="card compact scenario-section-switcher">
+              <div className="segmented compact-segmented">
+                <button
+                  className={scenarioTrainingSection === 'tmas1' ? 'seg active' : 'seg'}
+                  onClick={() => setScenarioTrainingSection('tmas1')}
+                >
+                  TMAS 1
+                </button>
+                <button
+                  className={scenarioTrainingSection === 'tmas2' ? 'seg active' : 'seg'}
+                  onClick={() => setScenarioTrainingSection('tmas2')}
+                >
+                  TMAS 2
+                </button>
+              </div>
+              <p className="muted scenario-section-meta">
+                {activeScenarioSectionStats.scenarios} scenarios • {activeScenarioSectionStats.questions} questions
+              </p>
+            </div>
             <div className="quiz-wrap">
               <div
                 className={`quiz-fire-host level-${scenarioFireLevel}`}
@@ -11712,10 +11810,26 @@ function App() {
                   <>
                     <div className="quiz-top">
                       <span>Scenario Streak: {scenarioStreak}</span>
+                      <span>{scenarioCurrentQuestion.scenarioTitle}</span>
                     </div>
-                    <h3 ref={scenarioPromptRef}>{scenarioCurrentQuestion.prompt}</h3>
+                    {scenarioCurrentQuestion.questionCount > 1 ? (
+                      <>
+                        <p className="scenario-series-label">
+                          {scenarioCurrentQuestion.tmasSet === 'tmas2' ? 'TMAS 2' : 'TMAS 1'} • Question {scenarioCurrentQuestion.questionNumber} of {scenarioCurrentQuestion.questionCount}
+                        </p>
+                        <h3 ref={scenarioPromptRef}>{scenarioCurrentQuestion.scenarioStem}</h3>
+                        <p className="scenario-subprompt">{scenarioCurrentQuestion.prompt}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="scenario-series-label">
+                          {scenarioCurrentQuestion.tmasSet === 'tmas2' ? 'TMAS 2' : 'TMAS 1'}
+                        </p>
+                        <h3 ref={scenarioPromptRef}>{scenarioCurrentQuestion.prompt}</h3>
+                      </>
+                    )}
                     <div className="scenario-actions">
-                      <span className="choice-hint">Press 1–4 to answer</span>
+                      <span className="choice-hint">{scenarioChoiceHint}</span>
                       {scenarioCurrentQuestion.choices.map((choice, index) => (
                         <button
                           key={`scenario-choice-${scenarioCurrentQuestion.id}-${index}`}
@@ -11742,12 +11856,12 @@ function App() {
                     {scenarioResult ? (
                       <div className="card compact">
                         <p><strong>Answer:</strong> {scenarioCurrentQuestion.choices[scenarioCurrentQuestion.correctIndex]}</p>
-                        <p className="muted">{scenarioCurrentQuestion.explanation}</p>
+                        {scenarioCurrentQuestion.explanation ? <p className="muted">{scenarioCurrentQuestion.explanation}</p> : null}
                       </div>
                     ) : null}
                     <div className="scenario-next-wrap" ref={scenarioNextRef}>
                       <button className="secondary scenario-next" onClick={() => nextScenarioQuestion(undefined, scenarioCurrentQuestion.id)}>
-                        Next Scenario
+                        {scenarioNextButtonLabel}
                       </button>
                     </div>
                   </>
@@ -13180,15 +13294,15 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v0.31</h3>
+                <h3>What’s New · v0.32</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV031.map((group) => (
-                <article key={`v031-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV032.map((group) => (
+                <article key={`v032-note-${group.title}`} className="home-whats-new-card">
                   <h4>{group.title}</h4>
                   <ul>
                     {group.items.map((item) => (

@@ -2,9 +2,11 @@ import customRaw from './custom.json'
 import hsRaw from './hs.json'
 import pcRaw from './pc.json'
 import scenariosRaw from './scenarios.json'
+import scenariosTmas2Raw from './scenarios-tmas2.json'
 import vcRaw from './vc.json'
 
 export type ContentCategory = string
+export type ScenarioTrainingSection = 'tmas1' | 'tmas2'
 
 export type ContentBankItem = {
   id: string
@@ -25,6 +27,8 @@ export type ScenarioBankItem = {
   title: string
   scenario: string
   questions: string[]
+  tmasSet?: ScenarioTrainingSection
+  subQuestions?: ScenarioBankSubQuestion[]
   expectedAnswer?: string
   keyPoints?: string[]
   tags?: string[]
@@ -32,6 +36,14 @@ export type ScenarioBankItem = {
   codeSection?: string
   explanation?: string
   sourceUrl?: string
+}
+
+export type ScenarioBankSubQuestion = {
+  id: string
+  prompt: string
+  choices: string[]
+  expectedAnswer: string
+  explanation?: string
 }
 
 export type LocalContentBundle = {
@@ -71,6 +83,41 @@ function asStringArray(value: unknown) {
   return value
     .map((item) => asString(item))
     .filter(Boolean)
+}
+
+function normalizeScenarioTrainingSection(value: unknown): ScenarioTrainingSection {
+  return String(value || '').trim().toLowerCase() === 'tmas2' ? 'tmas2' : 'tmas1'
+}
+
+function parseScenarioSubQuestions(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  const items: ScenarioBankSubQuestion[] = []
+
+  for (const [index, entry] of value.entries()) {
+    if (!entry || typeof entry !== 'object') continue
+
+    const record = entry as Record<string, unknown>
+    const id = asString(record.id)
+    const prompt = asString(record.prompt)
+    const choices = asStringArray(record.choices)
+    const expectedAnswer = asString(record.expectedAnswer || record.expected_answer)
+
+    if (!id || !prompt || choices.length < 2 || !expectedAnswer || !choices.includes(expectedAnswer)) {
+      console.warn(`[content] scenario sub-question[${index}] is invalid and was skipped.`)
+      continue
+    }
+
+    items.push({
+      id,
+      prompt,
+      choices,
+      expectedAnswer,
+      explanation: asString(record.explanation) || undefined,
+    })
+  }
+
+  return items
 }
 
 function parseCodeItems(raw: unknown, sourceName: string, warnings: string[]): ContentBankItem[] {
@@ -135,9 +182,11 @@ function parseScenarioItems(raw: unknown, sourceName: string, warnings: string[]
     const title = asString(value.title)
     const scenario = asString(value.scenario)
     const questions = asStringArray(value.questions)
+    const subQuestions = parseScenarioSubQuestions(value.subQuestions || value.sub_questions)
+    const tmasSet = normalizeScenarioTrainingSection(value.tmasSet || value.tmas_set)
 
-    if (!id || !category || !title || !scenario || questions.length === 0) {
-      warnings.push(`[content] ${sourceName}[${index}]: missing required fields (id/category/title/scenario/questions[])`)
+    if (!id || !category || !title || !scenario || (questions.length === 0 && subQuestions.length === 0)) {
+      warnings.push(`[content] ${sourceName}[${index}]: missing required fields (id/category/title/scenario/questions[] or subQuestions[])`)
       continue
     }
 
@@ -147,6 +196,8 @@ function parseScenarioItems(raw: unknown, sourceName: string, warnings: string[]
       title,
       scenario,
       questions,
+      tmasSet,
+      subQuestions: subQuestions.length ? subQuestions : undefined,
       expectedAnswer: asString(value.expectedAnswer) || undefined,
       keyPoints: asStringArray(value.keyPoints),
       tags: asStringArray(value.tags),
@@ -171,6 +222,7 @@ export function loadLocalContentBundle(): LocalContentBundle {
   ]
 
   const scenarioItems = parseScenarioItems(scenariosRaw, 'scenarios.json', warnings)
+    .concat(parseScenarioItems(scenariosTmas2Raw, 'scenarios-tmas2.json', warnings))
 
   return { codeItems, scenarioItems, warnings }
 }
@@ -181,4 +233,5 @@ export const localContentFiles = {
   vc: vcRaw,
   custom: customRaw,
   scenarios: scenariosRaw,
+  scenariosTmas2: scenariosTmas2Raw,
 }

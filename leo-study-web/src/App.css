@@ -2075,12 +2075,39 @@ button:active:not(:disabled):not(.study-session-flashcard) {
 
 .scenario-section {
   margin-top: 2px;
+  display: grid;
+  gap: 12px;
 }
 
 .scenario-card {
   display: grid;
   gap: 10px;
   width: 100%;
+}
+
+.scenario-section-switcher {
+  display: grid;
+  gap: 10px;
+}
+
+.scenario-section-meta {
+  margin: 0;
+}
+
+.scenario-series-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.scenario-subprompt {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--text-primary);
 }
 
 .game-start-button {

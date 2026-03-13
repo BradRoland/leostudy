@@ -1,0 +1,5494 @@
+[
+  {
+    "id": "tmas2-scenario-001",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 1",
+    "scenario": "Officer Rivera sees Morgan Lopez crouched by a bike rack outside a library and hears a loud \u201csnap.\u201d The officer sees a cable lock freshly cut, the bike still secured, and a small pair of cable cutters on the ground. Morgan quickly walks away when approached.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-001-q1",
+        "prompt": "If Morgan intended to steal the bike and committed a direct but ineffectual act (cutting the lock), an attempt crime may be established even if the theft was not completed.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-001-q2",
+        "prompt": "Does an attempt crime require proof of specific intent to commit the target offense?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-001-q3",
+        "prompt": "Merely thinking about stealing the bike, without taking any direct action toward the theft, would be enough to prove an attempt.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-001-q4",
+        "prompt": "Are Morgan\u2019s actions and the presence of cutting tools relevant circumstantial evidence of intent?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05"
+    ],
+    "tags": [
+      "LD 05"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-002",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 2",
+    "scenario": "At an airport baggage claim, Jordan Kim grabs a black suitcase that looks identical to theirs and walks out. Minutes later, Jordan notices the luggage tag has a different name and immediately returns the suitcase to the airline desk to locate the owner. The owner confirms nothing is missing.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-002-q1",
+        "prompt": "Theft generally requires criminal intent to unlawfully deprive the owner of property.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-002-q2",
+        "prompt": "Can an honest mistake of fact that negates the required intent prevent theft liability?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-002-q3",
+        "prompt": "Returning property after realizing a mistake is irrelevant to evaluating intent.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-002-q4",
+        "prompt": "Should an officer consider timeline and behavior when assessing intent?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05"
+    ],
+    "tags": [
+      "LD 05"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-003",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 3",
+    "scenario": "A recruit says a newly passed city ordinance \u201coverrides state law and court rulings because it\u2019s newer.\u201d The training officer explains officers must understand sources of law and how conflicts are resolved. The recruit asks what controls in conflicts.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-003-q1",
+        "prompt": "Constitutional law controls over conflicting statutory or case law.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-003-q2",
+        "prompt": "Can case law interpret statutes and affect how officers apply the law?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-003-q3",
+        "prompt": "A local ordinance automatically overrides state law simply because it was enacted more recently.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-003-q4",
+        "prompt": "Should officers consider legal updates and controlling court decisions when enforcing a law?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05"
+    ],
+    "tags": [
+      "LD 05"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-004",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 4",
+    "scenario": "During a field contact, a trainee says, \u201cIt doesn\u2019t matter if it\u2019s a felony or an infraction\u2014arrest rules are always the same.\u201d The FTO explains that classification matters and officers must identify what type of crime occurred before choosing disposition. The trainee asks what they should document.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-004-q1",
+        "prompt": "Identifying whether an offense is a felony, misdemeanor, or infraction can affect lawful enforcement options.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-004-q2",
+        "prompt": "Should officers determine the crime type/classification before choosing detention, arrest, or citation options?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-004-q3",
+        "prompt": "Offense classification never affects any officer procedure or court process.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-004-q4",
+        "prompt": "Is articulating the facts supporting the classification part of good report writing?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 05",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-005",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 5",
+    "scenario": "A business owner demands an arrest after a customer refuses to pay a disputed invoice, claiming the work was defective. The owner says, \u201cIt\u2019s theft\u2014make them pay.\u201d The customer says it\u2019s a contract dispute.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-005-q1",
+        "prompt": "Some disputes are primarily civil rather than criminal, even if money is owed.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-005-q2",
+        "prompt": "Should an officer distinguish criminal conduct from civil disputes when deciding enforcement action?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-005-q3",
+        "prompt": "Any failure to pay a bill automatically proves a theft crime.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-005-q4",
+        "prompt": "Is it reasonable to document both parties\u2019 claims and advise on civil options when no crime is established?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05"
+    ],
+    "tags": [
+      "LD 05"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-006",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 6",
+    "scenario": "Late at night, a person throws a heavy glass bottle from a parking structure \u201cas a prank,\u201d and it shatters near a pedestrian who had to jump back. The person says, \u201cI didn\u2019t mean to hurt anyone.\u201d Witnesses report it was obviously dangerous.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-006-q1",
+        "prompt": "Criminal negligence involves a gross departure from ordinary care creating a high risk of harm.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-006-q2",
+        "prompt": "Is intent required for every criminal offense?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-006-q3",
+        "prompt": "Lack of intent to injure does not automatically eliminate liability for crimes based on criminal negligence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-006-q4",
+        "prompt": "Are foreseeability and risk awareness relevant facts to document?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05"
+    ],
+    "tags": [
+      "LD 05"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-007",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 7",
+    "scenario": "Officers respond to shoplifting. One suspect conceals items while a second person acts as a lookout and signals when employees approach. The lookout never touches merchandise and claims, \u201cI didn\u2019t steal anything.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-007-q1",
+        "prompt": "A person who intentionally aids the commission of a crime can be treated as a principal.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-007-q2",
+        "prompt": "Can lookout behavior be evidence of aiding and abetting?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-007-q3",
+        "prompt": "Merely being present near a crime is always enough to prove aiding and abetting.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-007-q4",
+        "prompt": "Should officers document conduct showing encouragement or assistance, not just presence?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 05",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-008",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 8",
+    "scenario": "A suspect is contacted for vandalism. The suspect admits being there but says, \u201cI didn\u2019t mean for damage to happen; it just did.\u201d The suspect then tries to leave as the officer continues questioning.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-008-q1",
+        "prompt": "Not all crimes require the same kind of intent; some focus on general intent or negligence concepts.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-008-q2",
+        "prompt": "If the officer\u2019s contact is consensual, is the person generally free to end it and leave?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-008-q3",
+        "prompt": "Ordering someone to stay can convert a consensual encounter into a detention.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-008-q4",
+        "prompt": "If the officer detains the person, must the officer have articulable reasonable suspicion?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 05",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-009",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 9",
+    "scenario": "Officers find Casey Park prying at a closed shop window with a screwdriver and trying to force the frame. Casey stops when headlights appear and tries to walk away. The window frame shows fresh damage, but no entry was made.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-009-q1",
+        "prompt": "Attempt generally requires a direct act toward committing the crime that goes beyond planning.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-009-q2",
+        "prompt": "Is prying at the window frame a fact that can support attempt analysis?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-009-q3",
+        "prompt": "Simply owning a screwdriver at home, without suspicious conduct, proves an attempt.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-009-q4",
+        "prompt": "If officers seize the screwdriver as evidence, should they document lawful basis and chain-of-custody?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 05",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-010",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 10",
+    "scenario": "After a felony theft, Drew Ellis helps the suspect hide in a back room and tells officers \u201cI didn\u2019t steal anything.\u201d Drew also tries to delete messages that show coordination. Officers consider evidence preservation and interview options.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-010-q1",
+        "prompt": "Helping a felon avoid arrest after the felony can constitute accessory- after-the-fact conduct.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-010-q2",
+        "prompt": "Is knowledge of the felony and intent to help the felon avoid capture relevant to accessory liability?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-010-q3",
+        "prompt": "Deleting incriminating messages can be relevant consciousness-of-guilt evidence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-010-q4",
+        "prompt": "If officers seek to search a phone beyond voluntary display, should they consider consent or a warrant?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 05",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-011",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 11",
+    "scenario": "Store staff report Taylor Perez concealed items, passed the registers without paying, and ran when confronted. During the escape, Taylor shoved an employee to get out the door. Staff provide value and video.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-011-q1",
+        "prompt": "Taking store property without paying, with intent to deprive, can satisfy theft elements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-011-q2",
+        "prompt": "Is documenting force used during the taking/escape important because it may affect classification?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-011-q3",
+        "prompt": "Using force or fear to keep property or escape can elevate theft conduct beyond simple theft.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-011-q4",
+        "prompt": "Should officers gather witness statements and video promptly?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-012",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 12",
+    "scenario": "A motel manager reports a guest checked in with suspicious information, stayed two nights, and left without paying while avoiding staff. The manager provides paperwork and video. The guest later says, \u201cI forgot my wallet.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-012-q1",
+        "prompt": "Defrauding an innkeeper involves obtaining lodging/services with intent to defraud.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-012-q2",
+        "prompt": "Do facts like fake information and avoiding contact help establish intent to defraud?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-012-q3",
+        "prompt": "Any inability to pay automatically proves intent to defraud.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-012-q4",
+        "prompt": "Should officers document the guest\u2019s statements and the hotel\u2019s records as evidence?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-013",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 13",
+    "scenario": "A person takes a car for a \u201ctest drive\u201d from a small dealership and does not return for hours. The dealer says no permission was given for such a long time. The driver later says, \u201cI was going to bring it back.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-013-q1",
+        "prompt": "Unlawfully taking or driving a vehicle without the owner\u2019s consent can be a vehicle-theft-related offense.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-013-q2",
+        "prompt": "Is lack of consent a key fact in a vehicle theft investigation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-013-q3",
+        "prompt": "If the vehicle is returned later, a vehicle-theft-related offense cannot apply.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-013-q4",
+        "prompt": "Should officers document time, distance, permission terms, and admissions?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-014",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 14",
+    "scenario": "Officers respond to a report of someone entering a home through an unlocked door and taking purses from a hallway. The homeowner says the suspect \u201cdidn\u2019t break anything\u201d so it\u2019s just theft. Officers locate a suspect nearby.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-014-q1",
+        "prompt": "Burglary can occur without forced entry.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-014-q2",
+        "prompt": "Is intent to commit theft or a felony at the time of entry a key burglary concept?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-014-q3",
+        "prompt": "Entering a structure with required criminal intent can be burglary even if the door was unlocked.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-014-q4",
+        "prompt": "Should officers ask about point of entry and what the suspect did immediately after entry?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-015",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 15",
+    "scenario": "Security reports someone entered a store during business hours, grabbed items, and tried to run out. The person says, \u201cIt\u2019s not burglary because the store is open.\u201d The officer must classify the conduct correctly.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-015-q1",
+        "prompt": "Shoplifting-related offenses focus on intent to steal while a business is open during regular hours.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-015-q2",
+        "prompt": "Is it important to document whether the suspect entered with intent to steal versus formed intent after entry?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-015-q3",
+        "prompt": "Theft from a store can never be charged unless there is forced entry.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-015-q4",
+        "prompt": "Should officers document value, concealment, and exit behavior?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-016",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 16",
+    "scenario": "Officers locate a suspect carrying a backpack full of new tools with price tags. Several serial numbers appear scratched off. The suspect gives a vague explanation and refuses consent to search further compartments.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-016-q1",
+        "prompt": "Possession of property with altered serial numbers can be a relevant property-crime indicator in the TTS objectives.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-016-q2",
+        "prompt": "Can altered identifiers be circumstantial evidence supporting probable cause and knowledge issues?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-016-q3",
+        "prompt": "Refusal to consent alone gives officers automatic authority to search the backpack.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-016-q4",
+        "prompt": "If officers lack another legal basis, should they consider a warrant or other lawful authority before searching?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-017",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 17",
+    "scenario": "A resident reports a garage burglary and provides a list of stolen electronics with serial numbers. Officers track one item to a specific apartment via a lawful tracking report, but there is no emergency. The occupant refuses entry.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-017-q1",
+        "prompt": "To search a residence for stolen property, officers generally need a warrant or a recognized exception.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-017-q2",
+        "prompt": "Is probable cause a basis to seek a search warrant?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-017-q3",
+        "prompt": "Probable cause alone automatically authorizes immediate warrantless entry into a home.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-017-q4",
+        "prompt": "Should officers preserve probable cause facts and seek a warrant rather than forcing entry?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-018",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 18",
+    "scenario": "Officers see Alex carrying a pry bar and lock picks behind a closed business at 2:00 a.m. Alex is also wearing gloves and checking door handles. Alex says, \u201cTools aren\u2019t illegal.\u201d Officers consider arrest elements and seizure.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-018-q1",
+        "prompt": "Possessing burglary tools with intent to use them unlawfully can be a crime.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-018-q2",
+        "prompt": "Are suspicious actions (checking doors, time of night) relevant to proving intent?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-018-q3",
+        "prompt": "Lawful possession of tools by itself always proves criminal intent.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-018-q4",
+        "prompt": "If officers seize tools as evidence, should they document lawful basis and chain-of-custody?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-019",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 19",
+    "scenario": "A bank reports a customer cashed a check that appears altered; the account holder confirms no authorization. The customer is located and has additional similar checks in a bag. The customer refuses consent to search the bag.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-019-q1",
+        "prompt": "Forgery involves a false writing or material alteration with intent to defraud.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-019-q2",
+        "prompt": "Is intent to defraud a required element officers should articulate through facts?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-019-q3",
+        "prompt": "Accidental error without intent to defraud automatically equals forgery.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-019-q4",
+        "prompt": "If officers seek to search the bag beyond plain view, should they rely on consent or a warrant/exception?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-020",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 20",
+    "scenario": "Firefighters extinguish a dumpster fire behind a restaurant. Witnesses saw someone pour liquid and ignite it before leaving. Officers locate a person nearby smelling of fuel and carrying a lighter.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-020-q1",
+        "prompt": "Willfully and maliciously setting fire to property can satisfy arson-related elements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-020-q2",
+        "prompt": "Should suspicious fires be treated as potential crime scenes with appropriate documentation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-020-q3",
+        "prompt": "Any accidental fire automatically constitutes arson.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-020-q4",
+        "prompt": "Are witness statements and ignition-related evidence relevant to probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-021",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 21",
+    "scenario": "Officers respond to a domestic argument. One party reports being slapped and pushed, leaving redness on the cheek. The suspect says, \u201cIt was nothing.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-021-q1",
+        "prompt": "Battery involves a willful and unlawful use of force or violence on another person.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-021-q2",
+        "prompt": "Can minor but offensive touching satisfy battery elements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-021-q3",
+        "prompt": "Assault requires actual physical contact.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-021-q4",
+        "prompt": "Should officers document injuries and statements from both parties?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-022",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 22",
+    "scenario": "In a parking lot, a suspect swings a glass bottle at another person\u2019s head but misses when the victim steps back. The suspect claims, \u201cI never hit them, so no crime.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-022-q1",
+        "prompt": "Assault can be committed even if no contact occurs.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-022-q2",
+        "prompt": "Can an object like a bottle be treated as a deadly weapon depending on how it is used?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-022-q3",
+        "prompt": "Injury is always required to prove assault.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-022-q4",
+        "prompt": "Should officers document distance, ability to strike, and victim fear?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-023",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 23",
+    "scenario": "A caregiver at a facility is reported for yelling threats at an elderly resident and shoving the resident\u2019s wheelchair. The resident appears fearful and says it happens often. There are no visible injuries today.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-023-q1",
+        "prompt": "Elder or dependent adult abuse can involve unjustifiable physical pain or mental suffering.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-023-q2",
+        "prompt": "Is the victim\u2019s age/dependency and caregiver relationship relevant to the investigation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-023-q3",
+        "prompt": "If there are no visible injuries, elder/dependent adult abuse cannot be investigated.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-023-q4",
+        "prompt": "Should officers document statements and consider victim safety planning/referrals?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-024",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 24",
+    "scenario": "Officers arrive at a disturbance where one person is holding a metal pipe and threatening another. Several bystanders are close, and the suspect ignores commands at first. Officers create distance and use calm communication while waiting for backup.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-024-q1",
+        "prompt": "Using time/distance/cover and communication can be appropriate de- escalation when feasible.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-024-q2",
+        "prompt": "Is an improvised weapon like a metal pipe potentially capable of causing serious injury?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-024-q3",
+        "prompt": "Officers should ignore bystander safety when deciding tactics.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-024-q4",
+        "prompt": "Should officers reassess and adjust tactics as compliance or threat level changes?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-025",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 25",
+    "scenario": "A victim reports a suspect threatened them and took their keys, then drove away in the victim\u2019s car. Officers locate the vehicle and conduct a coordinated high-risk stop; the suspect complies and is arrested.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-025-q1",
+        "prompt": "Taking a vehicle from a person\u2019s presence by force or fear can constitute carjacking.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-025-q2",
+        "prompt": "In a high-risk stop, are clear commands and safety positioning appropriate when feasible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-025-q3",
+        "prompt": "Deadly force is justified solely to prevent escape when a suspect is compliant and not threatening.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-025-q4",
+        "prompt": "If officers interrogate the suspect in custody, must Miranda be considered?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-026",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 26",
+    "scenario": "A victim reports their purse was ripped from their shoulder after a brief struggle, and the suspect ran away. The victim says they were scared and stumbled during the tug. Video shows a physical tugging struggle.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-026-q1",
+        "prompt": "Robbery involves taking property from a person or immediate presence by force or fear.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-026-q2",
+        "prompt": "Is force or fear a required robbery element?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-026-q3",
+        "prompt": "A stealth pickpocket theft with no force or fear is robbery.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-026-q4",
+        "prompt": "Should officers document force/fear facts to classify robbery properly?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-027",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 27",
+    "scenario": "Officers respond to a report of someone being forced into a vehicle. The victim later escapes and reports being held by threats and prevented from leaving. The suspect is located and initially resists handcuffing.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-027-q1",
+        "prompt": "False imprisonment involves unlawful violation of another\u2019s personal liberty.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-027-q2",
+        "prompt": "Can kidnapping analysis depend on movement and the circumstances of force or fear?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-027-q3",
+        "prompt": "If the victim was free to leave at any time, false imprisonment elements are not met.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-027-q4",
+        "prompt": "During arrest, may officers use objectively reasonable force to overcome resistance?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-028",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 28",
+    "scenario": "Officers respond to a welfare check; the door is slightly open and there is no response. Officers enter to check for medical emergency and find an adult deceased with no obvious signs of life. A family member asks officers to \u201csearch drawers for paperwork.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-028-q1",
+        "prompt": "Emergency entry may be lawful when officers reasonably believe someone may need immediate aid.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-028-q2",
+        "prompt": "After confirming death and no ongoing emergency, should further searching generally require proper legal authority?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-028-q3",
+        "prompt": "Finding a deceased person automatically authorizes officers to rummage through closed drawers.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-028-q4",
+        "prompt": "Should officers secure the scene and make appropriate notifications for an unattended death response?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-029",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 29",
+    "scenario": "A person is shot during an argument and later dies at the hospital. Witnesses describe a suspect who fled. Officers must balance scene control, evidence preservation, and immediate investigative steps.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-029-q1",
+        "prompt": "Homicide investigations require attention to scene security and evidence preservation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-029-q2",
+        "prompt": "Should officers identify and separate witnesses quickly to reduce contamination of statements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-029-q3",
+        "prompt": "Officers should allow anyone to handle potential evidence to \u201chelp\u201d the investigation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-029-q4",
+        "prompt": "Is documenting time, witness accounts, and physical evidence locations a priority?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-030",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 30",
+    "scenario": "Officers respond to an infant death and caregivers are hysterical. The scene is chaotic and multiple relatives are present. Officers must gather needed information respectfully while maintaining scene integrity.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-030-q1",
+        "prompt": "For a child death investigation, identifying information that should be obtained and documented is a recognized objective.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-030-q2",
+        "prompt": "Should officers interact with caregivers in a professional, compassionate manner while still conducting required investigative tasks?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-030-q3",
+        "prompt": "Because the call is emotionally difficult, officers should avoid documenting facts and rely on memory later.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-030-q4",
+        "prompt": "Should officers consider scene control and appropriate notifications as part of initial actions?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-031",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 31",
+    "scenario": "Officers contact Riley Chen outside a store. Riley is unsteady, vomiting, and repeatedly steps toward traffic, smells strongly of alcohol, and cannot state where they live. Riley insists, \u201cI\u2019m fine,\u201d but keeps stumbling into the roadway.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-031-q1",
+        "prompt": "Public intoxication involves being intoxicated in public to the point of inability to care for safety.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-031-q2",
+        "prompt": "Is odor of alcohol alone usually sufficient without impairment and safety indicators?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-031-q3",
+        "prompt": "Documenting safety risk observations is important for probable cause.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-031-q4",
+        "prompt": "Should officers consider medical evaluation or protective options when safety is at risk?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-032",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 32",
+    "scenario": "Two people are yelling in the street and one challenges the other to fight, drawing a crowd. Neighbors call saying they feel unsafe. Officers separate the parties and get statements.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-032-q1",
+        "prompt": "Challenging another person to fight in public can satisfy disturbing-the- peace conduct.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-032-q2",
+        "prompt": "Is documenting the specific conduct (challenge, crowd impact, refusal to stop) important?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-032-q3",
+        "prompt": "A quiet disagreement with no public disruption is always disturbing the peace.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-032-q4",
+        "prompt": "Should officers consider voluntary compliance before enforcement when feasible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-033",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 33",
+    "scenario": "At a hotel lot, officers observe a person approaching drivers and negotiating \u201csexual services for cash.\u201d The person says, \u201cNothing happened yet.\u201d A driver confirms the person offered services for a specific amount.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-033-q1",
+        "prompt": "Offering or agreeing to sexual conduct for compensation can satisfy prostitution-related solicitation elements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-033-q2",
+        "prompt": "Is completion of the act required to establish solicitation-type elements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-033-q3",
+        "prompt": "Clothing style alone proves prostitution-related crimes.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-033-q4",
+        "prompt": "Are observed negotiations and statements relevant evidence for probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-034",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 34",
+    "scenario": "A store manager finds a hidden camera placed to record inside a changing area and calls police. The camera is aimed where privacy is expected. Officers handle the device carefully.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-034-q1",
+        "prompt": "Secretly recording where privacy is reasonably expected can be an invasion-of-privacy offense.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-034-q2",
+        "prompt": "Is expectation of privacy a key factor when evaluating the offense?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-034-q3",
+        "prompt": "Officers should watch all recordings immediately to \u201cconfirm\u201d the crime.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-034-q4",
+        "prompt": "Should officers preserve evidence and avoid unnecessary viewing to protect victims and integrity?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-035",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 35",
+    "scenario": "A person loiters near a public restroom, repeatedly approaching patrons and offering \u201cprivate deals.\u201d The person never uses the restroom and leaves when security appears. Several witnesses describe the approach and statements.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-035-q1",
+        "prompt": "Loitering-type offenses often require proof of specific intent based on conduct and circumstances.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-035-q2",
+        "prompt": "Should officers document statements and repeated conduct showing intent?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-035-q3",
+        "prompt": "Standing near a restroom briefly, with no suspicious behavior, automatically proves the offense.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-035-q4",
+        "prompt": "Are witness statements key for establishing intent-based public-order offenses?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-036",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 36",
+    "scenario": "At a street fair, a group blocks the sidewalk so pedestrians cannot pass. Officers give a clear order to open a pathway; two refuse and taunt officers while the crowd compresses. Officers use calm communication and call for extra units for safety.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-036-q1",
+        "prompt": "Obstructing a public way can be an offense when willful and documented properly.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-036-q2",
+        "prompt": "Is an explicit lawful order and refusal relevant to proving willfulness?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-036-q3",
+        "prompt": "Using time, distance, and communication is appropriate de-escalation in crowd tension when feasible.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-036-q4",
+        "prompt": "Should officers document the order, refusal, and safety considerations in reports?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-037",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 37",
+    "scenario": "A resident reports someone repeatedly looked into a bedroom window at night. Officers find a person standing in shrubbery near the window and the person says, \u201cI was just curious.\u201d The resident says they felt unsafe.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-037-q1",
+        "prompt": "Prowling/peeping offenses depend on specific conduct and circumstances, not mere presence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-037-q2",
+        "prompt": "Should officers document time of night, suspect position, and visibility to support probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-037-q3",
+        "prompt": "Any accidental glance toward a window automatically proves prowling/peeping.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-037-q4",
+        "prompt": "Are witness statements and officer observations important for this kind of case?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-038",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 38",
+    "scenario": "Officers respond to a neighbor dispute where one party is shouting and pacing but not attacking anyone. The person begins to calm down after officers use respectful communication and give space. The parties finally agree to separate for the night.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-038-q1",
+        "prompt": "De-escalation can reduce situational intensity and increase voluntary compliance when feasible.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-038-q2",
+        "prompt": "Is calm, professional communication a recognized de-escalation tool?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-038-q3",
+        "prompt": "Officers should escalate to force immediately in every argument call regardless of threat level.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-038-q4",
+        "prompt": "Should officers continue reassessing and reduce intensity as compliance improves?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-039",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 39",
+    "scenario": "Officers respond to a public park where a person is behaving in a clearly inappropriate sexual way in a walkway visible to others. Families are nearby, and witnesses complain. The person says, \u201cI didn\u2019t think anyone could see me.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-039-q1",
+        "prompt": "Lewd conduct involves a willful lewd act in a public place or exposed to public view where others may be offended.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-039-q2",
+        "prompt": "Is visibility from public areas relevant to the elements and documentation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-039-q3",
+        "prompt": "The presence of bystanders and public view can be relevant to categorization and enforcement.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-039-q4",
+        "prompt": "Should officers use calm control and de-escalation to manage bystanders and the subject safely?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-040",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 40",
+    "scenario": "Security detains a person suspected of invasion-of-privacy recording conduct. The person has a phone and says, \u201cYou can\u2019t look through my phone without permission.\u201d The store wants officers to check the phone immediately.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-040-q1",
+        "prompt": "Searching a phone\u2019s digital contents generally requires proper legal authority such as consent or a warrant.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-040-q2",
+        "prompt": "May officers seize a phone as evidence when lawful while seeking proper authority to search contents?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-040-q3",
+        "prompt": "Seizing a phone automatically authorizes officers to browse all data immediately.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-040-q4",
+        "prompt": "Should officers preserve the device and pursue lawful process rather than conducting an unauthorized search?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 08",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-041",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 41",
+    "scenario": "A toddler is found alone near a busy street while a caregiver is inside a home asleep. The child is dirty and hungry but not injured. Neighbors say this happens often.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-041-q1",
+        "prompt": "Child endangerment-type investigations focus on whether a child was placed in unsafe conditions likely to cause harm.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-041-q2",
+        "prompt": "Should officers document supervision conditions, environment hazards, and neighbor statements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-041-q3",
+        "prompt": "If a child is not injured at the moment, there can never be a child endangerment investigation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-041-q4",
+        "prompt": "Is ensuring the child\u2019s immediate safety the first priority?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09"
+    ],
+    "tags": [
+      "LD 09"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-042",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 42",
+    "scenario": "A school counselor reports a student disclosed being hit at home and shows bruises. The counselor says they made a mandated report and want law enforcement follow-up. The caregiver arrives demanding to know who reported.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-042-q1",
+        "prompt": "Certain occupations have mandated reporting requirements for suspected child abuse.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-042-q2",
+        "prompt": "Should officers maintain confidentiality of the reporting party when required?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-042-q3",
+        "prompt": "Mandated reporters must wait until they have proof beyond doubt before reporting.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-042-q4",
+        "prompt": "Should officers document injuries, statements, and required notifications?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09"
+    ],
+    "tags": [
+      "LD 09"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-043",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 43",
+    "scenario": "A daycare worker reports suspected child abuse after seeing patterned bruising and hearing inconsistent explanations. The worker asks whether they \u201chave to\u201d report or can wait. Officers explain the worker\u2019s duties.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-043-q1",
+        "prompt": "Failure to report suspected child abuse when required can be a crime for mandated reporters.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-043-q2",
+        "prompt": "Should officers identify whether a reporting party falls into a mandated reporter category?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-043-q3",
+        "prompt": "A mandated reporter may choose not to report if they fear the parents will be upset.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-043-q4",
+        "prompt": "Should officers provide guidance on proper reporting channels and document the report properly?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-044",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 44",
+    "scenario": "Officers respond to a home where a parent is intoxicated and screaming while a child is crying in the yard. The parent refuses to cooperate and says officers must leave. Officers must decide whether lawful detention or other action is justified.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-044-q1",
+        "prompt": "Ensuring child safety is the primary responsibility in suspected child abuse/neglect responses.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-044-q2",
+        "prompt": "If officers detain the parent, must they have articulable facts supporting reasonable suspicion or probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-044-q3",
+        "prompt": "Noncooperation alone automatically justifies arrest in every situation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-044-q4",
+        "prompt": "Should officers document objective indicators of risk to the child and the adult\u2019s conduct?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-045",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 45",
+    "scenario": "Neighbors report a child screaming and an adult yelling threats inside an apartment. Officers knock and identify themselves; no one answers, and screaming continues. Officers reasonably believe the child may be in immediate danger.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-045-q1",
+        "prompt": "Exigent circumstances can justify warrantless entry to protect a minor when officers reasonably believe the minor is in immediate danger.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-045-q2",
+        "prompt": "Must exigency be supported by objective, articulable facts rather than speculation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-045-q3",
+        "prompt": "Warrantless entry is justified anytime someone \u201chas a feeling\u201d a child is upset.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-045-q4",
+        "prompt": "Should any search after entry be limited to what is necessary for the protective purpose?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-046",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 46",
+    "scenario": "A parent reports finding what they believe to be illegal images involving minors on an adult\u2019s device and begs officers to \u201clook through it right now.\u201d The parent offers the device for officers to take. Officers want to preserve evidence properly.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-046-q1",
+        "prompt": "Cases involving suspected illegal images of minors require careful evidence handling and chain-of-custody.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-046-q2",
+        "prompt": "Should officers avoid unnecessary viewing/copying and follow proper procedures for digital evidence?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-046-q3",
+        "prompt": "Forwarding suspected images to a personal phone to \u201csave\u201d them is acceptable.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-046-q4",
+        "prompt": "Should officers consider specialized investigative resources and lawful process for digital searches?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-047",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 47",
+    "scenario": "Officers respond to child abuse allegations and a caregiver insists on sitting in the room during the child interview and answering for the child. The officer wants an accurate account without suggestion. The caregiver refuses to leave.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-047-q1",
+        "prompt": "Interviews with child victims should use age-appropriate, non-leading questions.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-047-q2",
+        "prompt": "When feasible and safe, is reducing adult influence often appropriate for accurate child interviews?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-047-q3",
+        "prompt": "Promising a child a guaranteed outcome is an appropriate interview method.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-047-q4",
+        "prompt": "If officers need to enter areas or seize evidence beyond what is voluntarily provided, should they consider legal authority limits?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-048",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 48",
+    "scenario": "A mandated reporter is worried about retaliation and asks officers not to reveal their identity. The suspected caregiver demands, \u201cTell me who called you.\u201d Officers decline and document the incident.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-048-q1",
+        "prompt": "Maintaining confidentiality of the reporting party is an officer responsibility in mandated reporting processes.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-048-q2",
+        "prompt": "Should officers avoid disclosing the reporting party\u2019s identity when confidentiality requirements apply?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-048-q3",
+        "prompt": "Disclosing the reporting party\u2019s identity to calm the suspect is always appropriate.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-048-q4",
+        "prompt": "Should officers document the confidentiality issue and report details as required?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-049",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 49",
+    "scenario": "Officers respond to a home where a parent is in crisis and yelling, and a child is present and frightened. The parent is not attacking but is escalating verbally. Officers use time, distance, calm communication, and request additional resources.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-049-q1",
+        "prompt": "De-escalation can reduce intensity and improve voluntary compliance when feasible.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-049-q2",
+        "prompt": "Should officers prioritize child safety while using de-escalation to manage the adult safely?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-049-q3",
+        "prompt": "Officers should escalate to force immediately even if the person is not an immediate threat and calming tactics are working.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-049-q4",
+        "prompt": "If the situation requires detention/arrest, must officers base it on articulable legal facts?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-050",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 50",
+    "scenario": "A suspect caregiver repeatedly contacts the reporting party and threatens \u201cyou\u2019ll regret reporting.\u201d The reporting party is fearful and asks for help. Officers begin documenting the threats and safety concerns.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-050-q1",
+        "prompt": "Threats related to reporting can create additional safety and investigative concerns in child abuse contexts.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-050-q2",
+        "prompt": "Should officers document exact statements, context, and witness information?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-050-q3",
+        "prompt": "Reporting parties should be told to \u201chandle it themselves\u201d without documentation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-050-q4",
+        "prompt": "Should officers consider lawful protective options and referrals consistent with responsibilities?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-051",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 51",
+    "scenario": "A victim reports a sexual assault and states there was no consent. The victim asks what medical options exist and whether they have to decide immediately. Officers keep the interview brief and respectful.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-051-q1",
+        "prompt": "Sex-crime investigations emphasize probable cause development and correct crime classification.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-051-q2",
+        "prompt": "Should officers offer victim-centered options and facilitate medical attention if requested or needed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-051-q3",
+        "prompt": "Officers should pressure the victim into a particular medical decision.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-051-q4",
+        "prompt": "Should officers document the victim\u2019s condition, timeline, and any immediate safety concerns?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10"
+    ],
+    "tags": [
+      "LD 10"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-052",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 52",
+    "scenario": "On a train, a passenger reports a stranger intentionally touched an intimate area without consent and then moved away. The victim is upset and asks whether it \u201ccounts\u201d if it was brief. Officers locate a possible suspect nearby.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-052-q1",
+        "prompt": "Non-consensual touching of an intimate part for a sexual purpose can satisfy sexual battery-type elements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-052-q2",
+        "prompt": "Is a victim-centered approach appropriate (privacy, respectful communication, options)?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-052-q3",
+        "prompt": "A brief unwanted sexual touching can never be a crime.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-052-q4",
+        "prompt": "Should officers identify witnesses and document location/timeline for probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10"
+    ],
+    "tags": [
+      "LD 10"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-053",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 53",
+    "scenario": "A sexual assault suspect is arrested and handcuffed in an interview room. An officer begins asking detailed incident questions before giving Miranda advisements. The suspect answers and then asks for a lawyer.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-053-q1",
+        "prompt": "Miranda warnings are required before custodial interrogation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-053-q2",
+        "prompt": "If the suspect invokes counsel, must interrogation stop?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-053-q3",
+        "prompt": "Detailed crime questions to a handcuffed suspect in an interview room are noncustodial by default.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-053-q4",
+        "prompt": "Should officers document the invocation and any waiver issues clearly?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 10",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-054",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 54",
+    "scenario": "A victim reports an indecent exposure incident in a park near a walking path. Witnesses confirm it was deliberate and public. Officers locate the suspect who claims it was accidental.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-054-q1",
+        "prompt": "Willful public exposure with wrongful intent can constitute indecent exposure.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-054-q2",
+        "prompt": "Are visibility and intent relevant facts for probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-054-q3",
+        "prompt": "Any accidental exposure automatically proves indecent exposure.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-054-q4",
+        "prompt": "Should officers document visibility, location, and witness statements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 10",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-055",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 55",
+    "scenario": "A victim shows officers apologetic messages from the suspect and asks how to preserve them. The victim offers to forward screenshots. Officers want proper evidence handling without overstepping search authority.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-055-q1",
+        "prompt": "Digital communications can be relevant evidence in sex-crime investigations.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-055-q2",
+        "prompt": "Should officers preserve evidence lawfully and maintain integrity (who captured it, when, what was shown)?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-055-q3",
+        "prompt": "Officers may search the suspect\u2019s phone contents without consent or legal authority because the victim showed messages.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-055-q4",
+        "prompt": "If investigators need a suspect device search, should they consider a warrant or another lawful basis?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 10",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-056",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 56",
+    "scenario": "A victim voluntarily provides clothing worn during a reported sexual assault and asks whether they can wash it first. Officers explain evidence preservation respectfully and arrange appropriate collection.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-056-q1",
+        "prompt": "Evidence handling should prevent contamination and maintain chain-of- custody.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-056-q2",
+        "prompt": "Should officers explain evidence preservation steps in a victim-centered way?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-056-q3",
+        "prompt": "Washing clothing before evidence collection is generally recommended.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-056-q4",
+        "prompt": "Should officers package items appropriately and document collection details?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 10",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-057",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 57",
+    "scenario": "Officers contact a suspect who agrees to \u201cshow a couple messages\u201d on their phone but says, \u201cYou can\u2019t go through anything else.\u201d The suspect then withdraws permission entirely. Officers consider whether they can keep searching.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-057-q1",
+        "prompt": "Consent can be limited in scope and withdrawn.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-057-q2",
+        "prompt": "If consent is withdrawn, must officers generally stop searching unless another lawful basis exists?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-057-q3",
+        "prompt": "Seizure of a phone always authorizes immediate browsing of all content.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-057-q4",
+        "prompt": "If more digital evidence is needed, should officers consider a warrant?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 10",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-058",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 58",
+    "scenario": "Officers respond to a report of a sex offense and the suspect is outside yelling at the victim. Officers separate the parties and maintain distance. The suspect demands to \u201ctalk right now\u201d and tries to approach.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-058-q1",
+        "prompt": "Separating parties and controlling scene safety can be appropriate in preliminary investigations.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-058-q2",
+        "prompt": "Is using time/distance and controlled communication consistent with de- escalation concepts when feasible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-058-q3",
+        "prompt": "Officers should force the victim to confront the suspect to \u201csettle it.\u201d",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-058-q4",
+        "prompt": "If officers detain the suspect, must they articulate legal facts supporting detention?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 10",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-059",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 59",
+    "scenario": "A victim begins to dissociate and asks to pause during a sex- crime interview. The victim requests an advocate and medical options. Officers slow down, offer privacy, and request appropriate resources.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-059-q1",
+        "prompt": "The manner of officer interaction with sex-crime victims can influence the information a victim is willing to provide.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-059-q2",
+        "prompt": "Should officers assess the victim\u2019s physical state and secure medical attention if needed or requested?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-059-q3",
+        "prompt": "Officers should ignore signs of distress and force the interview to continue immediately.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-059-q4",
+        "prompt": "Is de-escalation and calm communication appropriate to reduce trauma and increase cooperation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 10",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-060",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 60",
+    "scenario": "An officer checks compliance for a registrant who is required to update address information. Records show the person moved and did not report as required. The person says, \u201cI didn\u2019t know it mattered.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-060-q1",
+        "prompt": "Penal Code 290 requirements exist to track the whereabouts of known sex offenders.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-060-q2",
+        "prompt": "Can failure to comply with registration/update requirements be a violation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-060-q3",
+        "prompt": "Registration requirements are optional if a person claims they \u201cdidn\u2019t know.\u201d",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-060-q4",
+        "prompt": "Should officers document the move timeline and confirm requirements through official records?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 10",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 10",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-061",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 61",
+    "scenario": "Officer Lee approaches Avery at a bus stop and asks, \u201cCan I talk to you?\u201d Avery says, \u201cNo,\u201d and begins walking away. Officer Lee has no specific crime information but wants Avery to stay.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-061-q1",
+        "prompt": "In a consensual encounter, a reasonable person is free to leave or refuse to cooperate.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-061-q2",
+        "prompt": "May an officer ask questions without reasonable suspicion during a consensual encounter?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-061-q3",
+        "prompt": "Blocking a person\u2019s path and ordering them to stay can turn the contact into a detention.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-061-q4",
+        "prompt": "If it becomes a detention, is reasonable suspicion generally required?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15"
+    ],
+    "tags": [
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-062",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 62",
+    "scenario": "A suspect is detained for burglary suspicion based on a matching description and proximity in time and location. The officer keeps the suspect for 45 minutes waiting for a witness, even though no new facts develop. The suspect complains they were \u201cheld too long.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-062-q1",
+        "prompt": "A detention should last no longer than reasonably necessary to resolve the purpose of the stop.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-062-q2",
+        "prompt": "May an officer prolong detention without new facts simply to \u201csee what happens\u201d?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-062-q3",
+        "prompt": "Detention scope must be reasonably related to the circumstances that justified the stop.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-062-q4",
+        "prompt": "If suspicion is dispelled, should the officer end the detention?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15"
+    ],
+    "tags": [
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-063",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 63",
+    "scenario": "A witness reports a suspect punched someone and fled; the victim has visible injuries consistent with the report. Officers locate a matching suspect nearby who is sweating and breathing hard. The suspect denies involvement.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-063-q1",
+        "prompt": "Probable cause requires facts that would lead a reasonable person to believe a crime occurred and the suspect committed it.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-063-q2",
+        "prompt": "Can witness statements and observed injuries contribute to probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-063-q3",
+        "prompt": "An unsupported hunch is enough for probable cause.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-063-q4",
+        "prompt": "Should officers articulate and document the specific facts supporting probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15"
+    ],
+    "tags": [
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-064",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 64",
+    "scenario": "A customer wants to make a private person\u2019s arrest for a battery that just occurred and is willing to sign paperwork. The suspect says, \u201cThe officer didn\u2019t see it, so you can\u2019t arrest me.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-064-q1",
+        "prompt": "Private person arrest procedures can apply when a public offense was committed or attempted in the private person\u2019s presence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-064-q2",
+        "prompt": "If the private person is willing to make the arrest and provide a statement, may an officer accept custody under that procedure where appropriate?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-064-q3",
+        "prompt": "Officers can force a private person to make a private person\u2019s arrest.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-064-q4",
+        "prompt": "Should officers document the private person\u2019s statement and basis for the arrest?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15"
+    ],
+    "tags": [
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-065",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 65",
+    "scenario": "A suspect is handcuffed in a patrol car. An officer asks, \u201cWhere did you hide the stolen items?\u201d before giving Miranda warnings. The suspect answers.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-065-q1",
+        "prompt": "Miranda is required before custodial interrogation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-065-q2",
+        "prompt": "If a person is in custody and asked questions likely to elicit incriminating responses, must Miranda be considered?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-065-q3",
+        "prompt": "Miranda is required for all questions in every police interaction, including casual small talk.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-065-q4",
+        "prompt": "If the suspect invokes the right to remain silent, should interrogation stop?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15"
+    ],
+    "tags": [
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-066",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 66",
+    "scenario": "Officers have an arrest warrant and go to the suspect\u2019s residence. Officers reasonably believe the suspect is inside. A roommate refuses consent and says, \u201cYou need a search warrant.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-066-q1",
+        "prompt": "Entry into a home implicates strong constitutional protections and generally requires lawful authority.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-066-q2",
+        "prompt": "Does an arrest warrant generally authorize entry into the suspect\u2019s own residence if officers reasonably believe the suspect is inside?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-066-q3",
+        "prompt": "An arrest warrant automatically authorizes searching the entire home for evidence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-066-q4",
+        "prompt": "Should officers limit actions to lawful scope (locating the suspect) unless another search basis exists?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-067",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 67",
+    "scenario": "During a detention, an officer wants to search a backpack for \u201canything illegal,\u201d but the person refuses consent. The officer has no articulable reason to believe the person is armed and no specific evidence facts.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-067-q1",
+        "prompt": "Detention search/seizure authority is limited and must be supported by specific legal justifications.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-067-q2",
+        "prompt": "Without consent or another lawful basis, may officers open and search a backpack during a detention?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-067-q3",
+        "prompt": "A frisk is intended to find weapons, not general evidence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-067-q4",
+        "prompt": "If officers develop probable cause for the backpack, should they pursue lawful authority (warrant/exception) rather than guessing?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-068",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 68",
+    "scenario": "During a detention, a person repeatedly reaches toward the waistband and refuses commands to keep hands visible. The officer uses handcuffs briefly for safety while continuing verbal control. The person later claims, \u201cThat was an illegal arrest.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-068-q1",
+        "prompt": "Physical restraint can be used during a detention if objectively reasonable for safety.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-068-q2",
+        "prompt": "Should the officer document the specific safety facts that justified restraints?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-068-q3",
+        "prompt": "Any use of handcuffs automatically makes every detention an arrest in all circumstances.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-068-q4",
+        "prompt": "Should officers de-escalate and reduce restrictions when safety risk decreases?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-069",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 69",
+    "scenario": "An officer observes another officer using strikes on a handcuffed person who is not resisting. The observing officer hesitates, worried about conflict with coworkers. A supervisor later asks what steps were taken to intervene.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-069-q1",
+        "prompt": "Officers must recognize consequences of unreasonable force and their responsibilities when it occurs.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-069-q2",
+        "prompt": "Should an observing officer take appropriate steps to intervene or stop unreasonable force when safe and feasible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-069-q3",
+        "prompt": "Loyalty requires ignoring unreasonable force by another officer.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-069-q4",
+        "prompt": "Should the observing officer report/document the incident through proper channels?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-070",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 70",
+    "scenario": "Officers respond to a person in crisis who is yelling, pacing, and clenching fists but not attacking. The person calms after several minutes of respectful communication and space. Officers resolve the call without force.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-070-q1",
+        "prompt": "De-escalation strategies can reduce situational intensity and improve outcomes with voluntary compliance.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-070-q2",
+        "prompt": "Is reassessment and adjustment part of good decision-making during tense calls?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-070-q3",
+        "prompt": "De-escalation is never appropriate because officers can always use force.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-070-q4",
+        "prompt": "Should officers document key observations and actions even when no force is used?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-071",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 71",
+    "scenario": "Investigators apply for a search warrant for stolen electronics and list the items by serial number and the location to be searched. They also explain why the items are believed at that address.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-071-q1",
+        "prompt": "Probable cause is a basis for obtaining a search warrant.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-071-q2",
+        "prompt": "Should a warrant be particular about the place to search and items to seize?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-071-q3",
+        "prompt": "A warrant for one location automatically authorizes searching unrelated locations nearby.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-071-q4",
+        "prompt": "Should officers comply with warrant time limits and knock-notice rules unless an exception applies?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16"
+    ],
+    "tags": [
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-072",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 72",
+    "scenario": "Officers have probable cause but no warrant yet, and they believe evidence in a home may be destroyed if they leave. They secure the perimeter and prevent entry while a detective seeks a warrant. The occupant complains, \u201cYou can\u2019t stop me from going in.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-072-q1",
+        "prompt": "Under certain conditions, officers may secure an area pending issuance of a search warrant.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-072-q2",
+        "prompt": "Must such securing be based on lawful justification and reasonable limits?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-072-q3",
+        "prompt": "Officers may detain everyone indefinitely without any legal basis while \u201cwaiting.\u201d",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-072-q4",
+        "prompt": "Should officers document why securing was necessary and what steps were taken to minimize intrusion?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16"
+    ],
+    "tags": [
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-073",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 73",
+    "scenario": "During a traffic stop, an officer lawfully stands at the open car door and sees contraband in plain view on the seat. The driver says, \u201cYou can\u2019t use what you saw.\u201d The officer did not move any objects to see it.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-073-q1",
+        "prompt": "Plain view seizure has legal requirements and does not automatically equal an unlawful search.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-073-q2",
+        "prompt": "Must the officer be lawfully present and have lawful access to seize the item?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-073-q3",
+        "prompt": "Officers may move objects to create \u201cplain view\u201d without legal authority.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-073-q4",
+        "prompt": "Should the officer document the lawful vantage point and what was observed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16"
+    ],
+    "tags": [
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-074",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 74",
+    "scenario": "An officer asks Pat Gomez, \u201cDo you mind if I search your trunk?\u201d Pat says yes, but then says \u201cstop\u201d mid-search and withdraws consent. The officer considers continuing anyway.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-074-q1",
+        "prompt": "Consent can be limited and withdrawn.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-074-q2",
+        "prompt": "If consent is withdrawn, must the search generally stop unless another lawful basis exists?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-074-q3",
+        "prompt": "Consent searches always require probable cause.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-074-q4",
+        "prompt": "Should officers document scope and withdrawal clearly?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 16",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-075",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 75",
+    "scenario": "During a detention, a suspect repeatedly reaches toward a jacket pocket despite commands. The officer conducts a limited frisk and feels a hard object consistent with a knife, then secures it safely. The suspect complains it was an \u201cevidence search.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-075-q1",
+        "prompt": "A frisk is a limited pat-down for weapons when specific facts suggest the person may be armed and dangerous.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-075-q2",
+        "prompt": "Must officers articulate facts supporting safety concerns for the frisk?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-075-q3",
+        "prompt": "A frisk is intended to find general evidence of crime, not weapons.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-075-q4",
+        "prompt": "If the frisk reveals a weapon-like object, may the officer take steps to secure it?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 16",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-076",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 76",
+    "scenario": "After a lawful custodial arrest, the officer searches the arrestee\u2019s pockets incident to arrest and finds stolen property. The arrestee says, \u201cYou needed a warrant to search me.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-076-q1",
+        "prompt": "Search incident to a lawful custodial arrest allows searching the arrestee\u2019s person.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-076-q2",
+        "prompt": "Can this search occur without a separate warrant for the person?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-076-q3",
+        "prompt": "Search incident to arrest automatically authorizes searching an entire residence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-076-q4",
+        "prompt": "Should officers keep the search tied to lawful scope and document it?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 16",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-077",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 77",
+    "scenario": "During detention, a suspect puts a small bag in their mouth and begins swallowing. Officers believe it could harm the suspect and destroy evidence, and the suspect begins coughing.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-077-q1",
+        "prompt": "Use of force to prevent swallowing evidence must be objectively reasonable and consider safety risk.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-077-q2",
+        "prompt": "Should officers seek medical evaluation when ingestion is suspected or distress is observed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-077-q3",
+        "prompt": "Any amount of force is automatically justified whenever evidence might be swallowed.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-077-q4",
+        "prompt": "Should officers document why immediate action was necessary and what alternatives were considered?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 16",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-078",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 78",
+    "scenario": "A driver is arrested and the vehicle must be towed because no licensed driver is available. Officers conduct an inventory according to standardized policy and list valuables. The driver later alleges officers \u201csearched for evidence.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-078-q1",
+        "prompt": "A lawful inventory must follow standardized policy and procedures.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-078-q2",
+        "prompt": "Is inventory intended to protect property and reduce claims, not to search for evidence?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-078-q3",
+        "prompt": "Inventory is valid even if officers ignore policy and do it only to hunt for evidence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-078-q4",
+        "prompt": "Should officers document what was inventoried and why towing was necessary?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 16",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-079",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 79",
+    "scenario": "Investigators seek a blood sample from a felony suspect who refuses consent. Supervisors advise the team to consider warrants and lawful bodily intrusion procedures.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-079-q1",
+        "prompt": "Obtaining blood samples implicates bodily intrusion concerns and requires legal authority.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-079-q2",
+        "prompt": "Absent a valid exception, is a warrant typically needed over objection?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-079-q3",
+        "prompt": "Officers may force a blood draw without any legal authority if it helps the case.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-079-q4",
+        "prompt": "Should officers coordinate with medical personnel and follow lawful procedures if authorized?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 16",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-080",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 80",
+    "scenario": "During a photo lineup, the administering officer tells the witness, \u201cWe caught the guy\u2014he\u2019s in here somewhere.\u201d The witness appears pressured and quickly selects a photo. The defense later challenges the lineup as suggestive.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-080-q1",
+        "prompt": "Officers must avoid suggestiveness in identification procedures to protect due process.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-080-q2",
+        "prompt": "Should lineup administrators remain neutral and avoid implying the suspect is present?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-080-q3",
+        "prompt": "Pressuring a witness to choose someone is acceptable.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-080-q4",
+        "prompt": "Is thorough documentation of procedure and witness statements important?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 16",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 16",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-081",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 81",
+    "scenario": "During an arrest, a suspect actively pulls away, kicks, and tries to run into traffic. Officers use physical control to stop the flight and gain handcuffs.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-081-q1",
+        "prompt": "Officers may use objectively reasonable force to effect arrest, prevent escape, or overcome resistance.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-081-q2",
+        "prompt": "Should officers consider threat level, active resistance, and environment when selecting force options?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-081-q3",
+        "prompt": "Once a suspect resists, any level of force is always justified.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-081-q4",
+        "prompt": "After force is used, should officers monitor for injury and follow reporting requirements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20"
+    ],
+    "tags": [
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-082",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 82",
+    "scenario": "Officers respond to a person in crisis holding a sharp object near their own body, yelling that they don\u2019t want anyone to come closer. The person is not advancing toward officers. Officers create distance and request additional resources.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-082-q1",
+        "prompt": "De-escalation can include time, distance, cover, and calm communication when feasible.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-082-q2",
+        "prompt": "Should officers continuously reassess threat and adjust tactics as the situation changes?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-082-q3",
+        "prompt": "Officers must rush in immediately even when time and distance can safely reduce risk.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-082-q4",
+        "prompt": "Should officers consider options that maximize safety for the person and officers?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20"
+    ],
+    "tags": [
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-083",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 83",
+    "scenario": "After a struggle, a suspect is in custody and complains of breathing difficulty and pain. Officers observe exhaustion and minor bleeding. Officers request medical evaluation and document the force used.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-083-q1",
+        "prompt": "After force is used, officers must monitor the person and address medical needs when indicated.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-083-q2",
+        "prompt": "Should officers request medical evaluation when distress is observed or reported?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-083-q3",
+        "prompt": "Once someone is handcuffed, officers no longer need to monitor their condition.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-083-q4",
+        "prompt": "Should officers document the chronology, resistance, and force used?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20"
+    ],
+    "tags": [
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-084",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 84",
+    "scenario": "Officers consider using a less-lethal tool on a suspect in a small area with bystanders nearby. The suspect is holding a blunt object but is not charging. Officers reposition, give warnings, and attempt communication.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-084-q1",
+        "prompt": "Officers should consider backdrop, bystanders, and foreseeable risks before deploying force tools.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-084-q2",
+        "prompt": "When feasible, should officers give clear commands and warnings to increase voluntary compliance?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-084-q3",
+        "prompt": "Deploying force blindly into a crowd is acceptable if officers are frustrated.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-084-q4",
+        "prompt": "Should officers document decision factors, warnings, and outcomes?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20"
+    ],
+    "tags": [
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-085",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 85",
+    "scenario": "A suspect points a firearm at officers from close distance. Officers respond with deadly force and the threat ends. Officers then secure the weapon and provide aid when safe.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-085-q1",
+        "prompt": "Deadly force can be objectively reasonable when an officer reasonably perceives imminent threat of death or serious bodily injury.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-085-q2",
+        "prompt": "Is deadly force evaluated under objective reasonableness based on facts known at the time?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-085-q3",
+        "prompt": "Deadly force is justified solely to stop a fleeing suspect who poses no immediate threat.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-085-q4",
+        "prompt": "After deadly force, should officers secure scene and render/arrange medical aid when safe?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 20",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-086",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 86",
+    "scenario": "An officer observes another officer striking a handcuffed person who is no longer resisting. The observing officer hesitates but then steps in to stop it and immediately notifies a supervisor.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-086-q1",
+        "prompt": "Officers should employ intervention techniques when they observe unreasonable force by another officer when safe and feasible.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-086-q2",
+        "prompt": "Should the observing officer report the incident through appropriate channels?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-086-q3",
+        "prompt": "Officers should ignore unreasonable force to avoid \u201cconflict\u201d with coworkers.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-086-q4",
+        "prompt": "Should officers ensure the restrained person is medically assessed if injury is possible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 20",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-087",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 87",
+    "scenario": "During a detention, a person goes from verbally resistant to actively pulling away and trying to flee. Officers use a brief control hold and handcuffing to stop the flight. The person quickly calms once restrained.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-087-q1",
+        "prompt": "Force options should be reasonable relative to resistance and circumstances known at the time.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-087-q2",
+        "prompt": "Should officers reassess and reduce force once resistance stops?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-087-q3",
+        "prompt": "Continued force after compliance is always justified.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-087-q4",
+        "prompt": "Should officers document resistance type, force used, and reassessment?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 20",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-088",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 88",
+    "scenario": "Officers respond to a lawful arrest warrant service. The subject is cooperative but emotionally upset and repeatedly asks \u201cwhy.\u201d Officers explain what they can, use calm tone, and keep the subject informed while maintaining safety.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-088-q1",
+        "prompt": "Effective communication can support de-escalation and safer outcomes.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-088-q2",
+        "prompt": "Is calm, respectful communication a recognized de-escalation component?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-088-q3",
+        "prompt": "Officers should intentionally escalate tension to gain compliance.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-088-q4",
+        "prompt": "Should officers document key behaviors and actions taken to reduce intensity?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 20",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-089",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 89",
+    "scenario": "During a struggle, a suspect grabs at an officer\u2019s duty belt and attempts to remove the officer\u2019s firearm from the holster. Another officer intervenes and stops the attempt. The suspect later says, \u201cI didn\u2019t get it out.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-089-q1",
+        "prompt": "Attempting to remove a firearm from a public officer is a serious safety threat and criminal offense category in LD 39 objectives.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-089-q2",
+        "prompt": "In such an event, is rapid escalation to protect the firearm generally reasonable?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-089-q3",
+        "prompt": "Attempting to take an officer\u2019s firearm is equivalent to a minor refusal to comply.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-089-q4",
+        "prompt": "Should officers preserve evidence (reports, witnesses, video) and document the attempt thoroughly?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20",
+      "LD 39"
+    ],
+    "tags": [
+      "LD 20",
+      "LD 39"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-090",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 90",
+    "scenario": "During a chaotic arrest, a bystander intentionally steps in and physically interferes with handcuffing while yelling threats at officers. Officers create distance, request backup, and take enforcement action based on the interference.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-090-q1",
+        "prompt": "De-escalation includes scene assessment and management and can improve decision-making.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-090-q2",
+        "prompt": "Can willfully obstructing officers in lawful performance of duties be a criminal offense?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-090-q3",
+        "prompt": "Threats and interference should be ignored as \u201cfree speech\u201d even when they block lawful actions.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-090-q4",
+        "prompt": "Should officers document commands given and the specific interference and threats?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 20",
+      "LD 15",
+      "LD 39"
+    ],
+    "tags": [
+      "LD 20",
+      "LD 15",
+      "LD 39"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-091",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 91",
+    "scenario": "A victim reports the suspect said, \u201cIf you testify, I\u2019ll make you regret it,\u201d and the victim now refuses to cooperate out of fear. The suspect later claims it was \u201cjust talk.\u201d Officers take a report and consider safety planning.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-091-q1",
+        "prompt": "Intimidating witnesses or victims can be a crime category in LD 39 objectives.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-091-q2",
+        "prompt": "Is documenting exact words and context important when evaluating intimidation offenses?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-091-q3",
+        "prompt": "Witness intimidation can never apply if the suspect says they were \u201cjoking.\u201d",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-091-q4",
+        "prompt": "Should officers consider victim safety measures and referrals?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39"
+    ],
+    "tags": [
+      "LD 39"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-092",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 92",
+    "scenario": "A restrained party repeatedly contacts a protected party in violation of a court order. The protected party shows messages and says, \u201cI told them to stop.\u201d The restrained party says, \u201cThey wanted to talk.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-092-q1",
+        "prompt": "Violating a court order is an objective category in LD 39.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-092-q2",
+        "prompt": "Is confirming the order terms and service/knowledge relevant to a violation investigation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-092-q3",
+        "prompt": "If the protected party responds, the violation automatically disappears regardless of the order.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-092-q4",
+        "prompt": "Should officers preserve messages and document timelines?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39"
+    ],
+    "tags": [
+      "LD 39"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-093",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 93",
+    "scenario": "A handcuffed arrestee briefly escapes from the patrol car when the door is opened and runs. Officers locate the arrestee a short time later. The arrestee says, \u201cI wasn\u2019t in jail, so it can\u2019t be escape.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-093-q1",
+        "prompt": "Escaping or attempting to escape from peace officer custody is an LD 39 objective category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-093-q2",
+        "prompt": "Is lawful custody status relevant to establishing escape elements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-093-q3",
+        "prompt": "Running away before any detention or arrest is the same as escape from custody.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-093-q4",
+        "prompt": "Should officers document custody status, restraints, and flight timeline?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39"
+    ],
+    "tags": [
+      "LD 39"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-094",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 94",
+    "scenario": "A person calls 911 reporting a \u201cshooting in progress,\u201d but officers arrive to find no incident. The caller later admits they fabricated the report to cause a large police response. Dispatch logs confirm the call.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-094-q1",
+        "prompt": "Falsely reporting an emergency is an LD 39 objective category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-094-q2",
+        "prompt": "Is it relevant that the report was knowingly false and intended to prompt a response?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-094-q3",
+        "prompt": "Exaggerating facts to get a faster response is never a crime.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-094-q4",
+        "prompt": "Should officers document admissions, logs, and timeline for review?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39"
+    ],
+    "tags": [
+      "LD 39"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-095",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 95",
+    "scenario": "During a lawful detention, a bystander steps between officers and a detainee, refuses repeated commands to back up, and physically interferes with handcuffing. The bystander says, \u201cI\u2019m not doing anything.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-095-q1",
+        "prompt": "Willfully resisting, delaying, or obstructing officers in lawful duties is an LD 39 objective category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-095-q2",
+        "prompt": "Must the officer be acting lawfully for an obstruction offense to apply?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-095-q3",
+        "prompt": "Standing at a distance and silently observing is always obstruction.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-095-q4",
+        "prompt": "Should officers document commands and specific interference actions?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 39",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-096",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 96",
+    "scenario": "A person tells an officer, \u201cIf you arrest my friend, I\u2019ll hurt you,\u201d and steps forward aggressively to intimidate the officer into stopping lawful action. Witnesses hear the statement.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-096-q1",
+        "prompt": "Threatening a public officer is an LD 39 objective category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-096-q2",
+        "prompt": "Is the context (threat aiming to influence official duties) important to document?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-096-q3",
+        "prompt": "Profanity alone, without threats or interference, is always the same as threatening a public officer.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-096-q4",
+        "prompt": "Should officers document exact words, distance, demeanor, and witnesses?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 39",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-097",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 97",
+    "scenario": "During a detention, a person provides a false name and date of birth to avoid being identified as someone with a warrant. Fingerprints later confirm true identity. The person says, \u201cIt\u2019s just a nickname.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-097-q1",
+        "prompt": "Providing false identity to a peace officer is an LD 39 objective category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-097-q2",
+        "prompt": "Must the false information be willful (intended to mislead) to support the offense?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-097-q3",
+        "prompt": "Any nickname is automatically a crime even with no intent to mislead.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-097-q4",
+        "prompt": "Should officers document the false statement and how identity was verified?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 39",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-098",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 98",
+    "scenario": "Officers witness a group pushing toward an arrestee and trying to pull the arrestee away while yelling \u201cTake them back!\u201d Officers hold the line and later identify organizers. The group claims it was a \u201cpeaceful protest.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-098-q1",
+        "prompt": "Attempting to rescue or rescuing a person from lawful custody is an LD 39 objective category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-098-q2",
+        "prompt": "Is it important to document custody status and the group\u2019s actions toward freeing the arrestee?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-098-q3",
+        "prompt": "Any gathering near police is automatically unlawful assembly.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-098-q4",
+        "prompt": "Should officers document specific acts (pulling, pushing, commands, refusals) rather than labels?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 39",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-099",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 99",
+    "scenario": "During a chaotic arrest, a suspect grabs an officer\u2019s holstered firearm and yanks hard. Another officer intervenes and the suspect is controlled. The suspect later claims, \u201cNo harm, no foul.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-099-q1",
+        "prompt": "Attempting to remove a firearm from a public officer is an LD 39 objective category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-099-q2",
+        "prompt": "Is rapid escalation to protect the weapon generally reasonable for officer safety?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-099-q3",
+        "prompt": "Because no one was injured, there is no crime to investigate.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-099-q4",
+        "prompt": "Should officers document the attempt and ensure medical assessment if needed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 39",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  },
+  {
+    "id": "tmas2-scenario-100",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 100",
+    "scenario": "At a large street event, officers declare an unlawful assembly and issue a clear, repeated order to disperse. Several people leave, but one person refuses and stays in the roadway, yelling at officers and encouraging others to remain too. Officers maintain distance and give additional warnings.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-100-q1",
+        "prompt": "Refusal to disperse after a lawful order is an LD 39 objective category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-100-q2",
+        "prompt": "Must the order be lawfully given and reasonably communicated to support enforcement?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-100-q3",
+        "prompt": "De-escalation and scene management can reduce risk in crowd events when feasible.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-100-q4",
+        "prompt": "Should officers document the dispersal order, warnings, and the person\u2019s refusal behavior?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 39",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 39",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf"
+  }
+]
