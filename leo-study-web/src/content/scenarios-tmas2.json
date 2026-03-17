@@ -148,6 +148,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-003-q5",
+        "prompt": "Officers should understand the relationship among constitutional, statutory, and case law.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-003-q6",
+        "prompt": "Can case law affect how statutes are interpreted and applied?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-003-q7",
+        "prompt": "A newer local ordinance automatically overrides state law in a conflict.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-003-q8",
+        "prompt": "Should officers verify controlling authority before enforcement if conflicts are suspected?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -156,7 +192,7 @@
     "tags": [
       "LD 05"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-004",
@@ -256,15 +292,53 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-005-q5",
+        "prompt": "Criminal and civil law are distinct, and some disputes are civil rather than criminal.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-005-q6",
+        "prompt": "Should an officer analyze whether crime elements are present before taking enforcement action?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-005-q7",
+        "prompt": "Owing money in a dispute automatically proves theft.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-005-q8",
+        "prompt": "If no crime is established, is documenting both parties\u2019 information still appropriate?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 05"
+      "LD 05",
+      "LD 15"
     ],
     "tags": [
-      "LD 05"
+      "LD 05",
+      "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-006",
@@ -309,6 +383,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-006-q5",
+        "prompt": "Criminal negligence involves a gross departure from ordinary care creating high risk of injury.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-006-q6",
+        "prompt": "Can some crimes be based on criminal negligence rather than intent to harm?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-006-q7",
+        "prompt": "Lack of intent always eliminates criminal liability.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-006-q8",
+        "prompt": "Is documenting the risk created and foreseeability important in negligence analysis?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -317,7 +427,7 @@
     "tags": [
       "LD 05"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-007",
@@ -362,6 +472,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-007-q5",
+        "prompt": "An accomplice can be a party to a crime even without touching the property.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-007-q6",
+        "prompt": "Does the officer need facts showing intentional assistance beyond mere presence?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-007-q7",
+        "prompt": "Being present at a crime scene always proves accomplice liability.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-007-q8",
+        "prompt": "Is \u201clookout\u201d behavior relevant circumstantial evidence of aiding?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -372,7 +518,7 @@
       "LD 05",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-008",
@@ -584,6 +730,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-011-q5",
+        "prompt": "Theft requires taking someone else\u2019s property with required unlawful intent.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-011-q6",
+        "prompt": "Can force used during taking/escape affect offense classification analysis?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-011-q7",
+        "prompt": "Force during escape can never change the nature of the crime.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-011-q8",
+        "prompt": "Should the officer document value, witness accounts, and any force/fear facts?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -594,7 +776,7 @@
       "LD 06",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-012",
@@ -639,6 +821,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-012-q5",
+        "prompt": "Defrauding an innkeeper involves obtaining services with intent to defraud.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-012-q6",
+        "prompt": "Are deceptive behaviors (fake info, avoiding staff) relevant to inferring intent?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-012-q7",
+        "prompt": "Any unpaid bill automatically proves intent to defraud.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-012-q8",
+        "prompt": "Should officers preserve records and obtain witness statements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -649,7 +867,7 @@
       "LD 06",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-013",
@@ -914,6 +1132,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-017-q5",
+        "prompt": "Searching a residence generally requires a warrant or recognized exception.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-017-q6",
+        "prompt": "Probable cause alone always authorizes immediate warrantless home entry.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-017-q7",
+        "prompt": "Should officers consider obtaining a warrant rather than forcing entry?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -924,7 +1169,7 @@
       "LD 06",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-018",
@@ -969,6 +1214,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-018-q5",
+        "prompt": "Are time, location, and actions relevant to proving criminal intent?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-018-q6",
+        "prompt": "Having tools alone, without suspicious conduct, always proves the intent element.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-018-q7",
+        "prompt": "If seized, must tools be handled as evidence with documentation and chain of custody?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -981,7 +1253,7 @@
       "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-019",
@@ -1026,6 +1298,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-019-q5",
+        "prompt": "Is intent to defraud a key element to establish?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-019-q6",
+        "prompt": "A mistake with no intent to defraud automatically equals forgery.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-019-q7",
+        "prompt": "Are bank records, statements, and timelines relevant for probable cause determination?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1038,7 +1337,7 @@
       "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-020",
@@ -1083,6 +1382,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-020-q5",
+        "prompt": "Willfully and maliciously setting a fire can satisfy arson\u2011related elements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-020-q6",
+        "prompt": "Should officers treat suspicious fires as potential crime scenes for evidence preservation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-020-q7",
+        "prompt": "Any accidental fire automatically equals arson.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-020-q8",
+        "prompt": "Are witness statements and physical indicators (fuel odor) relevant to probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1095,7 +1430,7 @@
       "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-021",
@@ -1140,6 +1475,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-021-q5",
+        "prompt": "Battery can include willful unlawful touching, even if injury is minor.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-021-q6",
+        "prompt": "Should officers document injuries and statements even in \u201cminor\u201d cases?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-021-q7",
+        "prompt": "Assault requires actual contact.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-021-q8",
+        "prompt": "Are witness statements and photographs relevant evidence?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1150,7 +1521,7 @@
       "LD 07",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-022",
@@ -1195,6 +1566,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-022-q5",
+        "prompt": "Assault can be committed without physical contact.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-022-q6",
+        "prompt": "Can a bottle be treated as a deadly weapon depending on how it\u2019s used? 9",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-022-q7",
+        "prompt": "Injury is required to prove assault.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-022-q8",
+        "prompt": "Should the officer document distance, present ability, and victim fear?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1205,7 +1612,7 @@
       "LD 07",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-023",
@@ -1250,6 +1657,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-023-q5",
+        "prompt": "Elder/dependent adult abuse may involve unjustifiable physical pain or mental suffering.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-023-q6",
+        "prompt": "Is the care relationship relevant to the investigation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-023-q7",
+        "prompt": "Without visible injury, the event cannot be investigated as abuse.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-023-q8",
+        "prompt": "Should officers consider safety planning and referrals as part of response?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1260,7 +1703,7 @@
       "LD 07",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-024",
@@ -1305,6 +1748,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-024-q5",
+        "prompt": "Time, distance, and cover can assist de\u2011escalation when feasible.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-024-q6",
+        "prompt": "Is a metal pipe capable of causing serious bodily injury depending on use?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-024-q7",
+        "prompt": "Officers should ignore public safety and focus only on arresting immediately.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-024-q8",
+        "prompt": "Should officers reassess tactics as threat and compliance change?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1315,7 +1794,7 @@
       "LD 07",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-025",
@@ -1360,6 +1839,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-025-q5",
+        "prompt": "Taking a vehicle by force or fear can satisfy carjacking elements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-025-q6",
+        "prompt": "Are coordinated commands and safe positioning appropriate during high\u2011risk stops?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-025-q7",
+        "prompt": "Deadly force is justified solely to prevent escape when the suspect is compliant and not threatening.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-025-q8",
+        "prompt": "If officers interrogate the suspect in custody, is Miranda required?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1372,7 +1887,7 @@
       "LD 15",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-026",
@@ -1417,6 +1932,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-026-q5",
+        "prompt": "Is force or fear required for robbery?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-026-q6",
+        "prompt": "Pickpocket theft with no force or fear is robbery.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-026-q7",
+        "prompt": "Should officers document force/fear facts to classify the offense correctly?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1429,7 +1971,7 @@
       "LD 15",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-027",
@@ -1586,6 +2128,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-029-q5",
+        "prompt": "Scene security and evidence preservation are key initial homicide response priorities.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-029-q6",
+        "prompt": "Should officers identify and separate witnesses early to reduce statement contamination?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-029-q7",
+        "prompt": "Anyone may handle potential evidence to help officers \u201cfigure it out.\u201d",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-029-q8",
+        "prompt": "Is documenting timelines and evidence locations important?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1596,7 +2174,7 @@
       "LD 07",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-030",
@@ -1698,6 +2276,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-031-q5",
+        "prompt": "Public intoxication requires more than alcohol odor; it involves safety/self\u2011care impairment.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-031-q6",
+        "prompt": "Should officers document safety risk and impairment observations to establish probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-031-q7",
+        "prompt": "Alcohol odor alone always proves public intoxication.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-031-q8",
+        "prompt": "Should officers consider medical evaluation or protective care if safety is threatened?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1708,7 +2322,7 @@
       "LD 08",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-032",
@@ -1808,6 +2422,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-033-q5",
+        "prompt": "Offering or agreeing to sexual conduct for compensation can satisfy solicitation elements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-033-q6",
+        "prompt": "Is completion of the act required to establish solicitation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-033-q7",
+        "prompt": "Clothing style alone proves prostitution\u2011related offenses.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-033-q8",
+        "prompt": "Are observed negotiations and statements relevant evidence?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1818,7 +2468,7 @@
       "LD 08",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-034",
@@ -1863,6 +2513,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-034-q5",
+        "prompt": "Recording where privacy is reasonably expected can be an invasion\u2011of\u2011privacy offense.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-034-q6",
+        "prompt": "Is expectation of privacy a key factor to document for probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-034-q7",
+        "prompt": "Officers should view all footage immediately as standard practice.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-034-q8",
+        "prompt": "Should officers preserve the device and avoid unnecessary viewing to protect victims and evidence integrity?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1873,7 +2559,7 @@
       "LD 08",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-035",
@@ -1918,6 +2604,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-035-q5",
+        "prompt": "Some loitering offenses require evidence of unlawful intent based on conduct and circumstances.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-035-q6",
+        "prompt": "Should officers document repeated conduct and statements to establish intent?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-035-q7",
+        "prompt": "Standing near a restroom briefly always establishes the offense.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-035-q8",
+        "prompt": "Are witness accounts useful for establishing intent\u2011based elements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1928,7 +2650,7 @@
       "LD 08",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-036",
@@ -1973,6 +2695,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-036-q5",
+        "prompt": "Obstruction of a public way can be an offense when willful and documented.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-036-q6",
+        "prompt": "Is a clear order and refusal relevant to proving willfulness?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-036-q7",
+        "prompt": "De\u2011escalation through communication and scene management can reduce risk in crowd situations.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-036-q8",
+        "prompt": "Should officers document warnings, refusals, and safety decisions?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -1985,7 +2743,7 @@
       "LD 15",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-037",
@@ -2030,6 +2788,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-037-q5",
+        "prompt": "Prowling/peeping offenses depend on specific conduct and circumstances beyond mere presence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-037-q6",
+        "prompt": "Should officers document time, suspect position, and line\u2011of\u2011sight?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-037-q7",
+        "prompt": "Are witness statements and officer observations important to probable cause?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2040,7 +2825,7 @@
       "LD 08",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-038",
@@ -2085,6 +2870,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-038-q5",
+        "prompt": "De\u2011escalation can reduce situational intensity and improve voluntary compliance.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-038-q6",
+        "prompt": "Is calm, professional communication a de\u2011escalation tool?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-038-q7",
+        "prompt": "Officers should escalate to force immediately in every argument regardless of threat level.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-038-q8",
+        "prompt": "Should officers reassess and reduce intensity as compliance improves?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2095,7 +2916,7 @@
       "LD 08",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-039",
@@ -2140,6 +2961,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-039-q5",
+        "prompt": "Public visibility is relevant when evaluating lewd\u2011conduct allegations.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-039-q6",
+        "prompt": "Should officers identify witnesses and document visibility from public areas?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-039-q7",
+        "prompt": "Conduct in a completely private area with no public exposure always meets public lewd\u2011conduct elements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-039-q8",
+        "prompt": "Should officers manage the scene professionally and use de\u2011escalation if crowds gather?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2152,7 +3009,7 @@
       "LD 15",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-040",
@@ -2197,6 +3054,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-040-q5",
+        "prompt": "Phone content searches generally require legal authority such as consent or a warrant.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-040-q6",
+        "prompt": "May officers seize a phone as evidence while seeking proper legal authority to search contents?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-040-q7",
+        "prompt": "Seizing the phone automatically authorizes browsing all stored data.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-040-q8",
+        "prompt": "If no exception applies, should officers seek a warrant rather than searching immediately?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2207,7 +3100,7 @@
       "LD 08",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-041",
@@ -2252,6 +3145,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-041-q5",
+        "prompt": "Child endangerment analysis focuses on unsafe conditions likely to cause harm.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-041-q6",
+        "prompt": "Is child safety the primary immediate priority for responding officers?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-041-q7",
+        "prompt": "If the child is uninjured, there is never a crime to investigate.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-041-q8",
+        "prompt": "Should officers document environment hazards and supervision facts?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2260,7 +3189,7 @@
     "tags": [
       "LD 09"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-042",
@@ -2305,15 +3234,53 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-042-q5",
+        "prompt": "Some occupations are mandated reporters of suspected child abuse, and failure to report can be a crime.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-042-q6",
+        "prompt": "Must officers recognize law enforcement reporting requirements and documentation duties in these cases?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-042-q7",
+        "prompt": "Officers should disclose the reporter\u2019s identity to the suspect to \u201ckeep the peace.\u201d",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-042-q8",
+        "prompt": "Should officers photograph/document injuries and obtain statements using appropriate methods?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 09"
+      "LD 09",
+      "LD 15"
     ],
     "tags": [
-      "LD 09"
+      "LD 09",
+      "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-043",
@@ -2468,6 +3435,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-045-q5",
+        "prompt": "Officers may enter without a warrant when they reasonably believe a minor is in immediate danger.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-045-q6",
+        "prompt": "Must exigency be based on objective, articulable facts?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-045-q7",
+        "prompt": "Warrantless entry is justified anytime someone feels \u201csomething might be wrong\u201d without indicators.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-045-q8",
+        "prompt": "After entry for protection, should any search be limited to the protective purpose unless other authority exists?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2478,7 +3481,7 @@
       "LD 09",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-046",
@@ -2523,6 +3526,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-046-q5",
+        "prompt": "Evidence handling in suspected child exploitation imagery cases must be careful and controlled.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-046-q6",
+        "prompt": "Should officers avoid unnecessary viewing/copying and preserve chain of custody?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-046-q7",
+        "prompt": "Forwarding suspected illegal images to a personal email is acceptable evidence practice.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-046-q8",
+        "prompt": "Should officers seek proper legal process for any deeper digital search?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2533,7 +3572,7 @@
       "LD 09",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-047",
@@ -2578,6 +3617,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-047-q5",
+        "prompt": "Child interviews should use age\u2011appropriate, non\u2011leading questions.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-047-q6",
+        "prompt": "When feasible, is reducing adult influence often important for interview integrity?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-047-q7",
+        "prompt": "Promising a child a guaranteed outcome is appropriate interview technique.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-047-q8",
+        "prompt": "If officers seek additional evidence inside the home beyond voluntary cooperation, should they consider warrant/exception limits?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2590,7 +3665,7 @@
       "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-048",
@@ -2635,6 +3710,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-048-q5",
+        "prompt": "Officers have responsibilities to maintain confidentiality of reporting parties in mandated reporting contexts.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-048-q6",
+        "prompt": "Should officers avoid disclosing the reporting party\u2019s identity when confidentiality applies?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-048-q7",
+        "prompt": "Disclosing the reporter\u2019s identity to calm the suspect is always appropriate.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-048-q8",
+        "prompt": "Should officers document the confidentiality concern and required reporting steps?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2647,7 +3758,7 @@
       "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-049",
@@ -2749,17 +3860,55 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-050-q5",
+        "prompt": "Threats tied to reporting can raise additional investigative and safety concerns.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-050-q6",
+        "prompt": "Should officers document exact statements, context, and any witnesses?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-050-q7",
+        "prompt": "Threats against a reporting party are irrelevant if no physical contact occurs.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-050-q8",
+        "prompt": "Should officers consider additional criminal violations and safety planning?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
       "LD 09",
-      "LD 15"
+      "LD 15",
+      "LD 39"
     ],
     "tags": [
       "LD 09",
-      "LD 15"
+      "LD 15",
+      "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-051",
@@ -2804,6 +3953,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-051-q5",
+        "prompt": "Sex\u2011crime investigations require probable cause development and correct crime classification.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-051-q6",
+        "prompt": "Should officers provide victim\u2011centered options and facilitate medical attention if requested or needed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-051-q7",
+        "prompt": "Should officers document timeline, safety concerns, and the victim\u2019s condition as observed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2812,7 +3988,7 @@
     "tags": [
       "LD 10"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-052",
@@ -2857,6 +4033,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-052-q5",
+        "prompt": "Non\u2011consensual touching of an intimate part for a sexual purpose can meet sexual battery\u2011type elements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-052-q6",
+        "prompt": "Is a respectful, private, victim\u2011centered approach appropriate during initial reporting?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-052-q7",
+        "prompt": "Should officers identify witnesses and preserve available footage when possible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2865,7 +4068,7 @@
     "tags": [
       "LD 10"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-053",
@@ -2910,6 +4113,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-053-q5",
+        "prompt": "Miranda applies to custodial interrogation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-053-q6",
+        "prompt": "If the suspect is in custody and asked questions likely to elicit incriminating answers, must Miranda be considered?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-053-q7",
+        "prompt": "Custody alone triggers Miranda, even with no interrogation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-053-q8",
+        "prompt": "If the suspect invokes the right to counsel, must questioning stop?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2920,7 +4159,7 @@
       "LD 10",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-054",
@@ -2965,6 +4204,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-054-q5",
+        "prompt": "Visibility and intent are key facts in indecent exposure allegations.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-054-q6",
+        "prompt": "Should officers document location, visibility, and witness observations?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-054-q7",
+        "prompt": "Are witness statements relevant to probable cause for public\u2011order sexual offenses?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -2975,7 +4241,7 @@
       "LD 10",
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-055",
@@ -3020,6 +4286,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-055-q5",
+        "prompt": "Should officers document what was shown, by whom, and when (integrity/chain considerations)?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-055-q6",
+        "prompt": "Because the victim showed messages, officers may search the suspect\u2019s phone without authority.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-055-q7",
+        "prompt": "If investigators need to search a suspect device, should they consider a warrant or valid exception?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -3030,7 +4323,7 @@
       "LD 10",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-056",
@@ -3075,6 +4368,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-056-q5",
+        "prompt": "Evidence collection should reduce contamination and preserve chain of custody.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-056-q6",
+        "prompt": "Should officers explain evidence handling in a trauma\u2011informed way?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-056-q7",
+        "prompt": "Washing evidence items before collection is generally recommended.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-056-q8",
+        "prompt": "Should officers package and document items appropriately?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -3085,7 +4414,7 @@
       "LD 10",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-057",
@@ -3130,6 +4459,24 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-057-q5",
+        "prompt": "If consent is withdrawn, must officers stop searching unless another legal basis exists?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-057-q6",
+        "prompt": "Refusal to consent automatically gives officers authority to search.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
       }
     ],
     "keyPoints": [
@@ -3142,7 +4489,7 @@
       "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-058",
@@ -3187,19 +4534,48 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-058-q5",
+        "prompt": "Separation and scene control can support victim safety and investigation integrity. 16",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-058-q6",
+        "prompt": "Are time/distance and controlled communication appropriate de\u2011escalation tactics when feasible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-058-q7",
+        "prompt": "Must any detention of the suspect be supported by articulable facts?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
       "LD 10",
       "LD 15",
-      "LD 16"
+      "LD 16",
+      "LD 20"
     ],
     "tags": [
       "LD 10",
       "LD 15",
-      "LD 16"
+      "LD 16",
+      "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-059",
@@ -3244,6 +4620,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-059-q5",
+        "prompt": "Officer interaction can influence the quality of information a victim is willing to provide.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-059-q6",
+        "prompt": "Should officers assess comfort and secure medical attention if requested/needed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-059-q7",
+        "prompt": "Officers should ignore distress signs and continue aggressively.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-059-q8",
+        "prompt": "Can de\u2011escalation and calm communication reduce trauma and improve cooperation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -3256,7 +4668,7 @@
       "LD 15",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-060",
@@ -3301,17 +4713,57 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-060-q5",
+        "prompt": "Penal Code section 290 is designed to let law enforcement track the whereabouts of known sex offenders.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-060-q6",
+        "prompt": "Can failure to comply with registration/update requirements be a criminal violation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-060-q7",
+        "prompt": "Registration updates are optional if the registrant claims they did not know.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-060-q8",
+        "prompt": "Should the officer document timelines and confirm requirements through official records?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
       "LD 10",
-      "LD 16"
+      "LD 15",
+      "LD 16",
+      "LD 39"
     ],
     "tags": [
       "LD 10",
-      "LD 16"
+      "LD 15",
+      "LD 16",
+      "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-061",
@@ -3356,6 +4808,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-061-q5",
+        "prompt": "In a consensual encounter, a reasonable person is free to leave.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-061-q6",
+        "prompt": "May officers ask questions without reasonable suspicion during a consensual encounter?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-061-q7",
+        "prompt": "Ordering the person to stay can convert the contact into a detention.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-061-q8",
+        "prompt": "If it becomes a detention, is reasonable suspicion required?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -3364,7 +4852,7 @@
     "tags": [
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-062",
@@ -3409,6 +4897,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-062-q5",
+        "prompt": "A detention should last no longer than reasonably necessary for its purpose.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-062-q6",
+        "prompt": "May an officer prolong a detention without new facts just to look for more evidence?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-062-q7",
+        "prompt": "Detention scope must be reasonably related to the circumstances justifying the stop.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-062-q8",
+        "prompt": "If suspicion is dispelled, should the detention end?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -3417,7 +4941,7 @@
     "tags": [
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-063",
@@ -3462,6 +4986,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-063-q5",
+        "prompt": "Probable cause requires objective facts supporting belief the suspect committed the crime.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-063-q6",
+        "prompt": "Can witness statements and observed injuries contribute to probable cause? 17",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-063-q7",
+        "prompt": "A hunch with no facts is probable cause.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-063-q8",
+        "prompt": "Should officers be able to articulate probable cause facts in reports?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -3470,7 +5030,7 @@
     "tags": [
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-064",
@@ -3568,6 +5128,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-065-q5",
+        "prompt": "Miranda warnings are required before custodial interrogation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-065-q6",
+        "prompt": "Is a handcuffed suspect in a patrol car generally considered \u201cin custody\u201d for Miranda analysis?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-065-q7",
+        "prompt": "Miranda is required in every officer conversation, including casual greetings.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-065-q8",
+        "prompt": "If the suspect invokes the right to remain silent, should questioning stop?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -3576,7 +5172,7 @@
     "tags": [
       "LD 15"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-066",
@@ -3676,6 +5272,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-067-q5",
+        "prompt": "Detention search authority is limited and must be legally justified.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-067-q6",
+        "prompt": "Without consent or another legal basis, may officers open a backpack during a detention?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-067-q7",
+        "prompt": "A frisk is for weapons; it does not automatically authorize searching containers.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-067-q8",
+        "prompt": "If facts later create probable cause, should officers pursue lawful authority before searching?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -3686,7 +5318,7 @@
       "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-068",
@@ -3731,6 +5363,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-068-q5",
+        "prompt": "Should the officer document the specific safety facts justifying restraints?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-068-q6",
+        "prompt": "Any handcuffing automatically makes every detention an arrest in all circumstances.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-068-q7",
+        "prompt": "Should officers reassess and reduce restraints when safety risk decreases?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -3741,7 +5400,7 @@
       "LD 15",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-069",
@@ -3896,15 +5555,44 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-071-q5",
+        "prompt": "Must warrants describe the place to search and items to seize with particularity?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-071-q6",
+        "prompt": "A warrant for one residence automatically authorizes searching unrelated residences nearby.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-071-q7",
+        "prompt": "Should officers follow time limits and execution rules such as knock\u2011and\u2011notice unless an exception applies?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
+      "LD 15",
       "LD 16"
     ],
     "tags": [
+      "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-072",
@@ -3949,15 +5637,53 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-072-q5",
+        "prompt": "Under certain conditions, officers may secure an area pending issuance of a warrant.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-072-q6",
+        "prompt": "Must the securing be reasonable in scope and duration?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-072-q7",
+        "prompt": "Officers may hold and search the home indefinitely without legal justification.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-072-q8",
+        "prompt": "Should officers document why securing the area was necessary?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
+      "LD 15",
       "LD 16"
     ],
     "tags": [
+      "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-073",
@@ -4002,15 +5728,44 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-073-q5",
+        "prompt": "Plain view seizure does not constitute a search when legal requirements are met.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-073-q6",
+        "prompt": "Officers may move objects to create plain view without authority.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-073-q7",
+        "prompt": "Is documenting how the item was seen important for admissibility?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
+      "LD 15",
       "LD 16"
     ],
     "tags": [
+      "LD 15",
       "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-074",
@@ -4055,17 +5810,35 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-074-q5",
+        "prompt": "If consent is withdrawn, must the search stop unless another legal basis exists? 19",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-074-q6",
+        "prompt": "Consenting once means the person can never withdraw.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
       }
     ],
     "keyPoints": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
     "tags": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-075",
@@ -4110,17 +5883,53 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-075-q5",
+        "prompt": "A frisk is a limited search for weapons when the person may be armed and dangerous.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-075-q6",
+        "prompt": "Must officers articulate specific facts supporting the frisk?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-075-q7",
+        "prompt": "A frisk is intended to search for general evidence rather than weapons.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-075-q8",
+        "prompt": "If an object is reasonably believed to be a weapon, may the officer secure it?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
     "tags": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-076",
@@ -4165,17 +5974,53 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-076-q5",
+        "prompt": "Search incident to lawful custodial arrest permits searching the arrestee\u2019s person.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-076-q6",
+        "prompt": "Can the search occur without a separate warrant for the person?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-076-q7",
+        "prompt": "Search incident to arrest automatically authorizes searching an entire home.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-076-q8",
+        "prompt": "Should the officer document the search and items found?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
     "tags": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-077",
@@ -4220,19 +6065,46 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-077-q5",
+        "prompt": "Any force used to prevent swallowing evidence must be objectively reasonable and consider health risks.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-077-q6",
+        "prompt": "Any force is automatically justified whenever evidence might be swallowed.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-077-q7",
+        "prompt": "Should officers document why immediate action was necessary?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 16",
       "LD 15",
+      "LD 16",
       "LD 20"
     ],
     "tags": [
-      "LD 16",
       "LD 15",
+      "LD 16",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-078",
@@ -4277,19 +6149,55 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-078-q5",
+        "prompt": "Vehicle inventories must follow standardized policy to be lawful administrative procedures.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-078-q6",
+        "prompt": "Is inventory intended to protect property and reduce claims rather than search for evidence?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-078-q7",
+        "prompt": "Inventories are lawful even if policy is ignored and the goal is evidence hunting.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-078-q8",
+        "prompt": "Should officers document why towing occurred and what was inventoried?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 16",
       "LD 15",
+      "LD 16",
       "LD 20"
     ],
     "tags": [
-      "LD 16",
       "LD 15",
+      "LD 16",
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-079",
@@ -4334,17 +6242,35 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-079-q5",
+        "prompt": "Blood draws are bodily intrusions requiring legal authority.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-079-q6",
+        "prompt": "Officers may force a blood draw without any legal authority if it might help the case.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
       }
     ],
     "keyPoints": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
     "tags": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-080",
@@ -4389,17 +6315,53 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-080-q5",
+        "prompt": "Identification procedures must avoid impermissible suggestiveness.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-080-q6",
+        "prompt": "Should administering officers maintain a neutral role during identification procedures?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-080-q7",
+        "prompt": "Pressuring a witness to choose is acceptable.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-080-q8",
+        "prompt": "Is documentation of procedure and witness statements important?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
     "tags": [
-      "LD 16",
-      "LD 15"
+      "LD 15",
+      "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-081",
@@ -4444,6 +6406,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-081-q5",
+        "prompt": "Officers may use objectively reasonable force to overcome resistance and prevent escape.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-081-q6",
+        "prompt": "Should force be proportionate to the threat and resistance known at the time?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-081-q7",
+        "prompt": "After force, should officers monitor for injury and provide/obtain medical aid when needed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -4452,7 +6441,7 @@
     "tags": [
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-082",
@@ -4497,6 +6486,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-082-q5",
+        "prompt": "De\u2011escalation aims to decrease intensity and improve decision-making.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-082-q6",
+        "prompt": "Can time/distance/cover and strategic communication support de\u2011escalation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-082-q7",
+        "prompt": "Officers must rush in immediately even when time and distance can increase safety.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-082-q8",
+        "prompt": "Should officers continuously reassess and adjust tactics?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -4505,7 +6530,7 @@
     "tags": [
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-083",
@@ -4550,6 +6575,33 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-083-q5",
+        "prompt": "After force, officers must monitor the person and respond to medical needs when indicated.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-083-q6",
+        "prompt": "Once handcuffed, officers no longer need to monitor condition.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-083-q7",
+        "prompt": "Should officers document the force chronology and key facts?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -4558,7 +6610,7 @@
     "tags": [
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-084",
@@ -4603,6 +6655,24 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-084-q5",
+        "prompt": "Scene assessment includes considering bystanders and foreseeable risks.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-084-q6",
+        "prompt": "When feasible, should officers give clear warnings and commands before deploying force tools?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -4611,7 +6681,7 @@
     "tags": [
       "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-085",
@@ -4656,17 +6726,44 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-085-q5",
+        "prompt": "Deadly force can be objectively reasonable when there is an imminent threat of death or serious injury.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-085-q6",
+        "prompt": "Is deadly force evaluated under an objective reasonableness standard based on facts known at 21 the time?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-085-q7",
+        "prompt": "Should officers render/arrange medical aid when safe after force is used?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 20",
-      "LD 15"
+      "LD 15",
+      "LD 20"
     ],
     "tags": [
-      "LD 20",
-      "LD 15"
+      "LD 15",
+      "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-086",
@@ -4711,17 +6808,44 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-086-q5",
+        "prompt": "Failure to intervene in unreasonable force can have serious consequences.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-086-q6",
+        "prompt": "Should officers intervene when safe and feasible if force is inappropriate or unlawful?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-086-q7",
+        "prompt": "Should the incident be documented and reported through proper channels?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 20",
-      "LD 15"
+      "LD 15",
+      "LD 20"
     ],
     "tags": [
-      "LD 20",
-      "LD 15"
+      "LD 15",
+      "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-087",
@@ -4766,17 +6890,44 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-087-q5",
+        "prompt": "Force must remain objectively reasonable compared to resistance and circumstances.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-087-q6",
+        "prompt": "Should officers reassess and reduce force when resistance stops?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-087-q7",
+        "prompt": "Should officers document reassessment and why force changed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 20",
-      "LD 15"
+      "LD 15",
+      "LD 20"
     ],
     "tags": [
-      "LD 20",
-      "LD 15"
+      "LD 15",
+      "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-088",
@@ -4821,17 +6972,44 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-088-q5",
+        "prompt": "Effective communication can improve outcomes and reduce intensity.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-088-q6",
+        "prompt": "Is calm, respectful communication part of de\u2011escalation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-088-q7",
+        "prompt": "Should officers document behaviors and actions taken to reduce conflict?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 20",
-      "LD 15"
+      "LD 15",
+      "LD 20"
     ],
     "tags": [
-      "LD 20",
-      "LD 15"
+      "LD 15",
+      "LD 20"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-089",
@@ -4876,6 +7054,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-089-q5",
+        "prompt": "Attempting to remove an officer\u2019s firearm is a serious safety threat and criminal conduct category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-089-q6",
+        "prompt": "Is rapid escalation to protect the weapon generally reasonable due to the imminent danger?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-089-q7",
+        "prompt": "Attempting to remove an officer\u2019s firearm is equivalent to a minor refusal to comply.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-089-q8",
+        "prompt": "Should officers preserve evidence and document the attempt thoroughly?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -4886,7 +7100,7 @@
       "LD 20",
       "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-090",
@@ -4931,19 +7145,55 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-090-q5",
+        "prompt": "Scene assessment and management support safety and can aid de\u2011escalation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-090-q6",
+        "prompt": "Can threatening or obstructing officers be criminal conduct depending on facts?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-090-q7",
+        "prompt": "Physical interference must be ignored as \u201cjust speech.\u201d",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-090-q8",
+        "prompt": "Should officers document commands, threats, and interference actions?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 20",
       "LD 15",
+      "LD 20",
       "LD 39"
     ],
     "tags": [
-      "LD 20",
       "LD 15",
+      "LD 20",
       "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-091",
@@ -5041,15 +7291,53 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-092-q5",
+        "prompt": "Violating a court order is a crimes\u2011against\u2011justice\u2011system category in LD 39.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-092-q6",
+        "prompt": "Is confirming the order terms and knowledge/service relevant to the investigation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-092-q7",
+        "prompt": "If the protected party responds once, the violation automatically disappears regardless of order terms.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-092-q8",
+        "prompt": "Should officers preserve the messages and document timelines?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
+      "LD 15",
       "LD 39"
     ],
     "tags": [
+      "LD 15",
       "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-093",
@@ -5094,15 +7382,44 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-093-q5",
+        "prompt": "Escaping or attempting to escape from peace officer custody is a category of offense in LD 39.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-093-q6",
+        "prompt": "Running away during a consensual encounter is the same as escaping custody.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-093-q7",
+        "prompt": "Should officers document custody status, restraints, and the timeline of flight?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
+      "LD 15",
       "LD 39"
     ],
     "tags": [
+      "LD 15",
       "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-094",
@@ -5147,6 +7464,42 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-094-q5",
+        "prompt": "Knowingly making a false report of an emergency can be a criminal offense category in LD 39.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-094-q6",
+        "prompt": "Is intent/knowledge that the report was false relevant to proving the crime?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-094-q7",
+        "prompt": "Exaggerating or fabricating facts to get faster police response can never be a crime.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-094-q8",
+        "prompt": "Should officers document admissions and dispatch logs?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
@@ -5155,7 +7508,7 @@
     "tags": [
       "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-095",
@@ -5200,17 +7553,44 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-095-q5",
+        "prompt": "Willfully resisting, delaying, or obstructing an officer can be a criminal offense category.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-095-q6",
+        "prompt": "Must the officer be acting lawfully for obstruction elements to apply?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-095-q7",
+        "prompt": "Observing from a safe distance is always obstruction.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
       }
     ],
     "keyPoints": [
-      "LD 39",
-      "LD 15"
+      "LD 15",
+      "LD 39"
     ],
     "tags": [
-      "LD 39",
-      "LD 15"
+      "LD 15",
+      "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-096",
@@ -5255,17 +7635,55 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-096-q5",
+        "prompt": "Threatening a public officer is a category of offense in LD 39.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-096-q6",
+        "prompt": "Should officers document exact words, demeanor, distance, and witnesses?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-096-q7",
+        "prompt": "Profanity alone without threats is always the same as threatening an officer.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-096-q8",
+        "prompt": "Are time/distance and scene management appropriate for de\u2011escalation when threats raise safety risk?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 39",
-      "LD 15"
+      "LD 15",
+      "LD 20",
+      "LD 39"
     ],
     "tags": [
-      "LD 39",
-      "LD 15"
+      "LD 15",
+      "LD 20",
+      "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-097",
@@ -5310,17 +7728,53 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-097-q5",
+        "prompt": "Providing a false identity to a peace officer is a category of offense in LD 39.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-097-q6",
+        "prompt": "Must the false identification be willful to support the offense?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-097-q7",
+        "prompt": "Any nickname is automatically criminal even if not intended to mislead.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-097-q8",
+        "prompt": "Should officers document how identity was verified and the false information given?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 39",
-      "LD 15"
+      "LD 15",
+      "LD 39"
     ],
     "tags": [
-      "LD 39",
-      "LD 15"
+      "LD 15",
+      "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-098",
@@ -5365,17 +7819,53 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-098-q5",
+        "prompt": "Attempting to rescue or rescuing a person from lawful custody is a criminal category in LD 39.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-098-q6",
+        "prompt": "Is lawful custody status a key fact to establish for rescue/escape related offenses?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-098-q7",
+        "prompt": "Any crowd near police is automatically unlawful assembly.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-098-q8",
+        "prompt": "Should officers document the physical acts (pulling, pushing, commands, refusals) rather than general labels?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
-      "LD 39",
-      "LD 15"
+      "LD 15",
+      "LD 39"
     ],
     "tags": [
-      "LD 39",
-      "LD 15"
+      "LD 15",
+      "LD 39"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   },
   {
     "id": "tmas2-scenario-099",
@@ -5477,18 +7967,1300 @@
           "No"
         ],
         "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-100-q5",
+        "prompt": "Refusal to disperse after a lawful order is a public\u2011disturbance category in LD 39.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-100-q6",
+        "prompt": "Must the dispersal order be lawfully given and reasonably communicated to support enforcement?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-100-q7",
+        "prompt": "Anyone recording from a safe distance is automatically guilty of refusal to disperse.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-100-q8",
+        "prompt": "Should officers document warnings, opportunities to comply, and refusal behavior?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-100-q9",
+        "prompt": "Scene management and communication can support safer outcomes in crowd disturbance events.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-100-q10",
+        "prompt": "Can refusal to disperse be enforceable when the order is lawful and clearly communicated?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-100-q11",
+        "prompt": "Officers should escalate to force immediately even when safe de\u2011escalation is working.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-100-q12",
+        "prompt": "Should officers document the dispersal order, warnings, and the person\u2019s refusal actions?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 20",
+      "LD 39"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 20",
+      "LD 39"
+    ],
+    "sourceUrl": "TMAS 2  (1).pdf | TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-101",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 101",
+    "scenario": "An officer stops to talk with a person who admits they \u201cplanned to steal\u201d a bicycle and cut the lock, but the bicycle was still secured when police arrived. The person says, \u201cI didn\u2019t actually take it, so it\u2019s not a crime.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-101-q1",
+        "prompt": "Cutting the lock with intent to steal can satisfy attempt elements even if the theft was not completed.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-101-q2",
+        "prompt": "Does attempt require intent to commit the target offense?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-101-q3",
+        "prompt": "Planning at home with no overt act is enough to prove attempt.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-101-q4",
+        "prompt": "Should the officer document facts showing intent and a direct act beyond preparation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05"
+    ],
+    "tags": [
+      "LD 05"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-102",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 102",
+    "scenario": "At baggage claim, a traveler takes a suitcase they mistakenly believed was theirs and returns it as soon as they notice the name tag is different. Airport staff confirm the bags look identical.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-102-q1",
+        "prompt": "Mistake of fact can negate required criminal intent for some crimes.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-102-q2",
+        "prompt": "Is intent generally a basic element common to many crimes?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-102-q3",
+        "prompt": "Taking property by mistake always proves theft.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-102-q4",
+        "prompt": "Is the person\u2019s immediate return behavior relevant when evaluating intent?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05"
+    ],
+    "tags": [
+      "LD 05"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-103",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 103",
+    "scenario": "Two suspects commit a burglary; a third person later hides them and lies to police about their location. The third person says, \u201cI didn\u2019t commit the burglary.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-103-q1",
+        "prompt": "Different parties to a crime can include principals, accessories, and accomplices.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-103-q2",
+        "prompt": "Is helping after the fact (to avoid arrest) different from aiding during the crime?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-103-q3",
+        "prompt": "Someone who helps after a felony can never be criminally liable.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-103-q4",
+        "prompt": "Should officers document how and when assistance occurred to classify involvement?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05"
+    ],
+    "tags": [
+      "LD 05"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-104",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 104",
+    "scenario": "An officer speaks with a person who wants to leave during questioning; the officer has no specific facts and says, \u201cYou have to stay.\u201d The person asks, \u201cAm I detained?\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-104-q1",
+        "prompt": "A consensual encounter means a reasonable person would feel free to leave.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-104-q2",
+        "prompt": "If an officer orders a person to stay, can that elevate a contact into a detention?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-104-q3",
+        "prompt": "Detentions require no justification and can be based on curiosity alone.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-104-q4",
+        "prompt": "If elevated to a detention, is reasonable suspicion needed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 05",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-105",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 105",
+    "scenario": "Officers lawfully collect a tool left at the scene of an attempted theft and want to book it into evidence. The tool could link the suspect to the attempted crime.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-105-q1",
+        "prompt": "Evidence should be preserved with proper chain of custody.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-105-q2",
+        "prompt": "Is documenting where and how an item was found important for admissibility?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-105-q3",
+        "prompt": "Evidence handling is irrelevant if the suspect confessed.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-105-q4",
+        "prompt": "Should officers avoid unnecessary handling to reduce contamination risk?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 05",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-106",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 106",
+    "scenario": "A suspect tries to delete messages on a phone after being contacted by police. The officer considers whether they can scroll the phone immediately for evidence without consent.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-106-q1",
+        "prompt": "Attempting to destroy evidence can be relevant circumstantial evidence of consciousness of guilt.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-106-q2",
+        "prompt": "Do officers generally need legal authority (e.g., consent or warrant) to search phone contents?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-106-q3",
+        "prompt": "Seizing a phone automatically authorizes browsing all contents.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-106-q4",
+        "prompt": "If consent is refused and no exception applies, should officers consider a warrant?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 05",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 05",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-107",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 107",
+    "scenario": "A person enters an \u201cEmployees Only\u201d stockroom and is found stuffing merchandise into a backpack. The person says, \u201cThe store is open, so it can\u2019t be burglary.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-107-q1",
+        "prompt": "Burglary can occur without forced entry.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-107-q2",
+        "prompt": "Is intent at the time of entry a key burglary concept?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-107-q3",
+        "prompt": "Burglary requires the door to be locked.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-107-q4",
+        "prompt": "Are restricted\u2011area signs and conduct relevant to intent analysis?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06"
+    ],
+    "tags": [
+      "LD 06"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-108",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 108",
+    "scenario": "Officers locate a person with a high\u2011end camera that still has a security tag and a scratched serial number plate. The person cannot explain where it came from.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-108-q1",
+        "prompt": "Receiving stolen property focuses on knowledge that the property was stolen.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-108-q2",
+        "prompt": "Can altered serial numbers be circumstantial evidence of knowledge?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-108-q3",
+        "prompt": "A person must have personally stolen the item to be liable for receiving stolen property.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-108-q4",
+        "prompt": "Should the officer document the person\u2019s explanation and identifying facts about the property?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-109",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 109",
+    "scenario": "A school wall is spray\u2011painted overnight. Officers locate a person nearby with fresh paint on hands and matching cans. The person says, \u201cIt\u2019s public property, so it doesn\u2019t count.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-109-q1",
+        "prompt": "Maliciously defacing or damaging property can constitute vandalism.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-109-q2",
+        "prompt": "Is damage amount relevant to classification and reporting?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-109-q3",
+        "prompt": "Vandalism does not apply to public property.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-109-q4",
+        "prompt": "Should officers photograph damage and collect evidence when feasible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06"
+    ],
+    "tags": [
+      "LD 06"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-110",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 110",
+    "scenario": "A former employee enters a business after being told in writing not to return and refuses to leave when asked. The person says, \u201cI used to work here, so I can be here.\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-110-q1",
+        "prompt": "Remaining on property without permission after notice can be trespass.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-110-q2",
+        "prompt": "Is proof of notice/request to leave important to trespass elements?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-110-q3",
+        "prompt": "Trespass is always a felony.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-110-q4",
+        "prompt": "Should the officer document the notice, the refusal, and the requesting party\u2019s authority?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 06",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 06",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-111",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 111",
+    "scenario": "Officers hear screams inside a home and see signs suggesting someone may be badly injured. No one responds to knocks. Officers consider entry to address an immediate threat to life.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-111-q1",
+        "prompt": "Exigent circumstances can justify entry to address an immediate threat to life.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-111-q2",
+        "prompt": "Should the search after entry be limited to resolving the emergency unless additional authority exists?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-111-q3",
+        "prompt": "Officers may open drawers for unrelated evidence under the emergency entry alone.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-111-q4",
+        "prompt": "After emergency resolves, should investigators seek a warrant for further evidence searching?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-112",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 112",
+    "scenario": "Officers enter a home in hot pursuit of a felony suspect who ran inside. After arresting the suspect, officers want to search closed containers for stolen items.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-112-q1",
+        "prompt": "Hot pursuit can be an exigent circumstance supporting entry.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-112-q2",
+        "prompt": "After arrest, does searching closed containers generally require an additional legal basis?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-112-q3",
+        "prompt": "Entry under exigency automatically authorizes a full evidence search of the residence.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-112-q4",
+        "prompt": "Should officers document the continuous pursuit and scope limitations?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-113",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 113",
+    "scenario": "Officers respond to an infant death and caregivers are distraught. The scene is chaotic with many relatives. Officers must gather required information while remaining respectful and controlling the scene.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-113-q1",
+        "prompt": "Death investigations require initial actions, sources of information, and evidence considerations.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-113-q2",
+        "prompt": "Should officers communicate professionally and compassionately while performing required tasks?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-113-q3",
+        "prompt": "Because it\u2019s emotional, documentation is optional.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-113-q4",
+        "prompt": "Should officers control the scene to preserve evidence and reduce confusion?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 07",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 07",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-114",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 114",
+    "scenario": "A neighborhood reports a loud party for hours with yelling and music audible inside homes with windows closed. The host says it\u2019s a weekend and refuses to lower volume.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-114-q1",
+        "prompt": "Loud, unreasonable noise can be disturbing the peace depending on circumstances.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-114-q2",
+        "prompt": "Is any noise that annoys someone automatically disturbing the peace?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-114-q3",
+        "prompt": "Duration and impact on others are relevant to enforcement decisions.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-114-q4",
+        "prompt": "Should officers attempt voluntary compliance when feasible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 08"
+    ],
+    "tags": [
+      "LD 08"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-115",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 115",
+    "scenario": "A mandated reporter asks whether they can wait to report until they \u201cknow for sure.\u201d Officers explain the standard is suspicion, not certainty.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-115-q1",
+        "prompt": "The Penal Code mandates reporting requirements for certain professional categories.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-115-q2",
+        "prompt": "Can failure to report as required be a crime for mandated reporters?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-115-q3",
+        "prompt": "Mandated reporters should wait for proof beyond doubt before reporting.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-115-q4",
+        "prompt": "Should officers document the report and ensure required notifications are completed?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 15"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 15"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-116",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 116",
+    "scenario": "Officers respond where a caregiver is intoxicated and verbally aggressive while a child is crying nearby. Officers create distance, use calm communication, and request backup to safely separate the child from danger.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-116-q1",
+        "prompt": "Ensuring child safety is a primary responsibility in suspected abuse/neglect calls.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-116-q2",
+        "prompt": "Are time/distance/communication and backup appropriate de\u2011escalation tactics when feasible?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-116-q3",
+        "prompt": "Officers must leave if an adult refuses cooperation, even if the child is in immediate danger.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-116-q4",
+        "prompt": "If officers detain the adult, must they articulate legal facts supporting the detention?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-117",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 117",
+    "scenario": "A juvenile says they are afraid to go home due to abuse and becomes increasingly distressed during contact. Officers slow the interview, provide privacy, and request appropriate resources.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-117-q1",
+        "prompt": "Officer actions should prioritize child safety and effective preliminary investigation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-117-q2",
+        "prompt": "Can de\u2011escalation and calm communication support better outcomes in high\u2011emotion calls?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-117-q3",
+        "prompt": "Officers should ignore signs of distress to \u201cget the story faster.\u201d",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-117-q4",
+        "prompt": "Should officers document observed indicators and actions taken?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 09",
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 09",
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-118",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 118",
+    "scenario": "Officers seek to enter a dwelling to arrest a suspect. A roommate refuses consent and says the suspect is inside. Officers consider their authority.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-118-q1",
+        "prompt": "Entry into a dwelling to make an arrest is subject to specific legal requirements.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-118-q2",
+        "prompt": "If valid consent is not obtained and no exigency exists, should officers generally seek lawful authority such as a warrant?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-118-q3",
+        "prompt": "Officers may enter any home to arrest for a misdemeanor whenever they choose.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-118-q4",
+        "prompt": "Should officers document who gave (or refused) consent and why?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 16"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 16"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-119",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 119",
+    "scenario": "Officers respond to an emotionally intense call; calm communication reduces the subject\u2019s agitation and avoids force. A trainee asks, \u201cDoes that count as \u2018using de\u2011escalation\u2019?\u201d",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-119-q1",
+        "prompt": "De\u2011escalation is intended to decrease situational intensity and improve outcomes.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-119-q2",
+        "prompt": "Can communication and scene management be part of de\u2011escalation?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-119-q3",
+        "prompt": "De\u2011escalation is irrelevant because officers should always use force quickly.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-119-q4",
+        "prompt": "Should officers document key actions taken even when force is not used?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 20"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 20"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-120",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 120",
+    "scenario": "During a lawful detention, the person provides a false name and date of birth to avoid being linked to an outstanding warrant. Identity is later confirmed by records. 18",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-120-q1",
+        "prompt": "Providing false identity information to a peace officer can be a criminal offense.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-120-q2",
+        "prompt": "Must the false information be willful (intended to mislead) to support the offense?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-120-q3",
+        "prompt": "Any nickname is automatically a crime even without intent to mislead.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-120-q4",
+        "prompt": "Should officers document the false info and how identity was verified?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 39"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 39"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-121",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 121",
+    "scenario": "During a lawful arrest, a bystander threatens officers and tries to physically interfere. Officers maintain distance, call for backup, and control the scene.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-121-q1",
+        "prompt": "Scene assessment and management supports safety and can reduce escalation.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-121-q2",
+        "prompt": "Can willfully obstructing officers in lawful performance be criminal conduct?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      },
+      {
+        "id": "tmas2-scenario-121-q3",
+        "prompt": "Threats and physical interference must be ignored as \u201cjust speech.\u201d",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-121-q4",
+        "prompt": "Should officers document the threats, commands, and interference actions?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
+      }
+    ],
+    "keyPoints": [
+      "LD 15",
+      "LD 20",
+      "LD 39"
+    ],
+    "tags": [
+      "LD 15",
+      "LD 20",
+      "LD 39"
+    ],
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
+  },
+  {
+    "id": "tmas2-scenario-122",
+    "category": "scenario",
+    "tmasSet": "tmas2",
+    "title": "Scenario 122",
+    "scenario": "During a detention, officers see a person with a bag they believe may contain evidence, but the person refuses consent and there is no probable cause yet. Officers consider whether they can search the bag anyway.",
+    "questions": [],
+    "subQuestions": [
+      {
+        "id": "tmas2-scenario-122-q1",
+        "prompt": "Search authority must be based on legal requirements and scope limits.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "True"
+      },
+      {
+        "id": "tmas2-scenario-122-q2",
+        "prompt": "Without consent or another lawful basis, may officers search the bag?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "No"
+      },
+      {
+        "id": "tmas2-scenario-122-q3",
+        "prompt": "Refusal to consent automatically creates legal authority to search.",
+        "choices": [
+          "True",
+          "False"
+        ],
+        "expectedAnswer": "False"
+      },
+      {
+        "id": "tmas2-scenario-122-q4",
+        "prompt": "If officers develop probable cause, should they consider a warrant or valid exception before searching?",
+        "choices": [
+          "Yes",
+          "No"
+        ],
+        "expectedAnswer": "Yes"
       }
     ],
     "keyPoints": [
       "LD 39",
       "LD 15",
-      "LD 20"
+      "LD 16"
     ],
     "tags": [
       "LD 39",
       "LD 15",
-      "LD 20"
+      "LD 16"
     ],
-    "sourceUrl": "TMAS 2  (1).pdf"
+    "sourceUrl": "TMAS 2 TTS-to-LD Mapping and POST\u2011Style Scenario Bank.pdf"
   }
 ]
