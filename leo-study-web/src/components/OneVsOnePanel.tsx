@@ -155,6 +155,10 @@ type DuelProfileSnapshot = {
   nameStyle: NameStyle
   agency: string
   bio: string
+  currentActivity: {
+    label: string
+    updatedAt: string
+  } | null
   all: {
     wins: number
     losses: number
@@ -374,10 +378,21 @@ function emptyDuelProfileSnapshot(userId: string): DuelProfileSnapshot {
     nameStyle: { ...defaultNameStyle },
     agency: '',
     bio: '',
+    currentActivity: null,
     all: { wins: 0, losses: 0, matches: 0, currentStreak: 0, bestStreak: 0 },
     matching: { wins: 0, losses: 0, matches: 0 },
     quiz: { wins: 0, losses: 0, matches: 0 },
   }
+}
+
+function formatDuelProfileCurrentActivity(activity: DuelProfileSnapshot['currentActivity']) {
+  if (!activity?.label) return 'Unavailable'
+  const updatedAtMs = Date.parse(activity.updatedAt || '')
+  if (!Number.isFinite(updatedAtMs)) return activity.label
+  const elapsedMs = Math.max(0, Date.now() - updatedAtMs)
+  if (elapsedMs <= 90_000) return activity.label
+  if (elapsedMs <= 15 * 60 * 1000) return `Recently: ${activity.label}`
+  return 'Offline'
 }
 
 function duelLeaderboardCacheKey(userId: string, mode: DuelStatsMode) {
@@ -892,17 +907,32 @@ export function OneVsOnePanel(props: {
       return accumulator
     }, {})
 
-    const detailsMap = (Array.isArray(appStateRows) ? appStateRows : []).reduce<Record<string, { bio: string; agency: string; nameStyle: NameStyle }>>((accumulator, row) => {
+    const detailsMap = (Array.isArray(appStateRows) ? appStateRows : []).reduce<Record<string, {
+      bio: string
+      agency: string
+      nameStyle: NameStyle
+      currentActivity: DuelProfileSnapshot['currentActivity']
+    }>>((accumulator, row) => {
       const value = row as Record<string, unknown>
       const userId = String(value.user_id || '')
       if (!userId) return accumulator
       const details = value.profile_details && typeof value.profile_details === 'object'
         ? (value.profile_details as Record<string, unknown>)
         : {}
+      const rawCurrentActivity = details.currentActivity && typeof details.currentActivity === 'object'
+        ? (details.currentActivity as Record<string, unknown>)
+        : null
       accumulator[userId] = {
         bio: String(details.bio || '').trim(),
         agency: String(details.agency || '').trim(),
         nameStyle: sanitizeNameStyle(details.nameStyle),
+        currentActivity:
+          rawCurrentActivity && typeof rawCurrentActivity.label === 'string' && rawCurrentActivity.label.trim().length > 0
+            ? {
+              label: String(rawCurrentActivity.label || '').trim(),
+              updatedAt: String(rawCurrentActivity.updatedAt || ''),
+            }
+            : null,
       }
       return accumulator
     }, {})
@@ -923,6 +953,7 @@ export function OneVsOnePanel(props: {
         nameStyle: details?.nameStyle || fallbackProfile.nameStyle,
         agency: details?.agency || fallbackProfile.agency,
         bio: details?.bio || fallbackProfile.bio,
+        currentActivity: details?.currentActivity || fallbackProfile.currentActivity,
         all: {
           wins: all?.wins || 0,
           losses: all?.losses || 0,
@@ -3317,6 +3348,10 @@ export function OneVsOnePanel(props: {
               <div className="leader-profile-item">
                 <p className="leader-profile-label">Agency</p>
                 <p>{selectedDuelProfile.agency || 'Not provided'}</p>
+              </div>
+              <div className="leader-profile-item">
+                <p className="leader-profile-label">Current Activity</p>
+                <p>{formatDuelProfileCurrentActivity(selectedDuelProfile.currentActivity)}</p>
               </div>
               {selectedDuelProfile.all.currentStreak > 0 ? (
                 <div className="leader-profile-item">

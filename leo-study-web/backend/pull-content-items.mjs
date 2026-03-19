@@ -43,6 +43,7 @@ async function main() {
   const vc = []
   const custom = []
   const scenarios = []
+  const scenariosTmas2 = []
 
   for (const row of rows) {
     const item = row || {}
@@ -54,13 +55,34 @@ async function main() {
     if (type === 'scenario') {
       const scenario = String(item.scenario || '').trim()
       const questions = Array.isArray(item.scenario_questions) ? item.scenario_questions.map((entry) => String(entry).trim()).filter(Boolean) : []
-      if (!scenario || questions.length === 0) continue
-      scenarios.push({
+      const subQuestions = Array.isArray(item.scenario_sub_questions)
+        ? item.scenario_sub_questions
+            .map((entry) => ({
+              id: String(entry?.id || '').trim(),
+              prompt: String(entry?.prompt || '').trim(),
+              choices: Array.isArray(entry?.choices) ? entry.choices.map((choice) => String(choice).trim()).filter(Boolean) : [],
+              expectedAnswer: String(entry?.expectedAnswer || '').trim(),
+              explanation: String(entry?.explanation || '').trim() || undefined,
+            }))
+            .filter(
+              (entry) =>
+                entry.id &&
+                entry.prompt &&
+                Array.isArray(entry.choices) &&
+                entry.choices.length >= 2 &&
+                entry.expectedAnswer &&
+                entry.choices.includes(entry.expectedAnswer),
+            )
+        : []
+      if (!scenario || (questions.length === 0 && subQuestions.length === 0)) continue
+      const scenarioItem = {
         id,
         category,
         title: String(item.title || 'Scenario').trim(),
         scenario,
         questions,
+        tmasSet: String(item.tmas_set || '').trim().toLowerCase() === 'tmas2' ? 'tmas2' : 'tmas1',
+        subQuestions: subQuestions.length > 0 ? subQuestions : undefined,
         expectedAnswer: String(item.answer || '').trim() || undefined,
         keyPoints: Array.isArray(item.key_points) ? item.key_points.map((entry) => String(entry).trim()).filter(Boolean) : [],
         tags: Array.isArray(item.tags) ? item.tags.map((entry) => String(entry).trim()).filter(Boolean) : [],
@@ -68,7 +90,9 @@ async function main() {
         codeSection: String(item.code_section || '').trim() || undefined,
         explanation: String(item.explanation || '').trim() || undefined,
         sourceUrl: String(item.source_url || '').trim() || undefined,
-      })
+      }
+      if (scenarioItem.tmasSet === 'tmas2') scenariosTmas2.push(scenarioItem)
+      else scenarios.push(scenarioItem)
       continue
     }
 
@@ -97,9 +121,12 @@ async function main() {
   writeJson(path.join(contentDir, 'vc.json'), vc)
   writeJson(path.join(contentDir, 'custom.json'), custom)
   writeJson(path.join(contentDir, 'scenarios.json'), scenarios)
+  writeJson(path.join(contentDir, 'scenarios-tmas2.json'), scenariosTmas2)
 
   console.log(`Pulled ${rows.length} rows from content_items into src/content/*.json`)
-  console.log(`- pc: ${pc.length}, hs: ${hs.length}, vc: ${vc.length}, custom: ${custom.length}, scenarios: ${scenarios.length}`)
+  console.log(
+    `- pc: ${pc.length}, hs: ${hs.length}, vc: ${vc.length}, custom: ${custom.length}, scenarios: ${scenarios.length}, scenarios-tmas2: ${scenariosTmas2.length}`,
+  )
 }
 
 main().catch((err) => {

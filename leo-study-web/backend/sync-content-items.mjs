@@ -37,6 +37,8 @@ function toCodeRows(items) {
     source_url: String(item.sourceUrl || '').trim() || null,
     scenario: null,
     scenario_questions: [],
+    scenario_sub_questions: [],
+    tmas_set: 'tmas1',
     key_points: [],
     is_published: true,
   }))
@@ -56,7 +58,34 @@ function toScenarioRows(items) {
     explanation: String(item.explanation || '').trim() || null,
     source_url: String(item.sourceUrl || '').trim() || null,
     scenario: String(item.scenario || '').trim(),
-    scenario_questions: Array.isArray(item.questions) ? item.questions.map((entry) => String(entry).trim()).filter(Boolean).slice(0, 4) : [],
+    scenario_questions: Array.isArray(item.questions) && item.questions.length > 0
+      ? item.questions.map((entry) => String(entry).trim()).filter(Boolean).slice(0, 4)
+      : Array.isArray(item.subQuestions)
+        ? item.subQuestions
+            .map((entry) => String(entry?.prompt || '').trim())
+            .filter(Boolean)
+            .slice(0, 4)
+        : [],
+    scenario_sub_questions: Array.isArray(item.subQuestions)
+      ? item.subQuestions
+          .map((entry) => ({
+            id: String(entry?.id || '').trim(),
+            prompt: String(entry?.prompt || '').trim(),
+            choices: Array.isArray(entry?.choices) ? entry.choices.map((choice) => String(choice).trim()).filter(Boolean) : [],
+            expectedAnswer: String(entry?.expectedAnswer || '').trim(),
+            explanation: String(entry?.explanation || '').trim() || undefined,
+          }))
+          .filter(
+            (entry) =>
+              entry.id &&
+              entry.prompt &&
+              Array.isArray(entry.choices) &&
+              entry.choices.length >= 2 &&
+              entry.expectedAnswer &&
+              entry.choices.includes(entry.expectedAnswer),
+          )
+      : [],
+    tmas_set: String(item.tmasSet || '').trim().toLowerCase() === 'tmas2' ? 'tmas2' : 'tmas1',
     key_points: Array.isArray(item.keyPoints) ? item.keyPoints.map((entry) => String(entry).trim()).filter(Boolean) : [],
     is_published: true,
   }))
@@ -69,9 +98,10 @@ function dedupeRows(rows) {
     const category = String(row.category || '').toLowerCase()
     const codeSection = String(row.code_section || '').trim().toLowerCase()
     const scenario = String(row.scenario || '').trim().toLowerCase()
+    const tmasSet = String(row.tmas_set || 'tmas1').trim().toLowerCase() || 'tmas1'
     const key =
       type === 'scenario'
-        ? `scenario|${category}|${scenario || String(row.id || '').toLowerCase()}`
+        ? `scenario|${category}|${tmasSet}|${scenario || String(row.id || '').toLowerCase()}`
         : `code|${category}|${codeSection || String(row.id || '').toLowerCase()}`
     if (!map.has(key)) map.set(key, row)
   }
@@ -85,13 +115,16 @@ async function main() {
   const vc = parseJson(path.join(contentDir, 'vc.json'))
   const custom = parseJson(path.join(contentDir, 'custom.json'))
   const scenarios = parseJson(path.join(contentDir, 'scenarios.json'))
+  const scenariosTmas2 = parseJson(path.join(contentDir, 'scenarios-tmas2.json'))
 
   const codeRows = toCodeRows([...pc, ...hs, ...vc, ...custom]).filter(
     (item) => item.id && item.category && item.title && item.question,
   )
-  const scenarioRows = toScenarioRows(scenarios).filter(
-    (item) => item.id && item.category && item.title && item.scenario && Array.isArray(item.scenario_questions) && item.scenario_questions.length >= 2,
-  )
+  const scenarioRows = toScenarioRows([...scenarios, ...scenariosTmas2]).filter((item) => {
+    const hasLegacyQuestions = Array.isArray(item.scenario_questions) && item.scenario_questions.length >= 2
+    const hasGroupedQuestions = Array.isArray(item.scenario_sub_questions) && item.scenario_sub_questions.length >= 2
+    return item.id && item.category && item.title && item.scenario && (hasLegacyQuestions || hasGroupedQuestions)
+  })
 
   const payload = dedupeRows([...codeRows, ...scenarioRows])
   if (payload.length === 0) {

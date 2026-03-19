@@ -10,6 +10,8 @@ import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { OneVsOnePanel } from './components/OneVsOnePanel'
 import { DuelInviteBanner } from './components/DuelInviteBanner'
 import { GlobalChatWidget } from './components/GlobalChatWidget'
+import { StudyGuidePage } from './components/StudyGuidePage'
+import { StudyPracticeTestPage } from './components/StudyPracticeTestPage'
 import './components/GlobalChatWidget.css'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
@@ -32,8 +34,13 @@ type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'libra
 type StatsIconName = 'overview' | 'time' | 'words' | 'penal' | 'flashcards' | 'scenarios' | 'streak' | 'game' | 'studyset'
 type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
 type StudyAnswerMode = 'multiple' | 'truefalse'
-type StudyActivitySource = 'flashcards' | 'study_test' | 'matching' | 'speed' | 'duel'
+type StudyActivitySource = 'flashcards' | 'study_test' | 'study_guide' | 'study_practice' | 'matching' | 'speed' | 'duel'
 type PresenceStatus = 'active' | 'away'
+type CurrentUserActivity = {
+  key: string
+  label: string
+  updatedAt: string
+}
 type BannerTone = 'courteous' | 'notice' | 'urgent'
 
 const studyTrackingTickMs = 5000
@@ -63,6 +70,7 @@ type HomeLeaderboardEntry = {
   duelWins: number
   duelLosses: number
   duelCurrentWinStreak: number
+  currentActivity: CurrentUserActivity | null
 }
 
 type HomeLeaderboardCardKey = 'study_time' | 'study_streak' | 'matching' | 'speed' | 'mastered' | 'duel_wins' | 'duel_streak'
@@ -152,6 +160,7 @@ type LeaderboardEntry = {
   duelWins: number
   duelLosses: number
   duelCurrentWinStreak: number
+  currentActivity: CurrentUserActivity | null
 }
 
 type LeaderboardRefreshResult = {
@@ -234,6 +243,7 @@ type ProfileDetails = {
   systemNoticesSeen: string[]
   stats: UserStats
   algorithmSnapshot?: Record<string, PersistedAlgorithmStat>
+  currentActivity: CurrentUserActivity | null
 }
 
 type NameStyle = {
@@ -530,6 +540,7 @@ type LeaderboardProfileSnapshot = {
   studyDayStreak: number
   studyModeCounts: Record<CodeFilter, number>
   masteredCodes: number | null
+  currentActivity: CurrentUserActivity | null
 }
 
 type AppThemePreset = {
@@ -1351,6 +1362,30 @@ function sanitizeDisplayMode(value: unknown): DisplayMode {
   return value === 'light' ? 'light' : 'dark'
 }
 
+function sanitizeCurrentUserActivity(value: unknown): CurrentUserActivity | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = value as Partial<CurrentUserActivity>
+  const key = typeof raw.key === 'string' ? raw.key.trim() : ''
+  const label = typeof raw.label === 'string' ? raw.label.trim() : ''
+  const updatedAt = typeof raw.updatedAt === 'string' ? raw.updatedAt.trim() : ''
+  if (!key || !label) return null
+  return {
+    key,
+    label,
+    updatedAt,
+  }
+}
+
+function formatProfileCurrentActivity(activity: CurrentUserActivity | null, nowMs: number) {
+  if (!activity?.label) return 'Unavailable'
+  const updatedAtMs = Date.parse(activity.updatedAt || '')
+  if (!Number.isFinite(updatedAtMs)) return activity.label
+  const elapsedMs = Math.max(0, nowMs - updatedAtMs)
+  if (elapsedMs <= 90_000) return activity.label
+  if (elapsedMs <= 15 * 60 * 1000) return `Recently: ${activity.label}`
+  return 'Offline'
+}
+
 function sanitizeHomeLeaderboardPreferences(input: unknown): HomeLeaderboardPreferences {
   const fallback: HomeLeaderboardPreferences = {
     visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards],
@@ -1988,6 +2023,7 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
     studyDayStreak: 0,
     studyModeCounts: { ...defaultUserStats.studyModeCounts },
     masteredCodes: null,
+    currentActivity: null,
   }
   if (!input || typeof input !== 'object') return fallback
 
@@ -2015,6 +2051,7 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
       vehicle: normalizeCount(studyModeCountsRaw.vehicle),
     },
     masteredCodes: countMasteredCodesFromSnapshot(value.algorithmSnapshot),
+    currentActivity: sanitizeCurrentUserActivity(value.currentActivity),
   }
 }
 
@@ -2207,6 +2244,7 @@ function sanitizeState(input: unknown): PersistedState {
       namePresets: [],
       systemNoticesSeen: [],
       stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
+      currentActivity: null,
     },
   }
 
@@ -2235,6 +2273,7 @@ function sanitizeState(input: unknown): PersistedState {
             namePresets: sanitizeNamePresets((state.profileDetails as Partial<ProfileDetails>).namePresets),
             systemNoticesSeen: sanitizeSystemNoticesSeen((state.profileDetails as Partial<ProfileDetails>).systemNoticesSeen),
             stats: sanitizeUserStats((state.profileDetails as Partial<ProfileDetails>).stats),
+            currentActivity: sanitizeCurrentUserActivity((state.profileDetails as Partial<ProfileDetails>).currentActivity),
             algorithmSnapshot:
               (state.profileDetails as Partial<ProfileDetails>).algorithmSnapshot &&
               typeof (state.profileDetails as Partial<ProfileDetails>).algorithmSnapshot === 'object'
@@ -2252,6 +2291,7 @@ function sanitizeState(input: unknown): PersistedState {
             namePresets: [],
             systemNoticesSeen: [],
             stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
+            currentActivity: null,
           },
   }
 }
@@ -3381,6 +3421,7 @@ function App() {
     namePresets: [],
     systemNoticesSeen: [],
     stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
+    currentActivity: null,
   })
   const [leaderboardRotateMs, setLeaderboardRotateMs] = useState(defaultLeaderboardRotationMs)
   const [newPresetName, setNewPresetName] = useState('')
@@ -3536,6 +3577,8 @@ function App() {
   const studyActivityBySourceRef = useRef<Record<StudyActivitySource, number>>({
     flashcards: 0,
     study_test: 0,
+    study_guide: 0,
+    study_practice: 0,
     matching: 0,
     speed: 0,
     duel: 0,
@@ -4207,7 +4250,30 @@ function App() {
         const questions = Array.isArray(value.scenario_questions)
           ? value.scenario_questions.map((entry) => String(entry).trim()).filter(Boolean)
           : []
-        if (!id || !category || !title || !scenario || questions.length === 0) {
+        const subQuestions = Array.isArray(value.scenario_sub_questions)
+          ? value.scenario_sub_questions.reduce<ScenarioBankSubQuestion[]>((items, entry) => {
+              if (!entry || typeof entry !== 'object') return items
+              const record = entry as Record<string, unknown>
+              const subQuestionId = String(record.id || '').trim()
+              const prompt = String(record.prompt || '').trim()
+              const choices = Array.isArray(record.choices)
+                ? record.choices.map((choice) => String(choice).trim()).filter(Boolean)
+                : []
+              const expectedAnswer = String(record.expectedAnswer || record.expected_answer || '').trim()
+              if (!subQuestionId || !prompt || choices.length < 2 || !expectedAnswer || !choices.includes(expectedAnswer)) {
+                return items
+              }
+              items.push({
+                id: subQuestionId,
+                prompt,
+                choices,
+                expectedAnswer,
+                explanation: String(record.explanation || '').trim() || undefined,
+              })
+              return items
+            }, [])
+          : []
+        if (!id || !category || !title || !scenario || (questions.length === 0 && subQuestions.length === 0)) {
           console.warn(`[content] supabase content_items(scenario)[${index}] missing required fields, skipping.`)
           return accumulator
         }
@@ -4218,6 +4284,8 @@ function App() {
           title,
           scenario,
           questions,
+          tmasSet: String(value.tmas_set || '').trim().toLowerCase() === 'tmas2' ? 'tmas2' : 'tmas1',
+          subQuestions: subQuestions.length > 0 ? subQuestions : undefined,
           expectedAnswer: String(value.answer || '').trim() || undefined,
           keyPoints: Array.isArray(value.key_points) ? value.key_points.map((entry) => String(entry).trim()).filter(Boolean) : [],
           tags: Array.isArray(value.tags) ? value.tags.map((entry) => String(entry).trim()).filter(Boolean) : [],
@@ -4435,6 +4503,7 @@ function App() {
             studyDayStreak: 0,
             studyModeCounts: { ...defaultUserStats.studyModeCounts },
             masteredCodes: null,
+            currentActivity: null,
           }
           return accumulator
         }, {})
@@ -4459,6 +4528,7 @@ function App() {
             studyDayStreak: 0,
             studyModeCounts: { ...defaultUserStats.studyModeCounts },
             masteredCodes: null,
+            currentActivity: null,
           }
           detailsByUserId[userId] = {
             ...existing,
@@ -4471,6 +4541,7 @@ function App() {
             studyDayStreak: parsedDetails.studyDayStreak,
             studyModeCounts: parsedDetails.studyModeCounts,
             masteredCodes: parsedDetails.masteredCodes,
+            currentActivity: parsedDetails.currentActivity,
           }
           if (parsedDetails.masteredCodes === null) {
             fallbackMasteryUserIds.push(userId)
@@ -4564,6 +4635,7 @@ function App() {
               duelWins: duelStats?.wins || 0,
               duelLosses: duelStats?.losses || 0,
               duelCurrentWinStreak: duelStats?.currentWinStreak || 0,
+              currentActivity: detailsByUserId[userId]?.currentActivity || null,
             }
           },
         )
@@ -4720,6 +4792,7 @@ function App() {
           studyDayStreak: 0,
           studyModeCounts: { ...defaultUserStats.studyModeCounts },
           masteredCodes: null,
+          currentActivity: null,
         }
         if (ownerRotationMs === null && ownerUserIds.has(userId)) {
           ownerRotationMs = details.homeLeaderboardRotationMs
@@ -4753,6 +4826,7 @@ function App() {
           duelWins: duelStats.wins,
           duelLosses: duelStats.losses,
           duelCurrentWinStreak: duelStats.currentWinStreak,
+          currentActivity: details.currentActivity,
         })
         studyStreakRows.push({
           userId,
@@ -4772,6 +4846,7 @@ function App() {
           duelWins: duelStats.wins,
           duelLosses: duelStats.losses,
           duelCurrentWinStreak: duelStats.currentWinStreak,
+          currentActivity: details.currentActivity,
         })
         masteredRows.push({
           userId,
@@ -4791,6 +4866,7 @@ function App() {
           duelWins: duelStats.wins,
           duelLosses: duelStats.losses,
           duelCurrentWinStreak: duelStats.currentWinStreak,
+          currentActivity: details.currentActivity,
         })
 
         for (const mode of duelLeaderboardModeOrder) {
@@ -4814,6 +4890,7 @@ function App() {
               duelWins: duelModeStats.wins,
               duelLosses: duelModeStats.losses,
               duelCurrentWinStreak: duelModeStats.currentWinStreak,
+              currentActivity: details.currentActivity,
             })
           }
           if (duelModeStats.currentWinStreak > 0) {
@@ -4835,6 +4912,7 @@ function App() {
               duelWins: duelModeStats.wins,
               duelLosses: duelModeStats.losses,
               duelCurrentWinStreak: duelModeStats.currentWinStreak,
+              currentActivity: details.currentActivity,
             })
           }
         }
@@ -5009,6 +5087,7 @@ function App() {
         namePresets: nextState.profileDetails.namePresets,
         systemNoticesSeen: nextState.profileDetails.systemNoticesSeen,
         stats: nextState.profileDetails.stats,
+        currentActivity: nextState.profileDetails.currentActivity,
       })
 
       const { data: historyRows, error: historyError } = await client
@@ -5131,6 +5210,7 @@ function App() {
             namePresets: previous.namePresets,
             systemNoticesSeen: previous.systemNoticesSeen,
             stats: previous.stats,
+            currentActivity: previous.currentActivity,
           }))
         },
       )
@@ -7257,6 +7337,7 @@ function App() {
       namePresets: [],
       systemNoticesSeen: [],
       stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
+      currentActivity: null,
     })
     setNewPresetName('')
     setStateHydrated(false)
@@ -7399,9 +7480,11 @@ function App() {
   const isSignUpPage = currentPath === '/signup'
   const isHomePage = currentPath === '/home'
   const isStudyHubPage = currentPath === '/study'
+  const isStudyGuidePage = currentPath === '/study/guide'
+  const isStudyPracticeTestPage = currentPath === '/study/practice-test'
   const isStudyFlashcardsPage = currentPath === '/study/flashcards'
   const isStudyTestPage = currentPath === '/study/test'
-  const isStudyPage = isStudyHubPage || isStudyFlashcardsPage || isStudyTestPage
+  const isStudyPage = isStudyHubPage || isStudyGuidePage || isStudyPracticeTestPage || isStudyFlashcardsPage || isStudyTestPage
   const isGamesHubPage = currentPath === '/games'
   const isGamesMatchingPage = currentPath === '/games/matching'
   const isGamesSpeedPage = currentPath === '/games/speed'
@@ -7419,7 +7502,11 @@ function App() {
     setBugReportPagePath(currentPath)
   }, [currentPath, isProfilePage])
   const activeStudyActivitySource: StudyActivitySource | null =
-    isStudyFlashcardsPage && studyFlashSessionOpen && orderedStudyFlashSessionCards.length > 0
+    isStudyGuidePage
+      ? 'study_guide'
+      : isStudyPracticeTestPage
+        ? 'study_practice'
+      : isStudyFlashcardsPage && studyFlashSessionOpen && orderedStudyFlashSessionCards.length > 0
       ? 'flashcards'
       : isStudyTestPage && studyTestSessionOpen && !studyTestSessionDone && Boolean(currentQuestion)
         ? 'study_test'
@@ -7902,9 +7989,13 @@ function App() {
   const pageTitle = isProfilePage
     ? 'Settings'
     : isStatsPage
-      ? 'Stats'
+    ? 'Stats'
     : isSupportPage
         ? 'Support Creator'
+        : isStudyGuidePage
+          ? 'Study Guide'
+        : isStudyPracticeTestPage
+          ? 'Practice Test'
         : isStudyFlashcardsPage
           ? 'Study Flashcards'
           : isStudyTestPage
@@ -7922,6 +8013,86 @@ function App() {
                 : activeTab === 'scenarios'
                   ? 'Scenarios'
                   : 'Home'
+  const publicCurrentActivity = useMemo(() => {
+    if (isGamesDuelPage) return { key: 'duel', label: 'In 1v1' }
+    if (isGamesMatchingPage) return { key: 'matching', label: matchRunning && !matchDone ? 'Playing Matching' : 'In Matching Setup' }
+    if (isGamesSpeedPage) return { key: 'speed', label: speedRunning && !speedDone && Boolean(speedCurrentQuestion) ? 'Playing Speed Test' : 'In Speed Test Setup' }
+    if (isStudyPracticeTestPage) return { key: 'study_practice', label: 'On Practice Test' }
+    if (isStudyGuidePage) return { key: 'study_guide', label: 'Reading Study Guide' }
+    if (isStudyFlashcardsPage) return {
+      key: 'flashcards',
+      label: studyFlashSessionOpen && orderedStudyFlashSessionCards.length > 0 ? 'Studying Flashcards' : 'On Flashcards',
+    }
+    if (isStudyTestPage) return {
+      key: 'study_test',
+      label: studyTestSessionOpen && !studyTestSessionDone && Boolean(currentQuestion) ? 'Taking Study Test' : 'On Study Test',
+    }
+    if (isStudyHubPage) return { key: 'study_hub', label: 'In Study Hub' }
+    if (isLeaderboardsPage) return { key: 'leaderboards', label: 'Viewing Leaderboards' }
+    if (isChatPage) return { key: 'chat', label: 'In Chat' }
+    if (isSupportPage) return { key: 'support', label: 'On Support' }
+    if (isProfilePage) return { key: 'settings', label: 'In Settings' }
+    if (isStatsPage) return { key: 'stats', label: 'Viewing Stats' }
+    if (activeTab === 'scenarios') return { key: 'scenarios', label: 'Reviewing Scenarios' }
+    if (activeTab === 'library') return { key: 'library', label: 'Browsing Library' }
+    return { key: 'home', label: 'On Home' }
+  }, [
+    activeTab,
+    currentQuestion,
+    isChatPage,
+    isGamesDuelPage,
+    isGamesMatchingPage,
+    isGamesSpeedPage,
+    isLeaderboardsPage,
+    isProfilePage,
+    isStatsPage,
+    isStudyFlashcardsPage,
+    isStudyGuidePage,
+    isStudyHubPage,
+    isStudyPracticeTestPage,
+    isStudyTestPage,
+    isSupportPage,
+    matchDone,
+    matchRunning,
+    orderedStudyFlashSessionCards.length,
+    speedCurrentQuestion,
+    speedDone,
+    speedRunning,
+    studyFlashSessionOpen,
+    studyTestSessionDone,
+    studyTestSessionOpen,
+  ])
+  useEffect(() => {
+    if (!currentUserId || !stateHydrated) return
+
+    const syncCurrentActivity = () => {
+      if (document.visibilityState !== 'visible') return
+      setProfileDetails((previous) => {
+        const nextUpdatedAt = new Date().toISOString()
+        const previousUpdatedAtMs = Date.parse(previous.currentActivity?.updatedAt || '')
+        if (
+          previous.currentActivity?.key === publicCurrentActivity.key &&
+          previous.currentActivity?.label === publicCurrentActivity.label &&
+          Number.isFinite(previousUpdatedAtMs) &&
+          Date.now() - previousUpdatedAtMs < 12_000
+        ) {
+          return previous
+        }
+        return {
+          ...previous,
+          currentActivity: {
+            key: publicCurrentActivity.key,
+            label: publicCurrentActivity.label,
+            updatedAt: nextUpdatedAt,
+          },
+        }
+      })
+    }
+
+    syncCurrentActivity()
+    const interval = window.setInterval(syncCurrentActivity, 15_000)
+    return () => window.clearInterval(interval)
+  }, [currentUserId, publicCurrentActivity.key, publicCurrentActivity.label, stateHydrated])
   const toggleHomeLeaderboardDraftCard = useCallback((card: HomeLeaderboardCardKey) => {
     setHomeLeaderboardSettingsDraft((current) => {
       const visibleCards = current.visibleCards.includes(card)
@@ -8053,6 +8224,14 @@ function App() {
     goToPath('/study/flashcards', { tab: 'study' })
   }, [goToPath])
 
+  const openStudyGuidePage = useCallback(() => {
+    goToPath('/study/guide', { tab: 'study' })
+  }, [goToPath])
+
+  const openStudyPracticeTestPage = useCallback(() => {
+    goToPath('/study/practice-test', { tab: 'study' })
+  }, [goToPath])
+
   const openStudyTestPage = useCallback(() => {
     goToPath('/study/test', { tab: 'study' })
   }, [goToPath])
@@ -8112,6 +8291,26 @@ function App() {
                 icon: 'study' as AppIconName,
                 active: isStudyHubPage,
                 onClick: () => navigateToTab('study'),
+              },
+              {
+                key: 'study-guide',
+                label: 'Study Guide',
+                icon: 'study' as AppIconName,
+                active: isStudyGuidePage,
+                onClick: () => {
+                  setMobileNavMenuOpen(false)
+                  openStudyGuidePage()
+                },
+              },
+              {
+                key: 'study-practice-test',
+                label: 'Practice Test',
+                icon: 'test' as AppIconName,
+                active: isStudyPracticeTestPage,
+                onClick: () => {
+                  setMobileNavMenuOpen(false)
+                  openStudyPracticeTestPage()
+                },
               },
               {
                 key: 'study-flashcards',
@@ -8191,12 +8390,16 @@ function App() {
       isProfilePage,
       isStatsPage,
       isStudyFlashcardsPage,
+      isStudyGuidePage,
+      isStudyPracticeTestPage,
       isStudyHubPage,
       isStudyPage,
       isStudyTestPage,
       isSupportPage,
       navigateToTab,
       openStudyFlashcardsPage,
+      openStudyGuidePage,
+      openStudyPracticeTestPage,
       openStudyTestPage,
     ],
   )
@@ -8229,6 +8432,9 @@ function App() {
   const selectedLeaderboardWeeklyFirstSpots = selectedLeaderboardEntry
     ? weeklyFirstSpotCountsByUser[selectedLeaderboardEntry.userId] || 0
     : 0
+  const selectedLeaderboardCurrentActivityLabel = selectedLeaderboardEntry
+    ? formatProfileCurrentActivity(selectedLeaderboardEntry.currentActivity, clockNowMs)
+    : 'Unavailable'
   const leaderAvatarFrameClass = (userId?: string, extraClassName?: string) => {
     const classes = ['leader-avatar-frame']
     if (extraClassName) classes.push(extraClassName)
@@ -8523,6 +8729,8 @@ function App() {
       source_url: editorDraft.sourceUrl.trim() || null,
       scenario: type === 'scenario' ? scenarioPrompt : null,
       scenario_questions: type === 'scenario' ? choiceOptions : [],
+      scenario_sub_questions: [],
+      tmas_set: 'tmas1',
       key_points: [],
       is_published: editorDraft.isPublished,
       updated_at: new Date().toISOString(),
@@ -8758,6 +8966,7 @@ function App() {
       duelWins: entry.duelWins,
       duelLosses: entry.duelLosses,
       duelCurrentWinStreak: entry.duelCurrentWinStreak,
+      currentActivity: entry.currentActivity,
     })
     setSelectedLeaderboardIsTop(isTop)
   }
@@ -9702,6 +9911,20 @@ function App() {
               </button>
               <div className="taskbar-submenu">
                 <button
+                  className={isStudyGuidePage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
+                  onClick={openStudyGuidePage}
+                >
+                  <AppIcon name="study" className="taskbar-sub-icon" />
+                  Study Guide
+                </button>
+                <button
+                  className={isStudyPracticeTestPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
+                  onClick={openStudyPracticeTestPage}
+                >
+                  <AppIcon name="test" className="taskbar-sub-icon" />
+                  Practice Test
+                </button>
+                <button
                   className={isStudyFlashcardsPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
                   onClick={openStudyFlashcardsPage}
                 >
@@ -10641,6 +10864,24 @@ function App() {
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isStudyHubPage && (
           <section className="study-section study-hub">
             <div className="study-actions-grid">
+              <button className="card study-action-card" onClick={openStudyGuidePage}>
+                <div className="study-action-icon">
+                  <AppIcon name="study" className="button-icon" />
+                </div>
+                <div>
+                  <h3>Study Guide</h3>
+                  <p className="muted">Review the uploaded TMAS guides by full module or by individual learning domain.</p>
+                </div>
+              </button>
+              <button className="card study-action-card" onClick={openStudyPracticeTestPage}>
+                <div className="study-action-icon">
+                  <AppIcon name="test" className="button-icon" />
+                </div>
+                <div>
+                  <h3>Practice Test</h3>
+                  <p className="muted">Run the TMAS-style scenario-based practice exam and review your LD breakdown after each attempt.</p>
+                </div>
+              </button>
               <button className="card study-action-card" onClick={openStudyFlashcardsPage}>
                 <div className="study-action-icon">
                   <AppIcon name="flashcards" className="button-icon" />
@@ -10807,6 +11048,20 @@ function App() {
             </div>
           </section>
         )}
+
+        {isStudyGuidePage ? (
+          <StudyGuidePage
+            onOpenFlashcards={openStudyFlashcardsPage}
+            onOpenTest={openStudyTestPage}
+            onStudyActivity={() => markStudyActivity('study_guide')}
+          />
+        ) : null}
+
+        {isStudyPracticeTestPage ? (
+          <StudyPracticeTestPage
+            onStudyActivity={() => markStudyActivity('study_practice')}
+          />
+        ) : null}
 
         {isStudyFlashcardsPage ? (
           <section className="study-session-page">
@@ -13477,6 +13732,10 @@ function App() {
                     : 'No study data yet'}
                 </p>
               </div>
+              <div className="leader-profile-item">
+                <p className="leader-profile-label">Current Activity</p>
+                <p>{selectedLeaderboardCurrentActivityLabel}</p>
+              </div>
               <div className="leader-profile-item leader-profile-item-wide">
                 <p className="leader-profile-label">About Me</p>
                 <p>{selectedLeaderboardEntry.bio || 'Not provided'}</p>
@@ -13730,6 +13989,14 @@ function App() {
                 <button className={isStudyHubPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => navigateToTab('study')}>
                   <AppIcon name="study" className="mobile-bottom-icon" />
                   <span>Study Hub</span>
+                </button>
+                <button className={isStudyGuidePage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); openStudyGuidePage() }}>
+                  <AppIcon name="study" className="mobile-bottom-icon" />
+                  <span>Study Guide</span>
+                </button>
+                <button className={isStudyPracticeTestPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); openStudyPracticeTestPage() }}>
+                  <AppIcon name="test" className="mobile-bottom-icon" />
+                  <span>Practice Test</span>
                 </button>
                 <button className={isStudyFlashcardsPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); openStudyFlashcardsPage() }}>
                   <AppIcon name="flashcards" className="mobile-bottom-icon" />
