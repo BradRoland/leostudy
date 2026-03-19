@@ -1,4 +1,5 @@
 import { studyGuideOfficialResearchByLd } from './studyGuideOfficialResearch'
+import { strengthenScenarioDistractors } from './practiceTestChoiceTuning'
 
 type PracticeTestQuestion = {
   id: string
@@ -366,9 +367,9 @@ function buildArrestScenario(seed: ArrestFocusSeed, index: number): PracticeTest
       'At the first lawful restraint point in this scenario, what is the best legal classification of the officer contact?',
       [
         seed.stopBasis,
-        'A purely consensual encounter that does not allow officers to restrain the suspect',
-        'A civil standby with no detention or arrest authority',
-        'A booking decision that cannot occur until after jail intake',
+        'A consensual encounter because officers may ask questions and watch the suspect without restricting movement',
+        'A de facto arrest because the known facts already establish enough certainty for immediate booking',
+        'A community-caretaking contact only because the scene still needs to be stabilized before any criminal investigation can begin',
       ],
       0,
       'This question tracks the LD 15 TTS on differentiating a detention from a consensual encounter and recognizing reasonable suspicion from specific, articulable facts.',
@@ -383,9 +384,9 @@ function buildArrestScenario(seed: ArrestFocusSeed, index: number): PracticeTest
       'Once officers confirm the facts in this scenario, what is the strongest arrest authority?',
       [
         seed.arrestAuthority,
-        'Continue the detention only until a supervisor arrives because field arrest authority never applies here',
-        'Release the suspect because officers always need a warrant before making any arrest in the field',
-        'Issue a warning because the described conduct cannot support custody',
+        'Continue the detention and seek more corroboration because the facts amount only to reasonable suspicion, not probable cause',
+        'Treat the event as a private-person arrest only because officers cannot make a field arrest unless the offense occurs directly in their presence',
+        'Freeze the scene and seek a warrant first because probable cause alone is not enough for immediate custody here',
       ],
       0,
       'This is anchored to the LD 15 arrest TTS. The tested point is whether officers can connect the facts to probable cause and the correct arrest authority, not just assume custody is allowed.',
@@ -397,9 +398,9 @@ function buildArrestScenario(seed: ArrestFocusSeed, index: number): PracticeTest
       'If officers make a lawful custodial arrest here, what search authority most directly follows?',
       [
         seed.searchScope,
-        'A full search of every nearby residence without a warrant',
-        'A search of the suspect’s digital accounts without consent or a warrant',
-        'A search of uninvolved bystanders solely because they are standing nearby',
+        'A limited pat search for weapons only, unless a separate doctrine later supports a fuller evidentiary search',
+        'A protective sweep of the nearest residence even without facts showing another dangerous person is inside',
+        'Immediate review of any phone or cloud account found on the arrestee because it was carried at the time of arrest',
       ],
       0,
       'This is the LD 16 TTS point on warrantless searches incident to arrest. The correct answer stays inside the lawful scope of the arrest doctrine instead of expanding it into places or data the doctrine does not cover.',
@@ -426,9 +427,9 @@ function buildSearchScenario(seed: SearchFocusSeed): PracticeTestScenario {
       'What is the strongest search authority in this scenario?',
       [
         seed.authority,
-        'A blanket power to search anywhere the suspect has ever stayed',
-        'Authority to search every phone on scene without a warrant',
-        'Authority to search solely because the contact occurs after dark',
+        'A limited officer-safety frisk only, because the facts do not support the broader evidentiary search being considered',
+        'Temporary detention while officers seek a warrant, because none of the present facts support immediate warrantless search authority',
+        'Search authority based on the suspect’s mere presence at the scene, even without clear control, consent, or probable-cause facts',
       ],
       0,
       'This is anchored to the exact LD 16 TTS doctrine being tested. The strongest answer is the one that matches the legal search theory supported by the facts, not a generalized suspicion.',
@@ -440,9 +441,9 @@ function buildSearchScenario(seed: SearchFocusSeed): PracticeTestScenario {
       'Under that authority, what is the proper scope limitation?',
       [
         seed.scope,
-        'Search every nearby room and vehicle regardless of the basis for the original search',
-        'Search any digital account the suspect has ever used',
-        'Search only after the suspect signs a written confession',
+        'Search any container or room the suspect has recently accessed, even if the doctrine does not reach that area',
+        'Search the entire property for evidence of any crime once one lawful basis for entry or search exists',
+        'Delay opening containers that are otherwise within scope until the suspect gives a fresh post-search statement',
       ],
       0,
       'The LD 16 TTS tests not just whether officers have authority, but also whether they stay inside the correct scope of that doctrine.',
@@ -454,9 +455,9 @@ function buildSearchScenario(seed: SearchFocusSeed): PracticeTestScenario {
       'Which next step best keeps the investigation lawful as the scene develops?',
       [
         seed.nextStep,
-        'Expand the search first and decide on the legal basis later',
-        'Arrest immediately without tying the arrest to any articulable facts',
-        'Ignore the suspect’s statements because officer observations alone are the only facts that matter',
+        'Expand the search now and rely on later report writing to align the facts with a legal doctrine',
+        'Use blanket consent language after the fact to cover areas officers already decided to search',
+        'Rely entirely on a suspect admission or denial instead of documenting the objective facts that create the search authority',
       ],
       0,
       'This is a TTS-based follow-up question about staying inside the doctrine actually authorizing the search. Officers have to preserve the right theory before they expand the search or seize more evidence.',
@@ -468,9 +469,9 @@ function buildSearchScenario(seed: SearchFocusSeed): PracticeTestScenario {
       'If this search is challenged later, which fact pattern best protects the evidence from suppression?',
       [
         seed.reportDetail,
-        'Only the officer’s belief that the suspect was probably lying',
-        'Only the property receipt given after the scene was complete',
-        'Only the suspect’s later jail classification',
+        'Mainly the officer’s intuition that the suspect was being deceptive, even if the underlying authority facts are thin',
+        'The fact that contraband was ultimately found, even if the original authority and scope were not clearly documented',
+        'General experience with similar cases in the area, without tying the specific scene facts to the search doctrine used',
       ],
       0,
       'This is tied to the LD 16 exclusionary-rule and search-doctrine TTS points. Admissibility turns on the facts showing lawful authority, lawful scope, and a clean connection between the doctrine used and the evidence seized.',
@@ -491,9 +492,9 @@ function buildForceScenario(seed: ForceFocusSeed): PracticeTestScenario {
       'At the first decision point, which response best reflects LD 20 force principles?',
       [
         seed.initialResponse,
-        'Rush in immediately with physical force before assessing distance, cover, or communication options',
-        'Do nothing at all and allow the threat to continue developing unchecked',
-        'Skip commands and scene control because verbal efforts are never relevant once tension rises',
+        'Close distance immediately for hands-on control before evaluating cover, containment, or communication options',
+        'Hold position without engaging verbally or repositioning bystanders until the subject makes the next move',
+        'Focus entirely on the subject and delay scene management for uninvolved people until after physical control is gained',
       ],
       0,
       'This question is based on the LD 20 TTS deescalation points. The correct response uses self-control, scene management, communication, and tactical positioning before escalating force.',
@@ -508,9 +509,9 @@ function buildForceScenario(seed: ForceFocusSeed): PracticeTestScenario {
       'If force becomes necessary on these facts, which option is most defensible under LD 20?',
       [
         seed.forceOption,
-        'Any level of force the officer prefers, regardless of threat level or resistance',
-        'Deadly force automatically, even if the facts do not show an imminent threat of death or serious bodily injury',
-        'No force under any circumstances, even if the suspect presents an immediate threat',
+        'Use the highest available force option immediately to end the event quickly, even if lower options remain tactically reasonable',
+        'Continue only verbal efforts even after the subject presents an imminent assaultive threat that lesser responses cannot safely manage',
+        'Base the force choice mainly on the subject’s past history or offense type instead of the current threat, resistance, and scene conditions',
       ],
       0,
       'This tracks the LD 20 TTS on objective reasonableness, force options, and deadly-force considerations when applicable. The correct answer matches the threat, resistance, and totality of circumstances known at the moment force is used.',
@@ -527,9 +528,9 @@ function buildForceScenario(seed: ForceFocusSeed): PracticeTestScenario {
       'After the force event is over and the scene is stabilized, what immediate duty remains?',
       [
         seed.postForceDuty,
-        'Leave the scene as soon as possible before documenting what happened',
-        'Delay all medical attention until the end of the shift report',
-        'Avoid collecting witness information because the body-worn camera replaces every other step',
+        'Clear the scene first and handle medical care, witness identification, and evidence preservation later if time permits',
+        'Delay medical attention until transport or booking is arranged so the scene report can be finished first',
+        'Rely on body-worn video alone instead of making notifications, securing evidence, or documenting witness accounts',
       ],
       0,
       hasInterventionAngle
@@ -550,9 +551,9 @@ function buildForceScenario(seed: ForceFocusSeed): PracticeTestScenario {
         : 'Which fact matters most in showing that the force decision stayed objectively reasonable under the TTS?',
       [
         seed.reportDetail,
-        'Only the officer’s personal feeling that the suspect seemed dangerous',
-        'Only that the suspect was arrested after force was used',
-        'Only that other officers were present at the scene',
+        'Mainly the officer’s personal fear response, even if the objective threat cues were not specifically articulated',
+        'The fact that the suspect was eventually arrested, even without explaining the resistance and decision points leading to force',
+        'That other officers were present and generally agreed with the decision after the event, even without specific scene facts',
       ],
       0,
       hasInterventionAngle
@@ -1038,8 +1039,10 @@ const forceSeeds: ForceFocusSeed[] = [
   },
 ]
 
-export const ld152016FocusScenarios: PracticeTestScenario[] = [
+const rawLd152016FocusScenarios: PracticeTestScenario[] = [
   ...arrestSeeds.map(buildArrestScenario),
   ...searchSeeds.map(buildSearchScenario),
   ...forceSeeds.map(buildForceScenario),
 ]
+
+export const ld152016FocusScenarios: PracticeTestScenario[] = strengthenScenarioDistractors(rawLd152016FocusScenarios)

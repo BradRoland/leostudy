@@ -1,4 +1,5 @@
 import { ld152016FocusScenarios } from './practiceTestFocusScenarios'
+import { strengthenScenarioDistractors } from './practiceTestChoiceTuning'
 
 export type PracticeTestModuleId = 'tmas1' | 'tmas2' | 'tmas3' | 'ld152016'
 
@@ -3273,7 +3274,7 @@ const tmas2ExtendedScenarios: PracticeTestScenario[] = [
   ),
 ]
 
-const allTmas2Scenarios = [...tmas2Scenarios, ...tmas2ExtendedScenarios]
+const allTmas2Scenarios = strengthenScenarioDistractors([...tmas2Scenarios, ...tmas2ExtendedScenarios])
 
 function countQuestions(scenarios: PracticeTestScenario[]) {
   return scenarios.reduce((total, item) => total + item.questions.length, 0)
