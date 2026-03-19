@@ -630,29 +630,37 @@ const homeEncouragementQuotes = [
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
 ]
-const releaseNotesV032: Array<{ title: string; items: string[] }> = [
+const releaseNotesV040: Array<{ title: string; items: string[] }> = [
   {
-    title: 'TMAS Scenario Expansion (v0.32)',
+    title: 'Study Guide Rebuild (v0.40)',
     items: [
-      'Added a dedicated TMAS 2 section inside Scenarios so users can switch between TMAS 1 and TMAS 2 directly on the scenarios page.',
-      'The current website scenarios now live under TMAS 1, and TMAS 2 has been added as a separate training section.',
-      'Imported 100 TMAS 2 scenarios from the PDF and keyed each scenario with 4 questions for a full 400-question scenario bank.',
+      'Added a full Study Guide section inside Study Hub with a cleaner LD-by-LD layout, chapter navigation, and a left-side LD rail that scrolls independently.',
+      'Rebuilt each LD study guide around official POST workbook material and the tested TTS points instead of a generic workbook dump.',
+      'Each LD now shows TMAS exam coverage, chapter jump links, TTS breakdowns, explanations, and TMAS-style example scenarios tied to the tested objectives.',
     ],
   },
   {
-    title: 'Scenario Flow Improvements',
+    title: 'Practice Test Expansion',
     items: [
-      'TMAS 2 scenarios now run as one scenario stem with four sequential questions so each scenario stays grouped correctly.',
-      'Scenario cards now show TMAS section, scenario title, question progress, and total counts for the selected section.',
-      'Scenario progression was updated so TMAS 2 randomizes by scenario group while keeping all four questions together.',
+      'Added a dedicated Practice Test section in Study Hub with a full-screen test flow, cleaner setup, mobile-friendly layout, and improved results coaching.',
+      'Added a TMAS 2 practice bank with randomized scenario-based testing, selectable test lengths, and LD performance coaching at the end of each run.',
+      'Added a focused LD 15 / 16 / 20 practice test with concentrated arrest, search, and force scenarios for the most heavily tested TMAS material.',
     ],
   },
   {
-    title: 'Content Loading Reliability',
+    title: 'TMAS 2 Scenario and TTS Coverage',
     items: [
-      'TMAS 2 content now loads even when the app is running in Supabase content mode.',
-      'Local TMAS scenario files are merged into the runtime content source so scenario sections do not disappear when Supabase content is enabled.',
-      'The scenarios page now stays aligned with your shipped local training packs while still using Supabase for editable content.',
+      'Expanded TMAS 2 scenarios and kept grouped four-question scenario flows so each scenario stays together during randomization.',
+      'The focused LD 15 / 16 / 20 practice bank is now mapped directly to the official POST TTS objectives instead of generic labels.',
+      'TMAS 2 scenario metadata now syncs correctly through Supabase, including grouped sub-questions and TMAS section tagging.',
+    ],
+  },
+  {
+    title: 'Quality and UX Updates',
+    items: [
+      'Practice tests now scale better for desktop and mobile, support real scrolling through long scenarios, and automatically move users into the explanation area after answering.',
+      'Study Guide and Practice Test study time now counts only while the user is actively interacting, not while sitting AFK on the page.',
+      'Profile views now show what another user is currently doing on the site, such as studying, testing, flashcards, 1v1, or practice tests.',
     ],
   },
 ]
@@ -10048,10 +10056,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 0.32"
+                    aria-label="Open what's new for version 0.40"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v0.32
+                    What's New · v0.40
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -13549,15 +13557,15 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v0.32</h3>
+                <h3>What’s New · v0.40</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV032.map((group) => (
-                <article key={`v032-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV040.map((group) => (
+                <article key={`v040-note-${group.title}`} className="home-whats-new-card">
                   <h4>{group.title}</h4>
                   <ul>
                     {group.items.map((item) => (
