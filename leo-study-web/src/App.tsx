@@ -702,7 +702,10 @@ const tierLabel: Record<SupporterTier, string> = {
 }
 
 function normalizeRoutePath(path: string): string {
-  const lowered = String(path || '/').toLowerCase()
+  const lowered = String(path || '/')
+    .split('#')[0]
+    .split('?')[0]
+    .toLowerCase()
   const normalized = lowered.replace(/\/+$/, '')
   return normalized.length > 0 ? normalized : '/'
 }
@@ -8305,6 +8308,13 @@ function App() {
     goToPath('/study/practice-test', { tab: 'study' })
   }, [goToPath])
 
+  const openPriorityTmas2PracticeTestPage = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('practice-test-scroll-target', 'setup')
+    }
+    goToPath('/study/practice-test', { tab: 'study' })
+  }, [goToPath])
+
   const openStudyTestPage = useCallback(() => {
     goToPath('/study/test', { tab: 'study' })
   }, [goToPath])
@@ -10145,7 +10155,7 @@ function App() {
                   </button>
                 </div>
               </div>
-              <button className="home-tmas-cta" type="button" onClick={openStudyPracticeTestPage}>
+              <button className="home-tmas-cta" type="button" onClick={openPriorityTmas2PracticeTestPage}>
                 <div className="home-tmas-cta-copy">
                   <span className="home-tmas-cta-kicker">Priority Focus</span>
                   <strong>Study for TMAS 2 now. Get ready for Tuesday.</strong>

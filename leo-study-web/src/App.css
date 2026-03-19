@@ -5655,7 +5655,24 @@ textarea {
 }
 
 .study-practice-setup-card .study-session-top-action-start {
+  width: min(100%, 540px);
+  min-height: 64px;
+  padding: 16px 24px;
   justify-self: center;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, rgba(255, 255, 255, 0.18));
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 24%, transparent), transparent 42%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 74%, #7fb3ff 26%), color-mix(in srgb, var(--accent) 58%, #5b8cff 42%));
+  box-shadow:
+    0 14px 28px color-mix(in srgb, var(--accent) 18%, rgba(0, 0, 0, 0.34)),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent) inset,
+    0 0 22px color-mix(in srgb, var(--accent) 20%, transparent);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .study-practice-results-card-overlay {
@@ -5716,6 +5733,8 @@ textarea {
   }
 
   .study-practice-setup-card .study-session-top-action-start {
+    min-height: 58px;
+    padding: 14px 18px;
     justify-self: stretch;
   }
 

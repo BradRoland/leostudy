@@ -174,6 +174,7 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
   const questionBlockRef = useRef<HTMLDivElement | null>(null)
   const feedbackRef = useRef<HTMLDivElement | null>(null)
   const nextActionRef = useRef<HTMLButtonElement | null>(null)
+  const setupStartRef = useRef<HTMLButtonElement | null>(null)
 
   const selectedModule = useMemo(() => getPracticeTestModule(selectedModuleId), [selectedModuleId])
   const availableQuestionCount = useMemo(
@@ -329,6 +330,20 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
 
     return () => window.cancelAnimationFrame(frame)
   }, [currentQuestion, selectedChoice, sessionActive, sessionComplete])
+
+  useEffect(() => {
+    if (sessionActive || sessionComplete) return
+    if (typeof window === 'undefined') return
+    if (window.sessionStorage.getItem('practice-test-scroll-target') !== 'setup') return
+
+    const frame = window.requestAnimationFrame(() => {
+      setupStartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setupStartRef.current?.focus({ preventScroll: true })
+      window.sessionStorage.removeItem('practice-test-scroll-target')
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [sessionActive, sessionComplete, selectedModuleId, effectiveQuestionCount])
 
   const resetSession = () => {
     setSessionActive(false)
@@ -809,6 +824,7 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
                 className="primary study-session-top-action study-session-top-action-start"
                 onClick={startSession}
                 disabled={selectedModule.status !== 'available' || selectedModule.scenarios.length === 0}
+                ref={setupStartRef}
               >
                 Start {effectiveQuestionCount}-Question Practice Test
               </button>
