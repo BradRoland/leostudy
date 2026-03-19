@@ -325,6 +325,20 @@
     "explanation": "Causing or permitting unjustifiable pain or placing a child in a dangerous situation."
   },
   {
+    "id": "pc-pc-273a-a-child-endangerment-likely-gbi",
+    "category": "pc",
+    "title": "Child endangerment likely to produce great bodily harm or death",
+    "question": "Which section number matches: Child endangerment likely to produce great bodily harm or death?",
+    "answer": "PC 273a(a)",
+    "tags": [
+      "child abuse",
+      "children"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 273a(a)",
+    "explanation": "Any person who, under circumstances likely to produce great bodily harm or death, willfully causes or permits a child to suffer unjustifiable physical pain or mental suffering, or having the care or custody of a child, willfully causes or permits that child to be placed in a dangerous situation."
+  },
+  {
     "id": "pc-pc-286-sodomy",
     "category": "pc",
     "title": "Sodomy",
@@ -363,6 +377,36 @@
     "difficulty": "easy",
     "codeSection": "PC 288(a)",
     "explanation": "Willfully touching a child or coercing contact with intent to arouse sexual desires; child under 14."
+  },
+  {
+    "id": "pc-pc-311-1-a-manufacturing-or-distributing-child-pornography",
+    "category": "pc",
+    "title": "Manufacturing or distributing child pornography",
+    "question": "Which section number matches: Manufacturing or distributing child pornography?",
+    "answer": "PC 311.1(a)",
+    "tags": [
+      "sex crimes",
+      "child exploitation",
+      "children"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 311.1(a)",
+    "explanation": "Knowingly manufacturing, duplicating, printing, publishing, exchanging, distributing, or possessing with intent to distribute matter depicting a person under 18 engaging in sexual conduct."
+  },
+  {
+    "id": "pc-pc-311-11-possession-of-child-pornography",
+    "category": "pc",
+    "title": "Possession of child pornography",
+    "question": "Which section number matches: Possession of child pornography?",
+    "answer": "PC 311.11",
+    "tags": [
+      "sex crimes",
+      "child exploitation",
+      "children"
+    ],
+    "difficulty": "medium",
+    "codeSection": "PC 311.11",
+    "explanation": "Knowingly possessing or controlling any matter showing a child under 18 engaging in or simulating sexual conduct."
   },
   {
     "id": "pc-pc-314-indecent-exposure",
