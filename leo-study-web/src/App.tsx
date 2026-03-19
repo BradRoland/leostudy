@@ -41,6 +41,12 @@ type CurrentUserActivity = {
   label: string
   updatedAt: string
 }
+type ProfileActivityDisplay = {
+  state: 'active' | 'idle' | 'offline'
+  statusLabel: string
+  mainLabel: string
+  subLabel: string
+}
 type BannerTone = 'courteous' | 'notice' | 'urgent'
 
 const studyTrackingTickMs = 5000
@@ -1384,14 +1390,73 @@ function sanitizeCurrentUserActivity(value: unknown): CurrentUserActivity | null
   }
 }
 
-function formatProfileCurrentActivity(activity: CurrentUserActivity | null, nowMs: number) {
-  if (!activity?.label) return 'Unavailable'
-  const updatedAtMs = Date.parse(activity.updatedAt || '')
-  if (!Number.isFinite(updatedAtMs)) return activity.label
+function describeProfileCurrentActivity(
+  activity: CurrentUserActivity | null,
+  nowMs: number,
+  presence?: PresenceStatus | null,
+): ProfileActivityDisplay {
+  const activityLabel = String(activity?.label || '').trim()
+  const fallbackLabel = activityLabel ? `Last activity: ${activityLabel}` : 'No recent activity'
+
+  if (presence === 'active') {
+    return {
+      state: 'active',
+      statusLabel: 'Active',
+      mainLabel: activityLabel || 'Active on site',
+      subLabel: 'Active now',
+    }
+  }
+
+  if (presence === 'away') {
+    return {
+      state: 'idle',
+      statusLabel: 'Idling',
+      mainLabel: 'Idling',
+      subLabel: fallbackLabel,
+    }
+  }
+
+  if (!activityLabel) {
+    return {
+      state: 'offline',
+      statusLabel: 'Offline',
+      mainLabel: 'Offline',
+      subLabel: 'No recent activity',
+    }
+  }
+
+  const updatedAtMs = Date.parse(activity?.updatedAt || '')
+  if (!Number.isFinite(updatedAtMs)) {
+    return {
+      state: 'active',
+      statusLabel: 'Active',
+      mainLabel: activityLabel,
+      subLabel: 'Active now',
+    }
+  }
   const elapsedMs = Math.max(0, nowMs - updatedAtMs)
-  if (elapsedMs <= 90_000) return activity.label
-  if (elapsedMs <= 15 * 60 * 1000) return `Recently: ${activity.label}`
-  return 'Offline'
+  if (elapsedMs <= 90_000) {
+    return {
+      state: 'active',
+      statusLabel: 'Active',
+      mainLabel: activityLabel,
+      subLabel: 'Active now',
+    }
+  }
+  if (elapsedMs <= 15 * 60 * 1000) {
+    return {
+      state: 'idle',
+      statusLabel: 'Idling',
+      mainLabel: 'Idling',
+      subLabel: fallbackLabel,
+    }
+  }
+  return {
+    state: 'offline',
+    statusLabel: 'Offline',
+    mainLabel: 'Offline',
+    subLabel: fallbackLabel,
+  }
 }
 
 function sanitizeHomeLeaderboardPreferences(input: unknown): HomeLeaderboardPreferences {
@@ -8440,9 +8505,18 @@ function App() {
   const selectedLeaderboardWeeklyFirstSpots = selectedLeaderboardEntry
     ? weeklyFirstSpotCountsByUser[selectedLeaderboardEntry.userId] || 0
     : 0
-  const selectedLeaderboardCurrentActivityLabel = selectedLeaderboardEntry
-    ? formatProfileCurrentActivity(selectedLeaderboardEntry.currentActivity, clockNowMs)
-    : 'Unavailable'
+  const selectedLeaderboardCurrentActivity = selectedLeaderboardEntry
+    ? describeProfileCurrentActivity(
+      selectedLeaderboardEntry.currentActivity,
+      clockNowMs,
+      onlinePresenceByUserId[selectedLeaderboardEntry.userId],
+    )
+    : {
+      state: 'offline',
+      statusLabel: 'Offline',
+      mainLabel: 'Offline',
+      subLabel: 'No recent activity',
+    }
   const leaderAvatarFrameClass = (userId?: string, extraClassName?: string) => {
     const classes = ['leader-avatar-frame']
     if (extraClassName) classes.push(extraClassName)
@@ -10071,6 +10145,17 @@ function App() {
                   </button>
                 </div>
               </div>
+              <button className="home-tmas-cta" type="button" onClick={openStudyPracticeTestPage}>
+                <div className="home-tmas-cta-copy">
+                  <span className="home-tmas-cta-kicker">Priority Focus</span>
+                  <strong>Study for TMAS 2 now. Get ready for Tuesday.</strong>
+                  <span className="home-tmas-cta-subtitle">Open the TMAS 2 practice test and start a full scenario-based run.</span>
+                </div>
+                <span className="home-tmas-cta-button">
+                  <AppIcon name="test" className="button-icon" />
+                  TMAS 2 Practice Test
+                </span>
+              </button>
               <div className="home-actions">
                 <button className="primary" onClick={() => { setActiveTab('study'); navigate('/study') }}>
                   <AppIcon name="flashcards" className="button-icon" />
@@ -13716,9 +13801,14 @@ function App() {
                 </span>
               </span>
               <div className="leader-profile-head">
-                <h3 className={`leader-profile-name ${displayNameClass(selectedLeaderboardEntry.supporterTier, true)}`} style={leaderboardProfileNameStyle}>
-                  {selectedLeaderboardEntry.playerName}
-                </h3>
+                <div className="leader-profile-name-row">
+                  <h3 className={`leader-profile-name ${displayNameClass(selectedLeaderboardEntry.supporterTier, true)}`} style={leaderboardProfileNameStyle}>
+                    {selectedLeaderboardEntry.playerName}
+                  </h3>
+                  <span className={`profile-presence-pill is-${selectedLeaderboardCurrentActivity.state}`}>
+                    {selectedLeaderboardCurrentActivity.statusLabel}
+                  </span>
+                </div>
                 <div className="leader-profile-pills">
                   <p className="leader-theme-pill">Tier: {tierLabel[selectedLeaderboardEntry.supporterTier]}</p>
                   {selectedLeaderboardEntry.isOwner ? <p className="owner-pill owner-pill-inline">Owner</p> : null}
@@ -13742,7 +13832,12 @@ function App() {
               </div>
               <div className="leader-profile-item">
                 <p className="leader-profile-label">Current Activity</p>
-                <p>{selectedLeaderboardCurrentActivityLabel}</p>
+                <div className="leader-profile-activity">
+                  <p className={`leader-profile-activity-main is-${selectedLeaderboardCurrentActivity.state}`}>
+                    {selectedLeaderboardCurrentActivity.mainLabel}
+                  </p>
+                  <p className="leader-profile-activity-sub">{selectedLeaderboardCurrentActivity.subLabel}</p>
+                </div>
               </div>
               <div className="leader-profile-item leader-profile-item-wide">
                 <p className="leader-profile-label">About Me</p>

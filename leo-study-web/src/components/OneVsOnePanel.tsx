@@ -178,6 +178,13 @@ type DuelProfileSnapshot = {
   }
 }
 
+type DuelProfileActivityDisplay = {
+  state: 'active' | 'idle' | 'offline'
+  statusLabel: string
+  mainLabel: string
+  subLabel: string
+}
+
 type OnlineInviteUser = {
   user_id: string
   username: string
@@ -385,14 +392,51 @@ function emptyDuelProfileSnapshot(userId: string): DuelProfileSnapshot {
   }
 }
 
-function formatDuelProfileCurrentActivity(activity: DuelProfileSnapshot['currentActivity']) {
-  if (!activity?.label) return 'Unavailable'
-  const updatedAtMs = Date.parse(activity.updatedAt || '')
-  if (!Number.isFinite(updatedAtMs)) return activity.label
+function describeDuelProfileCurrentActivity(activity: DuelProfileSnapshot['currentActivity']): DuelProfileActivityDisplay {
+  const activityLabel = String(activity?.label || '').trim()
+  const fallbackLabel = activityLabel ? `Last activity: ${activityLabel}` : 'No recent activity'
+
+  if (!activityLabel) {
+    return {
+      state: 'offline',
+      statusLabel: 'Offline',
+      mainLabel: 'Offline',
+      subLabel: 'No recent activity',
+    }
+  }
+
+  const updatedAtMs = Date.parse(activity?.updatedAt || '')
+  if (!Number.isFinite(updatedAtMs)) {
+    return {
+      state: 'active',
+      statusLabel: 'Active',
+      mainLabel: activityLabel,
+      subLabel: 'Active now',
+    }
+  }
   const elapsedMs = Math.max(0, Date.now() - updatedAtMs)
-  if (elapsedMs <= 90_000) return activity.label
-  if (elapsedMs <= 15 * 60 * 1000) return `Recently: ${activity.label}`
-  return 'Offline'
+  if (elapsedMs <= 90_000) {
+    return {
+      state: 'active',
+      statusLabel: 'Active',
+      mainLabel: activityLabel,
+      subLabel: 'Active now',
+    }
+  }
+  if (elapsedMs <= 15 * 60 * 1000) {
+    return {
+      state: 'idle',
+      statusLabel: 'Idling',
+      mainLabel: 'Idling',
+      subLabel: fallbackLabel,
+    }
+  }
+  return {
+    state: 'offline',
+    statusLabel: 'Offline',
+    mainLabel: 'Offline',
+    subLabel: fallbackLabel,
+  }
 }
 
 function duelLeaderboardCacheKey(userId: string, mode: DuelStatsMode) {
@@ -2143,6 +2187,14 @@ export function OneVsOnePanel(props: {
     && selectedDuelProfile.all.currentStreak > 1
     && selectedDuelProfile.all.currentStreak === topCurrentStreakValue,
   )
+  const selectedDuelProfileActivity = selectedDuelProfile
+    ? describeDuelProfileCurrentActivity(selectedDuelProfile.currentActivity)
+    : {
+      state: 'offline',
+      statusLabel: 'Offline',
+      mainLabel: 'Offline',
+      subLabel: 'No recent activity',
+    }
 
   const myRoundsCompleted = useMemo(() => {
     if (!room) return 0
@@ -3324,12 +3376,17 @@ export function OneVsOnePanel(props: {
                   </span>
                 </span>
                 <div className="onevone-profile-name-wrap">
-                  <h3
-                    className={`leader-profile-name ${displayNameClass(selectedDuelProfile.supporterTier, true)}`}
-                    style={displayNameStyle(selectedDuelProfile.nameStyle, selectedDuelProfile.supporterTier)}
-                  >
-                    {selectedDuelProfile.username}
-                  </h3>
+                  <div className="leader-profile-name-row">
+                    <h3
+                      className={`leader-profile-name ${displayNameClass(selectedDuelProfile.supporterTier, true)}`}
+                      style={displayNameStyle(selectedDuelProfile.nameStyle, selectedDuelProfile.supporterTier)}
+                    >
+                      {selectedDuelProfile.username}
+                    </h3>
+                    <span className={`profile-presence-pill is-${selectedDuelProfileActivity.state}`}>
+                      {selectedDuelProfileActivity.statusLabel}
+                    </span>
+                  </div>
                   <div className="leader-profile-pills">
                     <p className="leader-theme-pill">Tier: {supporterTierLabel[selectedDuelProfile.supporterTier]}</p>
                     {selectedProfileHasTopCurrentStreak ? (
@@ -3351,7 +3408,12 @@ export function OneVsOnePanel(props: {
               </div>
               <div className="leader-profile-item">
                 <p className="leader-profile-label">Current Activity</p>
-                <p>{formatDuelProfileCurrentActivity(selectedDuelProfile.currentActivity)}</p>
+                <div className="leader-profile-activity">
+                  <p className={`leader-profile-activity-main is-${selectedDuelProfileActivity.state}`}>
+                    {selectedDuelProfileActivity.mainLabel}
+                  </p>
+                  <p className="leader-profile-activity-sub">{selectedDuelProfileActivity.subLabel}</p>
+                </div>
               </div>
               {selectedDuelProfile.all.currentStreak > 0 ? (
                 <div className="leader-profile-item">
