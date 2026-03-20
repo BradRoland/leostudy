@@ -234,13 +234,53 @@ body {
   gap: 6px;
 }
 
+.taskbar-section-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 8px 0;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-radius: 10px;
+  text-align: left;
+}
+
+.taskbar-section-toggle:hover {
+  background: color-mix(in srgb, var(--panel) 48%, transparent);
+  color: var(--text);
+  box-shadow: none;
+  transform: none;
+}
+
 .taskbar-label {
   margin: 0;
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  padding: 2px 8px 0;
+  padding: 0;
+}
+
+.taskbar-section-toggle .taskbar-label {
+  color: inherit;
+}
+
+.taskbar-section-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: transform 0.18s ease;
+}
+
+.taskbar-section-chevron.collapsed {
+  transform: rotate(-90deg);
 }
 
 .taskbar-nav-btn,
@@ -274,6 +314,10 @@ body {
   display: grid;
   gap: 6px;
   padding-left: 10px;
+}
+
+.taskbar-submenu.collapsed {
+  display: none;
 }
 
 .taskbar-sub-btn {
@@ -793,15 +837,19 @@ body {
   margin-top: 8px;
   padding: 18px 20px;
   border-radius: 22px;
-  border: 1px solid color-mix(in srgb, #73b3ff 54%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--accent) 54%, var(--border));
   background:
-    radial-gradient(circle at top left, rgba(87, 145, 255, 0.34), transparent 44%),
-    radial-gradient(circle at 85% 20%, rgba(116, 79, 255, 0.28), transparent 34%),
-    linear-gradient(135deg, rgba(27, 46, 94, 0.98), rgba(18, 29, 58, 0.94));
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 34%, transparent), transparent 44%),
+    radial-gradient(circle at 85% 20%, color-mix(in srgb, var(--good) 20%, transparent), transparent 34%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent) 26%, var(--panel-strong) 74%),
+      color-mix(in srgb, var(--accent) 18%, var(--body-base) 82%)
+    );
   box-shadow:
     0 16px 34px rgba(7, 16, 36, 0.3),
-    0 0 0 1px rgba(131, 177, 255, 0.12) inset,
-    0 0 26px rgba(79, 122, 255, 0.18);
+    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent) inset,
+    0 0 26px color-mix(in srgb, var(--accent) 18%, transparent);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -842,19 +890,19 @@ body {
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #9fc8ff;
+  color: color-mix(in srgb, var(--accent) 66%, white 34%);
 }
 
 .home-tmas-cta-copy strong {
   font-size: clamp(1.15rem, 2.5vw, 1.55rem);
   line-height: 1.15;
-  color: #f5f8ff;
+  color: var(--text);
 }
 
 .home-tmas-cta-subtitle {
   font-size: 0.92rem;
   line-height: 1.4;
-  color: color-mix(in srgb, #f5f8ff 76%, #a8bbdb 24%);
+  color: color-mix(in srgb, var(--text) 78%, var(--muted) 22%);
   max-width: 56ch;
 }
 
@@ -867,13 +915,19 @@ body {
   min-height: 48px;
   padding: 0 18px;
   border-radius: 999px;
-  border: 1px solid rgba(170, 208, 255, 0.32);
-  background: linear-gradient(180deg, rgba(102, 175, 255, 0.3), rgba(68, 117, 255, 0.24));
-  color: #f6f9ff;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 72%, white 28%),
+    color-mix(in srgb, var(--accent) 84%, black 16%)
+  );
+  color: white;
   font-size: 0.92rem;
   font-weight: 800;
   white-space: nowrap;
-  box-shadow: 0 10px 20px rgba(20, 52, 122, 0.22);
+  box-shadow:
+    0 10px 20px color-mix(in srgb, var(--accent) 24%, rgba(20, 52, 122, 0.22)),
+    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent) inset;
 }
 
 .day-streak-chip-fire {

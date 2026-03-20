@@ -674,6 +674,7 @@ const studyStreakMilestones = [3, 7, 14, 21, 30]
 
 const defaultGamesModeSelection: GameModeSelection = { duration: 30, filter: 'all' }
 const gamesModeStorageKey = 'leo_study_games_mode_selection'
+const taskbarCollapseStorageKey = 'leo_study_taskbar_collapsed_groups'
 
 function sanitizeGameModeSelection(input: unknown): GameModeSelection {
   if (!input || typeof input !== 'object') return { ...defaultGamesModeSelection }
@@ -691,6 +692,36 @@ function loadStoredGameModeSelection(): GameModeSelection {
     return sanitizeGameModeSelection(JSON.parse(raw) as unknown)
   } catch {
     return { ...defaultGamesModeSelection }
+  }
+}
+
+function loadTaskbarCollapsedGroups() {
+  if (typeof window === 'undefined') {
+    return {
+      study: false,
+      games: false,
+    }
+  }
+
+  try {
+    const raw = window.localStorage.getItem(taskbarCollapseStorageKey)
+    if (!raw) {
+      return {
+        study: false,
+        games: false,
+      }
+    }
+
+    const parsed = JSON.parse(raw) as Partial<Record<'study' | 'games', boolean>>
+    return {
+      study: Boolean(parsed.study),
+      games: Boolean(parsed.games),
+    }
+  } catch {
+    return {
+      study: false,
+      games: false,
+    }
   }
 }
 
@@ -3565,6 +3596,7 @@ function App() {
   const [reduceVisualEffects, setReduceVisualEffects] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [mobileNavMenuOpen, setMobileNavMenuOpen] = useState(false)
+  const [taskbarCollapsedGroups, setTaskbarCollapsedGroups] = useState(() => loadTaskbarCollapsedGroups())
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const streakLossNoticeRef = useRef('')
 
@@ -3603,6 +3635,11 @@ function App() {
   const [speedSessionQuestions, setSpeedSessionQuestions] = useState<QuizQuestion[]>([])
   const [showSpeedSetupModal, setShowSpeedSetupModal] = useState(false)
   const [speedFeedback, setSpeedFeedback] = useState('')
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(taskbarCollapseStorageKey, JSON.stringify(taskbarCollapsedGroups))
+  }, [taskbarCollapsedGroups])
   const [speedAnswerLocked, setSpeedAnswerLocked] = useState(false)
   const [scenarioTrainingSection, setScenarioTrainingSection] = useState<ScenarioTrainingSection>('tmas1')
   const [scenarioDeck, setScenarioDeck] = useState<ScenarioQuestion[]>([])
@@ -9996,12 +10033,22 @@ function App() {
             </div>
 
             <div className="taskbar-section">
-              <p className="taskbar-label">Study</p>
+              <button
+                className="taskbar-section-toggle"
+                type="button"
+                aria-expanded={!taskbarCollapsedGroups.study}
+                onClick={() => setTaskbarCollapsedGroups((current) => ({ ...current, study: !current.study }))}
+              >
+                <span className="taskbar-label">Study</span>
+                <span className={`taskbar-section-chevron ${taskbarCollapsedGroups.study ? 'collapsed' : ''}`} aria-hidden>
+                  ▾
+                </span>
+              </button>
               <button className={isStudyPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('study')}>
                 <AppIcon name="study" className="taskbar-icon" />
                 Study Hub
               </button>
-              <div className="taskbar-submenu">
+              <div className={`taskbar-submenu ${taskbarCollapsedGroups.study ? 'collapsed' : ''}`}>
                 <button
                   className={isStudyGuidePage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
                   onClick={openStudyGuidePage}
@@ -10034,12 +10081,22 @@ function App() {
             </div>
 
             <div className="taskbar-section">
-              <p className="taskbar-label">Games</p>
+              <button
+                className="taskbar-section-toggle"
+                type="button"
+                aria-expanded={!taskbarCollapsedGroups.games}
+                onClick={() => setTaskbarCollapsedGroups((current) => ({ ...current, games: !current.games }))}
+              >
+                <span className="taskbar-label">Games</span>
+                <span className={`taskbar-section-chevron ${taskbarCollapsedGroups.games ? 'collapsed' : ''}`} aria-hidden>
+                  ▾
+                </span>
+              </button>
               <button className={isGamesPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('games')}>
                 <AppIcon name="games" className="taskbar-icon" />
                 Games Hub
               </button>
-              <div className="taskbar-submenu">
+              <div className={`taskbar-submenu ${taskbarCollapsedGroups.games ? 'collapsed' : ''}`}>
                 <button
                   className={isGamesSpeedPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
                   onClick={() => {

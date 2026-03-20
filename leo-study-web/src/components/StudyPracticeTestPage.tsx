@@ -58,6 +58,10 @@ function shuffleArray<T>(items: T[]) {
 }
 
 function randomizeQuestion(question: PracticeTestQuestion): PracticeTestQuestion {
+  if (question.format === 'true_false') {
+    return question
+  }
+
   const shuffledChoiceIndexes = shuffleArray(question.choices.map((_, index) => index))
   return {
     ...question,
@@ -188,6 +192,10 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
   const effectiveQuestionCount = useMemo(
     () => availableLengthOptions.find((count) => count === selectedQuestionCount) ?? availableLengthOptions[0] ?? 0,
     [availableLengthOptions, selectedQuestionCount],
+  )
+  const averageQuestionsPerScenario = useMemo(
+    () => (selectedModule.scenarios.length > 0 ? availableQuestionCount / selectedModule.scenarios.length : 0),
+    [availableQuestionCount, selectedModule.scenarios.length],
   )
   const activeScenarios = sessionScenarios.length > 0 ? sessionScenarios : selectedModule.scenarios
   const flattenedQuestions = useMemo(
@@ -417,6 +425,9 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
     : isLastQuestionInScenario
       ? 'Next Scenario'
       : 'Next Question'
+  const currentQuestionHint = currentQuestion
+    ? `Press 1–${currentQuestion.choices.length} or tap a choice. ${currentQuestion.format === 'true_false' ? 'These true / false checks are intentionally close-call items.' : 'The question is centered and the answer set stays directly beneath it.'}`
+    : ''
   const sessionOverlay = (sessionActive || sessionComplete) ? (
     <div className={`study-session-overlay study-practice-session-overlay ${overlayThemeClasses}`.trim()}>
       <div className="study-practice-session-shell">
@@ -460,6 +471,9 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
                     <div className="study-practice-question-tags">
                       <span className="study-practice-question-objective">LD {currentQuestion.ldNumber}</span>
                       <span className="study-practice-question-objective">{currentQuestion.objective}</span>
+                      {currentQuestion.format === 'true_false' ? (
+                        <span className="study-practice-question-objective">True / False</span>
+                      ) : null}
                     </div>
                   </div>
                   <h2>{currentQuestion.prompt}</h2>
@@ -496,7 +510,7 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
                   </div>
 
                   {selectedChoice === null ? (
-                    <p className="muted tiny study-practice-choice-hint">Press 1–4 or tap a choice. The question is centered and the answer set stays directly beneath it.</p>
+                    <p className="muted tiny study-practice-choice-hint">{currentQuestionHint}</p>
                   ) : (
                     <div className="study-practice-feedback" ref={feedbackRef} aria-live="polite">
                       <p className={selectedChoice === currentQuestion.correctIndex ? 'good' : 'bad'}>
@@ -795,6 +809,9 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
                 <div className="study-practice-length-grid">
                   {availableLengthOptions.map((count) => {
                     const isSelected = count === effectiveQuestionCount
+                    const estimatedScenarioPulls = averageQuestionsPerScenario > 0
+                      ? Math.ceil(count / averageQuestionsPerScenario)
+                      : 0
                     return (
                       <button
                         key={`practice-length-${count}`}
@@ -805,7 +822,7 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
                         }}
                       >
                         <strong>{count}</strong>
-                        <small>{Math.ceil(count / 4)} scenario pulls</small>
+                        <small>~{estimatedScenarioPulls} scenario pulls</small>
                       </button>
                     )
                   })}
@@ -837,6 +854,7 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
                 <ul className="study-practice-list">
                   <li>The live session opens in a dedicated full-screen test window.</li>
                   <li>Each run randomizes scenario order, question order, and answer order.</li>
+                  <li>The bank now mixes multiple-choice items with harder true / false checks inside each scenario set.</li>
                   <li>After you answer, the screen jumps straight to the explanation and next action.</li>
                 </ul>
               </div>

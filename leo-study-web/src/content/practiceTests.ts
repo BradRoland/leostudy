@@ -1,5 +1,6 @@
 import { ld152016FocusScenarios } from './practiceTestFocusScenarios'
 import { strengthenScenarioDistractors } from './practiceTestChoiceTuning'
+import { appendTrueFalseFollowUps } from './practiceTestTrueFalse'
 
 export type PracticeTestModuleId = 'tmas1' | 'tmas2' | 'tmas3' | 'ld152016'
 
@@ -11,6 +12,7 @@ export type PracticeTestQuestion = {
   choices: string[]
   correctIndex: number
   explanation: string
+  format?: 'multiple_choice' | 'true_false'
 }
 
 export type PracticeTestScenario = {
@@ -3274,7 +3276,9 @@ const tmas2ExtendedScenarios: PracticeTestScenario[] = [
   ),
 ]
 
-const allTmas2Scenarios = strengthenScenarioDistractors([...tmas2Scenarios, ...tmas2ExtendedScenarios])
+const allTmas2Scenarios = appendTrueFalseFollowUps(
+  strengthenScenarioDistractors([...tmas2Scenarios, ...tmas2ExtendedScenarios]),
+)
 
 function countQuestions(scenarios: PracticeTestScenario[]) {
   return scenarios.reduce((total, item) => total + item.questions.length, 0)

@@ -1,6 +1,11 @@
 type ScenarioLike = {
   questions: Array<{
+    id: string
+    ldNumber: string
+    objective: string
+    prompt: string
     choices: string[]
+    correctIndex: number
   }>
 }
 
@@ -203,12 +208,251 @@ function strengthenChoices(choices: string[]) {
   return choices.map((choice) => exactChoiceRewrites.get(choice) ?? choice)
 }
 
-export function strengthenScenarioDistractors<T extends ScenarioLike>(scenarios: T[]): T[] {
+type PromptCategory =
+  | 'offense'
+  | 'role'
+  | 'mental_state'
+  | 'supporting_fact'
+  | 'report'
+  | 'response'
+  | 'level'
+  | 'search'
+  | 'miranda'
+  | 'force'
+  | 'general'
+
+const curatedDistractorBanks: Record<string, Partial<Record<PromptCategory, string[]>>> = {
+  '5': {
+    offense: [
+      'Conspiracy based on agreement plus overt acts',
+      'Accessory after the fact',
+      'Attempt liability based on a direct but ineffectual act',
+      'Principal liability through aiding and abetting',
+    ],
+    role: [
+      'Accessory after the fact',
+      'Conspiracy based on agreement plus overt acts',
+      'A witness with no criminal exposure',
+      'A civil plaintiff only',
+    ],
+  },
+  '6': {
+    offense: [
+      'Receiving stolen property',
+      'Possession of burglary tools',
+      'Possession of or receiving property with altered serial numbers',
+      'Defrauding an innkeeper',
+      'Theft by false pretenses',
+      'Trespass with vandalism exposure',
+      'Shoplifting',
+    ],
+    level: ['Straight felonies only', 'A wobbler that can be filed either way', 'Misdemeanors', 'Infractions only'],
+  },
+  '7': {
+    offense: [
+      'Battery or other force-based crime-against-the-person analysis',
+      'Assault with a deadly weapon',
+      'False imprisonment',
+      'Criminal threats',
+      'Voluntary manslaughter',
+      'Murder',
+    ],
+    force: [
+      'Containment and de-escalation while reassessing threat cues',
+      'Less-lethal force only if it remains objectively reasonable under the changing threat facts',
+      'Deadly force only if the suspect presents an imminent threat of death or serious bodily injury',
+      'Immediate medical care, scene control, and detailed force articulation after the event',
+    ],
+  },
+  '8': {
+    offense: [
+      'Forgery',
+      'False report of an emergency',
+      'Defrauding an innkeeper',
+      'Prostitution or solicitation for prostitution',
+      'Trespass or prowling exposure',
+      'False personation or obstruction-related exposure',
+    ],
+    level: ['Straight felonies only', 'A wobbler that can be filed either way', 'Misdemeanors', 'Infractions only'],
+  },
+  '9': {
+    offense: [
+      'Child endangerment',
+      'Child neglect',
+      'Mandated-reporter failure analysis',
+      'Immediate child-safety / exigency analysis',
+      'Custodial or caregiver neglect theory',
+    ],
+    response: [
+      'Take immediate action to protect any child who may still be at risk and preserve the first disclosure accurately',
+      'Stabilize the child, assess medical needs, and document exact statements and scene conditions',
+      'Treat the call as a child-protection response first, not only a delayed report for detectives',
+    ],
+  },
+  '10': {
+    offense: [
+      'Sexual battery or unlawful sexual touching',
+      'Rape or unlawful sexual intercourse exposure',
+      'Lewd conduct or child-molestation analysis',
+      'Sex-offender registration violation',
+      'Victim-centered sex-crime first-response issue',
+    ],
+    response: [
+      'Use a calm, victim-centered approach while preserving the initial disclosure and immediate safety needs',
+      'Separate the victim from the suspect, assess medical or forensic needs, and document the first account carefully',
+      'Avoid a blame-focused interview and preserve support resources, witness information, and disclosure details',
+    ],
+  },
+  '15': {
+    offense: [
+      'A consensual encounter',
+      'A detention supported by specific, articulable facts',
+      'A warrantless arrest supported by probable cause',
+      'Custodial interrogation requiring Miranda',
+    ],
+    miranda: [
+      'Miranda is required before custodial interrogation designed to elicit incriminating responses',
+      'Questions may stay limited to public-safety or booking issues, but incriminating custodial interrogation still requires Miranda',
+      'Custody alone is not enough; Miranda attaches when custody and interrogation are both present',
+    ],
+  },
+  '16': {
+    search: [
+      'Search based on valid consent with actual or apparent authority',
+      'Probable-cause vehicle search that includes containers capable of holding the object sought',
+      'Search condition search tied to the probation or parole terms',
+      'Plain-view seizure after lawful access to the location',
+      'Protective pat search for weapons based on specific officer-safety facts',
+    ],
+  },
+  '20': {
+    force: [
+      'Containment, cover, communication, and de-escalation while reassessing the threat',
+      'A less-lethal option only if it remains objectively reasonable under the totality of the circumstances',
+      'Deadly force only if the suspect presents an imminent threat of death or serious bodily injury',
+      'Immediate intervention, medical care, and reporting duties after unreasonable or reportable force',
+    ],
+    response: [
+      'Slow the event down when feasible, use cover and distance, and reassess threat cues before escalating force',
+      'Choose the force option that is objectively reasonable now, not the harshest option theoretically available',
+      'After force, secure the scene, request medical aid, and document the threat facts and warnings clearly',
+    ],
+  },
+  '39': {
+    offense: [
+      'Witness intimidation or retaliation-related threats',
+      'Violation of a court order',
+      'False bomb or false emergency report',
+      'Accessory after the fact',
+      'Perjury or false-statement-related exposure',
+    ],
+    miranda: [
+      'Custodial questioning about witness threats still requires Miranda before incriminating interrogation',
+      'Officers may separate safety questions from the later evidentiary interview, but Miranda still governs custodial interrogation',
+      'Court-order or intimidation cases do not create a blanket Miranda exception',
+    ],
+  },
+}
+
+const weakDistractorPatterns = [
+  /\bpublic intoxication\b/i,
+  /\bdisturbing the peace\b/i,
+  /\bindecent exposure\b/i,
+  /\barson\b/i,
+  /\bkidnapping\b/i,
+  /\bcarjacking\b/i,
+  /\bloitering\b/i,
+  /\bpublic nuisance\b/i,
+  /\bfailure to appear\b/i,
+  /\bcivil standby\b/i,
+  /\bvoluntary witness\b/i,
+  /\bconfidential informant\b/i,
+  /\bmandatory child-abuse report\b/i,
+]
+
+function normalizeText(text: string) {
+  return text.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function compareKey(text: string) {
+  return normalizeText(text)
+    .replace(/\b(a|an|the)\b/g, '')
+    .replace(/\bonly\b/g, '')
+    .replace(/[.?!]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function classifyPrompt(prompt: string, objective: string, ldNumber: string): PromptCategory {
+  const text = `${prompt} ${objective}`.toLowerCase()
+
+  if (/\bmiranda\b|\bcustodial interrogation\b|\binterrogat/i.test(text)) return 'miranda'
+  if (/\bforce\b|\bless-lethal\b|\bdeadly\b|\bde-?escal/i.test(text)) return 'force'
+  if (/\bsearch\b|\bpat search\b|\bplain view\b|\bwarrant\b|\bconsent\b|\bcontainer\b|\bprobation\b|\bparole\b/.test(text)) return 'search'
+  if (/\bwhat level\b|\bfelony\b|\bmisdemeanor\b|\binfraction\b/.test(text)) return 'level'
+  if (/\bmental state\b|\bintent\b/.test(text)) return 'mental_state'
+  if (/\bwhich fact\b|\bwhat fact\b|\bmost directly supports\b|\bmost strongly supports\b|\bbest supports\b|\bkey fact\b/.test(text)) return 'supporting_fact'
+  if (/\breport\b|\bdocument\b|\bdocumentation\b|\badvisement\b|\bwhat should be included\b/.test(text)) return 'report'
+  if (/\bfirst-response\b|\bfirst response\b|\bbest first\b|\bbest initial\b|\bbest response\b|\bshould officers do first\b|\bbest approach\b|\bbest reflects\b|\bwhat is the best first-response approach\b/.test(text)) return 'response'
+  if (/\brole best fits\b|\baiding and abetting\b|\bprincipal\b|\baccessory\b|\bconspiracy\b/.test(text)) return 'role'
+  if (/\boffense\b|\bcrime\b|\bcharge\b|\btheory\b|\bviolation\b|\bclassification\b/.test(text)) return 'offense'
+  if (ldNumber === '20') return 'force'
+  if (ldNumber === '16') return 'search'
+  if (ldNumber === '15') return 'miranda'
+  return 'general'
+}
+
+function isWeakDistractor(choice: string, category: PromptCategory) {
+  if (weakDistractorPatterns.some((pattern) => pattern.test(choice))) return true
+  if (category === 'offense' || category === 'role' || category === 'level') {
+    return choice.length < 40 || !/[.?!]/.test(choice)
+  }
+  return false
+}
+
+function replaceWeakDistractors<T extends ScenarioLike>(scenarios: T[]) {
   return scenarios.map((scenario) => ({
     ...scenario,
-    questions: scenario.questions.map((question) => ({
-      ...question,
-      choices: strengthenChoices(question.choices),
-    })),
+    questions: scenario.questions.map((question) => {
+      const category = classifyPrompt(question.prompt, question.objective, question.ldNumber)
+      const rewrittenChoices = strengthenChoices(question.choices)
+      const correctChoice = rewrittenChoices[question.correctIndex]
+      const allowCuratedReplacement =
+        category === 'offense' || ((category === 'role' || category === 'level') && correctChoice.length <= 48)
+      const usedChoices = new Set(rewrittenChoices.map((choice) => compareKey(choice)))
+      const curatedCandidates = (curatedDistractorBanks[question.ldNumber]?.[category] ?? []).filter(
+        (candidate) =>
+          compareKey(candidate) !== compareKey(rewrittenChoices[question.correctIndex]) && !usedChoices.has(compareKey(candidate)),
+      )
+      let curatedIndex = 0
+      const nextReplacement = () => {
+        while (curatedIndex < curatedCandidates.length) {
+          const candidate = curatedCandidates[curatedIndex]
+          curatedIndex += 1
+          const key = compareKey(candidate)
+          if (usedChoices.has(key)) continue
+          usedChoices.add(key)
+          return candidate
+        }
+        return null
+      }
+
+      const choices = rewrittenChoices.map((choice, index) => {
+        if (index === question.correctIndex) return choice
+        if (!allowCuratedReplacement || !isWeakDistractor(choice, category)) return choice
+
+        const replacement = nextReplacement()
+        return replacement ?? choice
+      })
+
+      return {
+        ...question,
+        choices,
+      }
+    }),
   }))
+}
+
+export function strengthenScenarioDistractors<T extends ScenarioLike>(scenarios: T[]): T[] {
+  return replaceWeakDistractors(scenarios)
 }

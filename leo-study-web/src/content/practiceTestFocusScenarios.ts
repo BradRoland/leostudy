@@ -1,5 +1,6 @@
 import { studyGuideOfficialResearchByLd } from './studyGuideOfficialResearch'
 import { strengthenScenarioDistractors } from './practiceTestChoiceTuning'
+import { appendTrueFalseFollowUps } from './practiceTestTrueFalse'
 
 type PracticeTestQuestion = {
   id: string
@@ -9,6 +10,7 @@ type PracticeTestQuestion = {
   choices: string[]
   correctIndex: number
   explanation: string
+  format?: 'multiple_choice' | 'true_false'
 }
 
 type PracticeTestScenario = {
@@ -1045,4 +1047,6 @@ const rawLd152016FocusScenarios: PracticeTestScenario[] = [
   ...forceSeeds.map(buildForceScenario),
 ]
 
-export const ld152016FocusScenarios: PracticeTestScenario[] = strengthenScenarioDistractors(rawLd152016FocusScenarios)
+export const ld152016FocusScenarios: PracticeTestScenario[] = appendTrueFalseFollowUps(
+  strengthenScenarioDistractors(rawLd152016FocusScenarios),
+)
