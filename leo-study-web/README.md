@@ -1,105 +1,281 @@
 # LEO Study Web
 
-React + Supabase app for California code study.
+California POST study platform focused on penal codes, vehicle codes, health and safety codes, TMAS prep, scenarios, games, and user progress tracking.
 
-## Included
+This app is built for academy recruits, cadets, and officers who want a single place to study California law and prepare for POST-style testing.
 
-- Email sign-in/sign-up
-- Google OAuth sign-in (via Supabase Auth)
-- First-run profile setup (username + avatar upload)
-- Persisted user progress (`app_state`)
-- Persisted leaderboard (`leaderboard`)
-- Existing study, flashcard, and matching game features
+## What the app includes
+
+- California code library for:
+  - Penal Code
+  - Health & Safety Code
+  - Vehicle Code
+- Study modes:
+  - quick quiz
+  - flashcards
+  - study guide by LD
+  - scenario training
+  - practice tests
+- Games:
+  - matching
+  - speed / quiz-style modes
+  - 1v1 modes
+- TMAS support:
+  - TMAS 1 scenario section
+  - TMAS 2 scenario section
+  - TMAS 2 practice test
+  - focused LD `15 / 16 / 20` practice test
+- POST-based study guide:
+  - LD-by-LD guide
+  - workbook + TTS-driven study content
+  - TMAS coverage tagging
+- User systems:
+  - sign-in with email / Google
+  - profiles and avatars
+  - study time tracking
+  - activity / presence status
+  - leaderboards and weekly leaderboards
+  - high scores by game
+  - support tiers via Stripe
+
+## Current TMAS / study features
+
+- `Study Guide`
+  - built around POST workbook and TTS coverage
+  - broken down by LD
+  - designed to count study time only while the user is actively interacting
+- `Practice Test`
+  - TMAS 2 full practice bank
+  - focused LD `15 / 16 / 20` bank
+  - randomized scenarios, randomized question order, randomized answer order
+  - multiple-choice plus harder true/false follow-up items
+  - LD coaching at the end of a run (`Proficient`, `Needs More Reps`, `Lacking`)
+- `Scenarios`
+  - TMAS 1 and TMAS 2 separated in the UI
+  - TMAS 2 supports grouped sub-questions per scenario
+
+## Tech stack
+
+- React 19
+- TypeScript
+- Vite
+- Supabase
+- Stripe
+- Vercel Analytics / Speed Insights
+
+## Project structure
+
+```text
+src/
+  components/                 main UI sections
+  content/                    local study content and practice banks
+  App.tsx                     app shell, routing, top-level state
+  App.css                     main styling
+
+backend/
+  stripe-webhook.mjs          Stripe tier webhook server
+  sync-content-items.mjs      push local content into Supabase
+  pull-content-items.mjs      pull content back from Supabase
+
+supabase/
+  schema.sql                  base schema
+  migrations/                 incremental DB updates
+```
+
+## Local content files
+
+### Code and scenario content synced to Supabase
+
+- `src/content/pc.json`
+- `src/content/hs.json`
+- `src/content/vc.json`
+- `src/content/scenarios.json`
+- `src/content/scenarios-tmas2.json`
+- `src/content/custom.json`
+
+### Study guide / practice-test source files
+
+These are frontend-source files and are deployed by Git push, not by `content:sync`.
+
+- `src/content/studyGuide.ts`
+- `src/content/studyGuideOfficialResearch.ts`
+- `src/content/studyGuideExamBlueprint.ts`
+- `src/content/study-guide-post-research.json`
+- `src/content/practiceTests.ts`
+- `src/content/practiceTestFocusScenarios.ts`
+- `src/content/practiceTestChoiceTuning.ts`
+- `src/content/practiceTestTrueFalse.ts`
 
 ## Setup
 
-1. Install dependencies:
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-2. Copy env and fill values from your Supabase project:
+### 2. Create `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Required vars:
+### 3. Fill environment variables
+
+#### Frontend
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_CONTENT_SOURCE` (`local` or `supabase`, default: `local`)
-- `VITE_OWNER_EMAIL` (optional bootstrap convenience)
-- `VITE_SUPABASE_AVATAR_BUCKET` (default: `avatars`)
+- `VITE_CONTENT_SOURCE`
+  - `local` for local JSON content only
+  - `supabase` to load remote `content_items`
+- `VITE_OWNER_EMAIL` optional
+- `VITE_SUPABASE_AVATAR_BUCKET` optional, default `avatars`
 - `VITE_STRIPE_LINK_TIER2`
 - `VITE_STRIPE_LINK_TIER5`
 - `VITE_STRIPE_LINK_TIER10`
 
-3. Run SQL bootstrap in Supabase SQL editor:
+#### Backend / scripts
 
-- `/Users/jank/Documents/New project/leo-study-web/supabase/schema.sql`
-  - Includes `profiles.bio`, `profiles.agency`, and `app_state.profile_details` for profile details.
-  - Includes `leaderboard.match_duration` and `leaderboard.match_filter` for categorized matching leaderboards.
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260215_owner_roles_and_content_items.sql`
-  - Adds `user_roles` + `content_items` + owner-only RLS for content editing.
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260222_public_chat_retention_cleanup.sql`
-  - Adds hourly server-side cleanup for `public_messages` rows older than 48 hours.
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_account_moderation.sql`
-  - Adds owner ban/delete account tools, removes banned users from leaderboards, and blocks banned users from writing progress/scores.
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_account_moderation_rpc_hotfix.sql`
-  - Adds a stable owner moderation RPC (`owner_moderate_account_json`) and refreshes PostgREST schema cache.
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260226_leaderboard_only_reset.sql`
-  - Adds owner-only `reset_global_leaderboard_only()` so global leaderboard resets do not wipe user progress stats.
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260226_leaderboard_only_reset_sql_editor_fix.sql`
-  - Allows the same reset function to run from Supabase SQL editor (`postgres`) while keeping owner checks for normal app users.
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260226_leaderboard_only_reset_include_high_scores.sql`
-  - Extends the reset function to clear `leaderboard` + `app_state.high_scores` while preserving study progress and profile stats.
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260226_app_state_clobber_guard.sql`
-  - Adds a DB trigger that prevents accidental overwrite of non-empty `app_state` progress with empty/default values.
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_WEBHOOK_PORT`
+- `STRIPE_TEST_TOKEN`
+- `STRIPE_PRICE_ID_TIER2`
+- `STRIPE_PRICE_ID_TIER5`
+- `STRIPE_PRICE_ID_TIER10`
 
-4. Run app:
+### 4. Set up Supabase
+
+Run:
+
+- `supabase/schema.sql`
+- every SQL file in `supabase/migrations/` in chronological order
+
+Important migrations include:
+
+- `20260215_owner_roles_and_content_items.sql`
+- `20260221_1v1_invites.sql`
+- `20260222_public_chat_retention_cleanup.sql`
+- `20260224_owner_account_moderation.sql`
+- `20260226_app_state_clobber_guard.sql`
+- `20260305_weekly_leaderboard.sql`
+- `20260318_content_items_tmas_metadata.sql`
+
+### 5. Start local dev
 
 ```bash
 npm run dev
 ```
 
-- Local: `http://localhost:5173`
+Default local URLs:
 
-## Safe leaderboard reset (no user stat wipe)
+- `http://localhost:5173`
+- `http://127.0.0.1:5173`
 
-Run this in Supabase SQL editor when you only want to clear leaderboard rankings:
+## Dev domain
 
-```sql
-select public.reset_global_leaderboard_only();
-```
+`vite.config.ts` is already configured to allow:
 
-This preserves:
-- `app_state` (study progress + mastery stats)
-- `duel_player_stats` (1v1 W/L + streak stats)
-- `game_attempt_history`
+- `dev.180.academy`
+- `180.academy`
+- `test.180.academy`
+- `testt.180.academy`
 
-And it clears:
-- `leaderboard` rows
-- `app_state.high_scores` for all users
+If you are using the `dev.180.academy` Cloudflare tunnel workflow, the tunnel must point to the machine running Vite on port `5173`.
 
-## How to add/edit questions locally
+The app already supports HMR on `dev.180.academy` through the Vite server config.
 
-Local content lives in:
+## Common scripts
 
-- `/Users/jank/Documents/New project/leo-study-web/src/content/pc.json`
-- `/Users/jank/Documents/New project/leo-study-web/src/content/hs.json`
-- `/Users/jank/Documents/New project/leo-study-web/src/content/vc.json`
-- `/Users/jank/Documents/New project/leo-study-web/src/content/scenarios.json`
-- `/Users/jank/Documents/New project/leo-study-web/src/content/custom.json` (for future categories)
-
-Set `.env`:
+### App
 
 ```bash
-VITE_CONTENT_SOURCE=local
+npm run dev
+npm run build
+npm run preview
+npm run lint
 ```
 
-Code-item shape (`pc/hs/vc/custom`):
+### Content sync
+
+Push local code/scenario content into Supabase:
+
+```bash
+npm run content:sync
+```
+
+Pull `content_items` from Supabase back into local files:
+
+```bash
+npm run content:pull
+```
+
+### Owner bootstrap
+
+```bash
+npm run owner:bootstrap -- owner@email.com
+```
+
+### Stripe webhook
+
+```bash
+npm run stripe:webhook
+```
+
+### PM2 webhook management
+
+```bash
+npm run pm2:webhook:start
+npm run pm2:webhook:restart
+npm run pm2:webhook:logs
+```
+
+## Content workflow
+
+### If you changed local JSON code/scenario content
+
+Examples:
+
+- Penal Code
+- HS Code
+- Vehicle Code
+- scenario banks
+
+Do both:
+
+```bash
+npm run build
+npm run content:sync
+```
+
+Then commit and push.
+
+### If you changed practice tests or study-guide logic in code
+
+Examples:
+
+- `practiceTests.ts`
+- `practiceTestFocusScenarios.ts`
+- `practiceTestChoiceTuning.ts`
+- `practiceTestTrueFalse.ts`
+- `StudyPracticeTestPage.tsx`
+- study guide components / generators
+
+These changes go live through Git deployment. They are not primarily driven by `content_items`, so the critical step is:
+
+```bash
+npm run build
+git push origin main
+```
+
+`content:sync` is still safe to run, but it does not publish those source-driven practice-test logic changes by itself.
+
+## Content shapes
+
+### Code item
 
 ```json
 {
@@ -116,7 +292,7 @@ Code-item shape (`pc/hs/vc/custom`):
 }
 ```
 
-Scenario shape (`scenarios.json`):
+### Scenario item
 
 ```json
 {
@@ -130,166 +306,108 @@ Scenario shape (`scenarios.json`):
 }
 ```
 
-Validation behavior:
-- Missing required fields are logged as warnings in browser console.
-- Invalid items are skipped and will not crash the app.
+## Owner / editor workflow
 
-## Owner bootstrap + Content Editor (remote editable)
+If `VITE_CONTENT_SOURCE=supabase`:
 
-1. Set env and run migrations.
-2. Assign initial owner (one-time):
+- owners can create and edit content in the app
+- non-owners can read published content but cannot mutate content
 
-```bash
-npm run owner:bootstrap -- owner@email.com
-```
+Typical owner workflow:
 
-- If an owner already exists, use `--force` only when you intentionally want to reassign.
-- This command uses `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`.
+1. apply schema + migrations
+2. bootstrap owner
+3. sign in as owner
+4. use the in-app content editor
 
-3. Switch content source:
+## Stripe support tiers
 
-```bash
-VITE_CONTENT_SOURCE=supabase
-```
+The app currently uses tip-style support tiers:
 
-4. Sign in as owner and open `Profile` (Settings). You will see `Content Editor`:
-- Create/edit/delete content items.
-- Categories are flexible (`pc`, `hs`, `vc`, `scenario`, or any new category string).
-- Non-owner accounts can read published content but cannot mutate content (enforced by RLS).
+- `$2`
+- `$5`
+- `$10`
 
-To keep Supabase and local files in sync:
+Users can unlock perks without making the app hard-paywalled.
 
-- Push local files to Supabase:
-```bash
-npm run content:sync
-```
-- Pull Supabase content back into local files:
-```bash
-npm run content:pull
-```
+### Payment links
 
-## Supabase Google auth
+Create three Stripe Payment Links and put them into:
 
-In Supabase dashboard:
+- `VITE_STRIPE_LINK_TIER2`
+- `VITE_STRIPE_LINK_TIER5`
+- `VITE_STRIPE_LINK_TIER10`
 
-- Auth → Providers → Google → Enable
-- Add Google OAuth Client ID/Secret
-- Add redirect URL: `http://localhost:5173`
+### Auto-upgrade webhook
 
-## Tier payments (easy setup)
+The webhook server upgrades `profiles.supporter_tier` after Stripe checkout success.
 
-1. In Stripe, create three Payment Links (`$2`, `$5`, `$10`).
-2. Paste each link into the matching env var:
-   - `VITE_STRIPE_LINK_TIER2`
-   - `VITE_STRIPE_LINK_TIER5`
-   - `VITE_STRIPE_LINK_TIER10`
-3. In the app, open Profile → Support Tier and tap `Upgrade with Stripe`.
-
-## Tier auto-upgrade (Stripe webhook)
-
-This project includes a webhook server that upgrades `profiles.supporter_tier` automatically when Stripe checkout succeeds.
-
-1. Add backend webhook env vars:
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `STRIPE_SECRET_KEY`
-   - `STRIPE_WEBHOOK_SECRET`
-   - `STRIPE_PRICE_ID_TIER2`
-   - `STRIPE_PRICE_ID_TIER5`
-   - `STRIPE_PRICE_ID_TIER10`
-   - Optional fallback: `STRIPE_PAYMENT_LINK_ID_TIER2`, `STRIPE_PAYMENT_LINK_ID_TIER5`, `STRIPE_PAYMENT_LINK_ID_TIER10`
-2. Start webhook server:
+Start it with:
 
 ```bash
 npm run stripe:webhook
 ```
 
-3. In Stripe Dashboard → Developers → Webhooks:
-   - Add endpoint: `https://<your-public-domain>/stripe/webhook`
-   - Subscribe to event: `checkout.session.completed`
-4. Use the signing secret from Stripe as `STRIPE_WEBHOOK_SECRET`.
+Stripe webhook endpoint:
+
+```text
+https://<your-public-domain>/stripe/webhook
+```
+
+Subscribe to:
+
+- `checkout.session.completed`
 
 Notes:
-- The app adds `client_reference_id=<supabase_user_id>` and `prefilled_email` to Stripe checkout links automatically.
-- The webhook uses `client_reference_id` first, then falls back to matching Stripe customer email to Supabase auth email.
-- Tier detection supports metadata, price IDs, payment link IDs, and amount-based fallback.
-- If you cannot expose `localhost:8788` directly, tunnel it (Cloudflare Tunnel, ngrok, etc.).
 
-## Webhook test (manual verification)
+- the app sends `client_reference_id=<supabase_user_id>` when opening Stripe checkout
+- the webhook uses `client_reference_id` first and email fallback second
+- tier detection supports metadata, price IDs, payment link IDs, and amount fallback
 
-Use this to verify auto-tier update without making a live charge.
+## Weekly leaderboard reset
 
-1. Set one extra env var:
-   - `STRIPE_TEST_TOKEN=<any-random-secret>`
-2. Restart webhook server:
+If you need to clear rankings without wiping user progress:
 
-```bash
-npm run stripe:webhook
+```sql
+select public.reset_global_leaderboard_only();
 ```
 
-3. Trigger test upgrade (replace values):
+This preserves:
 
-```bash
-curl -X POST http://localhost:8788/stripe/test/apply \
-  -H "content-type: application/json" \
-  -H "x-test-token: YOUR_TEST_TOKEN" \
-  -d '{"tier":"tier5","email":"YOUR_LOGIN_EMAIL"}'
-```
+- `app_state`
+- `duel_player_stats`
+- `game_attempt_history`
 
-Expected response: `{"ok":true,"userId":"...","tier":"tier5"}`
+And clears:
 
-## Keep webhook running (PM2)
+- `leaderboard`
+- `app_state.high_scores`
 
-1. Install PM2 globally:
+## Troubleshooting
 
-```bash
-npm install -g pm2
-```
+### Owner moderation RPC missing
 
-2. Start webhook process:
+Run, in order if needed:
 
-```bash
-npm run pm2:webhook:start
-```
+- `supabase/migrations/20260224_owner_moderation_public_rpc_repair.sql`
+- `supabase/migrations/20260224_owner_moderation_minimal_last_resort.sql`
+- `supabase/migrations/20260224_owner_moderation_rpc_v2.sql`
+- `supabase/migrations/20260224_owner_account_moderation_rpc_hotfix.sql`
 
-3. Save process list and enable restart on reboot:
+If that still fails:
 
-```bash
-pm2 save
-pm2 startup
-```
-
-Useful commands:
-- `npm run pm2:webhook:restart`
-- `npm run pm2:webhook:logs`
-
-## Owner moderation RPC troubleshooting
-
-If the owner sees `Owner moderation RPC is missing in Supabase`, run:
-
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_moderation_public_rpc_repair.sql`
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_moderation_minimal_last_resort.sql`
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_moderation_rpc_v2.sql`
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_account_moderation_rpc_hotfix.sql`
-- If that still fails, run:
-  - `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260224_owner_moderation_emergency_single_rpc.sql`
+- `supabase/migrations/20260224_owner_moderation_emergency_single_rpc.sql`
 
 Then hard refresh the app.
 
-## Public chat 48-hour retention
+### Public chat retention
 
-Run this migration in Supabase SQL editor:
+`20260222_public_chat_retention_cleanup.sql` creates:
 
-- `/Users/jank/Documents/New project/leo-study-web/supabase/migrations/20260222_public_chat_retention_cleanup.sql`
+- `public.cleanup_public_messages_48h()`
+- hourly cron cleanup for `public_messages`
 
-What it does:
-
-- Creates `public.cleanup_public_messages_48h()` as a `security definer` function.
-- Schedules hourly cron job `public_chat_cleanup_48h_hourly` with `pg_cron`.
-- Deletes rows from `public.public_messages` where `created_at < now() - interval '48 hours'`.
-- Keeps cleanup server-side (no client cleanup code required).
-
-Verify job + behavior:
+Verify:
 
 ```sql
 select jobid, jobname, schedule, command
@@ -297,6 +415,29 @@ from cron.job
 where jobname = 'public_chat_cleanup_48h_hourly';
 ```
 
+Run manually:
+
 ```sql
 select public.cleanup_public_messages_48h();
 ```
+
+## Deployment checklist
+
+Before pushing to `main`:
+
+1. run `npm run build`
+2. if JSON/scenario content changed, run `npm run content:sync`
+3. commit only intended files
+4. push `main`
+5. verify:
+   - app loads
+   - practice test loads
+   - study guide loads
+   - scenarios load
+   - Stripe webhook is online if tier changes are part of the release
+
+## Notes
+
+- This project is built to feel like POST-style practice, but it is not an official POST exam.
+- The practice test banks are intentionally scenario-based and application-heavy.
+- The README is meant to document the current working app state, not just the original scaffold.
