@@ -17,6 +17,8 @@ type ScenarioLike<TQuestion extends QuestionLike = QuestionLike> = {
 
 type Candidate<TQuestion extends QuestionLike> = {
   question: TQuestion
+  selectedChoice: string
+  correctChoice: string
   prompt: string
   explanation: string
   score: number
@@ -80,6 +82,20 @@ function hasPromptPenalty(prompt: string) {
   return promptPenaltyPatterns.some((pattern) => pattern.test(prompt))
 }
 
+function formatObjectiveLabel(objective: string) {
+  const trimmed = objective.trim()
+  if (!trimmed) return 'practice test'
+  return trimmed.charAt(0).toLowerCase() + trimmed.slice(1)
+}
+
+function formatChoiceReference(choice: string) {
+  return choice.trim().replace(/[.?!]+$/, '')
+}
+
+function buildTrueFalsePrompt(question: QuestionLike, choice: string) {
+  return `True or False: Based on this scenario, the best answer for the ${formatObjectiveLabel(question.objective)} question is “${formatChoiceReference(choice)}”.`
+}
+
 function buildTrueCandidate<TQuestion extends QuestionLike>(question: TQuestion): Candidate<TQuestion> | null {
   const correctChoice = question.choices[question.correctIndex]
   const normalizedChoice = normalizeChoiceText(correctChoice)
@@ -91,8 +107,10 @@ function buildTrueCandidate<TQuestion extends QuestionLike>(question: TQuestion)
 
   return {
     question,
-    prompt: `True or False: ${normalizedChoice}`,
-    explanation: `True. ${question.explanation}`,
+    selectedChoice: correctChoice,
+    correctChoice,
+    prompt: buildTrueFalsePrompt(question, correctChoice),
+    explanation: `True. “${formatChoiceReference(correctChoice)}” is the best answer for this scenario. ${question.explanation}`,
     score,
     correctIndex: 0,
   }
@@ -118,8 +136,10 @@ function buildFalseCandidate<TQuestion extends QuestionLike>(question: TQuestion
 
   return {
     question,
-    prompt: `True or False: ${bestWrongChoice.choice}`,
-    explanation: `False. ${question.explanation}`,
+    selectedChoice: bestWrongChoice.choice,
+    correctChoice,
+    prompt: buildTrueFalsePrompt(question, bestWrongChoice.choice),
+    explanation: `False. “${formatChoiceReference(bestWrongChoice.choice)}” is not the best answer here. The better answer is “${formatChoiceReference(correctChoice)}”. ${question.explanation}`,
     score: bestWrongChoice.score,
     correctIndex: 1,
   }
