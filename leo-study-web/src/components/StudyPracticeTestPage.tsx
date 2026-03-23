@@ -48,6 +48,11 @@ function formatDuration(seconds: number) {
   return `${minutes}m ${remainingSeconds.toString().padStart(2, '0')}s`
 }
 
+function formatTtsRefs(refs: string[]) {
+  if (!refs.length) return ''
+  return `TTS ${refs.join(' / ')}`
+}
+
 function shuffleArray<T>(items: T[]) {
   const copy = [...items]
   for (let index = copy.length - 1; index > 0; index -= 1) {
@@ -470,6 +475,9 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
                     <span className="study-practice-question-count">Question {currentQuestionNumber}</span>
                     <div className="study-practice-question-tags">
                       <span className="study-practice-question-objective">LD {currentQuestion.ldNumber}</span>
+                      {currentQuestion.ttsRefs.length ? (
+                        <span className="study-practice-question-objective">{formatTtsRefs(currentQuestion.ttsRefs)}</span>
+                      ) : null}
                       <span className="study-practice-question-objective">{currentQuestion.objective}</span>
                       {currentQuestion.format === 'true_false' ? (
                         <span className="study-practice-question-objective">True / False</span>
@@ -663,8 +671,9 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
                       <article key={`missed-${question.id}`} className="study-practice-review-item">
                         <div className="study-practice-review-top">
                           <strong>{index + 1}. LD {question.ldNumber}</strong>
-                          <span>{question.objective}</span>
+                          <span>{question.ttsRefs.length ? formatTtsRefs(question.ttsRefs) : question.objective}</span>
                         </div>
+                        {question.ttsRefs.length ? <small>{question.objective}</small> : null}
                         <p>{question.prompt}</p>
                         <small>{question.explanation}</small>
                       </article>

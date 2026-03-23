@@ -893,10 +893,88 @@ body {
   color: color-mix(in srgb, var(--accent) 66%, white 34%);
 }
 
-.home-tmas-cta-copy strong {
+.home-tmas-cta-copy > strong {
   font-size: clamp(1.15rem, 2.5vw, 1.55rem);
   line-height: 1.15;
   color: var(--text);
+}
+
+.home-tmas-cta-countdown {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--panel-strong) 88%, transparent), color-mix(in srgb, var(--body-base) 78%, transparent)),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--danger) 18%, transparent), transparent 40%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent),
+    0 10px 24px rgba(7, 16, 36, 0.16);
+}
+
+.home-tmas-cta-countdown-countdown {
+  border-color: color-mix(in srgb, var(--danger) 26%, var(--border));
+}
+
+.home-tmas-cta-countdown-today {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--danger) 14%, var(--panel-strong) 86%), color-mix(in srgb, var(--accent) 10%, var(--body-base) 90%)),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--danger) 24%, transparent), transparent 42%);
+}
+
+.home-tmas-cta-countdown-past {
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+}
+
+.home-tmas-cta-countdown-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.home-tmas-cta-countdown-copy strong {
+  font-size: 1.05rem;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.home-tmas-cta-countdown-copy span {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--text) 82%, var(--muted) 18%);
+}
+
+.home-tmas-cta-countdown-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-tmas-cta-countdown-part {
+  min-width: 74px;
+  padding: 9px 10px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 18%, var(--border));
+  background: color-mix(in srgb, var(--body-base) 58%, var(--panel-strong) 42%);
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+}
+
+.home-tmas-cta-countdown-part strong {
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--text);
+}
+
+.home-tmas-cta-countdown-part small {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text) 68%, var(--muted) 32%);
 }
 
 .home-tmas-cta-subtitle {
@@ -969,6 +1047,18 @@ body {
     flex-direction: column;
     align-items: flex-start;
     padding: 16px;
+  }
+
+  .home-tmas-cta-countdown {
+    width: 100%;
+  }
+
+  .home-tmas-cta-countdown-parts {
+    width: 100%;
+  }
+
+  .home-tmas-cta-countdown-part {
+    flex: 1 1 0;
   }
 
   .home-tmas-cta-button {

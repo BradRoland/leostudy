@@ -1,5 +1,7 @@
 import { ld152016FocusScenarios } from './practiceTestFocusScenarios'
 import { strengthenScenarioDistractors } from './practiceTestChoiceTuning'
+import { polishPracticeScenarios } from './practiceTestQuestionPolish'
+import { resolvePracticeTestTtsRefs } from './practiceTestTtsRefs'
 import { appendTrueFalseFollowUps } from './practiceTestTrueFalse'
 
 export type PracticeTestModuleId = 'tmas1' | 'tmas2' | 'tmas3' | 'ld152016'
@@ -7,6 +9,7 @@ export type PracticeTestModuleId = 'tmas1' | 'tmas2' | 'tmas3' | 'ld152016'
 export type PracticeTestQuestion = {
   id: string
   ldNumber: string
+  ttsRefs: string[]
   objective: string
   prompt: string
   choices: string[]
@@ -46,6 +49,7 @@ function question(
   return {
     id,
     ldNumber,
+    ttsRefs: resolvePracticeTestTtsRefs(ldNumber, objective),
     objective,
     prompt,
     choices,
@@ -926,16 +930,16 @@ const tmas2Scenarios: PracticeTestScenario[] = [
       question(
         'tmas2-practice-14-q2',
         '5',
-        'Conspiracy',
-        'The text-message planning between the participants is most relevant to what additional LD 5 issue?',
+        'Parties to a crime',
+        'The role-assignment texts are most important because they help prove what LD 5 point?',
         [
-          'Conspiracy based on an agreement plus overt acts',
-          'Public intoxication',
-          'Receiving stolen property only',
-          'A mandatory child-abuse report',
+          'Knowing, intentional participation by the planners as parties to the crime rather than mere presence',
+          'Only a civil business dispute about the generators',
+          'That no criminal attempt analysis exists until the generators leave the yard',
+          'That later concealment automatically makes every participant an accessory only',
         ],
         0,
-        'TMAS 2 can test conspiracy in the same scenario as attempt and aiding/abetting. An agreement to commit the crime plus overt acts in furtherance supports conspiracy analysis.',
+        'LD 5 tests whether officers can separate active, knowing participation from mere presence. The texts assigning lookout and transport roles support party-to-a-crime analysis by showing intentional involvement in the theft plan.',
       ),
       question(
         'tmas2-practice-14-q3',
@@ -1035,7 +1039,7 @@ const tmas2Scenarios: PracticeTestScenario[] = [
     'tmas2-practice-16',
     'Apartment Parking-Lot Abduction',
     'At 2210 hours, witnesses call 911 after seeing Marco shove his former girlfriend Elena into his pickup in an apartment parking lot. Witnesses say Marco pressed a folding knife against Elena’s side, told her to “get in or bleed here,” and then drove several blocks before patrol units stopped the truck. During the initial struggle, a neighbor trying to help was punched in the jaw. Elena tells officers Marco also said, “If you call the cops after this, I’ll kill you.”',
-    ['7'],
+    ['7', '39'],
     [
       question(
         'tmas2-practice-16-q1',
@@ -1053,17 +1057,17 @@ const tmas2Scenarios: PracticeTestScenario[] = [
       ),
       question(
         'tmas2-practice-16-q2',
-        '7',
-        'Criminal threats',
-        'Marco’s statement, “If you call the cops after this, I’ll kill you,” most directly raises what additional offense issue?',
+        '39',
+        'Threats of retaliation against a victim',
+        'Marco’s statement, “If you call the cops after this, I’ll kill you,” is most important because it supports what additional justice-system issue?',
         [
-          'Criminal threats',
+          'Threats of retaliation against a victim or witness',
           'Shoplifting',
           'Forgery',
-          'Defrauding an innkeeper',
+          'No additional issue because the kidnapping already occurred',
         ],
         0,
-        'TMAS 2 LD 7 questions often test separate threat-based offenses arising during a violent encounter. A death threat meant to terrorize the victim should be evaluated independently.',
+        'LD 39 includes threats meant to stop a victim or witness from contacting law enforcement. The statement is not just dramatic language; it is evidence of retaliation-focused intimidation tied to the reporting process.',
       ),
       question(
         'tmas2-practice-16-q3',
@@ -1697,16 +1701,16 @@ const tmas2ExtendedScenarios: PracticeTestScenario[] = [
       question(
         'tmas2-practice-26-q2',
         '5',
-        'Conspiracy',
-        'The group messages arranging roles and timing are most important for what additional LD 5 issue?',
+        'Parties to a crime',
+        'The group messages arranging roles and timing are most important because they help prove what LD 5 point?',
         [
-          'Conspiracy based on agreement plus overt acts',
-          'Public intoxication',
-          'Child neglect',
-          'A civil contract dispute',
+          'Knowing, intentional participation by the planners as parties to the crime rather than mere presence',
+          'Public intoxication by the people in the message thread',
+          'Child neglect because the crime happened at night',
+          'A civil contract dispute over warehouse access',
         ],
         0,
-        'TMAS-style LD 5 questions often test conspiracy when suspects agree on roles and then take steps to carry out the plan.',
+        'LD 5 asks officers to identify who is criminally liable as a party to the crime. Messages assigning lookout, transport, and concealment roles help show purposeful participation, not accidental presence.',
       ),
       question(
         'tmas2-practice-26-q3',
@@ -2031,16 +2035,16 @@ const tmas2ExtendedScenarios: PracticeTestScenario[] = [
       question(
         'tmas2-practice-31-q3',
         '7',
-        'Criminal threats',
-        'The statement about breaking Ms. Ortega’s face if she told police most directly supports evaluation of what offense?',
+        'Elder or dependent adult abuse',
+        'Because Ms. Ortega is 72 years old, officers should also evaluate what additional LD 7 issue?',
         [
-          'Criminal threats',
+          'Elder or dependent adult abuse',
           'Receiving stolen property',
           'Arson',
-          'No additional offense because it was only verbal',
+          'No additional offense because the force was brief',
         ],
         0,
-        'Threatening serious harm to stop the victim from reporting the crime raises a separate LD 7 criminal-threat issue.',
+        'LD 7 requires officers to recognize when assaultive or battery conduct is committed against an elder or dependent adult. Ms. Ortega’s age makes elder-abuse analysis a separate issue officers should not miss.',
       ),
       question(
         'tmas2-practice-31-q4',
@@ -2095,16 +2099,16 @@ const tmas2ExtendedScenarios: PracticeTestScenario[] = [
       question(
         'tmas2-practice-32-q3',
         '7',
-        'Criminal threats',
-        'The statement that the woman would “disappear tonight” if she screamed most directly raises which additional issue?',
+        'Force or fear in restraint analysis',
+        'The statement that the woman would “disappear tonight” if she screamed is most important because it helps prove what part of the restraint analysis?',
         [
-          'Criminal threats',
+          'That the restraint or movement was accomplished by force or fear',
           'Only disorderly conduct',
-          'No issue because it happened during a physical assault',
+          'No issue because threats do not matter once physical force is already used',
           'A civil warning only',
         ],
         0,
-        'Threatening serious harm in order to control or terrorize the victim can be tested separately as a criminal-threat offense.',
+        'Under LD 7, officers must evaluate whether restraint or movement was achieved by force or fear. The threat helps explain why the victim complied and supports the kidnapping or false-imprisonment analysis.',
       ),
       question(
         'tmas2-practice-32-q4',
@@ -3105,16 +3109,16 @@ const tmas2ExtendedScenarios: PracticeTestScenario[] = [
       question(
         'tmas2-practice-48-q2',
         '5',
-        'Conspiracy',
-        'The shared plan, list of unit numbers, and arranged roles are most relevant to what additional LD 5 issue?',
+        'Parties to a crime',
+        'The shared plan, list of unit numbers, and arranged roles are most important because they help prove what LD 5 point?',
         [
-          'Conspiracy',
+          'Knowing, intentional participation by the planners as parties to the crime rather than mere presence',
           'Public intoxication',
           'Indecent exposure',
-          'No additional issue because the burglary was interrupted',
+          'No additional criminal-liability issue because the burglary was interrupted',
         ],
         0,
-        'Agreement plus overt acts toward the target crime supports conspiracy analysis even when the offense is interrupted.',
+        'LD 5 asks officers to identify parties to a crime. The shared plan, target list, and assigned roles show purposeful participation in the burglary crew even though officers interrupted the offense.',
       ),
       question(
         'tmas2-practice-48-q3',
@@ -3277,7 +3281,9 @@ const tmas2ExtendedScenarios: PracticeTestScenario[] = [
 ]
 
 const allTmas2Scenarios = appendTrueFalseFollowUps(
-  strengthenScenarioDistractors([...tmas2Scenarios, ...tmas2ExtendedScenarios]),
+  polishPracticeScenarios(
+    strengthenScenarioDistractors([...tmas2Scenarios, ...tmas2ExtendedScenarios]),
+  ),
 )
 
 function countQuestions(scenarios: PracticeTestScenario[]) {

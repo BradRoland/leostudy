@@ -48,6 +48,16 @@ type ProfileActivityDisplay = {
   subLabel: string
 }
 type BannerTone = 'courteous' | 'notice' | 'urgent'
+type HomeCountdownPart = {
+  label: string
+  value: string
+}
+type HomeTmasCountdownDisplay = {
+  tone: 'countdown' | 'today'
+  headline: string
+  supporting: string
+  parts: HomeCountdownPart[]
+}
 
 const studyTrackingTickMs = 5000
 const studyActivityWindowMs = 20000
@@ -57,6 +67,47 @@ const historyHydrateLimit = 4000
 const remoteTrackHistoryMaxPoints = 900
 const remoteTimelineMaxPoints = 2400
 const interactiveTrendMaxPoints = 96
+const priorityTmas2ExamStartMs = Date.parse('2026-03-24T07:00:00-07:00')
+
+function padCountdownValue(value: number) {
+  return String(Math.max(0, value)).padStart(2, '0')
+}
+
+function buildPriorityTmas2Countdown(nowMs: number): HomeTmasCountdownDisplay | null {
+  if (nowMs >= priorityTmas2ExamStartMs) {
+    return null
+  }
+
+  const totalMinutesRemaining = Math.max(0, Math.floor((priorityTmas2ExamStartMs - nowMs) / 60_000))
+  const days = Math.floor(totalMinutesRemaining / (60 * 24))
+  const hours = Math.floor((totalMinutesRemaining % (60 * 24)) / 60)
+  const minutes = totalMinutesRemaining % 60
+  const isExamMorning = days === 0
+
+  if (isExamMorning) {
+    const hoursLeft = Math.floor(totalMinutesRemaining / 60)
+    return {
+      tone: 'today',
+      headline: `${padCountdownValue(hoursLeft)}h ${padCountdownValue(minutes)}m until TMAS 2`,
+      supporting: 'Tuesday, March 24, 2026 at 7:00 AM · final review window is open.',
+      parts: [
+        { label: 'Hours left', value: padCountdownValue(hoursLeft) },
+        { label: 'Minutes', value: padCountdownValue(minutes) },
+      ],
+    }
+  }
+
+  return {
+    tone: 'countdown',
+    headline: `${days} day${days === 1 ? '' : 's'} until TMAS 2`,
+    supporting: 'Tuesday, March 24, 2026 at 7:00 AM · use the scenario bank before the clock runs out.',
+    parts: [
+      { label: 'Days', value: String(days) },
+      { label: 'Hours', value: padCountdownValue(hours) },
+      { label: 'Minutes', value: padCountdownValue(minutes) },
+    ],
+  }
+}
 
 type HomeLeaderboardEntry = {
   userId: string
@@ -8352,6 +8403,11 @@ function App() {
     goToPath('/study/practice-test', { tab: 'study' })
   }, [goToPath])
 
+  const priorityTmas2Countdown = useMemo(
+    () => buildPriorityTmas2Countdown(clockNowMs),
+    [clockNowMs],
+  )
+
   const openStudyTestPage = useCallback(() => {
     goToPath('/study/test', { tab: 'study' })
   }, [goToPath])
@@ -10212,17 +10268,33 @@ function App() {
                   </button>
                 </div>
               </div>
-              <button className="home-tmas-cta" type="button" onClick={openPriorityTmas2PracticeTestPage}>
-                <div className="home-tmas-cta-copy">
-                  <span className="home-tmas-cta-kicker">Priority Focus</span>
-                  <strong>Study for TMAS 2 now. Get ready for Tuesday.</strong>
-                  <span className="home-tmas-cta-subtitle">Open the TMAS 2 practice test and start a full scenario-based run.</span>
-                </div>
-                <span className="home-tmas-cta-button">
-                  <AppIcon name="test" className="button-icon" />
-                  TMAS 2 Practice Test
-                </span>
-              </button>
+              {priorityTmas2Countdown ? (
+                <button className="home-tmas-cta" type="button" onClick={openPriorityTmas2PracticeTestPage}>
+                  <div className="home-tmas-cta-copy">
+                    <span className="home-tmas-cta-kicker">Priority Focus</span>
+                    <strong>Study for TMAS 2 now. Get ready for Tuesday.</strong>
+                    <div className={`home-tmas-cta-countdown home-tmas-cta-countdown-${priorityTmas2Countdown.tone}`}>
+                      <div className="home-tmas-cta-countdown-copy">
+                        <strong>{priorityTmas2Countdown.headline}</strong>
+                        <span>{priorityTmas2Countdown.supporting}</span>
+                      </div>
+                      <div className="home-tmas-cta-countdown-parts" aria-label={priorityTmas2Countdown.headline}>
+                        {priorityTmas2Countdown.parts.map((part) => (
+                          <span key={part.label} className="home-tmas-cta-countdown-part">
+                            <strong>{part.value}</strong>
+                            <small>{part.label}</small>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <span className="home-tmas-cta-subtitle">Open the TMAS 2 practice test and start a full scenario-based run.</span>
+                  </div>
+                  <span className="home-tmas-cta-button">
+                    <AppIcon name="test" className="button-icon" />
+                    TMAS 2 Practice Test
+                  </span>
+                </button>
+              ) : null}
               <div className="home-actions">
                 <button className="primary" onClick={() => { setActiveTab('study'); navigate('/study') }}>
                   <AppIcon name="flashcards" className="button-icon" />

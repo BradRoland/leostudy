@@ -1,6 +1,7 @@
 type QuestionLike = {
   id: string
   ldNumber: string
+  ttsRefs?: string[]
   objective: string
   prompt: string
   choices: string[]
@@ -23,6 +24,11 @@ type Candidate<TQuestion extends QuestionLike> = {
   explanation: string
   score: number
   correctIndex: number
+}
+
+type StatementTemplate = {
+  statement: string
+  qualityBoost: number
 }
 
 const penaltyPatterns = [/^only\b/i, /\balways\b/i, /\bnever\b/i, /\bpurely\b/i, /\bnothing\b/i]
@@ -82,18 +88,172 @@ function hasPromptPenalty(prompt: string) {
   return promptPenaltyPatterns.some((pattern) => pattern.test(prompt))
 }
 
-function formatObjectiveLabel(objective: string) {
-  const trimmed = objective.trim()
-  if (!trimmed) return 'practice test'
-  return trimmed.charAt(0).toLowerCase() + trimmed.slice(1)
-}
-
 function formatChoiceReference(choice: string) {
   return choice.trim().replace(/[.?!]+$/, '')
 }
 
+function quoteChoice(choice: string) {
+  return `“${formatChoiceReference(choice)}”`
+}
+
+function buildStatementTemplate(question: QuestionLike, choice: string): StatementTemplate {
+  const prompt = question.prompt.trim()
+  const quotedChoice = quoteChoice(choice)
+
+  const templates: Array<{ pattern: RegExp; qualityBoost: number; build: () => string }> = [
+    {
+      pattern: /(which|what) (fact|facts|fact set|combination of facts).*(best|most strongly|most directly) support/i,
+      qualityBoost: 36,
+      build: () => `${quotedChoice} is the fact pattern that best supports the tested issue here`,
+    },
+    {
+      pattern: /what mental state/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the mental state officers must be able to articulate here`,
+    },
+    {
+      pattern: /(which|what) role best fits|classification best fits/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the role or liability theory that best fits this conduct`,
+    },
+    {
+      pattern: /primarily civil/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the primarily civil issue in this scenario`,
+    },
+    {
+      pattern: /(what|which).*(additional|separate).*(issue|offense|concern|theory|crime|classification)|most directly raises what additional|most relevant to what additional/i,
+      qualityBoost: 35,
+      build: () => `${quotedChoice} is the additional issue officers should evaluate here`,
+    },
+    {
+      pattern: /(which|what).*(property crime|offense category|classification)|most directly supports which offense|most directly supports what offense|what offense should officers evaluate/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the strongest tested conclusion under these facts`,
+    },
+    {
+      pattern: /what is the strongest arrest authority/i,
+      qualityBoost: 35,
+      build: () => `${quotedChoice} is the strongest arrest authority here`,
+    },
+    {
+      pattern: /what is the strongest search authority|what search authority most directly follows/i,
+      qualityBoost: 35,
+      build: () => `${quotedChoice} is the strongest search authority here`,
+    },
+    {
+      pattern: /what is the proper scope limitation|what is the proper scope of the officers’ actions|under that authority, what is the proper scope limitation/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the correct scope limitation here`,
+    },
+    {
+      pattern: /which follow-up step would count as/i,
+      qualityBoost: 33,
+      build: () => `${quotedChoice} is the step that fits that definition`,
+    },
+    {
+      pattern: /which next step best keeps the investigation lawful/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the next step that best keeps the investigation lawful`,
+    },
+    {
+      pattern: /which fact matters most in showing/i,
+      qualityBoost: 33,
+      build: () => `${quotedChoice} is the fact that matters most on that issue`,
+    },
+    {
+      pattern: /what immediate duty remains/i,
+      qualityBoost: 33,
+      build: () => `${quotedChoice} is the immediate duty that still remains`,
+    },
+    {
+      pattern: /which option is most defensible under ld 20|which response best reflects ld 20 force principles/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the most defensible force option under these facts`,
+    },
+    {
+      pattern: /what is the best legal classification of the officer contact/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the best legal classification of the contact`,
+    },
+    {
+      pattern: /what should officers do next|what should happen first|what is the best immediate investigative step|what is the best first-response approach|what response is most consistent|which tactic best reflects|which tactic best fits|which officer conduct best reflects|which action best preserves/i,
+      qualityBoost: 33,
+      build: () => `${quotedChoice} is the response that best fits the tested rule here`,
+    },
+    {
+      pattern: /what rule applies|what is the correct rule|what is the best legal rule|what is the best rule|which statement is most accurate|what force principle is most accurate|what is the best legal conclusion|what is the strongest legal basis|what is the strongest legal significance|what is the strongest search-and-seizure significance/i,
+      qualityBoost: 33,
+      build: () => `${quotedChoice} is the strongest legal conclusion under these facts`,
+    },
+    {
+      pattern: /which report detail is most important|which detail is most important|which documentation choice best|which documentation step best|what should officers carefully document|what should officers document|which facts are most important to articulate|which set of evidence best preserves|which evidence package best supports/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the point officers should document or preserve`,
+    },
+    {
+      pattern: /why are .* important|why is .* important|what is the best reason/i,
+      qualityBoost: 31,
+      build: () => `${quotedChoice} is the best explanation for why that fact matters`,
+    },
+    {
+      pattern: /what is the legal effect of/i,
+      qualityBoost: 31,
+      build: () => `${quotedChoice} is the legal effect of those facts`,
+    },
+    {
+      pattern: /when would miranda become required|what is the key legal requirement|what must occur before custodial interrogation/i,
+      qualityBoost: 34,
+      build: () => `${quotedChoice} is the legal requirement before officers proceed`,
+    },
+    {
+      pattern: /what lawful option is most relevant|what is the officer’s correct role|how should officers treat .*statement/i,
+      qualityBoost: 30,
+      build: () => `${quotedChoice} is the most defensible legal approach here`,
+    },
+    {
+      pattern: /best described as what|encounter at minimum|elevated the contact into a detention/i,
+      qualityBoost: 30,
+      build: () => `${quotedChoice} best describes the contact at that point`,
+    },
+    {
+      pattern: /what legal standard is required|what standard/i,
+      qualityBoost: 29,
+      build: () => `${quotedChoice} is the governing legal standard here`,
+    },
+    {
+      pattern: /what level/i,
+      qualityBoost: 28,
+      build: () => `${quotedChoice} is the tested classification level here`,
+    },
+    {
+      pattern: /how should officers classify|how should officers evaluate|how should officers respond|how should officers handle/i,
+      qualityBoost: 29,
+      build: () => `${quotedChoice} is the best officer conclusion here`,
+    },
+  ]
+
+  const matchedTemplate = templates.find((template) => template.pattern.test(prompt))
+  if (matchedTemplate) {
+    return {
+      statement: matchedTemplate.build(),
+      qualityBoost: matchedTemplate.qualityBoost,
+    }
+  }
+
+  return {
+    statement: `${quotedChoice} is the strongest tested conclusion here`,
+    qualityBoost: 12,
+  }
+}
+
 function buildTrueFalsePrompt(question: QuestionLike, choice: string) {
-  return `True or False: Based on this scenario, the best answer for the ${formatObjectiveLabel(question.objective)} question is “${formatChoiceReference(choice)}”.`
+  const template = buildStatementTemplate(question, choice)
+  return {
+    prompt: `True or False: ${template.statement}.`,
+    statement: template.statement,
+    qualityBoost: template.qualityBoost,
+  }
 }
 
 function buildTrueCandidate<TQuestion extends QuestionLike>(question: TQuestion): Candidate<TQuestion> | null {
@@ -102,15 +262,16 @@ function buildTrueCandidate<TQuestion extends QuestionLike>(question: TQuestion)
   if (!normalizedChoice) return null
 
   const promptPenalty = hasPromptPenalty(question.prompt) ? 20 : 0
-  const score = normalizedChoice.length - promptPenalty
+  const promptData = buildTrueFalsePrompt(question, correctChoice)
+  const score = normalizedChoice.length + promptData.qualityBoost - promptPenalty
   if (score <= 0) return null
 
   return {
     question,
     selectedChoice: correctChoice,
     correctChoice,
-    prompt: buildTrueFalsePrompt(question, correctChoice),
-    explanation: `True. “${formatChoiceReference(correctChoice)}” is the best answer for this scenario. ${question.explanation}`,
+    prompt: promptData.prompt,
+    explanation: `True. ${promptData.statement}. ${question.explanation}`,
     score,
     correctIndex: 0,
   }
@@ -127,6 +288,7 @@ function buildFalseCandidate<TQuestion extends QuestionLike>(question: TQuestion
       const penalty = penaltyPatterns.reduce((total, pattern) => total + (pattern.test(entry.choice) ? 14 : 0), 0)
       return {
         choice: normalizedChoice,
+        rawChoice: entry.choice,
         score: overlapScore * 100 + normalizedChoice.length * 0.18 - penalty,
       }
     })
@@ -134,13 +296,15 @@ function buildFalseCandidate<TQuestion extends QuestionLike>(question: TQuestion
 
   if (!bestWrongChoice || !bestWrongChoice.choice) return null
 
+  const promptData = buildTrueFalsePrompt(question, bestWrongChoice.rawChoice)
+
   return {
     question,
     selectedChoice: bestWrongChoice.choice,
     correctChoice,
-    prompt: buildTrueFalsePrompt(question, bestWrongChoice.choice),
-    explanation: `False. “${formatChoiceReference(bestWrongChoice.choice)}” is not the best answer here. The better answer is “${formatChoiceReference(correctChoice)}”. ${question.explanation}`,
-    score: bestWrongChoice.score,
+    prompt: promptData.prompt,
+    explanation: `False. ${promptData.statement}. That answer sounds plausible, but it is not the strongest conclusion under these facts. The better answer is ${quoteChoice(correctChoice)}. ${question.explanation}`,
+    score: bestWrongChoice.score + promptData.qualityBoost,
     correctIndex: 1,
   }
 }
@@ -173,6 +337,7 @@ export function appendTrueFalseFollowUps<TScenario extends ScenarioLike>(scenari
       extras.push({
         id: `${scenario.id}-tf-1`,
         ldNumber: primaryTrueCandidate.question.ldNumber,
+        ttsRefs: primaryTrueCandidate.question.ttsRefs ?? [],
         objective: `${primaryTrueCandidate.question.objective} • True / False`,
         prompt: primaryTrueCandidate.prompt,
         choices: ['True', 'False'],
@@ -188,6 +353,7 @@ export function appendTrueFalseFollowUps<TScenario extends ScenarioLike>(scenari
       extras.push({
         id: `${scenario.id}-tf-2`,
         ldNumber: primaryFalseCandidate.question.ldNumber,
+        ttsRefs: primaryFalseCandidate.question.ttsRefs ?? [],
         objective: `${primaryFalseCandidate.question.objective} • True / False`,
         prompt: primaryFalseCandidate.prompt,
         choices: ['True', 'False'],
@@ -207,6 +373,7 @@ export function appendTrueFalseFollowUps<TScenario extends ScenarioLike>(scenari
         extras.push({
           id: `${scenario.id}-tf-3`,
           ldNumber: tertiaryCandidate.question.ldNumber,
+          ttsRefs: tertiaryCandidate.question.ttsRefs ?? [],
           objective: `${tertiaryCandidate.question.objective} • True / False`,
           prompt: tertiaryCandidate.prompt,
           choices: ['True', 'False'],

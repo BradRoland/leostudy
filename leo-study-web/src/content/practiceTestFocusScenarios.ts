@@ -1,10 +1,13 @@
 import { studyGuideOfficialResearchByLd } from './studyGuideOfficialResearch'
 import { strengthenScenarioDistractors } from './practiceTestChoiceTuning'
+import { polishPracticeScenarios } from './practiceTestQuestionPolish'
+import { resolvePracticeTestTtsRefs } from './practiceTestTtsRefs'
 import { appendTrueFalseFollowUps } from './practiceTestTrueFalse'
 
 type PracticeTestQuestion = {
   id: string
   ldNumber: string
+  ttsRefs: string[]
   objective: string
   prompt: string
   choices: string[]
@@ -99,7 +102,16 @@ function question(
   correctIndex: number,
   explanation: string,
 ): PracticeTestQuestion {
-  return { id, ldNumber, objective, prompt, choices, correctIndex, explanation }
+  return {
+    id,
+    ldNumber,
+    ttsRefs: resolvePracticeTestTtsRefs(ldNumber, objective),
+    objective,
+    prompt,
+    choices,
+    correctIndex,
+    explanation,
+  }
 }
 
 function scenario(
@@ -1048,5 +1060,7 @@ const rawLd152016FocusScenarios: PracticeTestScenario[] = [
 ]
 
 export const ld152016FocusScenarios: PracticeTestScenario[] = appendTrueFalseFollowUps(
-  strengthenScenarioDistractors(rawLd152016FocusScenarios),
+  polishPracticeScenarios(
+    strengthenScenarioDistractors(rawLd152016FocusScenarios),
+  ),
 )
