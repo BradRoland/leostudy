@@ -1658,6 +1658,53 @@ export function OneVsOnePanel(props: {
     setNotice('')
   }
 
+  const broadcastInviteCreated = useCallback(async (payload: {
+    targetUserId: string
+    inviteId: string
+    roomId: string
+  }) => {
+    if (!supabase) return
+
+    const broadcastChannel = supabase.channel(`duel-invite-broadcast-send-${payload.inviteId || Date.now().toString()}`)
+
+    try {
+      await new Promise<void>((resolve) => {
+        let settled = false
+        const finish = () => {
+          if (settled) return
+          settled = true
+          resolve()
+        }
+
+        broadcastChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED' || status === 'TIMED_OUT' || status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+            finish()
+          }
+        })
+
+        window.setTimeout(finish, 500)
+      })
+
+      const result = await broadcastChannel.send({
+        type: 'broadcast',
+        event: 'duel-invite-created',
+        payload: {
+          target_user_id: payload.targetUserId,
+          sender_user_id: currentUserId,
+          invite_id: payload.inviteId || null,
+          room_id: payload.roomId,
+          sent_at: new Date().toISOString(),
+        },
+      })
+
+      if (result !== 'ok') {
+        console.warn('[1v1] invite broadcast fallback send was not acknowledged:', result)
+      }
+    } finally {
+      await supabase.removeChannel(broadcastChannel)
+    }
+  }, [currentUserId, supabase])
+
   const sendInvite = async (targetUser: OnlineInviteUser) => {
     if (!supabase || !isSignedIn) return
     setInviteSendingUserId(targetUser.user_id)
@@ -1687,36 +1734,11 @@ export function OneVsOnePanel(props: {
       return
     }
 
-    if (supabase) {
-      const broadcastChannel = supabase.channel('duel-invite-broadcast')
-      await new Promise<void>((resolve) => {
-        let done = false
-        const finish = () => {
-          if (done) return
-          done = true
-          resolve()
-        }
-        broadcastChannel.subscribe((status) => {
-          if (status === 'SUBSCRIBED' || status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-            finish()
-          }
-        })
-        window.setTimeout(finish, 350)
-      })
-
-      void broadcastChannel.send({
-        type: 'broadcast',
-        event: 'duel-invite-created',
-        payload: {
-          target_user_id: targetUser.user_id,
-          sender_user_id: currentUserId,
-          invite_id: nextInviteId || null,
-          room_id: nextRoomId,
-          sent_at: new Date().toISOString(),
-        },
-      })
-      void supabase.removeChannel(broadcastChannel)
-    }
+    await broadcastInviteCreated({
+      targetUserId: targetUser.user_id,
+      inviteId: nextInviteId,
+      roomId: nextRoomId,
+    })
 
     setShowInviteModal(false)
     setRoomId(nextRoomId)

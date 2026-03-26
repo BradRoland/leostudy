@@ -137,6 +137,29 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
   }, [isSignedIn, loadPendingInvites])
 
   useEffect(() => {
+    if (!isSignedIn) return
+
+    const refreshInvites = () => {
+      if (document.visibilityState === 'hidden') return
+      void loadPendingInvites()
+    }
+
+    const refreshOnFocus = () => {
+      void loadPendingInvites()
+    }
+
+    window.addEventListener('focus', refreshOnFocus)
+    window.addEventListener('pageshow', refreshOnFocus)
+    document.addEventListener('visibilitychange', refreshInvites)
+
+    return () => {
+      window.removeEventListener('focus', refreshOnFocus)
+      window.removeEventListener('pageshow', refreshOnFocus)
+      document.removeEventListener('visibilitychange', refreshInvites)
+    }
+  }, [isSignedIn, loadPendingInvites])
+
+  useEffect(() => {
     if (!isSignedIn || pendingInvites.length === 0) return
     const timer = window.setInterval(() => {
       setNowMs(Date.now())
@@ -156,7 +179,11 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
           void loadPendingInvites()
         },
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          void loadPendingInvites()
+        }
+      })
 
     const broadcastChannel = client
       .channel('duel-invite-broadcast')
@@ -167,7 +194,11 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
           void loadPendingInvites()
         }
       })
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          void loadPendingInvites()
+        }
+      })
 
     return () => {
       void client.removeChannel(postgresChannel)
