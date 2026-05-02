@@ -185,7 +185,7 @@ export function StudyGuidePage({ onStudyActivity }: StudyGuidePageProps) {
             <div className="study-guide-hero-copy">
               <span className="study-guide-kicker">Study Guide</span>
               <h2>TTS-Aligned Learning Domains</h2>
-              <p className="muted">Each LD now shows only what the official POST Training and Testing Specification says can be tested, mapped directly to the matching official workbook chapter coverage.</p>
+              <p className="muted">Each LD shows only what the official POST Training and Testing Specification says can be tested, mapped directly to the matching official workbook chapter coverage.</p>
             </div>
           </div>
 

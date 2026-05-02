@@ -3,7 +3,7 @@ function dedupeRefs(refs: string[]) {
 }
 
 function parseExplicitTtsRefs(objective: string) {
-  const match = objective.match(/^TTS\s+(.+?)(?:\s+—|$)/i)
+  const match = objective.match(/^TTS\s+(.+?)(?:\s+[—-]|$)/i)
   if (!match) return []
   return dedupeRefs(
     match[1]

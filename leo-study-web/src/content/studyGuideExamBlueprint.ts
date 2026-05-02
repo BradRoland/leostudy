@@ -59,3 +59,10 @@ export const studyGuideExamCoverageSourceNote =
 export function getStudyGuideExamCoverage(ldNumber: string): StudyGuideExamCoverage[] {
   return (ldToExamIds[ldNumber] ?? []).map((examId) => studyGuideExamDefinitions[examId])
 }
+
+export function getStudyGuideExamLdNumbers(examId: StudyGuideExamId): string[] {
+  return Object.entries(ldToExamIds)
+    .filter(([, examIds]) => examIds?.includes(examId))
+    .map(([ldNumber]) => ldNumber)
+    .sort((left, right) => Number(left) - Number(right))
+}

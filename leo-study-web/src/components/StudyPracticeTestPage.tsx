@@ -21,10 +21,18 @@ const PRACTICE_LD_LABELS: Record<string, string> = {
   '8': 'General Criminal Statutes',
   '9': 'Crimes Against Children',
   '10': 'Sex Crimes',
+  '11': 'Juvenile Law and Procedure',
+  '12': 'Controlled Substances',
   '15': 'Laws of Arrest',
   '16': 'Search and Seizure',
   '20': 'Use of Force',
+  '25': 'Domestic Violence',
+  '26': 'Critical Incidents',
+  '28': 'Traffic Enforcement',
+  '37': 'People with Disabilities',
   '39': 'Crimes Against the Justice System',
+  '40': 'Weapons Violations',
+  '43': 'Terrorism Awareness',
 }
 
 type LdPerformanceLevel = 'proficient' | 'needs_reps' | 'lacking'
@@ -705,13 +713,13 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
             <span className="study-guide-kicker">Practice Test</span>
             <h2>TMAS-style scenario testing</h2>
             <p className="muted">
-              This practice test is built from the official POST TTS + workbook coverage, the TMAS 2 LD blueprint, and the scenario-bank material already loaded into the app. Each run shuffles the scenario order, question order, and answer choices.
+              This practice test is built from the official POST TTS + workbook coverage, the TMAS LD blueprints, and the scenario-bank material already loaded into the app. Each run shuffles the scenario order, question order, and answer choices.
             </p>
           </div>
           <div className="study-guide-stats">
             <div className="study-guide-stat-pill">
-              <small>Available now</small>
-              <strong>TMAS 2</strong>
+              <small>Selected</small>
+              <strong>{selectedModule.title}</strong>
             </div>
             <div className="study-guide-stat-pill">
               <small>Question count</small>
@@ -813,7 +821,7 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
               <div className="study-practice-length-section">
                 <div className="study-practice-length-copy">
                   <strong>Practice length</strong>
-                  <p className="muted">Choose a short warm-up or a longer full test. Every run pulls a fresh randomized mix from the TMAS 2 bank.</p>
+                  <p className="muted">Choose a short warm-up or a longer full test. Every run pulls a fresh randomized mix from the selected practice bank.</p>
                 </div>
                 <div className="study-practice-length-grid">
                   {availableLengthOptions.map((count) => {

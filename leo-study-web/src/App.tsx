@@ -687,37 +687,37 @@ const homeEncouragementQuotes = [
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
 ]
-const releaseNotesV040: Array<{ title: string; items: string[] }> = [
+const releaseNotesV045: Array<{ title: string; items: string[] }> = [
   {
-    title: 'Study Guide Rebuild (v0.40)',
+    title: 'TMAS 3 Study Guide (v0.45)',
     items: [
-      'Added a full Study Guide section inside Study Hub with a cleaner LD-by-LD layout, chapter navigation, and a left-side LD rail that scrolls independently.',
-      'Rebuilt each LD study guide around official POST workbook material and the tested TTS points instead of a generic workbook dump.',
-      'Each LD now shows TMAS exam coverage, chapter jump links, TTS breakdowns, explanations, and TMAS-style example scenarios tied to the tested objectives.',
+      'Added TMAS 3 coverage into the Study Guide using the Class 180 blueprint LDs: 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 20, 25, 26, 28, 37, 39, 40, and 43.',
+      'Kept the Study Guide simple again by removing the extra TMAS 3 focus selector and returning the left rail to the full LD list with TMAS tags still visible.',
+      'TMAS 3 study material stays aligned to the official POST TTS and workbook breakdowns already shown inside each LD.',
     ],
   },
   {
-    title: 'Practice Test Expansion',
+    title: 'TMAS 3 Practice Test',
     items: [
-      'Added a dedicated Practice Test section in Study Hub with a full-screen test flow, cleaner setup, mobile-friendly layout, and improved results coaching.',
-      'Added a TMAS 2 practice bank with randomized scenario-based testing, selectable test lengths, and LD performance coaching at the end of each run.',
-      'Added a focused LD 15 / 16 / 20 practice test with concentrated arrest, search, and force scenarios for the most heavily tested TMAS material.',
+      'Added TMAS 3 as a live Practice Test option inside Study Hub with the same full-screen randomized test flow used for TMAS 2.',
+      'Built 50 TMAS 3 scenario sets with 200 multiple-choice questions, matching the TMAS 2 scenario-bank size.',
+      'Each scenario keeps the academy-style grouped format, with realistic stems and four application questions tied to the scenario.',
     ],
   },
   {
-    title: 'TMAS 2 Scenario and TTS Coverage',
+    title: 'Harder, More Realistic Questions',
     items: [
-      'Expanded TMAS 2 scenarios and kept grouped four-question scenario flows so each scenario stays together during randomization.',
-      'The focused LD 15 / 16 / 20 practice bank is now mapped directly to the official POST TTS objectives instead of generic labels.',
-      'TMAS 2 scenario metadata now syncs correctly through Supabase, including grouped sub-questions and TMAS section tagging.',
+      'TMAS 3 questions now use more plausible distractors so more than one answer can feel tempting, forcing users to choose the strongest legal answer.',
+      'Added mixed-LD scenario sets that combine arrest, search, force, DV, juvenile, controlled substances, weapons, traffic, critical incidents, and terrorism-awareness issues.',
+      'Every TMAS 3 multiple-choice question is tagged back to explicit POST TTS references for better results coaching and review.',
     ],
   },
   {
-    title: 'Quality and UX Updates',
+    title: 'Question Volume and Randomization',
     items: [
-      'Practice tests now scale better for desktop and mobile, support real scrolling through long scenarios, and automatically move users into the explanation area after answering.',
-      'Study Guide and Practice Test study time now counts only while the user is actively interacting, not while sitting AFK on the page.',
-      'Profile views now show what another user is currently doing on the site, such as studying, testing, flashcards, 1v1, or practice tests.',
+      'TMAS 3 now produces 332 runtime questions after the true / false follow-up generator is applied.',
+      'TMAS 3 supports the existing 10, 20, 50, and 100 question test lengths and pulls a fresh randomized mix each run.',
+      'Results now label the added TMAS 3 LDs correctly, including Juvenile Law, Controlled Substances, Domestic Violence, Critical Incidents, Traffic, Disabilities, Weapons, and Terrorism Awareness.',
     ],
   },
 ]
@@ -10253,10 +10253,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 0.40"
+                    aria-label="Open what's new for version 0.45"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v0.40
+                    What's New · v0.45
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -13781,15 +13781,15 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v0.40</h3>
+                <h3>What’s New · v0.45</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV040.map((group) => (
-                <article key={`v040-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV045.map((group) => (
+                <article key={`v045-note-${group.title}`} className="home-whats-new-card">
                   <h4>{group.title}</h4>
                   <ul>
                     {group.items.map((item) => (

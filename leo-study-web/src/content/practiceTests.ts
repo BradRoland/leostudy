@@ -1,4 +1,5 @@
 import { ld152016FocusScenarios } from './practiceTestFocusScenarios'
+import { tmas3Scenarios } from './practiceTestTmas3Scenarios'
 import { strengthenScenarioDistractors } from './practiceTestChoiceTuning'
 import { polishPracticeScenarios } from './practiceTestQuestionPolish'
 import { resolvePracticeTestTtsRefs } from './practiceTestTtsRefs'
@@ -3326,12 +3327,24 @@ export const practiceTestModules: PracticeTestModule[] = [
   {
     id: 'tmas3',
     title: 'TMAS 3',
-    status: 'coming_soon',
-    description: 'TMAS 3 practice tests will be added once the TMAS 3 source material is loaded.',
-    formatSummary: 'Coming soon',
-    officialBasis: [],
-    formatSignals: [],
-    scenarios: [],
+    status: 'available',
+    description:
+      'A TMAS 3 scenario practice exam built from the local POST TTS/workbook research, the Success Criteria Class 180 TMAS 3 LD coverage, and the same applied one-best-answer format used for TMAS 2.',
+    formatSummary: `${countQuestions(tmas3Scenarios)} questions across ${tmas3Scenarios.length} scenario sets covering LD 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 20, 25, 26, 28, 37, 39, 40, and 43.`,
+    officialBasis: [
+      'Official POST Training and Testing Specifications for every LD listed in TMAS 3 coverage',
+      'Official POST student workbook material already mapped into the Study Guide for the same LDs',
+      'Success Criteria Class 180 blueprint showing TMAS 3 comprehensive exam LD coverage',
+      'Existing TMAS-style practice-test structure with scenario stems, four application questions, and harder true / false follow-ups',
+    ],
+    formatSignals: [
+      'Each scenario is written as an applied academy-style fact pattern instead of a code memorization prompt',
+      'Questions are explicitly tagged to the tested POST TTS points for the LD being assessed',
+      'Distractors are designed to sound plausible, so the user must pick the legally strongest answer rather than the obvious answer',
+      'Runs randomize scenario order, question order, and answer order just like the existing practice-test flow',
+      'Practice content only; not an official POST exam',
+    ],
+    scenarios: tmas3Scenarios,
   },
   {
     id: 'ld152016',
