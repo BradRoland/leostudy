@@ -3,10 +3,11 @@ import hsRaw from './hs.json'
 import pcRaw from './pc.json'
 import scenariosRaw from './scenarios.json'
 import scenariosTmas2Raw from './scenarios-tmas2.json'
+import { tmas3Scenarios } from './practiceTestTmas3Scenarios'
 import vcRaw from './vc.json'
 
 export type ContentCategory = string
-export type ScenarioTrainingSection = 'tmas1' | 'tmas2'
+export type ScenarioTrainingSection = 'tmas1' | 'tmas2' | 'tmas3'
 
 export type ContentBankItem = {
   id: string
@@ -86,7 +87,9 @@ function asStringArray(value: unknown) {
 }
 
 function normalizeScenarioTrainingSection(value: unknown): ScenarioTrainingSection {
-  return String(value || '').trim().toLowerCase() === 'tmas2' ? 'tmas2' : 'tmas1'
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === 'tmas2' || normalized === 'tmas3') return normalized
+  return 'tmas1'
 }
 
 function parseScenarioSubQuestions(value: unknown) {
@@ -211,6 +214,29 @@ function parseScenarioItems(raw: unknown, sourceName: string, warnings: string[]
   return items
 }
 
+function buildTmas3ScenarioBankItems(): ScenarioBankItem[] {
+  return tmas3Scenarios.map((scenario) => ({
+    id: scenario.id,
+    category: 'scenario',
+    title: scenario.title,
+    scenario: scenario.stem,
+    questions: scenario.questions.map((question) => question.prompt),
+    tmasSet: 'tmas3',
+    subQuestions: scenario.questions.map((question) => ({
+      id: question.id,
+      prompt: question.prompt,
+      choices: question.choices,
+      expectedAnswer: question.choices[question.correctIndex] || question.choices[0] || '',
+      explanation: question.explanation,
+    })),
+    keyPoints: scenario.questions.map((question) => question.explanation),
+    tags: ['tmas3', ...scenario.ldNumbers.map((ldNumber) => `ld-${ldNumber}`)],
+    difficulty: 'advanced',
+    explanation: scenario.questions.map((question) => question.explanation).join(' '),
+    sourceUrl: 'TMAS 3 scenario practice bank',
+  }))
+}
+
 export function loadLocalContentBundle(): LocalContentBundle {
   const warnings: string[] = []
 
@@ -223,6 +249,7 @@ export function loadLocalContentBundle(): LocalContentBundle {
 
   const scenarioItems = parseScenarioItems(scenariosRaw, 'scenarios.json', warnings)
     .concat(parseScenarioItems(scenariosTmas2Raw, 'scenarios-tmas2.json', warnings))
+    .concat(buildTmas3ScenarioBankItems())
 
   return { codeItems, scenarioItems, warnings }
 }
@@ -234,4 +261,5 @@ export const localContentFiles = {
   custom: customRaw,
   scenarios: scenariosRaw,
   scenariosTmas2: scenariosTmas2Raw,
+  scenariosTmas3: tmas3Scenarios,
 }

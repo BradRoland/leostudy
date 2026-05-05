@@ -1,0 +1,10 @@
+.env
+.env.*
+node_modules
+dist
+.tmp-post-*
+.playwright-cli
+../.playwright-cli
+backend/data/db.json
+*.log
+.DS_Store

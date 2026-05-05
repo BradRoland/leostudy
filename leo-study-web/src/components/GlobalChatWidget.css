@@ -883,3 +883,62 @@
   border-color: #d8dfef !important;
   color: #202a4c !important;
 }
+
+/* Chat polish */
+.global-chat-panel,
+.global-chat-panel-full {
+  overflow: hidden;
+}
+
+.global-chat-messages {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.global-chat-message {
+  overflow-wrap: anywhere;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.global-chat-message:hover {
+  transform: translateY(-1px);
+}
+
+.global-chat-reaction-picker {
+  transform-origin: top left;
+}
+
+.global-chat-input {
+  min-height: 42px;
+}
+
+.global-chat-send {
+  min-height: 42px;
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease !important;
+}
+
+.global-chat-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+  .global-chat-panel-full {
+    height: calc(100dvh - 170px);
+    max-height: calc(100dvh - 170px);
+    border-radius: 14px;
+  }
+
+  .global-chat-messages {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .global-chat-input {
+    font-size: 16px;
+  }
+}

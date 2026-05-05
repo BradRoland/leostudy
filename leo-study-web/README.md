@@ -340,18 +340,49 @@ Create three Stripe Payment Links and put them into:
 
 ### Auto-upgrade webhook
 
-The webhook server upgrades `profiles.supporter_tier` after Stripe checkout success.
+The webhook upgrades `profiles.supporter_tier` after Stripe checkout success. Production runs as a Vercel API Function, while local development can still use the Node webhook server.
 
-Start it with:
+Set these private server env vars in Vercel:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_ID_TIER2`
+- `STRIPE_PRICE_ID_TIER5`
+- `STRIPE_PRICE_ID_TIER10`
+- `STRIPE_PAYMENT_LINK_ID_TIER2`
+- `STRIPE_PAYMENT_LINK_ID_TIER5`
+- `STRIPE_PAYMENT_LINK_ID_TIER10`
+
+Production Stripe webhook endpoint:
+
+```text
+https://<your-public-domain>/api/stripe/webhook
+```
+
+Compatibility rewrite endpoint:
+
+```text
+https://<your-public-domain>/stripe/webhook
+```
+
+Health check:
+
+```text
+https://<your-public-domain>/api/health
+```
+
+For local testing only, start the standalone Node webhook with:
 
 ```bash
 npm run stripe:webhook
 ```
 
-Stripe webhook endpoint:
+Local endpoint:
 
 ```text
-https://<your-public-domain>/stripe/webhook
+http://localhost:8788/stripe/webhook
 ```
 
 Subscribe to:

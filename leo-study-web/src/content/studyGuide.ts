@@ -83,7 +83,7 @@ function isHeadingBlock(block: string) {
 
   const joined = lines.join(' ')
   if (joined.length > 110) return false
-  if (/^[\-\u2022o]/.test(joined)) return false
+  if (/^[-\u2022o]/.test(joined)) return false
   if (/^\d+\./.test(joined)) return false
 
   const firstCharacter = joined[0]
@@ -97,7 +97,7 @@ function splitDomainSections(domainId: string, body: string) {
     .split(/\n\s*\n/)
     .map((block) => cleanMultiline(block))
     .filter(Boolean)
-    .filter((block) => block.replace(/[\-\u2022o\s]/g, '').length >= 3)
+    .filter((block) => block.replace(/[-\u2022o\s]/g, '').length >= 3)
 
   const sections: StudyGuideSection[] = []
   let currentTitle = ''

@@ -186,6 +186,7 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
   const [answers, setAnswers] = useState<Record<string, number>>({})
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [completedAt, setCompletedAt] = useState<number | null>(null)
+  const [liveNowMs, setLiveNowMs] = useState<number>(() => Date.now())
   const [sessionScenarios, setSessionScenarios] = useState<PracticeTestScenario[]>([])
   const scenarioHeroRef = useRef<HTMLDivElement | null>(null)
   const questionBlockRef = useRef<HTMLDivElement | null>(null)
@@ -366,6 +367,17 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
     return () => window.cancelAnimationFrame(frame)
   }, [sessionActive, sessionComplete, selectedModuleId, effectiveQuestionCount])
 
+  useEffect(() => {
+    if (!sessionActive || sessionComplete) return
+
+    setLiveNowMs(Date.now())
+    const interval = window.setInterval(() => {
+      setLiveNowMs(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(interval)
+  }, [sessionActive, sessionComplete])
+
   const resetSession = () => {
     setSessionActive(false)
     setSessionComplete(false)
@@ -424,9 +436,9 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
 
   const elapsedSeconds = useMemo(() => {
     if (!startedAt) return 0
-    const finishedAt = completedAt ?? Date.now()
+    const finishedAt = completedAt ?? liveNowMs
     return Math.max(0, (finishedAt - startedAt) / 1000)
-  }, [completedAt, startedAt])
+  }, [completedAt, liveNowMs, startedAt])
 
   const progressPercent = flattenedQuestions.length > 0
     ? Math.min(100, Math.round((answeredCount / flattenedQuestions.length) * 100))

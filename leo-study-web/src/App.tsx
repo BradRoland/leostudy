@@ -66,7 +66,7 @@ const homeLeaderboardRefreshThrottleMs = 7000
 const historyHydrateLimit = 4000
 const remoteTrackHistoryMaxPoints = 900
 const remoteTimelineMaxPoints = 2400
-const interactiveTrendMaxPoints = 96
+const interactiveTrendMaxPoints = 72
 const priorityTmas2ExamStartMs = Date.parse('2026-03-24T07:00:00-07:00')
 
 function padCountdownValue(value: number) {
@@ -1140,21 +1140,6 @@ function buildDepartmentLeaders(entries: LeaderboardEntry[]): DepartmentLeaderbo
     )
 }
 
-function topDepartmentEntryForScope(
-  entries: LeaderboardEntry[],
-  options: { scope: 'weekly' | 'alltime'; weeklyWindow?: { weekStartMs: number; nextWeekStartMs: number } },
-): DepartmentLeaderboardEntry | null {
-  const scoped = options.scope === 'weekly' && options.weeklyWindow
-    ? entries.filter(
-      (entry) =>
-        entry.createdAt >= options.weeklyWindow!.weekStartMs &&
-        entry.createdAt < options.weeklyWindow!.nextWeekStartMs,
-    )
-    : entries
-  const leaders = buildDepartmentLeaders(scoped)
-  return leaders[0] || null
-}
-
 async function createCroppedAvatarFile(sourceUrl: string, zoom: number, offsetX: number, offsetY: number, sourceName: string) {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image()
@@ -1868,7 +1853,14 @@ function categoryToCodeSet(category: string, codeSection = ''): CodeSet | null {
 }
 
 function normalizeScenarioSection(value: ScenarioBankItem['tmasSet'] | null | undefined): ScenarioTrainingSection {
-  return value === 'tmas2' ? 'tmas2' : 'tmas1'
+  if (value === 'tmas2' || value === 'tmas3') return value
+  return 'tmas1'
+}
+
+function formatScenarioSectionLabel(section: ScenarioTrainingSection) {
+  if (section === 'tmas2') return 'TMAS 2'
+  if (section === 'tmas3') return 'TMAS 3'
+  return 'TMAS 1'
 }
 
 function buildScenarioChoices(choices: string[], correctChoice: string) {
@@ -1964,7 +1956,7 @@ function buildGroupedScenarioQuestions(row: ScenarioBankItem, subQuestions: Scen
 function buildScenarioDeck(rows: ScenarioBankItem[], section: ScenarioTrainingSection) {
   const filteredRows = rows.filter((row) => normalizeScenarioSection(row.tmasSet) === section)
 
-  if (section === 'tmas2') {
+  if (section === 'tmas2' || section === 'tmas3') {
     return shuffle(filteredRows).flatMap((row) => {
       const subQuestions = (row.subQuestions || []).filter((subQuestion) => subQuestion.choices.length >= 2)
       if (subQuestions.length === 0) return []
@@ -2930,11 +2922,31 @@ function buildTrendPath(points: number[]) {
     const y = paddingY + ((rangeMax - clamped) / range) * usableHeight
     return { x, y }
   })
+
+  const path = (() => {
+    if (coords.length === 0) return ''
+    if (coords.length === 1) return `M ${coords[0].x.toFixed(2)} ${coords[0].y.toFixed(2)}`
+    if (coords.length === 2) {
+      return coords.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ')
+    }
+
+    const segments = [`M ${coords[0].x.toFixed(2)} ${coords[0].y.toFixed(2)}`]
+    for (let index = 1; index < coords.length; index += 1) {
+      const previous = coords[index - 1]
+      const current = coords[index]
+      const controlX = (previous.x + current.x) / 2
+      segments.push(
+        `C ${controlX.toFixed(2)} ${previous.y.toFixed(2)}, ${controlX.toFixed(2)} ${current.y.toFixed(2)}, ${current.x.toFixed(2)} ${current.y.toFixed(2)}`,
+      )
+    }
+    return segments.join(' ')
+  })()
+
   return {
     width,
     height,
     coords,
-    path: coords.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' '),
+    path,
   }
 }
 
@@ -4448,7 +4460,7 @@ function App() {
           title,
           scenario,
           questions,
-          tmasSet: String(value.tmas_set || '').trim().toLowerCase() === 'tmas2' ? 'tmas2' : 'tmas1',
+          tmasSet: normalizeScenarioSection(String(value.tmas_set || '').trim().toLowerCase() as ScenarioTrainingSection),
           subQuestions: subQuestions.length > 0 ? subQuestions : undefined,
           expectedAnswer: String(value.answer || '').trim() || undefined,
           keyPoints: Array.isArray(value.key_points) ? value.key_points.map((entry) => String(entry).trim()).filter(Boolean) : [],
@@ -5724,6 +5736,7 @@ function App() {
         {
           tmas1: { scenarios: 0, questions: 0 },
           tmas2: { scenarios: 0, questions: 0 },
+          tmas3: { scenarios: 0, questions: 0 },
         },
       ),
     [scenarioItems],
@@ -9835,12 +9848,23 @@ function App() {
 
       {authReady && !currentUserId && isSignInPage ? (
         <div className="onboarding-overlay">
-          <div className="onboarding-card">
+          <form
+            className="onboarding-card"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void submitSignIn()
+            }}
+          >
             <p className="eyebrow">Welcome to</p>
             <h1>LEO Study</h1>
             <label>
               Email
-              <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} onKeyDown={handleSignInEnterKey} />
+              <input
+                value={authEmail}
+                onChange={(event) => setAuthEmail(event.target.value)}
+                onKeyDown={handleSignInEnterKey}
+                autoComplete="email"
+              />
             </label>
             <label>
               Password
@@ -9850,6 +9874,7 @@ function App() {
                   value={authPassword}
                   onChange={(event) => setAuthPassword(event.target.value)}
                   onKeyDown={handleSignInEnterKey}
+                  autoComplete="current-password"
                 />
                 <button type="button" className="password-eye" onClick={() => setShowSignInPassword((value) => !value)} aria-label="Toggle password visibility">
                   {showSignInPassword ? (
@@ -9868,10 +9893,10 @@ function App() {
                 </button>
               </div>
             </label>
-            <button className="primary" onClick={submitSignIn} disabled={authLoading}>
+            <button type="submit" className="primary" disabled={authLoading}>
               Sign In
             </button>
-            <button className="secondary" onClick={submitGoogle} disabled={authLoading}>
+            <button type="button" className="secondary" onClick={submitGoogle} disabled={authLoading}>
               <span className="google-mark" aria-hidden>
                 <svg viewBox="0 0 24 24" width="16" height="16">
                   <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.24 1.26-.96 2.33-2.04 3.04l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.49 0-.71-.06-1.4-.18-2.06H12z" />
@@ -9885,18 +9910,24 @@ function App() {
             <p className="muted tiny">Need an account? <Link to="/signup">Create one</Link></p>
             {authError ? <p className="bad">{authError}</p> : null}
             {authSuccess ? <p className="good">{authSuccess}</p> : null}
-          </div>
+          </form>
         </div>
       ) : null}
 
       {authReady && !currentUserId && isSignUpPage ? (
         <div className="onboarding-overlay">
-          <div className="onboarding-card">
+          <form
+            className="onboarding-card"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void submitSignUp()
+            }}
+          >
             <p className="eyebrow">Create account</p>
             <h1>LEO Study</h1>
             <label>
               Email
-              <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
+              <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" />
             </label>
             <label>
               Password
@@ -9905,6 +9936,7 @@ function App() {
                   type={showSignUpPassword ? 'text' : 'password'}
                   value={authPassword}
                   onChange={(event) => setAuthPassword(event.target.value)}
+                  autoComplete="new-password"
                 />
                 <button type="button" className="password-eye" onClick={() => setShowSignUpPassword((value) => !value)} aria-label="Toggle password visibility">
                   {showSignUpPassword ? (
@@ -9930,6 +9962,7 @@ function App() {
                   type={showSignUpPasswordConfirm ? 'text' : 'password'}
                   value={authPasswordConfirm}
                   onChange={(event) => setAuthPasswordConfirm(event.target.value)}
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -9954,10 +9987,10 @@ function App() {
               </div>
             </label>
             {authPasswordConfirm.length > 0 && authPassword !== authPasswordConfirm ? <p className="bad">Passwords do not match.</p> : null}
-            <button className="primary" onClick={submitSignUp} disabled={authLoading || authPassword.length === 0 || authPassword !== authPasswordConfirm}>
+            <button type="submit" className="primary" disabled={authLoading || authPassword.length === 0 || authPassword !== authPasswordConfirm}>
               Create Account
             </button>
-            <button className="secondary" onClick={submitGoogle} disabled={authLoading}>
+            <button type="button" className="secondary" onClick={submitGoogle} disabled={authLoading}>
               <span className="google-mark" aria-hidden>
                 <svg viewBox="0 0 24 24" width="16" height="16">
                   <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.24 1.26-.96 2.33-2.04 3.04l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.49 0-.71-.06-1.4-.18-2.06H12z" />
@@ -9971,7 +10004,7 @@ function App() {
             <p className="muted tiny">Already have an account? <Link to="/signin">Sign in</Link></p>
             {authError ? <p className="bad">{authError}</p> : null}
             {authSuccess ? <p className="good">{authSuccess}</p> : null}
-          </div>
+          </form>
         </div>
       ) : null}
 
@@ -10434,7 +10467,7 @@ function App() {
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                             <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                             </span>
                           </span>
                           <LeaderboardPlayerName entry={entry} />
@@ -10470,7 +10503,7 @@ function App() {
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                             <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                             </span>
                           </span>
                           <LeaderboardPlayerName entry={entry} />
@@ -10544,7 +10577,7 @@ function App() {
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                             <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                             </span>
                           </span>
                           <LeaderboardPlayerName entry={entry} />
@@ -10618,7 +10651,7 @@ function App() {
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                             <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                             </span>
                           </span>
                           <LeaderboardPlayerName entry={entry} />
@@ -10654,7 +10687,7 @@ function App() {
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                             <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                             </span>
                           </span>
                           <LeaderboardPlayerName entry={entry} />
@@ -10690,7 +10723,7 @@ function App() {
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                             <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                             </span>
                           </span>
                           <LeaderboardPlayerName entry={entry} />
@@ -10736,7 +10769,7 @@ function App() {
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                             <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                             </span>
                           </span>
                           <LeaderboardPlayerName entry={entry} />
@@ -10780,7 +10813,7 @@ function App() {
                         <span className="leader-avatar-wrap">
                           <span className="leader-crown" aria-label="Top Player">👑</span>
                           <span className={leaderAvatarFrameClass(weeklyTopPerformer.entry.userId)}>
-                            <img src={avatarFor(weeklyTopPerformer.entry.avatarUrl)} alt={weeklyTopPerformer.entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                            <img src={avatarFor(weeklyTopPerformer.entry.avatarUrl)} alt={weeklyTopPerformer.entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                           </span>
                         </span>
                         <LeaderboardPlayerName entry={weeklyTopPerformer.entry} />
@@ -10966,7 +10999,7 @@ function App() {
                               <span className="leader-avatar-wrap">
                                 {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                                 <span className={leaderAvatarFrameClass(entry.userId)}>
-                                  <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                                  <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                                 </span>
                               </span>
                               <LeaderboardPlayerName entry={entry} />
@@ -11750,7 +11783,7 @@ function App() {
                             <span className="leader-avatar-wrap">
                               {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                               <span className={leaderAvatarFrameClass(entry.userId)}>
-                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                               </span>
                             </span>
                             <LeaderboardPlayerName entry={entry} />
@@ -11788,7 +11821,7 @@ function App() {
                             <span className="leader-avatar-wrap">
                               {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                               <span className={leaderAvatarFrameClass(entry.userId)}>
-                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                               </span>
                             </span>
                             <LeaderboardPlayerName entry={entry} />
@@ -11825,7 +11858,7 @@ function App() {
                             <span className="leader-avatar-wrap">
                               {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                               <span className={leaderAvatarFrameClass(entry.userId)}>
-                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                               </span>
                             </span>
                             <LeaderboardPlayerName entry={entry} />
@@ -11925,7 +11958,7 @@ function App() {
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                             <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                             </span>
                           </span>
                           <LeaderboardPlayerName entry={entry} />
@@ -12120,7 +12153,7 @@ function App() {
                           <span className="leader-avatar-wrap">
                             {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
                             <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                             </span>
                           </span>
                           <LeaderboardPlayerName entry={entry} />
@@ -12249,6 +12282,12 @@ function App() {
                 >
                   TMAS 2
                 </button>
+                <button
+                  className={scenarioTrainingSection === 'tmas3' ? 'seg active' : 'seg'}
+                  onClick={() => setScenarioTrainingSection('tmas3')}
+                >
+                  TMAS 3
+                </button>
               </div>
               <p className="muted scenario-section-meta">
                 {activeScenarioSectionStats.scenarios} scenarios • {activeScenarioSectionStats.questions} questions
@@ -12302,7 +12341,7 @@ function App() {
                     {scenarioCurrentQuestion.questionCount > 1 ? (
                       <>
                         <p className="scenario-series-label">
-                          {scenarioCurrentQuestion.tmasSet === 'tmas2' ? 'TMAS 2' : 'TMAS 1'} • Question {scenarioCurrentQuestion.questionNumber} of {scenarioCurrentQuestion.questionCount}
+                          {formatScenarioSectionLabel(scenarioCurrentQuestion.tmasSet)} • Question {scenarioCurrentQuestion.questionNumber} of {scenarioCurrentQuestion.questionCount}
                         </p>
                         <h3 ref={scenarioPromptRef}>{scenarioCurrentQuestion.scenarioStem}</h3>
                         <p className="scenario-subprompt">{scenarioCurrentQuestion.prompt}</p>
@@ -12310,7 +12349,7 @@ function App() {
                     ) : (
                       <>
                         <p className="scenario-series-label">
-                          {scenarioCurrentQuestion.tmasSet === 'tmas2' ? 'TMAS 2' : 'TMAS 1'}
+                          {formatScenarioSectionLabel(scenarioCurrentQuestion.tmasSet)}
                         </p>
                         <h3 ref={scenarioPromptRef}>{scenarioCurrentQuestion.prompt}</h3>
                       </>
@@ -13936,7 +13975,7 @@ function App() {
               <span className="leader-avatar-wrap">
                 {selectedLeaderboardIsTop ? <span className="leader-crown leader-crown-modal" aria-label="Top Player">👑</span> : null}
                 <span className={leaderAvatarFrameClass(selectedLeaderboardEntry.userId, 'modal-avatar')}>
-                  <img src={avatarFor(selectedLeaderboardEntry.avatarUrl)} alt={selectedLeaderboardEntry.playerName} className="leader-avatar" onError={handleAvatarImageError} />
+                  <img src={avatarFor(selectedLeaderboardEntry.avatarUrl)} alt={selectedLeaderboardEntry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
                 </span>
               </span>
               <div className="leader-profile-head">
