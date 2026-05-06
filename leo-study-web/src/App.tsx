@@ -704,7 +704,7 @@ const homeLeaderboardRotationSteps = homeLeaderboardRotationDurations.flatMap((d
 )
 const codeBlasterFixedDuration: HomeDurationFilter = 30
 const blasterMaxAsteroids = 5
-const blasterLevelThresholds = [50, 150, 300, 500, 750, 1050, 1400, 1800, 2250, 2750]
+const blasterBaseLevelStep = 50
 const homeLeaderboardCardOrder: HomeLeaderboardCardKey[] = ['study_time', 'study_streak', 'matching', 'speed', 'blaster', 'mastered', 'duel_wins', 'duel_streak']
 const homeLeaderboardCardLabel: Record<HomeLeaderboardCardKey, string> = {
   study_time: 'Most Study Time',
@@ -1845,11 +1845,21 @@ function shuffle<T>(array: T[]) {
 }
 
 function blasterLevelForScore(score: number) {
-  return blasterLevelThresholds.filter((threshold) => score >= threshold).length + 1
+  let level = 1
+  while (score >= blasterNextLevelScore(level)) {
+    level += 1
+    if (level > 500) break
+  }
+  return level
 }
 
 function blasterNextLevelScore(level: number) {
-  return blasterLevelThresholds[level - 1] ?? blasterLevelThresholds[blasterLevelThresholds.length - 1] + (level - blasterLevelThresholds.length) * 600
+  const safeLevel = Math.max(1, Math.floor(level))
+  let total = 0
+  for (let currentLevel = 1; currentLevel <= safeLevel; currentLevel += 1) {
+    total += blasterBaseLevelStep + Math.round(Math.pow(currentLevel - 1, 1.35) * 38) + (currentLevel - 1) * 18
+  }
+  return total
 }
 
 function blasterLevelStartScore(level: number) {
@@ -1859,9 +1869,13 @@ function blasterLevelStartScore(level: number) {
 
 function blasterLevelSeconds(baseSeconds: number, level: number) {
   const normalizedBase = Math.max(8, baseSeconds)
-  const easedSeconds = Math.round(normalizedBase * Math.pow(0.9, Math.max(0, level - 1)))
-  const minimumSeconds = normalizedBase <= 15 ? 6 : normalizedBase <= 30 ? 8 : 10
+  const easedSeconds = Math.round(normalizedBase * Math.pow(0.88, Math.max(0, level - 1)))
+  const minimumSeconds = normalizedBase <= 15 ? 4 : normalizedBase <= 30 ? 5 : 6
   return Math.max(minimumSeconds, easedSeconds)
+}
+
+function blasterAsteroidSpeedMultiplier(level: number) {
+  return Math.min(3.4, 1 + Math.max(0, level - 1) * 0.12)
 }
 
 function blasterAsteroidDistance(left: Pick<BlasterTarget, 'x' | 'y' | 'size'>, right: Pick<BlasterTarget, 'x' | 'y' | 'size'>) {
@@ -1874,9 +1888,9 @@ function createBlasterAsteroid(section: CodeSection, promptId: string, index: nu
   const size = 78 + Math.random() * 26
   let x = 8 + Math.random() * 84
   let y = 14 + Math.random() * 58
-  const levelVelocityBoost = Math.min(1.15, Math.max(0, level - 1) * 0.11)
-  const horizontalVelocity = 0.7 + Math.random() * 0.92 + levelVelocityBoost
-  const verticalVelocity = 0.58 + Math.random() * 0.78 + levelVelocityBoost * 0.82
+  const levelVelocityBoost = Math.min(2.4, Math.max(0, level - 1) * 0.1)
+  const horizontalVelocity = 0.68 + Math.random() * 0.82 + levelVelocityBoost
+  const verticalVelocity = 0.54 + Math.random() * 0.7 + levelVelocityBoost * 0.78
 
   for (let attempt = 0; attempt < 36; attempt += 1) {
     const candidate = {
@@ -7372,9 +7386,9 @@ function App() {
     if (target.isCorrect) {
       const nextStreak = blasterStreak + 1
       const bonus = Math.min(20, nextStreak * 2)
-      const timeBonusSeconds = 3
       const nextScore = blasterScoreRef.current + 25 + bonus
       const nextLevel = blasterLevelForScore(nextScore)
+      const timeBonusSeconds = Math.max(1, 4 - Math.floor(Math.max(0, nextLevel - 1) / 4))
       const remainingTargets = blasterTargetsRef.current.filter((candidate) => candidate.id !== target.id)
       const previousLevel = blasterLevelRef.current
       const levelSeconds = blasterLevelSeconds(blasterSessionDurationRef.current, nextLevel)
@@ -7819,8 +7833,9 @@ function App() {
       blasterMotionLastAtRef.current = now
       setBlasterTargets((targets) => {
         const moved = targets.map((target) => {
-          let x = target.x + target.floatX * elapsedSeconds
-          let y = target.y + target.floatY * elapsedSeconds
+          const speedMultiplier = blasterAsteroidSpeedMultiplier(blasterLevelRef.current)
+          let x = target.x + target.floatX * speedMultiplier * elapsedSeconds
+          let y = target.y + target.floatY * speedMultiplier * elapsedSeconds
           let floatX = target.floatX
           let floatY = target.floatY
           const radiusX = Math.max(4.2, target.size / 21)
