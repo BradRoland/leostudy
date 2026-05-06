@@ -1004,11 +1004,16 @@ function buildLeaderboardBoards(entries: LeaderboardEntry[], limit = 5): Leaderb
   const boards: LeaderboardBoard[] = []
 
   for (const game of games) {
-    for (const duration of durations) {
+    const gameDurations = game === 'Code Blaster' ? [codeBlasterFixedDuration] : durations
+    for (const duration of gameDurations) {
       for (const filter of filters) {
         const scoped = entries
           .filter((entry) => entry.game === game)
-          .filter((entry) => entry.matchDuration === duration && entry.matchFilter === filter)
+          .filter((entry) =>
+            game === 'Code Blaster'
+              ? entry.matchFilter === filter
+              : entry.matchDuration === duration && entry.matchFilter === filter,
+          )
         const deduped = topEntryPerUser(scoped)
         const trimmed = limit > 0 ? deduped.slice(0, limit) : deduped
         if (trimmed.length === 0) continue
@@ -5972,7 +5977,9 @@ function App() {
         .filter((entry) => entry.game === leaderboardSelectedBoard.game)
         .filter(
           (entry) =>
-            entry.matchDuration === leaderboardSelectedBoard.duration && entry.matchFilter === leaderboardSelectedBoard.filter,
+            leaderboardSelectedBoard.game === 'Code Blaster'
+              ? entry.matchFilter === leaderboardSelectedBoard.filter
+              : entry.matchDuration === leaderboardSelectedBoard.duration && entry.matchFilter === leaderboardSelectedBoard.filter,
         ),
     ).slice(0, 5)
   }, [leaderboardSelectedBoard, scopedLeaderboardEntries])
@@ -5981,7 +5988,9 @@ function App() {
     for (const entry of scopedLeaderboardEntries) {
       if (entry.game !== leaderboardViewGame) continue
       if (entry.score <= 0) continue
-      const duration = [15, 30, 60].includes(Number(entry.matchDuration))
+      const duration = leaderboardViewGame === 'Code Blaster'
+        ? codeBlasterFixedDuration
+        : [15, 30, 60].includes(Number(entry.matchDuration))
         ? (Number(entry.matchDuration) as HomeDurationFilter)
         : 30
       const filter = (['all', 'penal', 'hs', 'vehicle'].includes(String(entry.matchFilter))
@@ -6006,14 +6015,14 @@ function App() {
   }, [leaderboardModeStats])
   const leaderboardModeMatrix = useMemo(
     () =>
-      ([15, 30, 60] as HomeDurationFilter[]).map((duration) => ({
+      (leaderboardViewGame === 'Code Blaster' ? [codeBlasterFixedDuration] : ([15, 30, 60] as HomeDurationFilter[])).map((duration) => ({
         duration,
         modes: (['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => ({
           filter,
           stat: leaderboardModeStatMap.get(`${duration}|${filter}`) || null,
         })),
       })),
-    [leaderboardModeStatMap],
+    [leaderboardModeStatMap, leaderboardViewGame],
   )
 
   const speedQuestionBank = useMemo(() => {
@@ -10425,8 +10434,8 @@ function App() {
     [gamesSelection.duration, gamesSelection.filter],
   )
   const blasterTrackKey = useMemo(
-    () => sessionTrackKey({ mode: 'blaster', duration: gamesSelection.duration, filter: gamesSelection.filter }),
-    [gamesSelection.duration, gamesSelection.filter],
+    () => sessionTrackKey({ mode: 'blaster', duration: codeBlasterFixedDuration, filter: gamesSelection.filter }),
+    [gamesSelection.filter],
   )
   const mergeTrackWithRemoteHistory = useCallback((trackKey: string, track: SessionTrack): SessionTrack => {
     const remoteScores = remoteTrackScoreHistory[trackKey] || []
@@ -11882,7 +11891,9 @@ function App() {
                   <div className="leaderboards-mode-matrix">
                     {leaderboardModeMatrix.map((group) => (
                       <div key={`leaderboard-mode-group-${group.duration}`} className="leaderboards-duration-group">
-                        <p className="leaderboards-duration-label">{group.duration}s</p>
+                        <p className="leaderboards-duration-label">
+                          {leaderboardViewGame === 'Code Blaster' ? 'Fixed Run' : `${group.duration}s`}
+                        </p>
                         <div className="leaderboards-duration-modes">
                           {group.modes.map(({ filter, stat }) => {
                             const isSelected = Boolean(
@@ -11924,7 +11935,9 @@ function App() {
                       <strong>{leaderboardViewGame}</strong>
                       <small>
                         {leaderboardSelectedBoard
-                          ? `${leaderboardSelectedBoard.duration}s • ${leaderboardCodeSetLabel(leaderboardSelectedBoard.filter)}`
+                          ? leaderboardSelectedBoard.game === 'Code Blaster'
+                            ? `Fixed Run • ${leaderboardCodeSetLabel(leaderboardSelectedBoard.filter)}`
+                            : `${leaderboardSelectedBoard.duration}s • ${leaderboardCodeSetLabel(leaderboardSelectedBoard.filter)}`
                           : 'No board selected'}
                       </small>
                     </div>
