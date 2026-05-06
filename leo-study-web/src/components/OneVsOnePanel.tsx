@@ -1465,7 +1465,7 @@ export function OneVsOnePanel(props: {
     setSubmittingRound(true)
     setError('')
     try {
-      const { error: rpcError } = await supabase.rpc('submit_1v1_round', {
+      const { data: submitState, error: rpcError } = await supabase.rpc('submit_1v1_round', {
         p_room_id: roomId,
         p_round: params.round,
         p_correct: params.correct,
@@ -1484,6 +1484,68 @@ export function OneVsOnePanel(props: {
         }
         return
       }
+
+      const payload = submitState && typeof submitState === 'object'
+        ? (submitState as Record<string, unknown>)
+        : null
+      const nextPlayers = Array.isArray(payload?.players)
+        ? payload.players
+          .map((row) => {
+            if (!row || typeof row !== 'object') return null
+            const value = row as Record<string, unknown>
+            const userId = String(value.user_id || '').trim()
+            if (!userId) return null
+            const current = livePlayersRef.current.find((player) => player.user_id === userId)
+            if (!current) return null
+            return {
+              ...current,
+              score: Number(value.score || current.score || 0),
+              total_time_ms: Number(value.total_time_ms || current.total_time_ms || 0),
+              fastest_round_ms: Number(value.fastest_round_ms || current.fastest_round_ms || 0),
+              current_round: Number(value.current_round || current.current_round || 1),
+              last_seen: new Date().toISOString(),
+            }
+          })
+          .filter((row): row is DuelRoomPlayerRow => row !== null)
+        : []
+
+      if (nextPlayers.length > 0) {
+        setPlayers((previous) => {
+          const byUserId = new Map(previous.map((player) => [player.user_id, player]))
+          nextPlayers.forEach((player) => byUserId.set(player.user_id, player))
+          return Array.from(byUserId.values()).sort((left, right) => left.slot_no - right.slot_no)
+        })
+      }
+
+      if (payload) {
+        const nextStatus = String(payload.status || '').trim()
+        const nextWinner = String(payload.winner_user_id || '').trim()
+        setRoom((previous) => {
+          if (!previous || previous.id !== roomId) return previous
+          const nextRoomStatus = ['waiting', 'in_progress', 'completed', 'cancelled'].includes(nextStatus)
+            ? nextStatus as DuelRoomStatus
+            : previous.status
+          const highestRound = nextPlayers.reduce((maxRound, player) => Math.max(maxRound, player.current_round), previous.current_round)
+          return {
+            ...previous,
+            status: nextRoomStatus,
+            winner_user_id: nextWinner || previous.winner_user_id,
+            current_round: nextRoomStatus === 'completed'
+              ? previous.rounds
+              : Math.max(previous.current_round, Math.min(previous.rounds, highestRound)),
+          }
+        })
+      }
+
+      const selfAdvanced = nextPlayers.some((player) => player.user_id === currentUserId && player.current_round > params.round)
+      if (room?.status === 'in_progress' && room.game_type === 'quiz' && selfAdvanced) {
+        setQuizLocked(false)
+        setQuizChoice(null)
+      }
+
+      window.setTimeout(() => {
+        void refreshRoomSnapshot()
+      }, 80)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not submit round.'
       setError(message)
@@ -1497,7 +1559,7 @@ export function OneVsOnePanel(props: {
     } finally {
       setSubmittingRound(false)
     }
-  }, [room?.game_type, room?.status, roomId, submittingRound])
+  }, [currentUserId, refreshRoomSnapshot, room?.game_type, room?.status, roomId, submittingRound])
 
   const triggerAutoForfeit = useCallback(async (roundKey: string, reason: 'question' | 'matching' = 'question') => {
     if (!supabase || !roomId || !roundKey) return

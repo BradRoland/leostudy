@@ -295,6 +295,15 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
   }, [availableLengthOptions, selectedQuestionCount])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const moduleTarget = window.sessionStorage.getItem('practice-test-module-target')
+    if (moduleTarget === 'tmas1' || moduleTarget === 'tmas2' || moduleTarget === 'tmas3') {
+      setSelectedModuleId(moduleTarget)
+      window.sessionStorage.removeItem('practice-test-module-target')
+    }
+  }, [])
+
+  useEffect(() => {
     if (!(sessionActive || sessionComplete)) return
 
     let lastMarkedAt = 0

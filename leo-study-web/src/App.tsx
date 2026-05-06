@@ -16,10 +16,11 @@ import './components/GlobalChatWidget.css'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
 type CodeFilter = CodeSet | 'all'
+type ScoreGameName = 'Matching' | 'Speed Test' | 'Code Blaster'
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 type DisplayMode = 'dark' | 'light'
 type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home' | 'leaderboards' | 'chat'
-type HomeActionTarget = 'study' | 'games-matching' | 'games-speed' | 'scenarios'
+type HomeActionTarget = 'study' | 'games-matching' | 'games-speed' | 'games-blaster' | 'scenarios'
 type HomeDurationFilter = 15 | 30 | 60
 type DuelLeaderboardMode = 'all' | 'matching' | 'quiz'
 type GameModeSelection = {
@@ -30,11 +31,11 @@ type HomeActionOptions = {
   gamePreset?: GameModeSelection
   forceAllTime?: boolean
 }
-type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'test' | 'warning' | 'chat' | 'leaderboards' | 'settings' | 'stats' | 'speed' | 'duel' | 'updates'
+type AppIconName = 'study' | 'games' | 'scenarios' | 'support' | 'home' | 'library' | 'flashcards' | 'test' | 'warning' | 'chat' | 'leaderboards' | 'settings' | 'stats' | 'speed' | 'duel' | 'updates' | 'blaster'
 type StatsIconName = 'overview' | 'time' | 'words' | 'penal' | 'flashcards' | 'scenarios' | 'streak' | 'game' | 'studyset'
 type StudyWrongness = 'balanced' | 'needs_work' | 'most_needs_work'
 type StudyAnswerMode = 'multiple' | 'truefalse'
-type StudyActivitySource = 'flashcards' | 'study_test' | 'study_guide' | 'study_practice' | 'matching' | 'speed' | 'duel'
+type StudyActivitySource = 'flashcards' | 'study_test' | 'study_guide' | 'study_practice' | 'matching' | 'speed' | 'duel' | 'blaster'
 type PresenceStatus = 'active' | 'away'
 type CurrentUserActivity = {
   key: string
@@ -68,6 +69,7 @@ const remoteTrackHistoryMaxPoints = 900
 const remoteTimelineMaxPoints = 2400
 const interactiveTrendMaxPoints = 72
 const priorityTmas2ExamStartMs = Date.parse('2026-03-24T07:00:00-07:00')
+const priorityTmas3ExamStartMs = Date.parse('2026-05-18T13:00:00-07:00')
 
 function padCountdownValue(value: number) {
   return String(Math.max(0, value)).padStart(2, '0')
@@ -109,6 +111,42 @@ function buildPriorityTmas2Countdown(nowMs: number): HomeTmasCountdownDisplay | 
   }
 }
 
+function buildPriorityTmas3Countdown(nowMs: number): HomeTmasCountdownDisplay | null {
+  if (nowMs >= priorityTmas3ExamStartMs) {
+    return null
+  }
+
+  const totalMinutesRemaining = Math.max(0, Math.floor((priorityTmas3ExamStartMs - nowMs) / 60_000))
+  const days = Math.floor(totalMinutesRemaining / (60 * 24))
+  const hours = Math.floor((totalMinutesRemaining % (60 * 24)) / 60)
+  const minutes = totalMinutesRemaining % 60
+  const isExamDay = days === 0
+
+  if (isExamDay) {
+    const hoursLeft = Math.floor(totalMinutesRemaining / 60)
+    return {
+      tone: 'today',
+      headline: `${padCountdownValue(hoursLeft)}h ${padCountdownValue(minutes)}m until TMAS 3`,
+      supporting: 'Monday, May 18, 2026 at 1:00 PM · final reps matter now.',
+      parts: [
+        { label: 'Hours left', value: padCountdownValue(hoursLeft) },
+        { label: 'Minutes', value: padCountdownValue(minutes) },
+      ],
+    }
+  }
+
+  return {
+    tone: 'countdown',
+    headline: `${days} day${days === 1 ? '' : 's'} until TMAS 3`,
+    supporting: 'Monday, May 18, 2026 at 1:00 PM · build pressure-tested confidence before test day.',
+    parts: [
+      { label: 'Days', value: String(days) },
+      { label: 'Hours', value: padCountdownValue(hours) },
+      { label: 'Minutes', value: padCountdownValue(minutes) },
+    ],
+  }
+}
+
 type HomeLeaderboardEntry = {
   userId: string
   playerName: string
@@ -130,7 +168,7 @@ type HomeLeaderboardEntry = {
   currentActivity: CurrentUserActivity | null
 }
 
-type HomeLeaderboardCardKey = 'study_time' | 'study_streak' | 'matching' | 'speed' | 'mastered' | 'duel_wins' | 'duel_streak'
+type HomeLeaderboardCardKey = 'study_time' | 'study_streak' | 'matching' | 'speed' | 'blaster' | 'mastered' | 'duel_wins' | 'duel_streak'
 
 type HomeLeaderboardPreferences = {
   visibleCards: HomeLeaderboardCardKey[]
@@ -191,6 +229,23 @@ type MatchCard = {
   codeSet: CodeSet
   text: string
   kind: 'code' | 'definition'
+}
+
+type BlasterTarget = {
+  id: string
+  sectionId: string
+  sectionNumber: string
+  codeSet: CodeSet
+  label: string
+  isCorrect: boolean
+  x: number
+  y: number
+  floatX: number
+  floatY: number
+  size: number
+  rotation: number
+  speed: number
+  delay: number
 }
 
 type LeaderboardEntry = {
@@ -323,7 +378,7 @@ type UserStats = {
   studyDayStreak: number
   bestStudyDayStreak: number
   lastStudyDay: string
-  gamePlays: Record<'matching' | 'speed', number>
+  gamePlays: Record<'matching' | 'speed' | 'blaster', number>
   flashcardsReviewed: number
   scenariosReviewed: number
   studyModeCounts: Record<CodeFilter, number>
@@ -331,7 +386,7 @@ type UserStats = {
   sessionTimeline: SessionTimelinePoint[]
 }
 
-type SessionMode = 'study_test' | 'matching' | 'speed'
+type SessionMode = 'study_test' | 'matching' | 'speed' | 'blaster'
 
 type SessionTrack = {
   lastAttempt: SessionAttemptSnapshot | null
@@ -372,7 +427,7 @@ type LeaderPreviewItem = {
 
 type LeaderboardBoard = {
   key: string
-  game: 'Matching' | 'Speed Test'
+  game: ScoreGameName
   duration: HomeDurationFilter
   filter: CodeFilter
   entries: LeaderboardEntry[]
@@ -647,12 +702,15 @@ const duelLeaderboardModeLabel: Record<DuelLeaderboardMode, string> = {
 const homeLeaderboardRotationSteps = homeLeaderboardRotationDurations.flatMap((duration) =>
   homeLeaderboardRotationCodeSets.map((codeSet) => ({ duration, codeSet })),
 )
-const homeLeaderboardCardOrder: HomeLeaderboardCardKey[] = ['study_time', 'study_streak', 'matching', 'speed', 'mastered', 'duel_wins', 'duel_streak']
+const blasterMaxAsteroids = 5
+const blasterLevelThresholds = [50, 150, 300, 500, 750, 1050, 1400, 1800, 2250, 2750]
+const homeLeaderboardCardOrder: HomeLeaderboardCardKey[] = ['study_time', 'study_streak', 'matching', 'speed', 'blaster', 'mastered', 'duel_wins', 'duel_streak']
 const homeLeaderboardCardLabel: Record<HomeLeaderboardCardKey, string> = {
   study_time: 'Most Study Time',
   study_streak: 'Best Study Streak',
   matching: 'Best Matching Score',
   speed: 'Best Speed Test Score',
+  blaster: 'Best Code Blaster Score',
   mastered: 'Most Mastered Codes',
   duel_wins: '1v1 Most Wins',
   duel_streak: '1v1 Streak Leaderboard',
@@ -662,6 +720,7 @@ const homeLeaderboardCardDescription: Record<HomeLeaderboardCardKey, string> = {
   study_streak: 'Longest active daily streak',
   matching: 'Highest matching game score',
   speed: 'Highest speed test score',
+  blaster: 'Highest Code Blaster score',
   mastered: 'Most 20-streak code masters',
   duel_wins: 'Most 1v1 wins',
   duel_streak: 'Largest active 1v1 streak',
@@ -671,6 +730,7 @@ const homeLeaderboardCardIcon: Record<HomeLeaderboardCardKey, AppIconName> = {
   study_streak: 'stats',
   matching: 'games',
   speed: 'speed',
+  blaster: 'blaster',
   mastered: 'library',
   duel_wins: 'duel',
   duel_streak: 'duel',
@@ -687,7 +747,39 @@ const homeEncouragementQuotes = [
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
 ]
-const releaseNotesV045: Array<{ title: string; items: string[] }> = [
+const releaseNotesV050: Array<{ title: string; items: string[] }> = [
+  {
+    title: 'Code Blaster Game Mode (v0.50)',
+    items: [
+      'Added a new space-blaster learning game where users aim at moving code asteroids, answer fast, and level up as the timer gets tighter.',
+      'Code Blaster now supports all the normal code sets, adds time bonuses for correct hits, limits asteroid clutter, and keeps motion smoother for smaller screens.',
+      'Added Code Blaster all-time and weekly leaderboards, level display, high-score celebrations, and system chat announcements when someone takes #1.',
+    ],
+  },
+  {
+    title: 'Leaderboard and Weekly Performer Updates',
+    items: [
+      'Code Blaster now counts toward Top Performer This Week alongside Matching and Speed Test.',
+      'Weekly performer scoring now uses normalized board points so one high-scoring mode does not overpower the rest of the leaderboard system.',
+      'Leaderboard cards now show Code Blaster mode details, including time, code set, and achieved level.',
+    ],
+  },
+  {
+    title: '1v1 and Game Stability',
+    items: [
+      'Improved 1v1 room behavior, invite flow, rematch reliability, spectator publishing, and ready-state updates.',
+      'Added stronger matching-game timing behavior so timers keep running correctly even while users click quickly.',
+      'Improved mobile scaling for 1v1 matching and regular matching so the tiles stay usable on smaller screens.',
+    ],
+  },
+  {
+    title: 'Polish and Quality Fixes',
+    items: [
+      'Improved chat reaction visibility, hover details, system announcements, and duplicate announcement prevention.',
+      'Added owner banner controls, bug reporting tools, and cleaner release notes from the home screen.',
+      'Updated the LEO Study favicon and tightened visual polish across games, study, and leaderboard pages.',
+    ],
+  },
   {
     title: 'TMAS 3 Study Guide (v0.45)',
     items: [
@@ -842,6 +934,7 @@ function canonicalAgencyName(rawAgency: string) {
 function sessionModeLabel(mode: SessionMode) {
   if (mode === 'study_test') return 'Study Test'
   if (mode === 'matching') return 'Matching'
+  if (mode === 'blaster') return 'Code Blaster'
   return 'Speed Test'
 }
 
@@ -858,7 +951,7 @@ function getSessionTrack(stats: UserStats, trackKey: string): SessionTrack {
 
 function getLeaderboardPreview(
   entries: LeaderboardEntry[],
-  game: 'Matching' | 'Speed Test',
+  game: ScoreGameName,
   duration: number,
   filter: CodeFilter,
   currentUserId: string,
@@ -883,7 +976,7 @@ function getLeaderboardPreview(
 function topLeaderboardEntryForMode(
   entries: LeaderboardEntry[],
   options: {
-    game: 'Matching' | 'Speed Test'
+    game: ScoreGameName
     duration: number
     filter: CodeFilter
     scope: 'weekly' | 'alltime'
@@ -906,7 +999,7 @@ function topLeaderboardEntryForMode(
 function buildLeaderboardBoards(entries: LeaderboardEntry[], limit = 5): LeaderboardBoard[] {
   const durations: HomeDurationFilter[] = [15, 30, 60]
   const filters: CodeFilter[] = ['all', 'penal', 'hs', 'vehicle']
-  const games: Array<'Matching' | 'Speed Test'> = ['Matching', 'Speed Test']
+  const games: ScoreGameName[] = ['Matching', 'Speed Test', 'Code Blaster']
   const boards: LeaderboardBoard[] = []
 
   for (const game of games) {
@@ -958,22 +1051,26 @@ function buildWeeklyTopPerformer(entries: LeaderboardEntry[]): WeeklyPerformance
   >()
 
   for (const board of boards) {
+    const topScore = Math.max(...board.entries.map((entry) => entry.score), 0)
     for (let index = 0; index < board.entries.length; index += 1) {
       const entry = board.entries[index]
+      const rankPoints = Math.max(0, 50 - index * 5)
+      const normalizedScorePoints = topScore > 0 ? Math.round((Math.max(entry.score, 0) / topScore) * 50) : 0
+      const boardPerformancePoints = rankPoints + normalizedScorePoints
       const current = byUser.get(entry.userId)
       if (!current) {
         byUser.set(entry.userId, {
           entry,
           firstPlaceCount: index === 0 ? 1 : 0,
           leaderboardAppearances: 1,
-          totalScore: entry.score,
+          totalScore: boardPerformancePoints,
           bestSingleScore: entry.score,
         })
         continue
       }
       current.firstPlaceCount += index === 0 ? 1 : 0
       current.leaderboardAppearances += 1
-      current.totalScore += entry.score
+      current.totalScore += boardPerformancePoints
       current.bestSingleScore = Math.max(current.bestSingleScore, entry.score)
       if (entry.score > current.entry.score || (entry.score === current.entry.score && entry.round > current.entry.round)) {
         current.entry = entry
@@ -1420,6 +1517,7 @@ const defaultUserStats: UserStats = {
   gamePlays: {
     matching: 0,
     speed: 0,
+    blaster: 0,
   },
   flashcardsReviewed: 0,
   scenariosReviewed: 0,
@@ -1725,6 +1823,12 @@ function isLeaderboardScoreImprovement(
   return score === current.score && round > current.round
 }
 
+function leaderboardEntryModeMeta(entry: Pick<LeaderboardEntry, 'game' | 'score' | 'matchDuration' | 'matchFilter'>) {
+  const mode = `${entry.matchDuration ?? '-'}s • ${leaderboardCodeSetLabel(entry.matchFilter)}`
+  if (entry.game === 'Code Blaster') return `${mode} • Level ${blasterLevelForScore(entry.score)}`
+  return mode
+}
+
 function shuffle<T>(array: T[]) {
   const clone = [...array]
   for (let index = clone.length - 1; index > 0; index -= 1) {
@@ -1732,6 +1836,75 @@ function shuffle<T>(array: T[]) {
     ;[clone[index], clone[nextIndex]] = [clone[nextIndex], clone[index]]
   }
   return clone
+}
+
+function blasterLevelForScore(score: number) {
+  return blasterLevelThresholds.filter((threshold) => score >= threshold).length + 1
+}
+
+function blasterNextLevelScore(level: number) {
+  return blasterLevelThresholds[level - 1] ?? blasterLevelThresholds[blasterLevelThresholds.length - 1] + (level - blasterLevelThresholds.length) * 600
+}
+
+function blasterLevelStartScore(level: number) {
+  if (level <= 1) return 0
+  return blasterNextLevelScore(level - 1)
+}
+
+function blasterLevelSeconds(baseSeconds: number, level: number) {
+  const normalizedBase = Math.max(8, baseSeconds)
+  const easedSeconds = Math.round(normalizedBase * Math.pow(0.9, Math.max(0, level - 1)))
+  const minimumSeconds = normalizedBase <= 15 ? 6 : normalizedBase <= 30 ? 8 : 10
+  return Math.max(minimumSeconds, easedSeconds)
+}
+
+function blasterAsteroidDistance(left: Pick<BlasterTarget, 'x' | 'y' | 'size'>, right: Pick<BlasterTarget, 'x' | 'y' | 'size'>) {
+  const dx = left.x - right.x
+  const dy = left.y - right.y
+  return Math.sqrt(dx * dx + dy * dy)
+}
+
+function createBlasterAsteroid(section: CodeSection, promptId: string, index: number, existingTargets: BlasterTarget[] = [], level = 1): BlasterTarget {
+  const size = 78 + Math.random() * 26
+  let x = 8 + Math.random() * 84
+  let y = 14 + Math.random() * 58
+  const levelVelocityBoost = Math.min(1.15, Math.max(0, level - 1) * 0.11)
+  const horizontalVelocity = 0.7 + Math.random() * 0.92 + levelVelocityBoost
+  const verticalVelocity = 0.58 + Math.random() * 0.78 + levelVelocityBoost * 0.82
+
+  for (let attempt = 0; attempt < 36; attempt += 1) {
+    const candidate = {
+      x: 8 + Math.random() * 84,
+      y: 14 + Math.random() * 58,
+      size,
+    }
+    const clear = existingTargets.every((target) => {
+      const minimumDistance = Math.max(13, (size + target.size) / 8.4)
+      return blasterAsteroidDistance(candidate, target) >= minimumDistance
+    })
+    if (clear) {
+      x = candidate.x
+      y = candidate.y
+      break
+    }
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    sectionId: section.id,
+    sectionNumber: section.sectionNumber,
+    codeSet: section.codeSet,
+    label: section.sectionNumber,
+    isCorrect: section.id === promptId,
+    x: Math.min(92, Math.max(8, x)),
+    y: Math.min(72, Math.max(14, y)),
+    floatX: (index % 2 === 0 ? 1 : -1) * horizontalVelocity,
+    floatY: (index % 3 === 0 ? 1 : -1) * verticalVelocity,
+    size,
+    rotation: -18 + Math.random() * 36,
+    speed: 9 + Math.random() * 5,
+    delay: Math.random() * -2,
+  }
 }
 
 function buildQuestions(sections: CodeSection[]) {
@@ -2275,7 +2448,7 @@ function sanitizeUserStats(input: unknown): UserStats {
   const sanitizeTimelinePoint = (entry: unknown): SessionTimelinePoint | null => {
     if (!entry || typeof entry !== 'object') return null
     const value = entry as Partial<SessionTimelinePoint>
-    const mode = (['study_test', 'matching', 'speed'].includes(String(value.mode)) ? String(value.mode) : '') as SessionMode | ''
+    const mode = (['study_test', 'matching', 'speed', 'blaster'].includes(String(value.mode)) ? String(value.mode) : '') as SessionMode | ''
     const filter = (['all', 'penal', 'hs', 'vehicle'].includes(String(value.filter)) ? String(value.filter) : '') as CodeFilter | ''
     if (!mode || !filter) return null
     const accuracy = typeof value.accuracy === 'number' ? Math.max(0, Math.min(100, Math.round(value.accuracy))) : null
@@ -2301,7 +2474,7 @@ function sanitizeUserStats(input: unknown): UserStats {
   if (Object.keys(normalizedTracks).length === 0) {
     const legacyAttemptsMap = legacyLastAttempts && typeof legacyLastAttempts === 'object' ? legacyLastAttempts as Record<string, unknown> : {}
     const legacyHistoryMap = legacyAccuracyHistory && typeof legacyAccuracyHistory === 'object' ? legacyAccuracyHistory as Record<string, unknown> : {}
-    const legacyModes: SessionMode[] = ['study_test', 'matching', 'speed']
+    const legacyModes: SessionMode[] = ['study_test', 'matching', 'speed', 'blaster']
     for (const mode of legacyModes) {
       const legacyAttempt = sanitizeAttempt(legacyAttemptsMap[mode])
       normalizedTracks[sessionTrackKey({ mode, filter: 'all', duration: mode === 'study_test' ? null : 0 })] = {
@@ -2319,6 +2492,7 @@ function sanitizeUserStats(input: unknown): UserStats {
     gamePlays: {
       matching: typeof (gamePlays as Record<string, unknown>).matching === 'number' ? Math.max(0, Math.floor((gamePlays as Record<string, number>).matching)) : 0,
       speed: typeof (gamePlays as Record<string, unknown>).speed === 'number' ? Math.max(0, Math.floor((gamePlays as Record<string, number>).speed)) : 0,
+      blaster: typeof (gamePlays as Record<string, unknown>).blaster === 'number' ? Math.max(0, Math.floor((gamePlays as Record<string, number>).blaster)) : 0,
     },
     flashcardsReviewed: typeof value.flashcardsReviewed === 'number' ? Math.max(0, Math.floor(value.flashcardsReviewed)) : 0,
     scenariosReviewed: typeof value.scenariosReviewed === 'number' ? Math.max(0, Math.floor(value.scenariosReviewed)) : 0,
@@ -2765,6 +2939,17 @@ function AppIcon({ name, className = '' }: { name: AppIconName; className?: stri
         <circle cx="16" cy="8" r="3" />
         <path d="M3.5 19c.8-3 2.4-4.5 4.5-4.5S11.7 16 12.5 19" />
         <path d="M11.5 19c.8-3 2.4-4.5 4.5-4.5s3.7 1.5 4.5 4.5" />
+      </svg>
+    )
+  }
+  if (name === 'blaster') {
+    return (
+      <svg {...commonProps} className={className} aria-hidden>
+        <path d="M12 3 7.5 14.5 12 12l4.5 2.5Z" />
+        <path d="M9.2 13.8 7 20l5-2 5 2-2.2-6.2" />
+        <path d="M4 7.5h2" />
+        <path d="M18 7.5h2" />
+        <path d="M12 20.5v1" />
       </svg>
     )
   }
@@ -3219,8 +3404,8 @@ function SessionPerformanceReportCard({ report }: { report: SessionPerformanceRe
 }
 
 type GameStartInsightsPanelProps = {
-  title: 'Matching' | 'Speed Test'
-  icon: 'games' | 'study'
+  title: ScoreGameName
+  icon: 'games' | 'study' | 'blaster'
   startLabel: string
   disabled?: boolean
   disabledHint?: string | null
@@ -3442,7 +3627,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('home')
   const [leaderboardsScope, setLeaderboardsScope] = useState<'weekly' | 'alltime'>('weekly')
   const [gameModeLeaderboardsScope, setGameModeLeaderboardsScope] = useState<'weekly' | 'alltime'>('alltime')
-  const [leaderboardViewGame, setLeaderboardViewGame] = useState<'Matching' | 'Speed Test'>('Matching')
+  const [leaderboardViewGame, setLeaderboardViewGame] = useState<ScoreGameName>('Matching')
   const [leaderboardViewDuration, setLeaderboardViewDuration] = useState<HomeDurationFilter>(15)
   const [leaderboardViewFilter, setLeaderboardViewFilter] = useState<CodeFilter>('all')
   const [onlineUsersCount, setOnlineUsersCount] = useState(0)
@@ -3639,8 +3824,11 @@ function App() {
   const [homeMatchingCodeFilter, setHomeMatchingCodeFilter] = useState<CodeFilter>('all')
   const [homeSpeedDurationFilter, setHomeSpeedDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeSpeedCodeFilter, setHomeSpeedCodeFilter] = useState<CodeFilter>('all')
+  const [homeBlasterDurationFilter, setHomeBlasterDurationFilter] = useState<HomeDurationFilter>(15)
+  const [homeBlasterCodeFilter, setHomeBlasterCodeFilter] = useState<CodeFilter>('all')
   const [homeMatchingConfigOpen, setHomeMatchingConfigOpen] = useState(false)
   const [homeSpeedConfigOpen, setHomeSpeedConfigOpen] = useState(false)
+  const [homeBlasterConfigOpen, setHomeBlasterConfigOpen] = useState(false)
   const [homeLeaderboardSettingsOpen, setHomeLeaderboardSettingsOpen] = useState(false)
   const [homeLeaderboardSettingsDraft, setHomeLeaderboardSettingsDraft] = useState<HomeLeaderboardPreferences>(() => ({
     visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards],
@@ -3698,6 +3886,22 @@ function App() {
   const [speedSessionQuestions, setSpeedSessionQuestions] = useState<QuizQuestion[]>([])
   const [showSpeedSetupModal, setShowSpeedSetupModal] = useState(false)
   const [speedFeedback, setSpeedFeedback] = useState('')
+  const [blasterRemaining, setBlasterRemaining] = useState(30)
+  const [blasterRunning, setBlasterRunning] = useState(false)
+  const [blasterDone, setBlasterDone] = useState(false)
+  const [blasterScore, setBlasterScore] = useState(0)
+  const [blasterCorrectCount, setBlasterCorrectCount] = useState(0)
+  const [blasterIncorrectCount, setBlasterIncorrectCount] = useState(0)
+  const [blasterLives, setBlasterLives] = useState(3)
+  const [blasterStreak, setBlasterStreak] = useState(0)
+  const [blasterLevel, setBlasterLevel] = useState(1)
+  const [blasterLevelPopup, setBlasterLevelPopup] = useState<number | null>(null)
+  const [blasterShipAngle, setBlasterShipAngle] = useState(0)
+  const [blasterPrompt, setBlasterPrompt] = useState<CodeSection | null>(null)
+  const [blasterTargets, setBlasterTargets] = useState<BlasterTarget[]>([])
+  const [blasterFeedback, setBlasterFeedback] = useState('')
+  const [blasterParticles, setBlasterParticles] = useState<Array<{ id: string; x: number; y: number; tone: 'good' | 'bad' }>>([])
+  const [blasterReport, setBlasterReport] = useState<SessionPerformanceReport | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -3713,6 +3917,7 @@ function App() {
   const [duelInviteJoinRoomId, setDuelInviteJoinRoomId] = useState<string | null>(null)
   const homeMatchingRotationIndexRef = useRef(0)
   const homeSpeedRotationIndexRef = useRef(0)
+  const homeBlasterRotationIndexRef = useRef(0)
   const lastAppStateUpdateRef = useRef(0)
   const highScoresRef = useRef(gameHighScoreSeed)
   const leaderboardRef = useRef<LeaderboardEntry[]>([])
@@ -3728,6 +3933,19 @@ function App() {
   const speedAnsweredCountRef = useRef(0)
   const speedSessionDurationRef = useRef(30)
   const speedSessionFilterRef = useRef<CodeFilter>('all')
+  const blasterScoreRef = useRef(0)
+  const blasterCorrectCountRef = useRef(0)
+  const blasterIncorrectCountRef = useRef(0)
+  const blasterTargetsRef = useRef<BlasterTarget[]>([])
+  const blasterLevelPopupTimerRef = useRef<number | null>(null)
+  const blasterLevelEndsAtRef = useRef(0)
+  const blasterSessionDurationRef = useRef(30)
+  const blasterSessionFilterRef = useRef<CodeFilter>('all')
+  const blasterSessionFinalizedRef = useRef(false)
+  const blasterLevelRef = useRef(1)
+  const blasterMotionFrameRef = useRef<number | null>(null)
+  const blasterMotionLastAtRef = useRef(0)
+  const finalizeBlasterSessionRef = useRef<(() => void) | null>(null)
   const matchCorrectCountRef = useRef(0)
   const matchIncorrectCountRef = useRef(0)
   const speedCorrectCountRef = useRef(0)
@@ -3758,6 +3976,7 @@ function App() {
     matching: 0,
     speed: 0,
     duel: 0,
+    blaster: 0,
   })
   const [quizFireWidth, setQuizFireWidth] = useState(0)
   const [scenarioFireWidth, setScenarioFireWidth] = useState(0)
@@ -4589,6 +4808,26 @@ function App() {
   useEffect(() => {
     speedIncorrectCountRef.current = speedIncorrectCount
   }, [speedIncorrectCount])
+
+  useEffect(() => {
+    blasterScoreRef.current = blasterScore
+  }, [blasterScore])
+
+  useEffect(() => {
+    blasterCorrectCountRef.current = blasterCorrectCount
+  }, [blasterCorrectCount])
+
+  useEffect(() => {
+    blasterIncorrectCountRef.current = blasterIncorrectCount
+  }, [blasterIncorrectCount])
+
+  useEffect(() => {
+    blasterTargetsRef.current = blasterTargets
+  }, [blasterTargets])
+
+  useEffect(() => {
+    blasterLevelRef.current = blasterLevel
+  }, [blasterLevel])
 
   const refreshLeaderboard = async (options: { force?: boolean } = {}): Promise<LeaderboardRefreshResult> => {
     if (!supabase) return { allTimeEntries: [], weeklyEntries: [] }
@@ -5509,6 +5748,16 @@ function App() {
         .slice(0, 8),
     [leaderboard, gamesSelection.duration, gamesSelection.filter],
   )
+  const blasterLeaderboard = useMemo(
+    () =>
+      topEntryPerUser(
+        leaderboard
+          .filter((entry) => entry.game === 'Code Blaster')
+          .filter((entry) => entry.matchDuration === gamesSelection.duration && entry.matchFilter === gamesSelection.filter),
+      )
+        .slice(0, 8),
+    [leaderboard, gamesSelection.duration, gamesSelection.filter],
+  )
   const duelHubLeaderboard = useMemo(() => {
     const perUser = new Map<string, LeaderboardEntry>()
     for (const entry of leaderboard) {
@@ -5558,6 +5807,18 @@ function App() {
         .slice(0, 5),
     [leaderboard, homeSpeedDurationFilter, homeSpeedCodeFilter],
   )
+  const homeBlasterLeaders = useMemo(
+    () =>
+      topEntryPerUser(
+        leaderboard
+          .filter((entry) => entry.game === 'Code Blaster')
+          .filter((entry) => entry.score > 0)
+          .filter((entry) => entry.matchDuration === homeBlasterDurationFilter)
+          .filter((entry) => entry.matchFilter === homeBlasterCodeFilter),
+      )
+        .slice(0, 5),
+    [leaderboard, homeBlasterDurationFilter, homeBlasterCodeFilter],
+  )
   const homeMatchingRotationSteps = useMemo(
     () =>
       homeLeaderboardRotationSteps.filter((step) =>
@@ -5584,6 +5845,19 @@ function App() {
       ),
     [leaderboard],
   )
+  const homeBlasterRotationSteps = useMemo(
+    () =>
+      homeLeaderboardRotationSteps.filter((step) =>
+        leaderboard.some(
+          (entry) =>
+            entry.game === 'Code Blaster' &&
+            entry.score > 0 &&
+            entry.matchDuration === step.duration &&
+            entry.matchFilter === step.codeSet,
+        ),
+      ),
+    [leaderboard],
+  )
   const homeLeaderboardPreferences = useMemo(
     () => sanitizeHomeLeaderboardPreferences(profileDetails.homeLeaderboardPreferences),
     [profileDetails.homeLeaderboardPreferences],
@@ -5602,6 +5876,7 @@ function App() {
   const homeShowsStudyStreakLeaderboard = homeVisibleLeaderboardCards.includes('study_streak')
   const homeShowsMatchingLeaderboard = homeVisibleLeaderboardCards.includes('matching')
   const homeShowsSpeedLeaderboard = homeVisibleLeaderboardCards.includes('speed')
+  const homeShowsBlasterLeaderboard = homeVisibleLeaderboardCards.includes('blaster')
   const homeShowsMasteredLeaderboard = homeVisibleLeaderboardCards.includes('mastered')
   const homeShowsDuelWinsLeaderboard = homeVisibleLeaderboardCards.includes('duel_wins')
   const homeShowsDuelStreakLeaderboard = homeVisibleLeaderboardCards.includes('duel_streak')
@@ -5628,6 +5903,15 @@ function App() {
       topEntryPerUser(
         gamesModeLeaderboardSource
           .filter((entry) => entry.game === 'Speed Test')
+          .filter((entry) => entry.matchDuration === gamesSelection.duration && entry.matchFilter === gamesSelection.filter),
+      ).slice(0, 8),
+    [gamesModeLeaderboardSource, gamesSelection.duration, gamesSelection.filter],
+  )
+  const blasterModeLeaderboard = useMemo(
+    () =>
+      topEntryPerUser(
+        gamesModeLeaderboardSource
+          .filter((entry) => entry.game === 'Code Blaster')
           .filter((entry) => entry.matchDuration === gamesSelection.duration && entry.matchFilter === gamesSelection.filter),
       ).slice(0, 8),
     [gamesModeLeaderboardSource, gamesSelection.duration, gamesSelection.filter],
@@ -5659,8 +5943,17 @@ function App() {
     () => visibleLeaderboardBoards.filter((board) => board.game === 'Speed Test'),
     [visibleLeaderboardBoards],
   )
+  const visibleBlasterBoards = useMemo(
+    () => visibleLeaderboardBoards.filter((board) => board.game === 'Code Blaster'),
+    [visibleLeaderboardBoards],
+  )
   const scopedLeaderboardEntries = leaderboardsScope === 'weekly' ? weeklyLeaderboardEntries : leaderboard
-  const leaderboardGameBoards = leaderboardViewGame === 'Matching' ? visibleMatchingBoards : visibleSpeedBoards
+  const leaderboardGameBoards =
+    leaderboardViewGame === 'Matching'
+      ? visibleMatchingBoards
+      : leaderboardViewGame === 'Speed Test'
+        ? visibleSpeedBoards
+        : visibleBlasterBoards
   const leaderboardSelectedBoard = useMemo(() => {
     if (leaderboardGameBoards.length === 0) return null
     return (
@@ -5986,7 +6279,7 @@ function App() {
   }, [])
 
   const handleLeaderboardTopMilestones = useCallback(async (options: {
-    game: 'Matching' | 'Speed Test'
+    game: ScoreGameName
     duration: number
     filter: CodeFilter
     beforeAllTimeEntries: LeaderboardEntry[]
@@ -6152,7 +6445,9 @@ function App() {
       ? 'study_test'
       : trackKey.startsWith('matching|')
         ? 'matching'
-        : 'speed'
+        : trackKey.startsWith('blaster|')
+          ? 'blaster'
+          : 'speed'
 
     setProfileDetails((previous) => {
       const currentTrack = previous.stats.sessionTracks[trackKey] || { lastAttempt: null, accuracyHistory: [], scoreHistory: [] }
@@ -6226,7 +6521,7 @@ function App() {
   }, [currentUserId, supabase])
 
   const syncWeeklyLeaderboardEntry = useCallback(async (options: {
-    game: 'Matching' | 'Speed Test'
+    game: ScoreGameName
     score: number
     round: number
     duration: number
@@ -6791,6 +7086,340 @@ function App() {
     setSpeedFeedback('')
   }
 
+  const setNextBlasterPrompt = useCallback((targetFilter: CodeFilter, existingTargets: BlasterTarget[] = [], addCount = 0) => {
+    const pool = targetFilter === 'all'
+      ? sections
+      : sections.filter((section) => section.codeSet === targetFilter)
+    if (pool.length === 0) {
+      setBlasterPrompt(null)
+      setBlasterTargets([])
+      return
+    }
+
+    const prompt = shuffle(pool)[0]
+    const existingSectionIds = new Set(existingTargets.map((target) => target.sectionId))
+    const reusableTargets = existingTargets.map((target) => ({
+      ...target,
+      isCorrect: target.sectionId === prompt.id,
+    }))
+
+    const nextSections: CodeSection[] = []
+    if (!existingSectionIds.has(prompt.id)) {
+      nextSections.push(prompt)
+    }
+    const cappedReusableTargets = reusableTargets.slice(0, blasterMaxAsteroids)
+    const neededNewTargets = Math.min(
+      blasterMaxAsteroids - cappedReusableTargets.length,
+      Math.max(addCount, blasterMaxAsteroids - cappedReusableTargets.length, nextSections.length),
+    )
+    const extras = shuffle(pool.filter((section) => !existingSectionIds.has(section.id) && section.id !== prompt.id))
+    nextSections.push(...extras.slice(0, Math.max(0, neededNewTargets - nextSections.length)))
+
+    setBlasterPrompt(prompt)
+    const nextAsteroids = [...cappedReusableTargets]
+    for (const section of nextSections) {
+      if (nextAsteroids.length >= blasterMaxAsteroids) break
+      nextAsteroids.push(createBlasterAsteroid(section, prompt.id, nextAsteroids.length, nextAsteroids, blasterLevelRef.current))
+    }
+
+    setBlasterTargets(shuffle(nextAsteroids).slice(0, blasterMaxAsteroids))
+  }, [sections])
+
+  const finalizeBlasterSession = useCallback(() => {
+    if (blasterSessionFinalizedRef.current) return
+    blasterSessionFinalizedRef.current = true
+    const finalScore = blasterScoreRef.current
+    const finalCorrect = blasterCorrectCountRef.current
+    const finalIncorrect = blasterIncorrectCountRef.current
+    const finalAttempts = finalCorrect + finalIncorrect
+    const finalAccuracy = finalAttempts > 0 ? Math.round((finalCorrect / finalAttempts) * 100) : 0
+    const sessionDuration = blasterSessionDurationRef.current
+    const sessionFilter = blasterSessionFilterRef.current
+    const trackKey = sessionTrackKey({ mode: 'blaster', duration: sessionDuration, filter: sessionFilter })
+    const track = getSessionTrack(profileDetails.stats, trackKey)
+    const previousAttempt = track.lastAttempt
+    const trend = [...track.accuracyHistory, finalAccuracy].slice(-8)
+    const remoteTrend = remoteTrackScoreHistory[trackKey] || []
+    const baseScoreTrend = remoteTrend.length > 0
+      ? remoteTrend
+      : track.scoreHistory && track.scoreHistory.length > 0
+        ? track.scoreHistory
+        : previousAttempt
+          ? [previousAttempt.score]
+          : []
+    const scoreTrend = [...baseScoreTrend, finalScore]
+    const focusTips = getFocusTips(sessionFilter, 'blaster')
+    const previousBest = highScoresRef.current.blaster
+    const isPersonalBest = finalScore > previousBest
+    setHighScores((previous) => ({ ...previous, blaster: Math.max(previous.blaster, finalScore) }))
+
+    const baseReport: SessionPerformanceReport = {
+      mode: 'blaster',
+      title: 'Code Blaster',
+      contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
+      accuracy: finalAccuracy,
+      correct: finalCorrect,
+      incorrect: finalIncorrect,
+      score: finalScore,
+      deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+      deltaScore: previousAttempt ? finalScore - previousAttempt.score : null,
+      trend,
+      scoreTrend,
+      focusTips,
+      leaderboardPreview: [],
+      currentRank: null,
+      previousRank: previousAttempt?.rank ?? null,
+    }
+
+    if (supabase && currentUserId) {
+      void (async () => {
+        const leaderboardBeforeSave = [...leaderboardRef.current]
+        const weeklyLeaderboardBeforeSave = [...weeklyLeaderboardRef.current]
+        const existing = leaderboardRef.current.find(
+          (entry) =>
+            entry.userId === currentUserId &&
+            entry.game === 'Code Blaster' &&
+            entry.matchDuration === sessionDuration &&
+            entry.matchFilter === sessionFilter,
+        )
+
+        if (isLeaderboardScoreImprovement(finalScore, finalCorrect, existing)) {
+          const { error: insertError } = await supabase
+            .from('leaderboard')
+            .upsert({
+              game: 'Code Blaster',
+              score: finalScore,
+              round: finalCorrect,
+              user_id: currentUserId,
+              match_duration: sessionDuration,
+              match_filter: sessionFilter,
+              created_at: new Date().toISOString(),
+            }, {
+              onConflict: 'user_id,game,match_duration,match_filter',
+              ignoreDuplicates: false,
+            })
+
+          if (insertError) {
+            console.error('Code Blaster leaderboard save failed:', insertError)
+          }
+        }
+
+        await syncWeeklyLeaderboardEntry({
+          game: 'Code Blaster',
+          score: finalScore,
+          round: finalCorrect,
+          duration: sessionDuration,
+          filter: sessionFilter,
+        })
+
+        const refreshed = await refreshLeaderboard({ force: true })
+        await refreshHomeLeaderboards({ force: true })
+        const leaderboardAfterSave = refreshed.allTimeEntries.length > 0 ? refreshed.allTimeEntries : leaderboardRef.current
+        const weeklyLeaderboardAfterSave = refreshed.weeklyEntries.length > 0 ? refreshed.weeklyEntries : weeklyLeaderboardRef.current
+        const milestone = await handleLeaderboardTopMilestones({
+          game: 'Code Blaster',
+          duration: sessionDuration,
+          filter: sessionFilter,
+          beforeAllTimeEntries: leaderboardBeforeSave,
+          afterAllTimeEntries: leaderboardAfterSave,
+          beforeWeeklyEntries: weeklyLeaderboardBeforeSave,
+          afterWeeklyEntries: weeklyLeaderboardAfterSave,
+        })
+        if (!milestone.becameWeeklyTop && !milestone.becameAllTimeTop && isPersonalBest) {
+          triggerCelebration('🎉 New Personal Best', `Code Blaster: ${finalScore} points`)
+        }
+
+        const { preview, currentRank } = getLeaderboardPreview(
+          leaderboardAfterSave,
+          'Code Blaster',
+          sessionDuration,
+          sessionFilter,
+          currentUserId,
+        )
+        setBlasterReport({ ...baseReport, leaderboardPreview: preview, currentRank })
+        saveSessionAttempt(trackKey, {
+          accuracy: finalAccuracy,
+          score: finalScore,
+          correct: finalCorrect,
+          incorrect: finalIncorrect,
+          rank: currentRank,
+          duration: sessionDuration,
+          filter: sessionFilter,
+          at: Date.now(),
+        })
+      })()
+    } else {
+      setBlasterReport(baseReport)
+      saveSessionAttempt(trackKey, {
+        accuracy: finalAccuracy,
+        score: finalScore,
+        correct: finalCorrect,
+        incorrect: finalIncorrect,
+        rank: null,
+        duration: sessionDuration,
+        filter: sessionFilter,
+        at: Date.now(),
+      })
+    }
+  }, [
+    currentUserId,
+    getFocusTips,
+    handleLeaderboardTopMilestones,
+    profileDetails.stats,
+    refreshHomeLeaderboards,
+    refreshLeaderboard,
+    remoteTrackScoreHistory,
+    saveSessionAttempt,
+    supabase,
+    syncWeeklyLeaderboardEntry,
+    triggerCelebration,
+  ])
+
+  useEffect(() => {
+    finalizeBlasterSessionRef.current = finalizeBlasterSession
+  }, [finalizeBlasterSession])
+
+  const startBlaster = () => {
+    const selectedDuration = gamesSelection.duration
+    const selectedFilter = gamesSelection.filter
+    const pool = selectedFilter === 'all' ? sections : sections.filter((section) => section.codeSet === selectedFilter)
+    if (pool.length === 0) return
+    blasterSessionDurationRef.current = selectedDuration
+    blasterSessionFilterRef.current = selectedFilter
+    const startingSeconds = blasterLevelSeconds(selectedDuration, 1)
+    blasterLevelEndsAtRef.current = Date.now() + startingSeconds * 1000
+    setBlasterRemaining(startingSeconds)
+    setBlasterScore(0)
+    setBlasterCorrectCount(0)
+    setBlasterIncorrectCount(0)
+    setBlasterLives(3)
+    setBlasterStreak(0)
+    setBlasterLevel(1)
+    blasterLevelRef.current = 1
+    setBlasterLevelPopup(null)
+    setBlasterShipAngle(0)
+    setBlasterFeedback('')
+    setBlasterReport(null)
+    setBlasterDone(false)
+    setBlasterRunning(true)
+    blasterScoreRef.current = 0
+    blasterCorrectCountRef.current = 0
+    blasterIncorrectCountRef.current = 0
+    blasterSessionFinalizedRef.current = false
+    if (blasterLevelPopupTimerRef.current !== null) {
+      window.clearTimeout(blasterLevelPopupTimerRef.current)
+      blasterLevelPopupTimerRef.current = null
+    }
+    setNextBlasterPrompt(selectedFilter, [], 5)
+    incrementUserStats((stats) => ({
+      ...stats,
+      gamePlays: {
+        ...stats.gamePlays,
+        blaster: stats.gamePlays.blaster + 1,
+      },
+    }))
+  }
+
+  const exitBlasterSession = () => {
+    setBlasterRunning(false)
+    setBlasterDone(false)
+    blasterSessionFinalizedRef.current = false
+    setBlasterFeedback('')
+    setBlasterPrompt(null)
+    setBlasterTargets([])
+    setBlasterParticles([])
+    setBlasterLevelPopup(null)
+    blasterLevelRef.current = 1
+    if (blasterLevelPopupTimerRef.current !== null) {
+      window.clearTimeout(blasterLevelPopupTimerRef.current)
+      blasterLevelPopupTimerRef.current = null
+    }
+  }
+
+  const aimBlasterShip = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!blasterRunning || blasterDone) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const shipX = rect.left + rect.width / 2
+    const shipY = rect.top + rect.height * 0.86
+    const angle = Math.atan2(event.clientY - shipY, event.clientX - shipX) * (180 / Math.PI) + 90
+    setBlasterShipAngle(Math.max(-76, Math.min(76, angle)))
+  }, [blasterDone, blasterRunning])
+
+  const answerBlasterTarget = useCallback((target: BlasterTarget, event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!blasterRunning || blasterDone || !blasterPrompt) return
+    markStudyActivity('blaster')
+    const rect = event.currentTarget.getBoundingClientRect()
+    const particleX = rect.left + rect.width / 2
+    const particleY = rect.top + rect.height / 2
+    const particleId = crypto.randomUUID()
+    setBlasterParticles((previous) => [...previous.slice(-18), { id: particleId, x: particleX, y: particleY, tone: target.isCorrect ? 'good' : 'bad' }])
+    window.setTimeout(() => {
+      setBlasterParticles((previous) => previous.filter((particle) => particle.id !== particleId))
+    }, 780)
+
+    if (target.isCorrect) {
+      const nextStreak = blasterStreak + 1
+      const bonus = Math.min(20, nextStreak * 2)
+      const timeBonusSeconds = 3
+      const nextScore = blasterScoreRef.current + 25 + bonus
+      const nextLevel = blasterLevelForScore(nextScore)
+      const remainingTargets = blasterTargetsRef.current.filter((candidate) => candidate.id !== target.id)
+      const previousLevel = blasterLevelRef.current
+      const levelSeconds = blasterLevelSeconds(blasterSessionDurationRef.current, nextLevel)
+      const now = Date.now()
+      const baselineDeadline = nextLevel > previousLevel
+        ? now + levelSeconds * 1000
+        : Math.max(now, blasterLevelEndsAtRef.current)
+      const bonusCapDeadline = now + (levelSeconds + 8) * 1000
+      const nextDeadline = Math.min(baselineDeadline + timeBonusSeconds * 1000, bonusCapDeadline)
+      blasterScoreRef.current = nextScore
+      blasterLevelEndsAtRef.current = nextDeadline
+      setBlasterStreak(nextStreak)
+      setBlasterCorrectCount((count) => count + 1)
+      setBlasterScore(nextScore)
+      setBlasterRemaining(Math.max(0, Math.ceil((nextDeadline - now) / 1000)))
+      setBlasterLevel((currentLevel) => {
+        if (nextLevel <= currentLevel) return currentLevel
+        setBlasterLevelPopup(nextLevel)
+        blasterLevelRef.current = nextLevel
+        if (blasterLevelPopupTimerRef.current !== null) {
+          window.clearTimeout(blasterLevelPopupTimerRef.current)
+        }
+        blasterLevelPopupTimerRef.current = window.setTimeout(() => {
+          setBlasterLevelPopup(null)
+          blasterLevelPopupTimerRef.current = null
+        }, 1250)
+        return nextLevel
+      })
+      markPerformance(target.codeSet, target.sectionNumber, true)
+      setBlasterFeedback(nextLevel > previousLevel ? `Level ${nextLevel}! +${25 + bonus} • +${timeBonusSeconds}s` : `Direct hit +${25 + bonus} • +${timeBonusSeconds}s`)
+      setNextBlasterPrompt(blasterSessionFilterRef.current, remainingTargets, 1)
+      return
+    }
+
+    setBlasterStreak(0)
+    setBlasterIncorrectCount((count) => count + 1)
+    const remainingTargetsAfterMiss = blasterTargetsRef.current.filter((candidate) => candidate.id !== target.id)
+    setBlasterScore((score) => {
+      const nextScore = Math.max(0, score - 10)
+      blasterScoreRef.current = nextScore
+      return nextScore
+    })
+    setBlasterLives((lives) => {
+      const nextLives = Math.max(0, lives - 1)
+      if (nextLives <= 0) {
+        setBlasterRunning(false)
+        setBlasterDone(true)
+        window.setTimeout(() => finalizeBlasterSession(), 0)
+      } else {
+        window.setTimeout(() => setNextBlasterPrompt(blasterSessionFilterRef.current, remainingTargetsAfterMiss, 1), 0)
+      }
+      return nextLives
+    })
+    markPerformance(blasterPrompt.codeSet, blasterPrompt.sectionNumber, false)
+    setBlasterFeedback('Missile missed -10')
+  }, [blasterDone, blasterLevel, blasterPrompt, blasterRunning, blasterStreak, finalizeBlasterSession, markPerformance, markStudyActivity, setNextBlasterPrompt])
+
   const answerSpeedQuestion = useCallback((choiceIndex: number) => {
     if (!speedRunning || !speedCurrentQuestion || speedAnswerLockRef.current) return
     if (isSpeedSpamAttempt(choiceIndex)) return
@@ -7147,6 +7776,98 @@ function App() {
     speedRunning,
     triggerCelebration,
   ])
+
+  useEffect(() => {
+    if (!blasterRunning || blasterDone) return
+    let sessionEnded = false
+    const tick = () => {
+      const deadline = blasterLevelEndsAtRef.current
+      const nextRemaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
+      setBlasterRemaining((previous) => (previous === nextRemaining ? previous : nextRemaining))
+      if (nextRemaining > 0 || sessionEnded) return
+
+      sessionEnded = true
+      setBlasterFeedback('Time expired')
+      setBlasterRunning(false)
+      setBlasterDone(true)
+      finalizeBlasterSessionRef.current?.()
+    }
+
+    tick()
+    const timer = window.setInterval(tick, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [blasterDone, blasterRunning])
+
+  useEffect(() => {
+    if (!blasterRunning || blasterDone) return
+    blasterMotionLastAtRef.current = globalThis.performance.now()
+    const moveAsteroids = (now: number) => {
+      const elapsedSeconds = Math.min(0.05, Math.max(0.001, (now - blasterMotionLastAtRef.current) / 1000))
+      blasterMotionLastAtRef.current = now
+      setBlasterTargets((targets) => {
+        const moved = targets.map((target) => {
+          let x = target.x + target.floatX * elapsedSeconds
+          let y = target.y + target.floatY * elapsedSeconds
+          let floatX = target.floatX
+          let floatY = target.floatY
+          const radiusX = Math.max(4.2, target.size / 21)
+          const radiusY = Math.max(5.4, target.size / 18)
+
+          if (x < 6 + radiusX || x > 94 - radiusX) {
+            floatX *= -1
+            x = Math.max(6 + radiusX, Math.min(94 - radiusX, x))
+          }
+          if (y < 10 + radiusY || y > 74 - radiusY) {
+            floatY *= -1
+            y = Math.max(10 + radiusY, Math.min(74 - radiusY, y))
+          }
+
+          return { ...target, x, y, floatX, floatY }
+        })
+
+        for (let leftIndex = 0; leftIndex < moved.length; leftIndex += 1) {
+          for (let rightIndex = leftIndex + 1; rightIndex < moved.length; rightIndex += 1) {
+            const left = moved[leftIndex]
+            const right = moved[rightIndex]
+            const minimumDistance = Math.max(7.5, (left.size + right.size) / 20)
+            const distance = blasterAsteroidDistance(left, right)
+            if (distance <= 0 || distance >= minimumDistance) continue
+
+            const overlap = (minimumDistance - distance) / 2
+            const dx = (left.x - right.x) / distance
+            const dy = (left.y - right.y) / distance
+            moved[leftIndex] = {
+              ...left,
+              x: Math.max(8, Math.min(92, left.x + dx * overlap)),
+              y: Math.max(12, Math.min(74, left.y + dy * overlap)),
+              floatX: right.floatX,
+              floatY: right.floatY,
+            }
+            moved[rightIndex] = {
+              ...right,
+              x: Math.max(8, Math.min(92, right.x - dx * overlap)),
+              y: Math.max(12, Math.min(74, right.y - dy * overlap)),
+              floatX: left.floatX,
+              floatY: left.floatY,
+            }
+          }
+        }
+
+        return moved
+      })
+      blasterMotionFrameRef.current = window.requestAnimationFrame(moveAsteroids)
+    }
+
+    blasterMotionFrameRef.current = window.requestAnimationFrame(moveAsteroids)
+
+    return () => {
+      if (blasterMotionFrameRef.current !== null) {
+        window.cancelAnimationFrame(blasterMotionFrameRef.current)
+        blasterMotionFrameRef.current = null
+      }
+    }
+  }, [blasterDone, blasterRunning])
 
   useEffect(() => {
     scenarioDeckRef.current = []
@@ -7608,6 +8329,21 @@ function App() {
     setSpeedAnsweredCount(0)
     setMatchScore(0)
     setMatchRound(1)
+    setBlasterDone(false)
+    setBlasterRunning(false)
+    setBlasterRemaining(gamesSelection.duration)
+    setBlasterScore(0)
+    setBlasterCorrectCount(0)
+    setBlasterIncorrectCount(0)
+    setBlasterLives(3)
+    setBlasterStreak(0)
+    setBlasterLevel(1)
+    setBlasterShipAngle(0)
+    setBlasterPrompt(null)
+    setBlasterTargets([])
+    setBlasterFeedback('')
+    setBlasterParticles([])
+    setBlasterReport(null)
     setStudyFlashSessionOpen(false)
     setStudyTestSessionOpen(false)
     setStudyTestSessionDone(false)
@@ -7665,8 +8401,9 @@ function App() {
   const isGamesHubPage = currentPath === '/games'
   const isGamesMatchingPage = currentPath === '/games/matching'
   const isGamesSpeedPage = currentPath === '/games/speed'
+  const isGamesBlasterPage = currentPath === '/games/blaster'
   const isGamesDuelPage = currentPath === '/games/duel'
-  const isGamesPage = isGamesHubPage || isGamesMatchingPage || isGamesSpeedPage || isGamesDuelPage
+  const isGamesPage = isGamesHubPage || isGamesMatchingPage || isGamesSpeedPage || isGamesBlasterPage || isGamesDuelPage
   const isScenariosPage = currentPath === '/scenarios'
   const isLibraryPage = currentPath === '/library'
   const isLeaderboardsPage = currentPath === '/leaderboards'
@@ -7998,7 +8735,7 @@ function App() {
   }, [isStudyTestPage])
 
   useEffect(() => {
-    if (!isGamesMatchingPage && !isGamesSpeedPage) return
+    if (!isGamesMatchingPage && !isGamesSpeedPage && !isGamesBlasterPage) return
     const scrollToTop = () => {
       window.scrollTo({ top: 0, behavior: 'auto' })
     }
@@ -8009,7 +8746,7 @@ function App() {
       window.cancelAnimationFrame(raf)
       window.clearTimeout(timer)
     }
-  }, [isGamesMatchingPage, isGamesSpeedPage, matchRunning, speedRunning, matchDone, speedDone])
+  }, [isGamesBlasterPage, isGamesMatchingPage, isGamesSpeedPage, matchRunning, speedRunning, blasterRunning, matchDone, speedDone, blasterDone])
 
   useEffect(() => {
     if (homeMatchingRotationSteps.length === 0) return
@@ -8034,6 +8771,18 @@ function App() {
     setHomeSpeedDurationFilter(first.duration)
     setHomeSpeedCodeFilter(first.codeSet)
   }, [homeSpeedRotationSteps, homeSpeedDurationFilter, homeSpeedCodeFilter])
+
+  useEffect(() => {
+    if (homeBlasterRotationSteps.length === 0) return
+    const hasCurrent = homeBlasterRotationSteps.some(
+      (step) => step.duration === homeBlasterDurationFilter && step.codeSet === homeBlasterCodeFilter,
+    )
+    if (hasCurrent) return
+    const first = homeBlasterRotationSteps[0]
+    homeBlasterRotationIndexRef.current = 0
+    setHomeBlasterDurationFilter(first.duration)
+    setHomeBlasterCodeFilter(first.codeSet)
+  }, [homeBlasterRotationSteps, homeBlasterDurationFilter, homeBlasterCodeFilter])
 
   useEffect(() => {
     if (!isHomePage || !homeShowsMatchingLeaderboard || homeMatchingConfigOpen || homeMatchingRotationSteps.length === 0) return
@@ -8074,6 +8823,25 @@ function App() {
   }, [isHomePage, homeShowsSpeedLeaderboard, homeSpeedConfigOpen, homeSpeedDurationFilter, homeSpeedCodeFilter, homeSpeedRotationSteps, leaderboardRotateMs])
 
   useEffect(() => {
+    if (!isHomePage || !homeShowsBlasterLeaderboard || homeBlasterConfigOpen || homeBlasterRotationSteps.length === 0) return
+
+    const currentIndex = homeBlasterRotationSteps.findIndex(
+      (step) => step.duration === homeBlasterDurationFilter && step.codeSet === homeBlasterCodeFilter,
+    )
+    if (currentIndex >= 0) homeBlasterRotationIndexRef.current = currentIndex
+
+    const timer = window.setInterval(() => {
+      const nextIndex = (homeBlasterRotationIndexRef.current + 1) % homeBlasterRotationSteps.length
+      homeBlasterRotationIndexRef.current = nextIndex
+      const nextStep = homeBlasterRotationSteps[nextIndex]
+      setHomeBlasterDurationFilter(nextStep.duration)
+      setHomeBlasterCodeFilter(nextStep.codeSet)
+    }, leaderboardRotateMs)
+
+    return () => window.clearInterval(timer)
+  }, [isHomePage, homeShowsBlasterLeaderboard, homeBlasterConfigOpen, homeBlasterDurationFilter, homeBlasterCodeFilter, homeBlasterRotationSteps, leaderboardRotateMs])
+
+  useEffect(() => {
     if (homeShowsMatchingLeaderboard) return
     if (homeMatchingConfigOpen) setHomeMatchingConfigOpen(false)
   }, [homeShowsMatchingLeaderboard, homeMatchingConfigOpen])
@@ -8082,6 +8850,11 @@ function App() {
     if (homeShowsSpeedLeaderboard) return
     if (homeSpeedConfigOpen) setHomeSpeedConfigOpen(false)
   }, [homeShowsSpeedLeaderboard, homeSpeedConfigOpen])
+
+  useEffect(() => {
+    if (homeShowsBlasterLeaderboard) return
+    if (homeBlasterConfigOpen) setHomeBlasterConfigOpen(false)
+  }, [homeShowsBlasterLeaderboard, homeBlasterConfigOpen])
 
   useEffect(() => {
     if (!homeLeaderboardSettingsOpen) return
@@ -8194,6 +8967,7 @@ function App() {
     if (isGamesDuelPage) return { key: 'duel', label: 'In 1v1' }
     if (isGamesMatchingPage) return { key: 'matching', label: matchRunning && !matchDone ? 'Playing Matching' : 'In Matching Setup' }
     if (isGamesSpeedPage) return { key: 'speed', label: speedRunning && !speedDone && Boolean(speedCurrentQuestion) ? 'Playing Speed Test' : 'In Speed Test Setup' }
+    if (isGamesBlasterPage) return { key: 'blaster', label: blasterRunning && !blasterDone ? 'Playing Code Blaster' : 'In Code Blaster Setup' }
     if (isStudyPracticeTestPage) return { key: 'study_practice', label: 'On Practice Test' }
     if (isStudyGuidePage) return { key: 'study_guide', label: 'Reading Study Guide' }
     if (isStudyFlashcardsPage) return {
@@ -8216,7 +8990,10 @@ function App() {
   }, [
     activeTab,
     currentQuestion,
+    blasterDone,
+    blasterRunning,
     isChatPage,
+    isGamesBlasterPage,
     isGamesDuelPage,
     isGamesMatchingPage,
     isGamesSpeedPage,
@@ -8412,12 +9189,25 @@ function App() {
   const openPriorityTmas2PracticeTestPage = useCallback(() => {
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem('practice-test-scroll-target', 'setup')
+      window.sessionStorage.setItem('practice-test-module-target', 'tmas2')
+    }
+    goToPath('/study/practice-test', { tab: 'study' })
+  }, [goToPath])
+
+  const openPriorityTmas3PracticeTestPage = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('practice-test-scroll-target', 'setup')
+      window.sessionStorage.setItem('practice-test-module-target', 'tmas3')
     }
     goToPath('/study/practice-test', { tab: 'study' })
   }, [goToPath])
 
   const priorityTmas2Countdown = useMemo(
     () => buildPriorityTmas2Countdown(clockNowMs),
+    [clockNowMs],
+  )
+  const priorityTmas3Countdown = useMemo(
+    () => buildPriorityTmas3Countdown(clockNowMs),
     [clockNowMs],
   )
 
@@ -8555,6 +9345,16 @@ function App() {
                 },
               },
               {
+                key: 'games-blaster',
+                label: 'Code Blaster',
+                icon: 'blaster' as AppIconName,
+                active: isGamesBlasterPage,
+                onClick: () => {
+                  setMobileNavMenuOpen(false)
+                  goToPath('/games/blaster', { tab: 'games' })
+                },
+              },
+              {
                 key: 'games-duel',
                 label: '1v1',
                 icon: 'duel' as AppIconName,
@@ -8572,6 +9372,7 @@ function App() {
       isChatPage,
       isGamesDuelPage,
       isGamesHubPage,
+      isGamesBlasterPage,
       isGamesMatchingPage,
       isGamesPage,
       isGamesSpeedPage,
@@ -9455,6 +10256,7 @@ function App() {
       study_test: { points: [] },
       matching: { points: [] },
       speed: { points: [] },
+      blaster: { points: [] },
     }
 
     const combinedTrackScores: Record<string, number[]> = {}
@@ -9480,6 +10282,8 @@ function App() {
           ? 'matching'
           : trackKey.startsWith('speed|')
             ? 'speed'
+            : trackKey.startsWith('blaster|')
+              ? 'blaster'
             : null
       if (!mode) continue
       if (Array.isArray(scores) && scores.length > 0) {
@@ -9487,7 +10291,7 @@ function App() {
       }
     }
 
-    const modePerformance = (['study_test', 'matching', 'speed'] as SessionMode[]).map((mode) => {
+    const modePerformance = (['study_test', 'matching', 'speed', 'blaster'] as SessionMode[]).map((mode) => {
       const points = modeBuckets[mode].points.filter((value) => Number.isFinite(value))
       const runs = points.length
       const averageScore = runs > 0 ? Math.round(points.reduce((sum, value) => sum + value, 0) / runs) : 0
@@ -9619,6 +10423,10 @@ function App() {
     () => sessionTrackKey({ mode: 'speed', duration: gamesSelection.duration, filter: gamesSelection.filter }),
     [gamesSelection.duration, gamesSelection.filter],
   )
+  const blasterTrackKey = useMemo(
+    () => sessionTrackKey({ mode: 'blaster', duration: gamesSelection.duration, filter: gamesSelection.filter }),
+    [gamesSelection.duration, gamesSelection.filter],
+  )
   const mergeTrackWithRemoteHistory = useCallback((trackKey: string, track: SessionTrack): SessionTrack => {
     const remoteScores = remoteTrackScoreHistory[trackKey] || []
     if (remoteScores.length === 0) return track
@@ -9635,12 +10443,20 @@ function App() {
     () => mergeTrackWithRemoteHistory(speedTrackKey, getSessionTrack(profileDetails.stats, speedTrackKey)),
     [mergeTrackWithRemoteHistory, profileDetails.stats, speedTrackKey],
   )
+  const blasterSessionTrack = useMemo(
+    () => mergeTrackWithRemoteHistory(blasterTrackKey, getSessionTrack(profileDetails.stats, blasterTrackKey)),
+    [mergeTrackWithRemoteHistory, profileDetails.stats, blasterTrackKey],
+  )
   const matchingFocusTips = useMemo(
     () => getFocusTips(gamesSelection.filter, 'matching').slice(0, 3),
     [gamesSelection.filter, getFocusTips],
   )
   const speedFocusTips = useMemo(
     () => getFocusTips(gamesSelection.filter, 'speed').slice(0, 3),
+    [gamesSelection.filter, getFocusTips],
+  )
+  const blasterFocusTips = useMemo(
+    () => getFocusTips(gamesSelection.filter, 'blaster').slice(0, 3),
     [gamesSelection.filter, getFocusTips],
   )
   const homeDailyQuote = useMemo(() => {
@@ -9660,7 +10476,7 @@ function App() {
   const homeLeaderboardChase = useMemo(() => {
     if (!currentUserId) return null
     const candidates: Array<{
-      game: 'Matching' | 'Speed Test'
+      game: ScoreGameName
       duration: HomeDurationFilter
       filter: CodeFilter
       topScore: number
@@ -9669,7 +10485,7 @@ function App() {
       status: 'leading' | 'chasing' | 'unranked'
     }> = []
 
-    for (const game of ['Matching', 'Speed Test'] as const) {
+    for (const game of ['Matching', 'Speed Test', 'Code Blaster'] as const) {
       for (const step of homeLeaderboardRotationSteps) {
         const scoped = topEntryPerUser(
           leaderboard
@@ -9746,7 +10562,11 @@ function App() {
             title: `You’re holding #1 in ${homeLeaderboardChase.game}`,
             detail: `Defend your lead in ${label}. One more run increases your cushion.`,
             cta: `Defend ${homeLeaderboardChase.game}`,
-            target: homeLeaderboardChase.game === 'Matching' ? 'games-matching' : 'games-speed',
+            target: homeLeaderboardChase.game === 'Matching'
+              ? 'games-matching'
+              : homeLeaderboardChase.game === 'Code Blaster'
+                ? 'games-blaster'
+                : 'games-speed',
             gamePreset: chasePreset,
           })
         } else {
@@ -9754,7 +10574,11 @@ function App() {
             title: `${homeLeaderboardChase.gap} points to #1`,
             detail: `${homeLeaderboardChase.game} ${label} is your closest jump target right now.`,
             cta: `Chase #1`,
-            target: homeLeaderboardChase.game === 'Matching' ? 'games-matching' : 'games-speed',
+            target: homeLeaderboardChase.game === 'Matching'
+              ? 'games-matching'
+              : homeLeaderboardChase.game === 'Code Blaster'
+                ? 'games-blaster'
+                : 'games-speed',
             gamePreset: chasePreset,
           })
         }
@@ -9802,6 +10626,11 @@ function App() {
     if (target === 'games-speed') {
       setActiveTab('games')
       navigate('/games/speed')
+      return
+    }
+    if (target === 'games-blaster') {
+      setActiveTab('games')
+      navigate('/games/blaster')
       return
     }
     setActiveTab('scenarios')
@@ -10205,6 +11034,15 @@ function App() {
                   Matching
                 </button>
                 <button
+                  className={isGamesBlasterPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
+                  onClick={() => {
+                    goToPath('/games/blaster', { tab: 'games' })
+                  }}
+                >
+                  <AppIcon name="blaster" className="taskbar-sub-icon" />
+                  Code Blaster
+                </button>
+                <button
                   className={isGamesDuelPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
                   onClick={() => {
                     goToPath('/games/duel', { tab: 'games' })
@@ -10286,10 +11124,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 0.45"
+                    aria-label="Open what's new for version 0.50"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v0.45
+                    What's New · v0.50
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -10328,6 +11166,48 @@ function App() {
                   </span>
                 </button>
               ) : null}
+              {priorityTmas3Countdown ? (
+                <button className="home-tmas-cta home-tmas-cta-tmas3" type="button" onClick={openPriorityTmas3PracticeTestPage}>
+                  <div className="home-tmas-cta-copy">
+                    <span className="home-tmas-cta-kicker">Upcoming Test</span>
+                    <strong>TMAS 3 is locked in for May 18 at 1300 hours.</strong>
+                    <div className={`home-tmas-cta-countdown home-tmas-cta-countdown-${priorityTmas3Countdown.tone}`}>
+                      <div className="home-tmas-cta-countdown-copy">
+                        <strong>{priorityTmas3Countdown.headline}</strong>
+                        <span>{priorityTmas3Countdown.supporting}</span>
+                      </div>
+                      <div className="home-tmas-cta-countdown-parts" aria-label={priorityTmas3Countdown.headline}>
+                        {priorityTmas3Countdown.parts.map((part) => (
+                          <span key={part.label} className="home-tmas-cta-countdown-part">
+                            <strong>{part.value}</strong>
+                            <small>{part.label}</small>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <span className="home-tmas-cta-subtitle">Jump straight into the TMAS 3 practice test and get real scenario reps before test day.</span>
+                  </div>
+                  <span className="home-tmas-cta-button">
+                    <AppIcon name="test" className="button-icon" />
+                    TMAS 3 Practice Test
+                  </span>
+                </button>
+              ) : null}
+              <button
+                className="home-blaster-cta"
+                type="button"
+                onClick={() => handleHomeAction('games-blaster', { forceAllTime: true })}
+              >
+                <span className="home-blaster-cta-icon">
+                  <AppIcon name="blaster" />
+                </span>
+                <span className="home-blaster-cta-copy">
+                  <span className="home-blaster-cta-kicker">New Game Mode</span>
+                  <strong>Try Code Blaster</strong>
+                  <span>Blast code asteroids, build your score, and chase the new weekly leaderboard.</span>
+                </span>
+                <span className="home-blaster-cta-action">Launch</span>
+              </button>
               <div className="home-actions">
                 <button className="primary" onClick={() => { setActiveTab('study'); navigate('/study') }}>
                   <AppIcon name="flashcards" className="button-icon" />
@@ -10583,7 +11463,7 @@ function App() {
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
-                          <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                          <small>{leaderboardEntryModeMeta(entry)}</small>
                           <strong>{entry.score} pts</strong>
                         </span>
                       </button>
@@ -10657,7 +11537,81 @@ function App() {
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
-                          <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                          <small>{leaderboardEntryModeMeta(entry)}</small>
+                          <strong>{entry.score} pts</strong>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              ) : null}
+
+              {homeShowsBlasterLeaderboard ? (
+              <div className="card leaderboard-card">
+                <div className="card-menu-head">
+                  <div className="leaderboard-card-head">
+                    <h3>Best Code Blaster Score</h3>
+                    <p className="leaderboard-card-subtitle">Top score by player</p>
+                  </div>
+                  <button className="icon-menu-button" onClick={() => setHomeBlasterConfigOpen((value) => !value)} aria-label="Configure Code Blaster leaderboard">⋯</button>
+                </div>
+                {homeBlasterConfigOpen ? (
+                  <div className="home-score-config">
+                    <label>Time</label>
+                    <div className="mini-chip-row">
+                      {([15, 30, 60] as HomeDurationFilter[]).map((value) => (
+                        <button
+                          key={`home-blaster-time-${value}`}
+                          className={homeBlasterDurationFilter === value ? 'chip chip-active' : 'chip'}
+                          onClick={() => setHomeBlasterDurationFilter(value)}
+                        >
+                          {`${value}s`}
+                        </button>
+                      ))}
+                    </div>
+                    <label>Code Set</label>
+                    <div className="mini-chip-row">
+                      {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((value) => (
+                        <button
+                          key={`home-blaster-code-${value}`}
+                          className={homeBlasterCodeFilter === value ? 'chip chip-active' : 'chip'}
+                          onClick={() => setHomeBlasterCodeFilter(value)}
+                        >
+                          {value === 'all' ? 'All' : codeSetLabel[value]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {homeBlasterRotationSteps.length === 0 ? <p className="muted">No Code Blaster leaderboard data yet.</p> : null}
+                {homeBlasterLeaders.length === 0 ? <p className="muted">No scores yet.</p> : (
+                  <div
+                    key={`home-blaster-rotation-${homeBlasterDurationFilter}-${homeBlasterCodeFilter}`}
+                    className="leaderboard-list leaderboard-rotate-list"
+                  >
+                    {homeBlasterLeaders.map((entry, index) => (
+                      <button
+                        key={`home-blaster-${entry.id}`}
+                        type="button"
+                        className="leader-row leader-row-button leader-row-rich"
+                        onClick={() => {
+                          setSelectedLeaderboardEntry(entry)
+                          setSelectedLeaderboardIsTop(index === 0)
+                        }}
+                      >
+                        <span className="leader-rank">#{index + 1}</span>
+                        <span className="leader-player">
+                          <span className="leader-avatar-wrap">
+                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                            <span className={leaderAvatarFrameClass(entry.userId)}>
+                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
+                            </span>
+                          </span>
+                          <LeaderboardPlayerName entry={entry} />
+                        </span>
+                        <span className="leader-result">
+                          <small>{leaderboardEntryModeMeta(entry)}</small>
                           <strong>{entry.score} pts</strong>
                         </span>
                       </button>
@@ -10794,7 +11748,7 @@ function App() {
               <article className="card leaderboard-summary-card leaderboard-summary-card-condensed">
                 <div className="leaderboard-card-head">
                   <h3>Top Performer This Week</h3>
-                  <p className="leaderboard-card-subtitle">Combined across all weekly leaderboards</p>
+                  <p className="leaderboard-card-subtitle">Matching, Speed Test, and Code Blaster weekly boards</p>
                 </div>
                 {!weeklyTopPerformer ? (
                   <p className="muted">No weekly scores yet.</p>
@@ -10819,7 +11773,7 @@ function App() {
                         <LeaderboardPlayerName entry={weeklyTopPerformer.entry} />
                       </span>
                       <span className="leader-result">
-                        <small>Weekly total</small>
+                        <small>Weekly performance</small>
                         <strong>{weeklyTopPerformer.totalScore} pts</strong>
                       </span>
                     </button>
@@ -10890,8 +11844,8 @@ function App() {
                   <h3>{leaderboardsScope === 'weekly' ? 'Weekly Leaderboards' : 'All-Time Leaderboards'}</h3>
                   <p className="leaderboard-card-subtitle">
                     {leaderboardsScope === 'weekly'
-                      ? 'Matching and Speed Test boards by mode • resets every Monday at 12:00 AM'
-                      : 'Matching and Speed Test boards by mode'}
+                      ? 'Matching, Speed Test, and Code Blaster boards by mode • resets every Monday at 12:00 AM'
+                      : 'Matching, Speed Test, and Code Blaster boards by mode'}
                   </p>
                 </div>
                 <div className="segmented compact-segmented leaderboards-scope-switch">
@@ -10926,6 +11880,12 @@ function App() {
                         onClick={() => setLeaderboardViewGame('Speed Test')}
                       >
                         Speed Test
+                      </button>
+                      <button
+                        className={leaderboardViewGame === 'Code Blaster' ? 'seg active compact-seg' : 'seg compact-seg'}
+                        onClick={() => setLeaderboardViewGame('Code Blaster')}
+                      >
+                        Code Blaster
                       </button>
                     </div>
                   </div>
@@ -11006,6 +11966,7 @@ function App() {
                             </span>
                             <span className="leader-result">
                               <strong>{entry.score} pts</strong>
+                              <small>{leaderboardEntryModeMeta(entry)}</small>
                             </span>
                           </button>
                         ))}
@@ -11717,6 +12678,16 @@ function App() {
                     type="button"
                     className="card compact game-mode-card games-hub-game-card"
                     onClick={() => {
+                      navigate('/games/blaster')
+                    }}
+                  >
+                    <span className="game-mode-title"><AppIcon name="blaster" className="button-icon" /> Code Blaster</span>
+                    <span className="muted tiny">Blast the right code in space</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="card compact game-mode-card games-hub-game-card"
+                    onClick={() => {
                       navigate('/games/duel')
                     }}
                   >
@@ -11789,7 +12760,7 @@ function App() {
                             <LeaderboardPlayerName entry={entry} />
                           </span>
                           <span className="leader-result">
-                            <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                            <small>{leaderboardEntryModeMeta(entry)}</small>
                             <strong>{entry.score} pts</strong>
                           </span>
                         </button>
@@ -11827,7 +12798,45 @@ function App() {
                             <LeaderboardPlayerName entry={entry} />
                           </span>
                           <span className="leader-result">
-                            <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                            <small>{leaderboardEntryModeMeta(entry)}</small>
+                            <strong>{entry.score} pts</strong>
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </article>
+
+                  <article className="card leaderboard-card game-leader-panel">
+                    {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
+                    <div className="leaderboard-card-head">
+                      <h3>Code Blaster Leaderboard</h3>
+                      <p className="leaderboard-card-subtitle">Top scores for the selected mode</p>
+                    </div>
+                    {blasterLeaderboard.length === 0 ? (
+                      <p className="muted">No Code Blaster scores submitted yet.</p>
+                    ) : (
+                      blasterLeaderboard.map((entry, index) => (
+                        <button
+                          key={`hub-blaster-${entry.id}`}
+                          type="button"
+                          className="leader-row leader-row-button game-leader-row leader-row-rich"
+                          onClick={() => {
+                            setSelectedLeaderboardEntry(entry)
+                            setSelectedLeaderboardIsTop(index === 0)
+                          }}
+                        >
+                          <span className="leader-rank">#{index + 1}</span>
+                          <span className="leader-player">
+                            <span className="leader-avatar-wrap">
+                              {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                              <span className={leaderAvatarFrameClass(entry.userId)}>
+                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
+                              </span>
+                            </span>
+                            <LeaderboardPlayerName entry={entry} />
+                          </span>
+                          <span className="leader-result">
+                            <small>{leaderboardEntryModeMeta(entry)}</small>
                             <strong>{entry.score} pts</strong>
                           </span>
                         </button>
@@ -11964,7 +12973,7 @@ function App() {
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
-                          <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                          <small>{leaderboardEntryModeMeta(entry)}</small>
                           <strong>{entry.score} pts</strong>
                         </span>
                       </button>
@@ -12159,7 +13168,7 @@ function App() {
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
-                          <small>{entry.matchDuration}s • {leaderboardCodeSetLabel(entry.matchFilter)}</small>
+                          <small>{leaderboardEntryModeMeta(entry)}</small>
                           <strong>{entry.score} pts</strong>
                         </span>
                       </button>
@@ -12250,6 +13259,238 @@ function App() {
                 </div>
               </div>
             ) : null}
+              </>
+            ) : null}
+
+            {isGamesBlasterPage ? (
+              <>
+                <h2>Code Blaster</h2>
+                {!blasterRunning && !blasterDone ? (
+                  <div className="games-mode-layout">
+                    <div className="card leaderboard-card game-leader-panel">
+                      {leaderboardError ? <p className="bad">{leaderboardError}</p> : null}
+                      <div className="leaderboard-card-head leaderboard-card-head-split">
+                        <div>
+                          <h3>Code Blaster Leaderboard</h3>
+                          <p className="leaderboard-card-subtitle">
+                            {gameModeLeaderboardsScope === 'weekly'
+                              ? 'Top weekly scores for the selected mode'
+                              : 'Top all-time scores for the selected mode'}
+                          </p>
+                        </div>
+                        <div className="segmented compact-segmented game-mode-scope-switch">
+                          <button
+                            className={gameModeLeaderboardsScope === 'weekly' ? 'seg active compact-seg' : 'seg compact-seg'}
+                            onClick={() => setGameModeLeaderboardsScope('weekly')}
+                          >
+                            Weekly
+                          </button>
+                          <button
+                            className={gameModeLeaderboardsScope === 'alltime' ? 'seg active compact-seg' : 'seg compact-seg'}
+                            onClick={() => setGameModeLeaderboardsScope('alltime')}
+                          >
+                            All Time
+                          </button>
+                        </div>
+                      </div>
+                      <div className="game-leaderboard-filters">
+                        <div className="game-filter-group">
+                          <span className="game-filter-label">Time</span>
+                          <div className="segmented compact-segmented">
+                            {[15, 30, 60].map((duration) => (
+                              <button
+                                key={`blaster-leader-time-${duration}`}
+                                className={gamesSelection.duration === duration ? 'seg active compact-seg' : 'seg compact-seg'}
+                                onClick={() => setGamesSelection((prev) => ({ ...prev, duration: duration as HomeDurationFilter }))}
+                              >
+                                {duration}s
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="game-filter-group">
+                          <span className="game-filter-label">Code Set</span>
+                          <div className="segmented compact-segmented">
+                            {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
+                              <button
+                                key={`blaster-leader-filter-${filter}`}
+                                className={gamesSelection.filter === filter ? 'seg active compact-seg' : 'seg compact-seg'}
+                                onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}
+                              >
+                                {filter === 'all' ? 'All' : codeSetLabel[filter]}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      {blasterModeLeaderboard.length === 0 ? (
+                        <p className="muted">
+                          {gameModeLeaderboardsScope === 'weekly'
+                            ? 'No weekly Code Blaster scores submitted yet.'
+                            : 'No all-time Code Blaster scores submitted yet.'}
+                        </p>
+                      ) : (
+                        blasterModeLeaderboard.map((entry, index) => (
+                          <button
+                            key={`blaster-${entry.id}`}
+                            type="button"
+                            className="leader-row leader-row-button game-leader-row leader-row-rich"
+                            onClick={() => {
+                              setSelectedLeaderboardEntry(entry)
+                              setSelectedLeaderboardIsTop(index === 0)
+                            }}
+                          >
+                            <span className="leader-rank">#{index + 1}</span>
+                            <span className="leader-player">
+                              <span className="leader-avatar-wrap">
+                                {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+                                <span className={leaderAvatarFrameClass(entry.userId)}>
+                                  <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
+                                </span>
+                              </span>
+                              <LeaderboardPlayerName entry={entry} />
+                            </span>
+                            <span className="leader-result">
+                              <small>{leaderboardEntryModeMeta(entry)}</small>
+                              <strong>{entry.score} pts</strong>
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    <GameStartInsightsPanel
+                      title="Code Blaster"
+                      icon="blaster"
+                      startLabel="Launch Code Blaster"
+                      disabled={sections.length === 0}
+                      disabledHint={sections.length === 0 ? 'No code sections loaded.' : null}
+                      onStart={startBlaster}
+                      duration={gamesSelection.duration}
+                      filter={gamesSelection.filter}
+                      sessionTrack={blasterSessionTrack}
+                      focusTips={blasterFocusTips}
+                      codeSetBreakdown={gameCodeSetBreakdown}
+                    />
+                  </div>
+                ) : null}
+
+                {(blasterRunning || blasterDone) ? (
+                  <div className="blaster-session-overlay">
+                    <div className={blasterDone && !blasterRunning ? 'blaster-session-shell blaster-session-shell-done' : 'blaster-session-shell'}>
+                      {blasterRunning ? (
+                        <>
+                          <div className="blaster-starfield" aria-hidden>
+                            <span></span><span></span><span></span><span></span><span></span>
+                          </div>
+                          {blasterLevelPopup ? (
+                            <div className="blaster-level-popup" aria-live="polite">
+                              Level {blasterLevelPopup}
+                            </div>
+                          ) : null}
+                          <div className="blaster-hud">
+                            <span>Time: {blasterRemaining}s</span>
+                            <span>Level: {blasterLevel}</span>
+                            <span>Score: {blasterScore}</span>
+                            <span>Lives: {'♥'.repeat(Math.max(0, blasterLives))}</span>
+                            <span>Next: {blasterNextLevelScore(blasterLevel)} pts</span>
+                          </div>
+                          <div className="blaster-level-progress" aria-label={`Level ${blasterLevel} progress`}>
+                            <span
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  Math.max(
+                                    0,
+                                    ((blasterScore - blasterLevelStartScore(blasterLevel)) /
+                                      Math.max(1, blasterNextLevelScore(blasterLevel) - blasterLevelStartScore(blasterLevel))) *
+                                      100,
+                                  ),
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                          <button
+                            className="secondary blaster-exit-button"
+                            onClick={() => {
+                              const confirmed = window.confirm('Exit Code Blaster? This run will end.')
+                              if (confirmed) exitBlasterSession()
+                            }}
+                          >
+                            Exit
+                          </button>
+                          <div className="blaster-prompt-card">
+                            <p className="muted tiny">Blast the matching code section</p>
+                            <h3>{blasterPrompt?.title || 'Incoming code'}</h3>
+                            <p>{shortText(blasterPrompt?.text || '', 180)}</p>
+                          </div>
+                          <div className="blaster-field" onPointerMove={aimBlasterShip}>
+                            {blasterTargets.map((target) => (
+                              <button
+                                key={target.id}
+                                type="button"
+                                className="blaster-target"
+                                style={{
+                                  left: `${target.x}%`,
+                                  top: `${target.y}%`,
+                                  width: `${target.size}px`,
+                                  height: `${target.size}px`,
+                                  '--float-x': `${target.floatX}px`,
+                                  '--float-y': `${target.floatY}px`,
+                                  '--rotation': `${target.rotation}deg`,
+                                  '--drift-duration': `${target.speed}s`,
+                                  '--drift-delay': `${target.delay}s`,
+                                } as CSSProperties}
+                                onClick={(event) => answerBlasterTarget(target, event)}
+                              >
+                                <span>{target.label}</span>
+                              </button>
+                            ))}
+                            <div
+                              className="blaster-ship"
+                              style={{ '--ship-angle': `${blasterShipAngle}deg` } as CSSProperties}
+                              aria-hidden
+                            >
+                              <span className="blaster-ship-body"></span>
+                              <span className="blaster-ship-flame"></span>
+                            </div>
+                          </div>
+                          {blasterFeedback ? <p className={blasterFeedback.includes('missed') ? 'bad blaster-feedback' : 'good blaster-feedback'}>{blasterFeedback}</p> : null}
+                          {blasterParticles.map((particle) => (
+                            <span
+                              key={particle.id}
+                              className={`blaster-burst blaster-burst-${particle.tone}`}
+                              style={{ left: particle.x, top: particle.y }}
+                              aria-hidden
+                            />
+                          ))}
+                        </>
+                      ) : null}
+
+                      {blasterDone && !blasterRunning ? (
+                        <div className="card session-card">
+                          <h3>Mission Complete</h3>
+                          <div className="speed-session-top speed-session-top-finished">
+                            <span>Time: {blasterRemaining}s</span>
+                            <span>Score: {blasterScore}</span>
+                            <span>Level: {blasterLevel}</span>
+                            <span>Hits: {blasterCorrectCount}</span>
+                          </div>
+                          {blasterReport ? <SessionPerformanceReportCard report={blasterReport} /> : (
+                            <>
+                              <p>Your score: {blasterScore}</p>
+                              <p>Targets hit: {blasterCorrectCount}</p>
+                            </>
+                          )}
+                          <div className="actions-row">
+                            <button className="primary" onClick={startBlaster}>Replay</button>
+                            <button className="secondary" onClick={exitBlasterSession}>Exit</button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
               </>
             ) : null}
 
@@ -12488,7 +13729,9 @@ function App() {
                   </p>
                   <p className="stats-label">Most Played Game</p>
                   <p className="stats-value">
-                    {mostPlayedGame && mostPlayedGame[1] > 0 ? `${mostPlayedGame[0] === 'speed' ? 'Speed Test' : 'Matching'} (${mostPlayedGame[1]} plays)` : 'No games yet'}
+                    {mostPlayedGame && mostPlayedGame[1] > 0
+                      ? `${mostPlayedGame[0] === 'speed' ? 'Speed Test' : mostPlayedGame[0] === 'blaster' ? 'Code Blaster' : 'Matching'} (${mostPlayedGame[1]} plays)`
+                      : 'No games yet'}
                   </p>
                 </article>
                 <article className="stats-highlight">
@@ -13820,15 +15063,15 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v0.45</h3>
+                <h3>What’s New · v0.50</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV045.map((group) => (
-                <article key={`v045-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV050.map((group) => (
+                <article key={`v050-note-${group.title}`} className="home-whats-new-card">
                   <h4>{group.title}</h4>
                   <ul>
                     {group.items.map((item) => (
@@ -14302,6 +15545,10 @@ function App() {
                 <button className={isGamesMatchingPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); goToPath('/games/matching', { tab: 'games' }) }}>
                   <AppIcon name="games" className="mobile-bottom-icon" />
                   <span>Matching</span>
+                </button>
+                <button className={isGamesBlasterPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); goToPath('/games/blaster', { tab: 'games' }) }}>
+                  <AppIcon name="blaster" className="mobile-bottom-icon" />
+                  <span>Blaster</span>
                 </button>
                 <button className={isGamesDuelPage ? 'mobile-nav-action active' : 'mobile-nav-action'} onClick={() => { setMobileNavMenuOpen(false); goToPath('/games/duel', { tab: 'games' }) }}>
                   <AppIcon name="duel" className="mobile-bottom-icon" />
