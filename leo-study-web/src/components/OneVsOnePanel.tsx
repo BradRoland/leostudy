@@ -664,6 +664,7 @@ export function OneVsOnePanel(props: {
   const winsLeaderboardRef = useRef<DuelStatsLeaderboardEntry[]>(winsLeaderboard)
   const streakLeaderboardRef = useRef<DuelStatsLeaderboardEntry[]>(streakLeaderboard)
   const myDuelStatsRef = useRef<DuelStatsLeaderboardEntry | null>(myDuelStats)
+  const roundStartedAtRef = useRef(0)
   const autoForfeitRoundKeyRef = useRef('')
   const quizSpamHistoryRef = useRef<QuizSpamSample[]>([])
   const quizSpamStrikeRef = useRef(0)
@@ -1454,6 +1455,11 @@ export function OneVsOnePanel(props: {
     && myPlayer.current_round <= room.rounds
     && !countdownActive,
   )
+  const roundIsInitialized = Boolean(
+    initializedRoundKey
+    && initializedRoundKeyRef.current === initializedRoundKey
+    && roundStartedAt > 0,
+  )
   const quizRoundTimeLimitMs = useMemo(() => {
     if (!room || room.game_type !== 'quiz') return duelQuizRoundTimeLimitMs
     return room.category === 'scenarios' ? duelScenarioQuizRoundTimeLimitMs : duelQuizRoundTimeLimitMs
@@ -1588,8 +1594,11 @@ export function OneVsOnePanel(props: {
     if (!room || room.status !== 'in_progress' || room.game_type !== 'quiz') return
     if (!canStartRound || !isQuizRound(currentRound) || quizLocked || submittingRound) return
 
+    const startedAt = roundStartedAtRef.current || roundStartedAt
+    if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
+
     const correct = choiceIndex === currentRound.correctIndex
-    const elapsedMs = Math.max(0, Date.now() - roundStartedAt)
+    const elapsedMs = Math.max(0, Date.now() - startedAt)
     const nextSample: QuizSpamSample = {
       round: currentRound.round,
       choiceIndex,
@@ -1634,6 +1643,7 @@ export function OneVsOnePanel(props: {
   }, [
     canStartRound,
     currentRound,
+    initializedRoundKey,
     markStudyActivity,
     quizLocked,
     room,
@@ -1649,7 +1659,9 @@ export function OneVsOnePanel(props: {
     if (initializedRoundKeyRef.current === initializedRoundKey) return
     initializedRoundKeyRef.current = initializedRoundKey
 
-    setRoundStartedAt(Date.now())
+    const nextRoundStartedAt = Date.now()
+    roundStartedAtRef.current = nextRoundStartedAt
+    setRoundStartedAt(nextRoundStartedAt)
     autoForfeitRoundKeyRef.current = ''
     if (room.game_type === 'quiz' && myPlayer.current_round <= 1) {
       quizSpamHistoryRef.current = []
@@ -1684,6 +1696,23 @@ export function OneVsOnePanel(props: {
       setMatchingCards(deterministicCards)
     }
   }, [canStartRound, currentRound, initializedRoundKey, myPlayer, room])
+
+  useEffect(() => {
+    if (!room || room.status === 'in_progress') return
+    initializedRoundKeyRef.current = ''
+    roundStartedAtRef.current = 0
+    autoForfeitRoundKeyRef.current = ''
+    setRoundStartedAt(0)
+    setQuizChoice(null)
+    setQuizLocked(false)
+    setSelectedMatchingCards([])
+    setWrongMatchingCardIds([])
+    setMatchedPairIds([])
+    setMatchingMistakes(0)
+    setMatchingRoundPoints(0)
+    setMatchingSubmitted(false)
+    setMatchingCards([])
+  }, [room?.id, room?.status])
 
   const createRoom = async () => {
     if (!supabase || !isSignedIn) return
@@ -1864,6 +1893,21 @@ export function OneVsOnePanel(props: {
     void refreshRoomSnapshot()
 
     if (state.rematch_started) {
+      initializedRoundKeyRef.current = ''
+      roundStartedAtRef.current = 0
+      autoForfeitRoundKeyRef.current = ''
+      quizSpamHistoryRef.current = []
+      quizSpamStrikeRef.current = 0
+      setRoundStartedAt(0)
+      setQuizChoice(null)
+      setQuizLocked(false)
+      setSelectedMatchingCards([])
+      setWrongMatchingCardIds([])
+      setMatchedPairIds([])
+      setMatchingMistakes(0)
+      setMatchingRoundPoints(0)
+      setMatchingSubmitted(false)
+      setMatchingCards([])
       setNotice('2/2 agreed. Starting rematch in 3…')
       return
     }
@@ -1923,11 +1967,12 @@ export function OneVsOnePanel(props: {
 
   useEffect(() => {
     if (!room || !myPlayer || room.status !== 'in_progress' || room.game_type !== 'quiz') return
-    if (isSpectator || !canStartRound || !isQuizRound(currentRound) || quizLocked || submittingRound) return
-    if (roundStartedAt <= 0) return
+    if (isSpectator || !canStartRound || !roundIsInitialized || !isQuizRound(currentRound) || quizLocked || submittingRound) return
+    const startedAt = roundStartedAtRef.current
+    if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
 
     const roundKey = `${room.id}:${myPlayer.user_id}:${currentRound.round}`
-    const elapsedMs = Math.max(0, Date.now() - roundStartedAt)
+    const elapsedMs = Math.max(0, Date.now() - startedAt)
     const remainingMs = quizRoundTimeLimitMs - elapsedMs
 
     if (remainingMs <= 0) {
@@ -1943,9 +1988,11 @@ export function OneVsOnePanel(props: {
   }, [
     canStartRound,
     currentRound,
+    initializedRoundKey,
     isSpectator,
     myPlayer,
     quizLocked,
+    roundIsInitialized,
     room,
     roundStartedAt,
     submittingRound,
@@ -1955,11 +2002,12 @@ export function OneVsOnePanel(props: {
 
   useEffect(() => {
     if (!room || !myPlayer || room.status !== 'in_progress' || room.game_type !== 'matching') return
-    if (isSpectator || !canStartRound || !isMatchingRound(currentRound) || matchingSubmitted || submittingRound) return
-    if (roundStartedAt <= 0) return
+    if (isSpectator || !canStartRound || !roundIsInitialized || !isMatchingRound(currentRound) || matchingSubmitted || submittingRound) return
+    const startedAt = roundStartedAtRef.current
+    if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
 
     const roundKey = `${room.id}:${myPlayer.user_id}:${currentRound.round}:matching`
-    const elapsedMs = Math.max(0, Date.now() - roundStartedAt)
+    const elapsedMs = Math.max(0, Date.now() - startedAt)
     const remainingMs = duelQuizRoundTimeLimitMs - elapsedMs
 
     if (remainingMs <= 0) {
@@ -1975,9 +2023,11 @@ export function OneVsOnePanel(props: {
   }, [
     canStartRound,
     currentRound,
+    initializedRoundKey,
     isSpectator,
     matchingSubmitted,
     myPlayer,
+    roundIsInitialized,
     room,
     roundStartedAt,
     submittingRound,
@@ -2015,8 +2065,10 @@ export function OneVsOnePanel(props: {
     if (matchingSubmitted || submittingRound) return
     if (matchedPairIds.length !== currentRound.pairs.length) return
 
+    const startedAt = roundStartedAtRef.current || roundStartedAt
+    if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
     setMatchingSubmitted(true)
-    const elapsedMs = Math.max(0, Date.now() - roundStartedAt)
+    const elapsedMs = Math.max(0, Date.now() - startedAt)
     const completionBonus = 20
     const roundPoints = Math.max(0, matchingRoundPoints + completionBonus)
     void submitRound({
@@ -2025,11 +2077,12 @@ export function OneVsOnePanel(props: {
       elapsedMs,
       points: roundPoints,
     })
-  }, [currentRound, matchedPairIds.length, matchingRoundPoints, matchingSubmitted, room, roundStartedAt, submitRound, submittingRound])
+  }, [currentRound, initializedRoundKey, matchedPairIds.length, matchingRoundPoints, matchingSubmitted, room, roundStartedAt, submitRound, submittingRound])
 
   const leaveRoom = useCallback(() => {
     initializedRoundKeyRef.current = ''
     autoForfeitRoundKeyRef.current = ''
+    roundStartedAtRef.current = 0
     quizSpamHistoryRef.current = []
     quizSpamStrikeRef.current = 0
     setRoomId(null)
