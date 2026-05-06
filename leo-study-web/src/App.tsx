@@ -702,6 +702,7 @@ const duelLeaderboardModeLabel: Record<DuelLeaderboardMode, string> = {
 const homeLeaderboardRotationSteps = homeLeaderboardRotationDurations.flatMap((duration) =>
   homeLeaderboardRotationCodeSets.map((codeSet) => ({ duration, codeSet })),
 )
+const codeBlasterFixedDuration: HomeDurationFilter = 30
 const blasterMaxAsteroids = 5
 const blasterLevelThresholds = [50, 150, 300, 500, 750, 1050, 1400, 1800, 2250, 2750]
 const homeLeaderboardCardOrder: HomeLeaderboardCardKey[] = ['study_time', 'study_streak', 'matching', 'speed', 'blaster', 'mastered', 'duel_wins', 'duel_streak']
@@ -1825,7 +1826,7 @@ function isLeaderboardScoreImprovement(
 
 function leaderboardEntryModeMeta(entry: Pick<LeaderboardEntry, 'game' | 'score' | 'matchDuration' | 'matchFilter'>) {
   const mode = `${entry.matchDuration ?? '-'}s • ${leaderboardCodeSetLabel(entry.matchFilter)}`
-  if (entry.game === 'Code Blaster') return `${mode} • Level ${blasterLevelForScore(entry.score)}`
+  if (entry.game === 'Code Blaster') return `${leaderboardCodeSetLabel(entry.matchFilter)} • Level ${blasterLevelForScore(entry.score)}`
   return mode
 }
 
@@ -3479,7 +3480,9 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
           {startLabel}
         </button>
         <p className="muted tiny game-start-note">
-          {duration}s • {filter === 'all' ? 'All Codes' : codeSetLabel[filter]}
+          {title === 'Code Blaster'
+            ? `Fixed run • ${filter === 'all' ? 'All Codes' : codeSetLabel[filter]}`
+            : `${duration}s • ${filter === 'all' ? 'All Codes' : codeSetLabel[filter]}`}
         </p>
         {disabled && disabledHint ? <p className="muted tiny game-start-note">{disabledHint}</p> : null}
       </div>
@@ -3824,7 +3827,6 @@ function App() {
   const [homeMatchingCodeFilter, setHomeMatchingCodeFilter] = useState<CodeFilter>('all')
   const [homeSpeedDurationFilter, setHomeSpeedDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeSpeedCodeFilter, setHomeSpeedCodeFilter] = useState<CodeFilter>('all')
-  const [homeBlasterDurationFilter, setHomeBlasterDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeBlasterCodeFilter, setHomeBlasterCodeFilter] = useState<CodeFilter>('all')
   const [homeMatchingConfigOpen, setHomeMatchingConfigOpen] = useState(false)
   const [homeSpeedConfigOpen, setHomeSpeedConfigOpen] = useState(false)
@@ -5753,10 +5755,10 @@ function App() {
       topEntryPerUser(
         leaderboard
           .filter((entry) => entry.game === 'Code Blaster')
-          .filter((entry) => entry.matchDuration === gamesSelection.duration && entry.matchFilter === gamesSelection.filter),
+          .filter((entry) => entry.matchDuration === codeBlasterFixedDuration && entry.matchFilter === gamesSelection.filter),
       )
         .slice(0, 8),
-    [leaderboard, gamesSelection.duration, gamesSelection.filter],
+    [leaderboard, gamesSelection.filter],
   )
   const duelHubLeaderboard = useMemo(() => {
     const perUser = new Map<string, LeaderboardEntry>()
@@ -5813,11 +5815,11 @@ function App() {
         leaderboard
           .filter((entry) => entry.game === 'Code Blaster')
           .filter((entry) => entry.score > 0)
-          .filter((entry) => entry.matchDuration === homeBlasterDurationFilter)
+          .filter((entry) => entry.matchDuration === codeBlasterFixedDuration)
           .filter((entry) => entry.matchFilter === homeBlasterCodeFilter),
       )
         .slice(0, 5),
-    [leaderboard, homeBlasterDurationFilter, homeBlasterCodeFilter],
+    [leaderboard, homeBlasterCodeFilter],
   )
   const homeMatchingRotationSteps = useMemo(
     () =>
@@ -5848,6 +5850,7 @@ function App() {
   const homeBlasterRotationSteps = useMemo(
     () =>
       homeLeaderboardRotationSteps.filter((step) =>
+        step.duration === codeBlasterFixedDuration &&
         leaderboard.some(
           (entry) =>
             entry.game === 'Code Blaster' &&
@@ -5912,9 +5915,9 @@ function App() {
       topEntryPerUser(
         gamesModeLeaderboardSource
           .filter((entry) => entry.game === 'Code Blaster')
-          .filter((entry) => entry.matchDuration === gamesSelection.duration && entry.matchFilter === gamesSelection.filter),
+          .filter((entry) => entry.matchDuration === codeBlasterFixedDuration && entry.matchFilter === gamesSelection.filter),
       ).slice(0, 8),
-    [gamesModeLeaderboardSource, gamesSelection.duration, gamesSelection.filter],
+    [gamesModeLeaderboardSource, gamesSelection.filter],
   )
   const allTimeLeaderboardBoards = useMemo(() => buildLeaderboardBoards(leaderboard), [leaderboard])
   const weeklyLeaderboardBoards = useMemo(
@@ -7280,7 +7283,7 @@ function App() {
   }, [finalizeBlasterSession])
 
   const startBlaster = () => {
-    const selectedDuration = gamesSelection.duration
+    const selectedDuration = codeBlasterFixedDuration
     const selectedFilter = gamesSelection.filter
     const pool = selectedFilter === 'all' ? sections : sections.filter((section) => section.codeSet === selectedFilter)
     if (pool.length === 0) return
@@ -8775,14 +8778,13 @@ function App() {
   useEffect(() => {
     if (homeBlasterRotationSteps.length === 0) return
     const hasCurrent = homeBlasterRotationSteps.some(
-      (step) => step.duration === homeBlasterDurationFilter && step.codeSet === homeBlasterCodeFilter,
+      (step) => step.codeSet === homeBlasterCodeFilter,
     )
     if (hasCurrent) return
     const first = homeBlasterRotationSteps[0]
     homeBlasterRotationIndexRef.current = 0
-    setHomeBlasterDurationFilter(first.duration)
     setHomeBlasterCodeFilter(first.codeSet)
-  }, [homeBlasterRotationSteps, homeBlasterDurationFilter, homeBlasterCodeFilter])
+  }, [homeBlasterRotationSteps, homeBlasterCodeFilter])
 
   useEffect(() => {
     if (!isHomePage || !homeShowsMatchingLeaderboard || homeMatchingConfigOpen || homeMatchingRotationSteps.length === 0) return
@@ -8826,7 +8828,7 @@ function App() {
     if (!isHomePage || !homeShowsBlasterLeaderboard || homeBlasterConfigOpen || homeBlasterRotationSteps.length === 0) return
 
     const currentIndex = homeBlasterRotationSteps.findIndex(
-      (step) => step.duration === homeBlasterDurationFilter && step.codeSet === homeBlasterCodeFilter,
+      (step) => step.codeSet === homeBlasterCodeFilter,
     )
     if (currentIndex >= 0) homeBlasterRotationIndexRef.current = currentIndex
 
@@ -8834,12 +8836,11 @@ function App() {
       const nextIndex = (homeBlasterRotationIndexRef.current + 1) % homeBlasterRotationSteps.length
       homeBlasterRotationIndexRef.current = nextIndex
       const nextStep = homeBlasterRotationSteps[nextIndex]
-      setHomeBlasterDurationFilter(nextStep.duration)
       setHomeBlasterCodeFilter(nextStep.codeSet)
     }, leaderboardRotateMs)
 
     return () => window.clearInterval(timer)
-  }, [isHomePage, homeShowsBlasterLeaderboard, homeBlasterConfigOpen, homeBlasterDurationFilter, homeBlasterCodeFilter, homeBlasterRotationSteps, leaderboardRotateMs])
+  }, [isHomePage, homeShowsBlasterLeaderboard, homeBlasterConfigOpen, homeBlasterCodeFilter, homeBlasterRotationSteps, leaderboardRotateMs])
 
   useEffect(() => {
     if (homeShowsMatchingLeaderboard) return
@@ -11558,18 +11559,6 @@ function App() {
                 </div>
                 {homeBlasterConfigOpen ? (
                   <div className="home-score-config">
-                    <label>Time</label>
-                    <div className="mini-chip-row">
-                      {([15, 30, 60] as HomeDurationFilter[]).map((value) => (
-                        <button
-                          key={`home-blaster-time-${value}`}
-                          className={homeBlasterDurationFilter === value ? 'chip chip-active' : 'chip'}
-                          onClick={() => setHomeBlasterDurationFilter(value)}
-                        >
-                          {`${value}s`}
-                        </button>
-                      ))}
-                    </div>
                     <label>Code Set</label>
                     <div className="mini-chip-row">
                       {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((value) => (
@@ -11587,7 +11576,7 @@ function App() {
                 {homeBlasterRotationSteps.length === 0 ? <p className="muted">No Code Blaster leaderboard data yet.</p> : null}
                 {homeBlasterLeaders.length === 0 ? <p className="muted">No scores yet.</p> : (
                   <div
-                    key={`home-blaster-rotation-${homeBlasterDurationFilter}-${homeBlasterCodeFilter}`}
+                    key={`home-blaster-rotation-${homeBlasterCodeFilter}`}
                     className="leaderboard-list leaderboard-rotate-list"
                   >
                     {homeBlasterLeaders.map((entry, index) => (
@@ -13295,20 +13284,6 @@ function App() {
                       </div>
                       <div className="game-leaderboard-filters">
                         <div className="game-filter-group">
-                          <span className="game-filter-label">Time</span>
-                          <div className="segmented compact-segmented">
-                            {[15, 30, 60].map((duration) => (
-                              <button
-                                key={`blaster-leader-time-${duration}`}
-                                className={gamesSelection.duration === duration ? 'seg active compact-seg' : 'seg compact-seg'}
-                                onClick={() => setGamesSelection((prev) => ({ ...prev, duration: duration as HomeDurationFilter }))}
-                              >
-                                {duration}s
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="game-filter-group">
                           <span className="game-filter-label">Code Set</span>
                           <div className="segmented compact-segmented">
                             {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
@@ -13366,7 +13341,7 @@ function App() {
                       disabled={sections.length === 0}
                       disabledHint={sections.length === 0 ? 'No code sections loaded.' : null}
                       onStart={startBlaster}
-                      duration={gamesSelection.duration}
+                      duration={codeBlasterFixedDuration}
                       filter={gamesSelection.filter}
                       sessionTrack={blasterSessionTrack}
                       focusTips={blasterFocusTips}
