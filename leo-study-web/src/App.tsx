@@ -7122,8 +7122,14 @@ function App() {
       return
     }
 
-    const prompt = shuffle(pool)[0]
     const existingSectionIds = new Set(existingTargets.map((target) => target.sectionId))
+    const sectionsById = new Map(pool.map((section) => [section.id, section]))
+    const existingPromptOptions = shuffle(
+      Array.from(existingSectionIds)
+        .map((sectionId) => sectionsById.get(sectionId))
+        .filter((section): section is CodeSection => Boolean(section)),
+    )
+    const prompt = existingPromptOptions[0] || shuffle(pool)[0]
     const reusableTargets = existingTargets.map((target) => ({
       ...target,
       isCorrect: target.sectionId === prompt.id,
