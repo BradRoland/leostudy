@@ -730,6 +730,23 @@ export function GlobalChatWidget({
     })
   }, [])
 
+  const openReactionPicker = useCallback((anchor: HTMLElement, messageId: string) => {
+    setReactionHover(null)
+    const buttonRect = anchor.getBoundingClientRect()
+    const estimatedWidth = Math.min(320, window.innerWidth - 24)
+    const left = Math.max(
+      12,
+      Math.min(
+        buttonRect.left + buttonRect.width / 2 - estimatedWidth / 2,
+        window.innerWidth - estimatedWidth - 12,
+      ),
+    )
+    const top = Math.max(12, buttonRect.top)
+    setReactionPicker((previous) =>
+      previous?.messageId === messageId ? null : { messageId, left, top },
+    )
+  }, [])
+
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!supabaseClient || !isAuthenticated) return
     const guardKey = `${messageId}|${emoji}|${currentUserId}`
@@ -1005,22 +1022,16 @@ export function GlobalChatWidget({
                       <button
                         type="button"
                         className="global-chat-reaction-add"
-                        onClick={(event) => {
-                          setReactionHover(null)
-                          const button = event.currentTarget
-                          const buttonRect = button.getBoundingClientRect()
-                          const estimatedWidth = Math.min(320, window.innerWidth - 24)
-                          const left = Math.max(
-                            12,
-                            Math.min(
-                              buttonRect.left + buttonRect.width / 2 - estimatedWidth / 2,
-                              window.innerWidth - estimatedWidth - 12,
-                            ),
-                          )
-                          const top = Math.max(12, buttonRect.top)
-                          setReactionPicker((previous) =>
-                            previous?.messageId === msg.id ? null : { messageId: msg.id, left, top },
-                          )
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          openReactionPicker(event.currentTarget, msg.id)
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          event.stopPropagation()
+                          openReactionPicker(event.currentTarget, msg.id)
                         }}
                         aria-label="Add reaction"
                       >
@@ -1029,60 +1040,6 @@ export function GlobalChatWidget({
                       </button>
                     ) : null}
                   </div>
-                  {reactionPicker?.messageId === msg.id ? (
-                    <div
-                      className="global-chat-reaction-picker"
-                      style={{
-                        left: `${reactionPicker.left}px`,
-                        top: `${reactionPicker.top}px`,
-                      }}
-                    >
-                      <p className="global-chat-reaction-picker-title">Popular</p>
-                      <div className="global-chat-reaction-picker-row">
-                        {popularReactionEmojis.map((emoji) => (
-                          <button
-                            key={`popular-${msg.id}-${emoji}`}
-                            type="button"
-                            className="global-chat-reaction-option"
-                            onMouseDown={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                            }}
-                            onClick={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                              void toggleReaction(msg.id, emoji)
-                              setReactionPicker(null)
-                            }}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="global-chat-reaction-picker-title">All emojis</p>
-                      <div className="global-chat-reaction-picker-grid">
-                        {allReactionEmojis.map((emoji) => (
-                          <button
-                            key={`all-${msg.id}-${emoji}`}
-                            type="button"
-                            className="global-chat-reaction-option"
-                            onMouseDown={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                            }}
-                            onClick={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                              void toggleReaction(msg.id, emoji)
-                              setReactionPicker(null)
-                            }}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                   {!msg.is_deleted && msg.user_id !== currentUserId && (
                     <button className="global-chat-report" onClick={() => setReportModalOpen(msg.id)} aria-label="Report message">
                       ⋯
@@ -1098,6 +1055,56 @@ export function GlobalChatWidget({
             })}
             <div ref={messagesEndRef} />
           </div>
+          {reactionPicker ? (
+            <div
+              className="global-chat-reaction-picker"
+              style={{
+                left: `${reactionPicker.left}px`,
+                top: `${reactionPicker.top}px`,
+              }}
+              onMouseDown={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+              }}
+            >
+              <p className="global-chat-reaction-picker-title">Popular</p>
+              <div className="global-chat-reaction-picker-row">
+                {popularReactionEmojis.map((emoji) => (
+                  <button
+                    key={`popular-${reactionPicker.messageId}-${emoji}`}
+                    type="button"
+                    className="global-chat-reaction-option"
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      void toggleReaction(reactionPicker.messageId, emoji)
+                      setReactionPicker(null)
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              <p className="global-chat-reaction-picker-title">All emojis</p>
+              <div className="global-chat-reaction-picker-grid">
+                {allReactionEmojis.map((emoji) => (
+                  <button
+                    key={`all-${reactionPicker.messageId}-${emoji}`}
+                    type="button"
+                    className="global-chat-reaction-option"
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      void toggleReaction(reactionPicker.messageId, emoji)
+                      setReactionPicker(null)
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {reactionHover ? (
             <div
               className="global-chat-reaction-tooltip"
