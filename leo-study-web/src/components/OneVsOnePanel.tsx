@@ -1142,7 +1142,8 @@ export function OneVsOnePanel(props: {
           current_round: Number(row.current_round || 1),
           last_seen: String(row.last_seen || ''),
         }))
-        const mappedResults: DuelRoomResultRow[] = (rpcResult.results || []).map((row: Record<string, unknown>) => ({
+        const mappedResults: DuelRoomResultRow[] = mappedRoom.status === 'completed'
+          ? (rpcResult.results || []).map((row: Record<string, unknown>) => ({
           id: String(row.id || ''),
           room_id: String(row.room_id || ''),
           user_id: String(row.user_id || ''),
@@ -1151,6 +1152,7 @@ export function OneVsOnePanel(props: {
           placement: Number(row.placement || 2),
           is_winner: Boolean(row.is_winner),
         }))
+          : []
         setRoom(mappedRoom)
         setPlayers(mappedPlayers)
         setResults(mappedResults)
@@ -1218,7 +1220,8 @@ export function OneVsOnePanel(props: {
         last_seen: String((row as Record<string, unknown>).last_seen || ''),
       }))
 
-      const mappedResults: DuelRoomResultRow[] = (Array.isArray(resultRows) ? resultRows : []).map((row) => ({
+      const mappedResults: DuelRoomResultRow[] = mappedRoom.status === 'completed'
+        ? (Array.isArray(resultRows) ? resultRows : []).map((row) => ({
         id: String((row as Record<string, unknown>).id || ''),
         room_id: String((row as Record<string, unknown>).room_id || ''),
         user_id: String((row as Record<string, unknown>).user_id || ''),
@@ -1227,6 +1230,7 @@ export function OneVsOnePanel(props: {
         placement: Number((row as Record<string, unknown>).placement || 2),
         is_winner: Boolean((row as Record<string, unknown>).is_winner),
       }))
+        : []
 
       setRoom(mappedRoom)
       setPlayers(mappedPlayers)
@@ -2213,7 +2217,7 @@ export function OneVsOnePanel(props: {
   }
 
   const roomPlayerRowsSorted = useMemo(() => {
-    if (results.length > 0) {
+    if (room?.status === 'completed' && results.length > 0) {
       return [...results].sort((left, right) => left.placement - right.placement)
     }
     return [...players].sort((left, right) => {
@@ -2221,7 +2225,7 @@ export function OneVsOnePanel(props: {
       if (left.total_time_ms !== right.total_time_ms) return left.total_time_ms - right.total_time_ms
       return left.slot_no - right.slot_no
     })
-  }, [players, results])
+  }, [players, results, room?.status])
 
   const myResultRow = useMemo(() => roomPlayerRowsSorted.find((entry) => entry.user_id === currentUserId) || null, [currentUserId, roomPlayerRowsSorted])
   const opponentResultRow = useMemo(() => roomPlayerRowsSorted.find((entry) => entry.user_id !== currentUserId) || null, [currentUserId, roomPlayerRowsSorted])
