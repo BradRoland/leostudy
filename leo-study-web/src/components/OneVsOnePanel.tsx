@@ -1572,7 +1572,11 @@ export function OneVsOnePanel(props: {
   }, [currentUserId, refreshRoomSnapshot, room?.game_type, room?.status, roomId, submittingRound])
 
   const triggerAutoForfeit = useCallback(async (roundKey: string, reason: 'question' | 'matching' = 'question') => {
-    if (!supabase || !roomId || !roundKey) return
+    if (!supabase || !roomId || !roundKey || !room || !myPlayer) return
+    if (room.status !== 'in_progress' || myPlayer.current_round > room.rounds) {
+      void refreshRoomSnapshot()
+      return
+    }
     if (autoForfeitRoundKeyRef.current === roundKey) return
     autoForfeitRoundKeyRef.current = roundKey
     setQuizLocked(true)
@@ -1592,7 +1596,7 @@ export function OneVsOnePanel(props: {
     }
 
     void refreshRoomSnapshot()
-  }, [quizRoundTimeLimitLabel, refreshRoomSnapshot, roomId])
+  }, [myPlayer, quizRoundTimeLimitLabel, refreshRoomSnapshot, room, roomId])
 
   const submitQuizAnswer = useCallback((choiceIndex: number) => {
     if (!room || room.status !== 'in_progress' || room.game_type !== 'quiz') return
@@ -1971,6 +1975,7 @@ export function OneVsOnePanel(props: {
 
   useEffect(() => {
     if (!room || !myPlayer || room.status !== 'in_progress' || room.game_type !== 'quiz') return
+    if (myPlayer.current_round > room.rounds) return
     if (isSpectator || !canStartRound || !roundIsInitialized || !isQuizRound(currentRound) || quizLocked || submittingRound) return
     const startedAt = roundStartedAtRef.current
     if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
@@ -2006,6 +2011,7 @@ export function OneVsOnePanel(props: {
 
   useEffect(() => {
     if (!room || !myPlayer || room.status !== 'in_progress' || room.game_type !== 'matching') return
+    if (myPlayer.current_round > room.rounds) return
     if (isSpectator || !canStartRound || !roundIsInitialized || !isMatchingRound(currentRound) || matchingSubmitted || submittingRound) return
     const startedAt = roundStartedAtRef.current
     if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
