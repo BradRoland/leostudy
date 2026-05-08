@@ -33,6 +33,7 @@ type DuelRoomPlayerRow = {
   fastest_round_ms: number
   current_round: number
   last_seen: string
+  finished_at?: string | null
 }
 
 type DuelRoomResultRow = {
@@ -1141,6 +1142,7 @@ export function OneVsOnePanel(props: {
           fastest_round_ms: Number(row.fastest_round_ms || 0),
           current_round: Number(row.current_round || 1),
           last_seen: String(row.last_seen || ''),
+          finished_at: row.finished_at ? String(row.finished_at) : null,
         }))
         const mappedResults: DuelRoomResultRow[] = mappedRoom.status === 'completed'
           ? (rpcResult.results || []).map((row: Record<string, unknown>) => ({
@@ -1218,6 +1220,7 @@ export function OneVsOnePanel(props: {
         fastest_round_ms: Number((row as Record<string, unknown>).fastest_round_ms || 0),
         current_round: Number((row as Record<string, unknown>).current_round || 1),
         last_seen: String((row as Record<string, unknown>).last_seen || ''),
+        finished_at: (row as Record<string, unknown>).finished_at ? String((row as Record<string, unknown>).finished_at) : null,
       }))
 
       const mappedResults: DuelRoomResultRow[] = mappedRoom.status === 'completed'
@@ -1500,21 +1503,23 @@ export function OneVsOnePanel(props: {
         : null
       const nextPlayers = Array.isArray(payload?.players)
         ? payload.players
-          .map((row) => {
+          .map((row): DuelRoomPlayerRow | null => {
             if (!row || typeof row !== 'object') return null
             const value = row as Record<string, unknown>
             const userId = String(value.user_id || '').trim()
             if (!userId) return null
             const current = livePlayersRef.current.find((player) => player.user_id === userId)
             if (!current) return null
-            return {
+            const nextPlayer: DuelRoomPlayerRow = {
               ...current,
               score: Number(value.score || current.score || 0),
               total_time_ms: Number(value.total_time_ms || current.total_time_ms || 0),
               fastest_round_ms: Number(value.fastest_round_ms || current.fastest_round_ms || 0),
               current_round: Number(value.current_round || current.current_round || 1),
+              finished_at: value.finished_at ? String(value.finished_at) : current.finished_at || null,
               last_seen: new Date().toISOString(),
             }
+            return nextPlayer
           })
           .filter((row): row is DuelRoomPlayerRow => row !== null)
         : []
@@ -2385,10 +2390,20 @@ export function OneVsOnePanel(props: {
         summary: myResultRow.score > opponentResultRow.score ? 'You win by score.' : 'Opponent wins by score.',
       }
     }
+    const myFinishedAt = playerByUserId.get(myResultRow.user_id)?.finished_at
+    const opponentFinishedAt = playerByUserId.get(opponentResultRow.user_id)?.finished_at
+    const myFinishedMs = myFinishedAt ? Date.parse(myFinishedAt) : Number.NaN
+    const opponentFinishedMs = opponentFinishedAt ? Date.parse(opponentFinishedAt) : Number.NaN
+    if (Number.isFinite(myFinishedMs) && Number.isFinite(opponentFinishedMs) && myFinishedMs !== opponentFinishedMs) {
+      return {
+        rule: 'Finish Order',
+        summary: myFinishedMs < opponentFinishedMs ? 'You win by finishing first.' : 'Opponent wins by finishing first.',
+      }
+    }
     if (myResultRow.total_time_ms !== opponentResultRow.total_time_ms) {
       return {
-        rule: 'Total Time',
-        summary: myResultRow.total_time_ms < opponentResultRow.total_time_ms ? 'You win on lower total time.' : 'Opponent wins on lower total time.',
+        rule: 'Answer Time',
+        summary: myResultRow.total_time_ms < opponentResultRow.total_time_ms ? 'You win on lower answer time.' : 'Opponent wins on lower answer time.',
       }
     }
 
@@ -3372,7 +3387,7 @@ export function OneVsOnePanel(props: {
                 <h3>{isSpectator ? 'Match Results' : 'Match Results'}</h3>
                 {!isSpectator && (
                 <p className="muted tiny onevone-tiebreak-order">
-                  Tie-break order: <strong>Score</strong> → <strong>Total time</strong> → <strong>Fastest single round</strong> → <strong>Draw</strong>
+                  Tie-break order: <strong>Score</strong> → <strong>Finish first</strong> → <strong>Answer time</strong> → <strong>Fastest single round</strong> → <strong>Draw</strong>
                 </p>
                 )}
                 <div
