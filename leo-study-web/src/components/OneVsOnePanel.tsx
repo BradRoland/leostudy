@@ -1472,11 +1472,26 @@ export function OneVsOnePanel(props: {
     if (!room || room.status !== 'in_progress') return 0
     const startedAtMs = room.started_at ? Date.parse(room.started_at) : NaN
     if (!Number.isFinite(startedAtMs)) return 0
-    const remainingMs = countdownSeconds * 1000 - Math.max(0, hudNow - startedAtMs)
+    const timeUntilServerStartMs = startedAtMs - hudNow
+    const remainingMs = timeUntilServerStartMs > 0
+      ? timeUntilServerStartMs
+      : countdownSeconds * 1000 - Math.max(0, hudNow - startedAtMs)
     if (remainingMs <= 0) return 0
     return Math.ceil(remainingMs / 1000)
   }, [hudNow, room])
   const countdownActive = countdownRemaining > 0
+
+  useEffect(() => {
+    if (!roomId || !isSignedIn) return
+    const shouldPollLobby = !room || room.status === 'waiting' || (room.status === 'in_progress' && countdownActive)
+    if (!shouldPollLobby) return
+
+    const timer = window.setInterval(() => {
+      void refreshRoomSnapshot()
+    }, 1200)
+
+    return () => window.clearInterval(timer)
+  }, [countdownActive, isSignedIn, refreshRoomSnapshot, room?.status, roomId])
 
   const canStartRound = Boolean(
     room
@@ -1973,6 +1988,8 @@ export function OneVsOnePanel(props: {
 
     const state = parseReadyRpcState(data)
     void refreshRoomSnapshot()
+    window.setTimeout(() => void refreshRoomSnapshot(), 250)
+    window.setTimeout(() => void refreshRoomSnapshot(), 900)
 
     if (state.rematch_started) {
       initializedRoundKeyRef.current = ''
