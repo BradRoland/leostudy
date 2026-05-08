@@ -13477,7 +13477,7 @@ function App() {
                       ) : null}
 
                       {blasterDone && !blasterRunning ? (
-                        <div className="card session-card">
+                        <div className="card session-card blaster-results-card">
                           <h3>Mission Complete</h3>
                           <div className="speed-session-top speed-session-top-finished">
                             <span>Time: {blasterRemaining}s</span>
@@ -13491,7 +13491,7 @@ function App() {
                               <p>Targets hit: {blasterCorrectCount}</p>
                             </>
                           )}
-                          <div className="actions-row">
+                          <div className="actions-row blaster-results-actions">
                             <button className="primary" onClick={startBlaster}>Replay</button>
                             <button className="secondary" onClick={exitBlasterSession}>Exit</button>
                           </div>

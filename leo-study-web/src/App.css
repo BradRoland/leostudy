@@ -11263,6 +11263,7 @@ textarea:focus-visible,
   background: color-mix(in srgb, var(--bg-main) 54%, transparent);
   backdrop-filter: blur(12px);
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .blaster-session-shell {
@@ -11286,13 +11287,34 @@ textarea:focus-visible,
   display: grid;
   place-items: center;
   padding: 24px;
-  overflow-y: auto;
+  height: auto;
+  min-height: 0;
+  max-height: calc(100svh - 48px - var(--global-banner-offset, 0px));
+  overflow: visible;
 }
 
 .blaster-session-shell-done .session-card {
-  width: min(640px, 100%);
-  max-height: calc(100vh - 112px - var(--global-banner-offset, 0px));
+  width: min(720px, 100%);
+  max-height: calc(100svh - 96px - var(--global-banner-offset, 0px));
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.blaster-results-card {
+  display: grid;
+  gap: 12px;
+  padding: clamp(14px, 2.2vw, 22px);
+}
+
+.blaster-results-actions {
+  position: sticky;
+  z-index: 3;
+  bottom: -1px;
+  margin: 4px -2px -2px;
+  padding-top: 10px;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--card-bg) 92%, transparent) 28%, var(--card-bg));
+  backdrop-filter: blur(10px);
 }
 
 .blaster-starfield,
@@ -11586,18 +11608,21 @@ textarea:focus-visible,
 
   .blaster-session-shell {
     width: 100%;
-    height: calc(100vh - 16px - var(--global-banner-offset, 0px));
+    height: calc(100svh - 16px - var(--global-banner-offset, 0px));
     min-height: 0;
-    max-height: calc(100vh - 16px - var(--global-banner-offset, 0px));
+    max-height: calc(100svh - 16px - var(--global-banner-offset, 0px));
     border-radius: 20px;
   }
 
   .blaster-session-shell-done {
     padding: 12px;
+    height: auto;
+    max-height: calc(100svh - 16px - var(--global-banner-offset, 0px));
   }
 
   .blaster-session-shell-done .session-card {
-    max-height: calc(100vh - 40px - var(--global-banner-offset, 0px));
+    max-height: calc(100svh - 40px - var(--global-banner-offset, 0px));
+    border-radius: 18px;
   }
 
   .blaster-hud {
@@ -11640,9 +11665,22 @@ textarea:focus-visible,
   }
 
   .blaster-session-shell {
-    height: calc(100vh - 12px - var(--global-banner-offset, 0px));
-    max-height: calc(100vh - 12px - var(--global-banner-offset, 0px));
+    height: calc(100svh - 12px - var(--global-banner-offset, 0px));
+    max-height: calc(100svh - 12px - var(--global-banner-offset, 0px));
     border-radius: 16px;
+  }
+
+  .blaster-session-shell-done {
+    max-height: calc(100svh - 12px - var(--global-banner-offset, 0px));
+  }
+
+  .blaster-session-shell-done .session-card {
+    max-height: calc(100svh - 28px - var(--global-banner-offset, 0px));
+  }
+
+  .blaster-results-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .blaster-hud {
