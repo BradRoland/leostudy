@@ -8774,35 +8774,44 @@ button.study-session-top-action-start:active:not(:disabled) {
 }
 
 .onevone-invite-modal {
-  width: min(760px, 100%);
-  max-height: calc(100dvh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+  width: min(980px, calc(100vw - 24px));
+  max-height: calc(100svh - max(18px, env(safe-area-inset-top)) - max(18px, env(safe-area-inset-bottom)));
   overflow: hidden;
   overscroll-behavior: contain;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 12px;
 }
 
 .onevone-invite-modal-body {
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding-right: 2px;
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(260px, 0.95fr) minmax(320px, 1.05fr);
+  align-items: stretch;
+  gap: 12px;
 }
 
 .onevone-online-list-wrap {
   min-height: 0;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
-  max-height: min(380px, 42dvh);
+  max-height: none;
+  overflow: hidden;
 }
 
 .onevone-invite-settings {
   display: grid;
   gap: 10px;
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .onevone-online-list-head {
@@ -8818,10 +8827,11 @@ button.study-session-top-action-start:active:not(:disabled) {
 
 .onevone-online-list {
   display: grid;
+  align-content: start;
   gap: 8px;
-  height: clamp(120px, 30dvh, 300px);
+  height: auto;
   max-height: none;
-  min-height: 120px;
+  min-height: 0;
   overflow: auto;
   padding-right: 2px;
   -webkit-overflow-scrolling: touch;
@@ -10206,16 +10216,22 @@ button:disabled {
   }
 
   .onevone-invite-modal {
-    max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom)));
+    width: min(100%, calc(100vw - 16px));
+    max-height: calc(100svh - max(10px, env(safe-area-inset-top)) - max(10px, env(safe-area-inset-bottom)));
+  }
+
+  .onevone-invite-modal-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+    align-content: start;
   }
 
   .onevone-online-list-wrap {
-    max-height: min(320px, 44dvh);
+    min-height: clamp(150px, 34svh, 280px);
   }
 
   .onevone-online-list {
-    height: clamp(110px, 32dvh, 260px);
-    min-height: 110px;
+    min-height: 0;
   }
 
   .onevone-entry-grid {
@@ -10338,16 +10354,36 @@ button:disabled {
 
 @media (max-height: 760px) {
   .onevone-invite-modal {
-    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+    max-height: calc(100svh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
   }
 
   .onevone-online-list-wrap {
-    max-height: min(270px, 46dvh);
+    min-height: clamp(116px, 30svh, 220px);
   }
 
   .onevone-online-list {
-    height: clamp(96px, 34dvh, 230px);
-    min-height: 96px;
+    min-height: 0;
+  }
+}
+
+@media (min-width: 721px) and (max-height: 620px) {
+  .onevone-invite-modal {
+    width: min(1040px, calc(100vw - 12px));
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .onevone-invite-modal-body {
+    grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.1fr);
+    gap: 10px;
+  }
+
+  .onevone-invite-settings {
+    gap: 8px;
+  }
+
+  .onevone-invite-settings .game-control {
+    gap: 5px;
   }
 }
 
