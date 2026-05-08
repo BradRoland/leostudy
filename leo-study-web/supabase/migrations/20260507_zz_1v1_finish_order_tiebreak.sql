@@ -43,7 +43,7 @@ begin
       rp.user_id,
       rp.score,
       rp.total_time_ms,
-      coalesce(rp.finished_at, 'infinity'::timestamptz) as finish_norm,
+      coalesce(rp.finished_at, rp.last_seen, 'infinity'::timestamptz) as finish_norm,
       case when rp.fastest_round_ms > 0 then rp.fastest_round_ms else 2147483647 end as fastest_norm
     from public.room_players rp
     where rp.room_id = p_room_id
@@ -57,7 +57,7 @@ begin
       rp.user_id,
       rp.score,
       rp.total_time_ms,
-      coalesce(rp.finished_at, 'infinity'::timestamptz) as finish_norm,
+      coalesce(rp.finished_at, rp.last_seen, 'infinity'::timestamptz) as finish_norm,
       case when rp.fastest_round_ms > 0 then rp.fastest_round_ms else 2147483647 end as fastest_norm
     from public.room_players rp
     where rp.room_id = p_room_id
@@ -93,7 +93,7 @@ begin
       rp.finished_at,
       row_number() over (
         order by rp.score desc,
-                 coalesce(rp.finished_at, 'infinity'::timestamptz) asc,
+                 coalesce(rp.finished_at, rp.last_seen, 'infinity'::timestamptz) asc,
                  rp.total_time_ms asc,
                  case when rp.fastest_round_ms > 0 then rp.fastest_round_ms else 2147483647 end asc
       ) as rank_position
@@ -271,7 +271,7 @@ begin
         rp.user_id,
         rp.score,
         rp.total_time_ms,
-        coalesce(rp.finished_at, 'infinity'::timestamptz) as finish_norm,
+        coalesce(rp.finished_at, rp.last_seen, 'infinity'::timestamptz) as finish_norm,
         case when rp.fastest_round_ms > 0 then rp.fastest_round_ms else 2147483647 end as fastest_norm
       from public.room_players rp
       where rp.room_id = p_room_id
@@ -285,7 +285,7 @@ begin
         rp.user_id,
         rp.score,
         rp.total_time_ms,
-        coalesce(rp.finished_at, 'infinity'::timestamptz) as finish_norm,
+        coalesce(rp.finished_at, rp.last_seen, 'infinity'::timestamptz) as finish_norm,
         case when rp.fastest_round_ms > 0 then rp.fastest_round_ms else 2147483647 end as fastest_norm
       from public.room_players rp
       where rp.room_id = p_room_id
@@ -319,7 +319,7 @@ begin
         rp.finished_at,
         row_number() over (
           order by rp.score desc,
-                   coalesce(rp.finished_at, 'infinity'::timestamptz) asc,
+                   coalesce(rp.finished_at, rp.last_seen, 'infinity'::timestamptz) asc,
                    rp.total_time_ms asc,
                    case when rp.fastest_round_ms > 0 then rp.fastest_round_ms else 2147483647 end asc
         ) as rank_position

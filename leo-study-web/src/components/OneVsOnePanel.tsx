@@ -659,6 +659,7 @@ export function OneVsOnePanel(props: {
   const livePlayersRef = useRef<DuelRoomPlayerRow[]>([])
   const refreshInFlightRef = useRef(false)
   const refreshQueuedRef = useRef(false)
+  const roundSubmitQueueRef = useRef<Promise<void>>(Promise.resolve())
   const waitingChatEndRef = useRef<HTMLDivElement | null>(null)
   const duelProfileCacheRef = useRef<Record<string, DuelProfileSnapshot>>({})
   const duelLeaderboardRequestRef = useRef(0)
@@ -1156,7 +1157,18 @@ export function OneVsOnePanel(props: {
         }))
           : []
         setRoom(mappedRoom)
-        setPlayers(mappedPlayers)
+        setPlayers((previous) => mappedPlayers.map((player) => {
+          const current = previous.find((item) => item.user_id === player.user_id)
+          if (!current || mappedRoom.status !== 'in_progress') return player
+          return {
+            ...player,
+            score: Math.max(player.score, current.score),
+            total_time_ms: Math.max(player.total_time_ms, current.total_time_ms),
+            fastest_round_ms: player.fastest_round_ms || current.fastest_round_ms,
+            current_round: Math.max(player.current_round, current.current_round),
+            finished_at: player.finished_at || current.finished_at || null,
+          }
+        }))
         setResults(mappedResults)
         const userIds = mappedPlayers.map((p) => p.user_id)
         if (userIds.length > 0) {
@@ -1236,7 +1248,18 @@ export function OneVsOnePanel(props: {
         : []
 
       setRoom(mappedRoom)
-      setPlayers(mappedPlayers)
+      setPlayers((previous) => mappedPlayers.map((player) => {
+        const current = previous.find((item) => item.user_id === player.user_id)
+        if (!current || mappedRoom.status !== 'in_progress') return player
+        return {
+          ...player,
+          score: Math.max(player.score, current.score),
+          total_time_ms: Math.max(player.total_time_ms, current.total_time_ms),
+          fastest_round_ms: player.fastest_round_ms || current.fastest_round_ms,
+          current_round: Math.max(player.current_round, current.current_round),
+          finished_at: player.finished_at || current.finished_at || null,
+        }
+      }))
       setResults(mappedResults)
 
       const userIds = mappedPlayers.map((player) => player.user_id)
@@ -1467,6 +1490,31 @@ export function OneVsOnePanel(props: {
     && initializedRoundKeyRef.current === initializedRoundKey
     && roundStartedAt > 0,
   )
+
+  const applyOptimisticRoundAdvance = useCallback((params: { round: number; points: number; elapsedMs: number }) => {
+    if (!room || !currentUserId) return
+    const nowIso = new Date().toISOString()
+    setPlayers((previous) => previous.map((player) => {
+      if (player.user_id !== currentUserId) return player
+      const nextRound = Math.max(player.current_round, Math.min(room.rounds + 1, params.round + 1))
+      const safeElapsedMs = Math.max(0, params.elapsedMs)
+      const nextFastest = safeElapsedMs > 0
+        ? player.fastest_round_ms > 0
+          ? Math.min(player.fastest_round_ms, safeElapsedMs)
+          : safeElapsedMs
+        : player.fastest_round_ms
+      return {
+        ...player,
+        score: player.score + Math.max(0, params.points),
+        total_time_ms: player.total_time_ms + safeElapsedMs,
+        fastest_round_ms: nextFastest,
+        current_round: nextRound,
+        finished_at: params.round >= room.rounds ? player.finished_at || nowIso : player.finished_at || null,
+        last_seen: nowIso,
+      }
+    }))
+  }, [currentUserId, room])
+
   const quizRoundTimeLimitMs = useMemo(() => {
     if (!room || room.game_type !== 'quiz') return duelQuizRoundTimeLimitMs
     return room.category === 'scenarios' ? duelScenarioQuizRoundTimeLimitMs : duelQuizRoundTimeLimitMs
@@ -1474,11 +1522,12 @@ export function OneVsOnePanel(props: {
   const quizRoundTimeLimitLabel = `${Math.round(quizRoundTimeLimitMs / 1000)}-second`
 
   const submitRound = useCallback(async (params: { round: number; correct: boolean; elapsedMs: number; points?: number }) => {
-    if (!supabase || !roomId || submittingRound) return
+    if (!supabase || !roomId) return
+    const client = supabase
     setSubmittingRound(true)
     setError('')
-    try {
-      const { data: submitState, error: rpcError } = await supabase.rpc('submit_1v1_round', {
+    const submitTask = async () => {
+      const { data: submitState, error: rpcError } = await client.rpc('submit_1v1_round', {
         p_room_id: roomId,
         p_round: params.round,
         p_correct: params.correct,
@@ -1495,6 +1544,7 @@ export function OneVsOnePanel(props: {
         if (room?.status === 'in_progress' && room.game_type === 'matching') {
           setMatchingSubmitted(false)
         }
+        void refreshRoomSnapshot()
         return
       }
 
@@ -1512,10 +1562,10 @@ export function OneVsOnePanel(props: {
             if (!current) return null
             const nextPlayer: DuelRoomPlayerRow = {
               ...current,
-              score: Number(value.score || current.score || 0),
-              total_time_ms: Number(value.total_time_ms || current.total_time_ms || 0),
+              score: Math.max(Number(value.score || 0), current.score || 0),
+              total_time_ms: Math.max(Number(value.total_time_ms || 0), current.total_time_ms || 0),
               fastest_round_ms: Number(value.fastest_round_ms || current.fastest_round_ms || 0),
-              current_round: Number(value.current_round || current.current_round || 1),
+              current_round: Math.max(Number(value.current_round || 1), current.current_round || 1),
               finished_at: value.finished_at ? String(value.finished_at) : current.finished_at || null,
               last_seen: new Date().toISOString(),
             }
@@ -1560,21 +1610,30 @@ export function OneVsOnePanel(props: {
 
       window.setTimeout(() => {
         void refreshRoomSnapshot()
-      }, 80)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not submit round.'
-      setError(message)
-      if (room?.status === 'in_progress' && room.game_type === 'quiz') {
-        setQuizLocked(false)
-        setQuizChoice(null)
-      }
-      if (room?.status === 'in_progress' && room.game_type === 'matching') {
-        setMatchingSubmitted(false)
-      }
-    } finally {
-      setSubmittingRound(false)
+      }, payload && String(payload.status || '') === 'completed' ? 80 : 250)
     }
-  }, [currentUserId, refreshRoomSnapshot, room?.game_type, room?.status, roomId, submittingRound])
+
+    roundSubmitQueueRef.current = roundSubmitQueueRef.current
+      .catch(() => undefined)
+      .then(submitTask)
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'Could not submit round.'
+        setError(message)
+        if (room?.status === 'in_progress' && room.game_type === 'quiz') {
+          setQuizLocked(false)
+          setQuizChoice(null)
+        }
+        if (room?.status === 'in_progress' && room.game_type === 'matching') {
+          setMatchingSubmitted(false)
+        }
+        void refreshRoomSnapshot()
+      })
+      .finally(() => {
+        setSubmittingRound(false)
+      })
+
+    await roundSubmitQueueRef.current
+  }, [currentUserId, refreshRoomSnapshot, room?.game_type, room?.status, roomId])
 
   const triggerAutoForfeit = useCallback(async (roundKey: string, reason: 'question' | 'matching' = 'question') => {
     if (!supabase || !roomId || !roundKey || !room || !myPlayer) return
@@ -1605,7 +1664,7 @@ export function OneVsOnePanel(props: {
 
   const submitQuizAnswer = useCallback((choiceIndex: number) => {
     if (!room || room.status !== 'in_progress' || room.game_type !== 'quiz') return
-    if (!canStartRound || !isQuizRound(currentRound) || quizLocked || submittingRound) return
+    if (!canStartRound || !isQuizRound(currentRound) || quizLocked) return
 
     const startedAt = roundStartedAtRef.current || roundStartedAt
     if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
@@ -1648,12 +1707,23 @@ export function OneVsOnePanel(props: {
         return
       }
       setNotice('Spam pattern detected. This answer is penalized as incorrect. Another trigger will forfeit.')
+      if (currentRound.round < room.rounds) {
+        applyOptimisticRoundAdvance({ round: currentRound.round, points: 0, elapsedMs })
+        setQuizChoice(null)
+        setQuizLocked(false)
+      }
       void submitRound({ round: currentRound.round, correct: false, elapsedMs })
       return
     }
 
+    if (currentRound.round < room.rounds) {
+      applyOptimisticRoundAdvance({ round: currentRound.round, points: correct ? 100 : 0, elapsedMs })
+      setQuizChoice(null)
+      setQuizLocked(false)
+    }
     void submitRound({ round: currentRound.round, correct, elapsedMs })
   }, [
+    applyOptimisticRoundAdvance,
     canStartRound,
     currentRound,
     initializedRoundKey,
@@ -1662,7 +1732,6 @@ export function OneVsOnePanel(props: {
     room,
     roundStartedAt,
     submitRound,
-    submittingRound,
     triggerAutoForfeit,
   ])
 
@@ -1958,7 +2027,7 @@ export function OneVsOnePanel(props: {
   // Keyboard shortcuts for 1v1 quiz (1-4 keys to answer)
   useEffect(() => {
     if (!room || room.status !== 'in_progress' || room.game_type !== 'quiz') return
-    if (!canStartRound || !isQuizRound(currentRound) || quizLocked || submittingRound) return
+    if (!canStartRound || !isQuizRound(currentRound) || quizLocked) return
 
     const handleQuizKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement
@@ -1976,12 +2045,12 @@ export function OneVsOnePanel(props: {
 
     window.addEventListener('keydown', handleQuizKeyDown)
     return () => window.removeEventListener('keydown', handleQuizKeyDown)
-  }, [room, currentRound, canStartRound, quizLocked, submittingRound, submitQuizAnswer])
+  }, [room, currentRound, canStartRound, quizLocked, submitQuizAnswer])
 
   useEffect(() => {
     if (!room || !myPlayer || room.status !== 'in_progress' || room.game_type !== 'quiz') return
     if (myPlayer.current_round > room.rounds) return
-    if (isSpectator || !canStartRound || !roundIsInitialized || !isQuizRound(currentRound) || quizLocked || submittingRound) return
+    if (isSpectator || !canStartRound || !roundIsInitialized || !isQuizRound(currentRound) || quizLocked) return
     const startedAt = roundStartedAtRef.current
     if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
 
@@ -2009,7 +2078,6 @@ export function OneVsOnePanel(props: {
     roundIsInitialized,
     room,
     roundStartedAt,
-    submittingRound,
     triggerAutoForfeit,
     quizRoundTimeLimitMs,
   ])
@@ -2017,7 +2085,7 @@ export function OneVsOnePanel(props: {
   useEffect(() => {
     if (!room || !myPlayer || room.status !== 'in_progress' || room.game_type !== 'matching') return
     if (myPlayer.current_round > room.rounds) return
-    if (isSpectator || !canStartRound || !roundIsInitialized || !isMatchingRound(currentRound) || matchingSubmitted || submittingRound) return
+    if (isSpectator || !canStartRound || !roundIsInitialized || !isMatchingRound(currentRound) || matchingSubmitted) return
     const startedAt = roundStartedAtRef.current
     if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
 
@@ -2045,7 +2113,6 @@ export function OneVsOnePanel(props: {
     roundIsInitialized,
     room,
     roundStartedAt,
-    submittingRound,
     triggerAutoForfeit,
   ])
 
@@ -2077,7 +2144,7 @@ export function OneVsOnePanel(props: {
 
   useEffect(() => {
     if (!room || room.game_type !== 'matching' || !isMatchingRound(currentRound)) return
-    if (matchingSubmitted || submittingRound) return
+    if (matchingSubmitted) return
     if (matchedPairIds.length !== currentRound.pairs.length) return
 
     const startedAt = roundStartedAtRef.current || roundStartedAt
@@ -2086,13 +2153,16 @@ export function OneVsOnePanel(props: {
     const elapsedMs = Math.max(0, Date.now() - startedAt)
     const completionBonus = 20
     const roundPoints = Math.max(0, matchingRoundPoints + completionBonus)
+    if (currentRound.round < room.rounds) {
+      applyOptimisticRoundAdvance({ round: currentRound.round, points: roundPoints, elapsedMs })
+    }
     void submitRound({
       round: currentRound.round,
       correct: true,
       elapsedMs,
       points: roundPoints,
     })
-  }, [currentRound, initializedRoundKey, matchedPairIds.length, matchingRoundPoints, matchingSubmitted, room, roundStartedAt, submitRound, submittingRound])
+  }, [applyOptimisticRoundAdvance, currentRound, initializedRoundKey, matchedPairIds.length, matchingRoundPoints, matchingSubmitted, room, roundStartedAt, submitRound])
 
   const leaveRoom = useCallback(() => {
     initializedRoundKeyRef.current = ''
@@ -2390,8 +2460,10 @@ export function OneVsOnePanel(props: {
         summary: myResultRow.score > opponentResultRow.score ? 'You win by score.' : 'Opponent wins by score.',
       }
     }
-    const myFinishedAt = playerByUserId.get(myResultRow.user_id)?.finished_at
-    const opponentFinishedAt = playerByUserId.get(opponentResultRow.user_id)?.finished_at
+    const myPlayerResult = playerByUserId.get(myResultRow.user_id)
+    const opponentPlayerResult = playerByUserId.get(opponentResultRow.user_id)
+    const myFinishedAt = myPlayerResult?.finished_at || (room && myPlayerResult && myPlayerResult.current_round > room.rounds ? myPlayerResult.last_seen : null)
+    const opponentFinishedAt = opponentPlayerResult?.finished_at || (room && opponentPlayerResult && opponentPlayerResult.current_round > room.rounds ? opponentPlayerResult.last_seen : null)
     const myFinishedMs = myFinishedAt ? Date.parse(myFinishedAt) : Number.NaN
     const opponentFinishedMs = opponentFinishedAt ? Date.parse(opponentFinishedAt) : Number.NaN
     if (Number.isFinite(myFinishedMs) && Number.isFinite(opponentFinishedMs) && myFinishedMs !== opponentFinishedMs) {
@@ -2422,7 +2494,7 @@ export function OneVsOnePanel(props: {
       rule: 'Draw',
       summary: 'Draw after all tie-breakers.',
     }
-  }, [myResultRow, opponentResultRow, playerByUserId])
+  }, [myResultRow, opponentResultRow, playerByUserId, room])
 
   const myFastestRoundMs = myResultRow ? playerByUserId.get(myResultRow.user_id)?.fastest_round_ms || 0 : 0
   const opponentFastestRoundMs = opponentResultRow ? playerByUserId.get(opponentResultRow.user_id)?.fastest_round_ms || 0 : 0
@@ -3226,7 +3298,7 @@ export function OneVsOnePanel(props: {
                           onClick={() => {
                             submitQuizAnswer(index)
                           }}
-                          disabled={quizLocked || submittingRound}
+                          disabled={quizLocked}
                         >
                           <span className="choice-key">{index + 1}</span> {choice}
                         </button>
@@ -3355,7 +3427,7 @@ export function OneVsOnePanel(props: {
                           <button
                             key={`duel-match-card-${currentRound.round}-${card.id}`}
                             className={`match-card${selected ? ' match-selected' : ''}${matched ? ' match-done' : ''}${wrong ? ' match-wrong' : ''}`}
-                            disabled={matchingSubmitted || submittingRound || matched || (!selected && selectedMatchingCards.length >= 2)}
+                            disabled={matchingSubmitted || matched || (!selected && selectedMatchingCards.length >= 2)}
                             onClick={() => handleMatchingCardClick(card.id)}
                           >
                             <strong className={card.kind === 'code' ? 'match-card-code' : 'match-card-definition'}>
