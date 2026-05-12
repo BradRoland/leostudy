@@ -152,6 +152,7 @@ type HomeLeaderboardEntry = {
   playerName: string
   avatarUrl: string
   supporterTier: SupporterTier
+  profileDecorationKey: string
   themeId: string
   nameStyle: NameStyle
   bio: string
@@ -255,6 +256,7 @@ type LeaderboardEntry = {
   playerName: string
   avatarUrl: string
   supporterTier: SupporterTier
+  profileDecorationKey: string
   bio: string
   agency: string
   nameStyle: NameStyle
@@ -350,6 +352,7 @@ type ProfileDetails = {
   homeLeaderboardRotationMs: number
   homeLeaderboardPreferences: HomeLeaderboardPreferences
   themeId: string
+  profileDecorationKey: string
   nameStyle: NameStyle
   namePresets: NameStylePreset[]
   systemNoticesSeen: string[]
@@ -472,6 +475,7 @@ type SessionPerformanceReport = {
 
 type SettingsTab =
   | 'profile'
+  | 'progression'
   | 'customization'
   | 'support'
   | 'security'
@@ -646,13 +650,79 @@ type LeaderboardProfileSnapshot = {
   bio: string
   agency: string
   themeId: string
+  profileDecorationKey: string
   nameStyle: NameStyle
   homeLeaderboardRotationMs: number
   studySeconds: number
   studyDayStreak: number
+  bestStudyDayStreak: number
+  gamePlays: UserStats['gamePlays']
+  flashcardsReviewed: number
+  scenariosReviewed: number
   studyModeCounts: Record<CodeFilter, number>
   masteredCodes: number | null
   currentActivity: CurrentUserActivity | null
+}
+
+type LevelRewardKind = 'halo' | 'decoration' | 'title' | 'badge'
+
+type LevelReward = {
+  level: number
+  key: string
+  title: string
+  description: string
+  icon: string
+  kind: LevelRewardKind
+}
+
+type LevelXpBreakdown = {
+  label: string
+  xp: number
+  description: string
+}
+
+type UserLevelProfile = {
+  level: number
+  totalXp: number
+  currentLevelXp: number
+  nextLevelXp: number
+  progressPercent: number
+  tierName: string
+  haloClass: string
+  decorationIcon: string
+  rewards: LevelReward[]
+  nextReward: LevelReward | null
+  breakdown: LevelXpBreakdown[]
+}
+
+type UserLevelInput = {
+  studySeconds: number
+  studyDayStreak: number
+  bestStudyDayStreak: number
+  masteredCodes: number
+  highScores: PersistedState['highScores']
+  gamePlays: UserStats['gamePlays']
+  flashcardsReviewed: number
+  scenariosReviewed: number
+  duelWins: number
+  duelLosses: number
+  duelCurrentWinStreak: number
+  leaderboardFirstPlaces: number
+  leaderboardAppearances: number
+  weeklyFirstPlaces: number
+  departmentRank: number | null
+  weeklyDepartmentRank: number | null
+  isTopPerformer: boolean
+  isWeeklyTopPerformer: boolean
+}
+
+type ProfileDecoration = {
+  key: string
+  title: string
+  icon: string
+  unlockLevel: number
+  description: string
+  tone: 'classic' | 'cute' | 'funny' | 'elite'
 }
 
 type AppThemePreset = {
@@ -1037,6 +1107,16 @@ function buildLeaderboardFirstPlaceCountMap(boards: LeaderboardBoard[]) {
     const topUserId = board.entries[0]?.userId
     if (!topUserId) continue
     counts[topUserId] = (counts[topUserId] || 0) + 1
+  }
+  return counts
+}
+
+function buildLeaderboardAppearanceCountMap(boards: LeaderboardBoard[]) {
+  const counts: Record<string, number> = {}
+  for (const board of boards) {
+    for (const entry of board.entries) {
+      counts[entry.userId] = (counts[entry.userId] || 0) + 1
+    }
   }
   return counts
 }
@@ -1535,6 +1615,177 @@ const defaultUserStats: UserStats = {
   },
   sessionTracks: {},
   sessionTimeline: [],
+}
+
+const levelRewards: LevelReward[] = [
+  { level: 2, key: 'bronze_halo', title: 'Bronze Halo', description: 'A clean rookie ring around your profile photo.', icon: '🥉', kind: 'halo' },
+  { level: 5, key: 'blue_halo', title: 'Academy Blue Halo', description: 'A brighter blue halo for consistent reps.', icon: '🔵', kind: 'halo' },
+  { level: 8, key: 'spark_badge', title: 'Study Spark', description: 'A spark overlay that shows you are building momentum.', icon: '✨', kind: 'decoration' },
+  { level: 10, key: 'silver_halo', title: 'Silver Halo', description: 'A polished frame for players putting in real time.', icon: '⚪', kind: 'halo' },
+  { level: 15, key: 'gold_halo', title: 'Gold Halo', description: 'A gold ring for strong leaderboard and study performance.', icon: '🏅', kind: 'halo' },
+  { level: 20, key: 'crown_overlay', title: 'Crown Overlay', description: 'A crown decoration for serious competitors.', icon: '👑', kind: 'decoration' },
+  { level: 25, key: 'neon_pulse', title: 'Neon Pulse', description: 'A subtle animated profile glow for elite grinders.', icon: '💠', kind: 'halo' },
+  { level: 30, key: 'diamond_halo', title: 'Diamond Halo', description: 'A diamond frame for high mastery and 1v1 wins.', icon: '💎', kind: 'halo' },
+  { level: 40, key: 'inferno_aura', title: 'Inferno Aura', description: 'A fire aura for top performers and long-term study streaks.', icon: '🔥', kind: 'decoration' },
+  { level: 50, key: 'legend_badge', title: 'Legend Badge', description: 'A legendary profile badge for academy-wide dominance.', icon: '🛡️', kind: 'badge' },
+]
+
+const profileDecorationCatalog: ProfileDecoration[] = [
+  { key: 'auto', title: 'Auto Best', icon: '✨', unlockLevel: 1, description: 'Automatically uses your highest unlocked level decoration.', tone: 'classic' },
+  { key: 'none', title: 'No Overlay', icon: '○', unlockLevel: 1, description: 'Clean profile picture with halo only.', tone: 'classic' },
+  { key: 'rookie_duck', title: 'Rookie Duck', icon: '🦆', unlockLevel: 1, description: 'Tiny duck energy. Surprisingly tactical.', tone: 'cute' },
+  { key: 'coffee_backup', title: 'Coffee Backup', icon: '☕', unlockLevel: 1, description: 'For the officer running on caffeine and Penal Code reps.', tone: 'funny' },
+  { key: 'evidence_taco', title: 'Evidence Taco', icon: '🌮', unlockLevel: 2, description: 'Do not eat the evidence. Probably.', tone: 'funny' },
+  { key: 'study_spark', title: 'Study Spark', icon: '✨', unlockLevel: 5, description: 'A cute little spark for consistent reps.', tone: 'classic' },
+  { key: 'donut_detail', title: 'Donut Detail', icon: '🍩', unlockLevel: 5, description: 'The classic. Respectfully glazed.', tone: 'funny' },
+  { key: 'tiny_frog', title: 'Tiny Frog', icon: '🐸', unlockLevel: 8, description: 'Unbothered. Moisturized. Knows PC 459.', tone: 'cute' },
+  { key: 'siren_pop', title: 'Siren Pop', icon: '🚨', unlockLevel: 10, description: 'A mini siren when your study stats start moving.', tone: 'classic' },
+  { key: 'brain_mode', title: 'Brain Mode', icon: '🧠', unlockLevel: 10, description: 'For when the LDs are finally clicking.', tone: 'classic' },
+  { key: 'trash_panda', title: 'Briefing Raccoon', icon: '🦝', unlockLevel: 12, description: 'Chaotic, cute, and somehow still prepared.', tone: 'funny' },
+  { key: 'gold_star', title: 'Gold Star', icon: '⭐', unlockLevel: 15, description: 'Simple, bright, and earned.', tone: 'classic' },
+  { key: 'baby_dragon', title: 'Baby Dragon', icon: '🐉', unlockLevel: 18, description: 'Cute now. Terrifying on leaderboards later.', tone: 'cute' },
+  { key: 'crown_overlay', title: 'Mini Crown', icon: '👑', unlockLevel: 20, description: 'For the user who keeps taking boards.', tone: 'elite' },
+  { key: 'unicorn_unit', title: 'Unicorn Unit', icon: '🦄', unlockLevel: 22, description: 'Ridiculous. Majestic. Legally distinct.', tone: 'funny' },
+  { key: 'neon_orb', title: 'Neon Orb', icon: '💠', unlockLevel: 25, description: 'A clean high-level glow marker.', tone: 'elite' },
+  { key: 'diamond_pop', title: 'Diamond Pop', icon: '💎', unlockLevel: 30, description: 'Diamond-level grinder status.', tone: 'elite' },
+  { key: 'ufo_watch', title: 'UFO Watch', icon: '🛸', unlockLevel: 35, description: 'Because your scores are out of this world. Yes, I said it.', tone: 'funny' },
+  { key: 'inferno_aura', title: 'Inferno Pop', icon: '🔥', unlockLevel: 40, description: 'For users who are absolutely cooking.', tone: 'elite' },
+  { key: 'legend_shield', title: 'Legend Shield', icon: '🛡️', unlockLevel: 50, description: 'The top-tier badge for academy legends.', tone: 'elite' },
+]
+
+function getProfileDecoration(key?: string) {
+  return profileDecorationCatalog.find((decoration) => decoration.key === key) || profileDecorationCatalog[0]
+}
+
+function sanitizeProfileDecorationKey(value: unknown) {
+  const key = typeof value === 'string' ? value : 'auto'
+  return getProfileDecoration(key).key
+}
+
+function unlockedProfileDecorations(level: number) {
+  return profileDecorationCatalog.filter((decoration) => decoration.unlockLevel <= level)
+}
+
+function decorationIconForLevelProfile(levelProfile?: UserLevelProfile | null, selectedKey?: string) {
+  if (!levelProfile) return ''
+  const decoration = getProfileDecoration(selectedKey)
+  if (decoration.key === 'none') return ''
+  if (decoration.key === 'auto') return levelProfile.decorationIcon
+  return decoration.unlockLevel <= levelProfile.level ? decoration.icon : levelProfile.decorationIcon
+}
+
+function sanitizeHighScores(input: unknown): PersistedState['highScores'] {
+  const value = input && typeof input === 'object' ? input as Partial<PersistedState['highScores']> : {}
+  const sanitizeScore = (rawValue: unknown) =>
+    typeof rawValue === 'number' && Number.isFinite(rawValue) ? Math.max(0, Math.floor(rawValue)) : 0
+  return {
+    matching: sanitizeScore(value.matching),
+    blaster: sanitizeScore(value.blaster),
+    caseFile: sanitizeScore(value.caseFile),
+    rapidFire: sanitizeScore(value.rapidFire),
+    gravity: sanitizeScore(value.gravity),
+  }
+}
+
+function xpRequiredForLevel(level: number) {
+  if (level <= 1) return 0
+  let total = 0
+  for (let currentLevel = 1; currentLevel < level; currentLevel += 1) {
+    total += 120 + currentLevel * 55 + Math.floor(Math.pow(currentLevel, 1.45) * 12)
+  }
+  return total
+}
+
+function levelFromXp(totalXp: number) {
+  let level = 1
+  while (level < 100 && totalXp >= xpRequiredForLevel(level + 1)) level += 1
+  return level
+}
+
+function levelTierName(level: number) {
+  if (level >= 50) return 'Legend'
+  if (level >= 40) return 'Inferno'
+  if (level >= 30) return 'Diamond'
+  if (level >= 25) return 'Neon'
+  if (level >= 15) return 'Gold'
+  if (level >= 10) return 'Silver'
+  if (level >= 5) return 'Academy Blue'
+  if (level >= 2) return 'Bronze'
+  return 'Recruit'
+}
+
+function levelHaloClass(level: number) {
+  if (level >= 50) return 'level-halo-legend'
+  if (level >= 40) return 'level-halo-inferno'
+  if (level >= 30) return 'level-halo-diamond'
+  if (level >= 25) return 'level-halo-neon'
+  if (level >= 15) return 'level-halo-gold'
+  if (level >= 10) return 'level-halo-silver'
+  if (level >= 5) return 'level-halo-blue'
+  if (level >= 2) return 'level-halo-bronze'
+  return 'level-halo-recruit'
+}
+
+function levelDecorationIcon(level: number) {
+  if (level >= 50) return '🛡️'
+  if (level >= 40) return '🔥'
+  if (level >= 30) return '💎'
+  if (level >= 20) return '👑'
+  if (level >= 8) return '✨'
+  return ''
+}
+
+function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
+  const breakdown: LevelXpBreakdown[] = []
+  const addXp = (label: string, xp: number, description: string) => {
+    const normalizedXp = Math.max(0, Math.round(xp))
+    if (normalizedXp <= 0) return
+    breakdown.push({ label, xp: normalizedXp, description })
+  }
+
+  addXp('Active study time', Math.floor(input.studySeconds / 60), '1 XP for every active study minute.')
+  addXp('Current study streak', input.studyDayStreak * 35, '35 XP for each active daily streak day.')
+  addXp('Best study streak', input.bestStudyDayStreak * 20, '20 XP for each best-streak day ever earned.')
+  addXp('Code mastery', input.masteredCodes * 90, '90 XP for every mastered code.')
+  addXp('Flashcard reps', Math.floor(input.flashcardsReviewed / 5), '1 XP for every 5 flashcards reviewed.')
+  addXp('Scenario reps', input.scenariosReviewed * 8, '8 XP for every scenario reviewed.')
+  addXp('Game participation', (input.gamePlays.matching + input.gamePlays.speed + input.gamePlays.blaster) * 8, '8 XP for each completed game session.')
+  addXp('Matching high score', Math.floor(input.highScores.matching / 10), 'High matching scores add skill XP.')
+  addXp('Code Blaster high score', Math.floor(input.highScores.blaster / 12), 'Code Blaster precision and speed add XP.')
+  addXp('Practice game scores', Math.floor((input.highScores.caseFile + input.highScores.rapidFire + input.highScores.gravity) / 14), 'Other study game high scores add XP.')
+  addXp('1v1 wins', input.duelWins * 125, '1v1 wins are weighted heavily.')
+  addXp('1v1 participation', input.duelLosses * 20, 'Losses still count for showing up and practicing.')
+  addXp('1v1 win streak', input.duelCurrentWinStreak * 80, 'Active 1v1 streaks earn bonus XP.')
+  addXp('Leaderboard placements', input.leaderboardAppearances * 80, 'Leaderboard appearances reward strong scores across modes.')
+  addXp('All-time #1 spots', input.leaderboardFirstPlaces * 350, 'All-time first-place boards are major XP wins.')
+  addXp('Weekly #1 spots', input.weeklyFirstPlaces * 220, 'Weekly first-place boards reward current momentum.')
+  addXp('Top performer', input.isTopPerformer ? 600 : 0, 'Bonus for being the all-time top performer.')
+  addXp('Weekly top performer', input.isWeeklyTopPerformer ? 400 : 0, 'Bonus for being this week’s top performer.')
+  addXp('Department strength', input.departmentRank === 1 ? 350 : input.departmentRank === 2 ? 220 : input.departmentRank === 3 ? 150 : 0, 'Top departments give every contributing member a boost.')
+  addXp('Weekly department strength', input.weeklyDepartmentRank === 1 ? 250 : input.weeklyDepartmentRank === 2 ? 160 : input.weeklyDepartmentRank === 3 ? 100 : 0, 'Weekly top departments add a smaller momentum bonus.')
+
+  const totalXp = breakdown.reduce((sum, item) => sum + item.xp, 0)
+  const level = levelFromXp(totalXp)
+  const levelFloor = xpRequiredForLevel(level)
+  const levelCeiling = xpRequiredForLevel(level + 1)
+  const currentLevelXp = Math.max(0, totalXp - levelFloor)
+  const nextLevelXp = Math.max(1, levelCeiling - levelFloor)
+  const rewards = levelRewards.filter((reward) => reward.level <= level)
+  const nextReward = levelRewards.find((reward) => reward.level > level) || null
+
+  return {
+    level,
+    totalXp,
+    currentLevelXp,
+    nextLevelXp,
+    progressPercent: Math.round(Math.min(100, (currentLevelXp / nextLevelXp) * 100)),
+    tierName: levelTierName(level),
+    haloClass: levelHaloClass(level),
+    decorationIcon: levelDecorationIcon(level),
+    rewards,
+    nextReward,
+    breakdown: breakdown.sort((left, right) => right.xp - left.xp),
+  }
 }
 
 const stripeTierLinks: Partial<Record<Exclude<SupporterTier, 'free'>, string>> = {
@@ -2360,10 +2611,15 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
     bio: '',
     agency: defaultAgency,
     themeId: appThemePresets[0].id,
+    profileDecorationKey: 'auto',
     nameStyle: { ...defaultNameStyle },
     homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
     studySeconds: 0,
     studyDayStreak: 0,
+    bestStudyDayStreak: 0,
+    gamePlays: { ...defaultUserStats.gamePlays },
+    flashcardsReviewed: 0,
+    scenariosReviewed: 0,
     studyModeCounts: { ...defaultUserStats.studyModeCounts },
     masteredCodes: null,
     currentActivity: null,
@@ -2383,10 +2639,19 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
     bio: typeof value.bio === 'string' ? value.bio : fallback.bio,
     agency: typeof value.agency === 'string' && value.agency.trim().length > 0 ? value.agency : fallback.agency,
     themeId: getThemePreset(typeof value.themeId === 'string' ? value.themeId : fallback.themeId).id,
+    profileDecorationKey: sanitizeProfileDecorationKey(value.profileDecorationKey),
     nameStyle: sanitizeNameStyle(value.nameStyle),
     homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs(value.homeLeaderboardRotationMs),
     studySeconds: normalizeCount(statsRaw.studySeconds),
     studyDayStreak: normalizeCount(statsRaw.studyDayStreak),
+    bestStudyDayStreak: normalizeCount(statsRaw.bestStudyDayStreak),
+    gamePlays: {
+      matching: normalizeCount((statsRaw.gamePlays as Record<string, unknown> | undefined)?.matching),
+      speed: normalizeCount((statsRaw.gamePlays as Record<string, unknown> | undefined)?.speed),
+      blaster: normalizeCount((statsRaw.gamePlays as Record<string, unknown> | undefined)?.blaster),
+    },
+    flashcardsReviewed: normalizeCount(statsRaw.flashcardsReviewed),
+    scenariosReviewed: normalizeCount(statsRaw.scenariosReviewed),
     studyModeCounts: {
       all: normalizeCount(studyModeCountsRaw.all),
       penal: normalizeCount(studyModeCountsRaw.penal),
@@ -2584,6 +2849,7 @@ function sanitizeState(input: unknown): PersistedState {
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
       themeId: appThemePresets[0].id,
+      profileDecorationKey: 'auto',
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
       systemNoticesSeen: [],
@@ -2599,10 +2865,7 @@ function sanitizeState(input: unknown): PersistedState {
   const state = input as Partial<PersistedState>
   return {
     performance: state.performance && typeof state.performance === 'object' ? state.performance : {},
-    highScores: {
-      ...gameHighScoreSeed,
-      ...(state.highScores && typeof state.highScores === 'object' ? state.highScores : {}),
-    },
+    highScores: sanitizeHighScores(state.highScores),
     bestStreak: typeof state.bestStreak === 'number' ? Math.max(0, Math.floor(state.bestStreak)) : 0,
     profileDetails:
       state.profileDetails && typeof state.profileDetails === 'object'
@@ -2613,6 +2876,7 @@ function sanitizeState(input: unknown): PersistedState {
             homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs((state.profileDetails as Partial<ProfileDetails>).homeLeaderboardRotationMs),
             homeLeaderboardPreferences: sanitizeHomeLeaderboardPreferences((state.profileDetails as Partial<ProfileDetails>).homeLeaderboardPreferences),
             themeId: getThemePreset(String((state.profileDetails as Partial<ProfileDetails>).themeId || appThemePresets[0].id)).id,
+            profileDecorationKey: sanitizeProfileDecorationKey((state.profileDetails as Partial<ProfileDetails>).profileDecorationKey),
             nameStyle: sanitizeNameStyle((state.profileDetails as Partial<ProfileDetails>).nameStyle),
             namePresets: sanitizeNamePresets((state.profileDetails as Partial<ProfileDetails>).namePresets),
             systemNoticesSeen: sanitizeSystemNoticesSeen((state.profileDetails as Partial<ProfileDetails>).systemNoticesSeen),
@@ -2631,6 +2895,7 @@ function sanitizeState(input: unknown): PersistedState {
             homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
             homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
             themeId: appThemePresets[0].id,
+            profileDecorationKey: 'auto',
             nameStyle: { ...defaultNameStyle },
             namePresets: [],
             systemNoticesSeen: [],
@@ -3794,6 +4059,7 @@ function App() {
     homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
     homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
     themeId: appThemePresets[0].id,
+    profileDecorationKey: 'auto',
     nameStyle: { ...defaultNameStyle },
     namePresets: [],
     systemNoticesSeen: [],
@@ -3842,6 +4108,7 @@ function App() {
     matching: [],
     quiz: [],
   })
+  const [levelProfilesByUserId, setLevelProfilesByUserId] = useState<Record<string, UserLevelProfile>>({})
   const [homeMatchingDurationFilter, setHomeMatchingDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeMatchingCodeFilter, setHomeMatchingCodeFilter] = useState<CodeFilter>('all')
   const [homeSpeedDurationFilter, setHomeSpeedDurationFilter] = useState<HomeDurationFilter>(15)
@@ -4933,10 +5200,15 @@ function App() {
             bio: String(entry.bio || ''),
             agency: String(entry.agency || defaultAgency),
             themeId: appThemePresets[0].id,
+            profileDecorationKey: 'auto',
             nameStyle: { ...defaultNameStyle },
             homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
             studySeconds: 0,
             studyDayStreak: 0,
+            bestStudyDayStreak: 0,
+            gamePlays: { ...defaultUserStats.gamePlays },
+            flashcardsReviewed: 0,
+            scenariosReviewed: 0,
             studyModeCounts: { ...defaultUserStats.studyModeCounts },
             masteredCodes: null,
             currentActivity: null,
@@ -4958,10 +5230,15 @@ function App() {
             bio: '',
             agency: defaultAgency,
             themeId: appThemePresets[0].id,
+            profileDecorationKey: 'auto',
             nameStyle: { ...defaultNameStyle },
             homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
             studySeconds: 0,
             studyDayStreak: 0,
+            bestStudyDayStreak: 0,
+            gamePlays: { ...defaultUserStats.gamePlays },
+            flashcardsReviewed: 0,
+            scenariosReviewed: 0,
             studyModeCounts: { ...defaultUserStats.studyModeCounts },
             masteredCodes: null,
             currentActivity: null,
@@ -4971,10 +5248,15 @@ function App() {
             bio: parsedDetails.bio || existing.bio,
             agency: existing.agency && existing.agency !== defaultAgency ? existing.agency : parsedDetails.agency,
             themeId: parsedDetails.themeId || existing.themeId,
+            profileDecorationKey: parsedDetails.profileDecorationKey || existing.profileDecorationKey,
             nameStyle: parsedDetails.nameStyle,
             homeLeaderboardRotationMs: parsedDetails.homeLeaderboardRotationMs,
             studySeconds: parsedDetails.studySeconds,
             studyDayStreak: parsedDetails.studyDayStreak,
+            bestStudyDayStreak: parsedDetails.bestStudyDayStreak,
+            gamePlays: parsedDetails.gamePlays,
+            flashcardsReviewed: parsedDetails.flashcardsReviewed,
+            scenariosReviewed: parsedDetails.scenariosReviewed,
             studyModeCounts: parsedDetails.studyModeCounts,
             masteredCodes: parsedDetails.masteredCodes,
             currentActivity: parsedDetails.currentActivity,
@@ -5052,6 +5334,7 @@ function App() {
               playerName: profilesByUserId[userId]?.username || 'Player',
               avatarUrl: profilesByUserId[userId]?.avatarUrl || defaultAvatarUrl,
               supporterTier: profilesByUserId[userId]?.supporterTier || 'free',
+              profileDecorationKey: detailsByUserId[userId]?.profileDecorationKey || 'auto',
               bio: detailsByUserId[userId]?.bio || '',
               agency: detailsByUserId[userId]?.agency || '',
               nameStyle: detailsByUserId[userId]?.nameStyle || { ...defaultNameStyle },
@@ -5113,7 +5396,7 @@ function App() {
     const refreshPromise = (async () => {
       const { data: states, error } = await supabase
         .from('app_state')
-        .select('user_id,profile_details')
+        .select('user_id,profile_details,high_scores,performance,best_streak')
         .limit(400)
       if (error || !states) return
 
@@ -5123,6 +5406,19 @@ function App() {
       let ownerUserIds = new Set<string>()
       const detailsByUserId: Record<string, LeaderboardProfileSnapshot> = {}
       const masteredCodesByUserId: Record<string, number> = {}
+      const allTimeBoardsForLevels = buildLeaderboardBoards(leaderboardRef.current, 0)
+      const weeklyBoardsForLevels = buildLeaderboardBoards(weeklyLeaderboardRef.current, 0)
+      const allTimeFirstsForLevels = buildLeaderboardFirstPlaceCountMap(allTimeBoardsForLevels)
+      const weeklyFirstsForLevels = buildLeaderboardFirstPlaceCountMap(weeklyBoardsForLevels)
+      const allTimeAppearancesForLevels = buildLeaderboardAppearanceCountMap(allTimeBoardsForLevels)
+      const allTimeTopPerformerForLevels = buildWeeklyTopPerformer(leaderboardRef.current)
+      const weeklyTopPerformerForLevels = buildWeeklyTopPerformer(weeklyLeaderboardRef.current)
+      const departmentRankByAgencyKey = new Map(
+        buildDepartmentLeaders(leaderboardRef.current).map((entry, index) => [entry.key, index + 1]),
+      )
+      const weeklyDepartmentRankByAgencyKey = new Map(
+        buildDepartmentLeaders(weeklyLeaderboardRef.current).map((entry, index) => [entry.key, index + 1]),
+      )
 
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -5204,6 +5500,7 @@ function App() {
       const studyRows: HomeLeaderboardEntry[] = []
       const studyStreakRows: HomeLeaderboardEntry[] = []
       const masteredRows: HomeLeaderboardEntry[] = []
+      const nextLevelProfilesByUserId: Record<string, UserLevelProfile> = {}
       const duelWinsRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
         all: [],
         matching: [],
@@ -5222,10 +5519,15 @@ function App() {
           bio: '',
           agency: defaultAgency,
           themeId: appThemePresets[0].id,
+          profileDecorationKey: 'auto',
           nameStyle: { ...defaultNameStyle },
           homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
           studySeconds: 0,
           studyDayStreak: 0,
+          bestStudyDayStreak: 0,
+          gamePlays: { ...defaultUserStats.gamePlays },
+          flashcardsReviewed: 0,
+          scenariosReviewed: 0,
           studyModeCounts: { ...defaultUserStats.studyModeCounts },
           masteredCodes: null,
           currentActivity: null,
@@ -5244,11 +5546,34 @@ function App() {
           quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
         }
         const duelStats = duelStatsByMode.all
+        const agencyKey = normalizeAgencyKey(canonicalAgencyName(details.agency || ''))
+        const highScoresForUser = sanitizeHighScores((row as Record<string, unknown>).high_scores)
+        nextLevelProfilesByUserId[userId] = buildUserLevelProfile({
+          studySeconds,
+          studyDayStreak,
+          bestStudyDayStreak: Math.max(details.bestStudyDayStreak, Number((row as Record<string, unknown>).best_streak || 0)),
+          masteredCodes: masteredCount,
+          highScores: highScoresForUser,
+          gamePlays: details.gamePlays,
+          flashcardsReviewed: details.flashcardsReviewed,
+          scenariosReviewed: details.scenariosReviewed,
+          duelWins: duelStats.wins,
+          duelLosses: duelStats.losses,
+          duelCurrentWinStreak: duelStats.currentWinStreak,
+          leaderboardFirstPlaces: allTimeFirstsForLevels[userId] || 0,
+          leaderboardAppearances: allTimeAppearancesForLevels[userId] || 0,
+          weeklyFirstPlaces: weeklyFirstsForLevels[userId] || 0,
+          departmentRank: departmentRankByAgencyKey.get(agencyKey) || null,
+          weeklyDepartmentRank: weeklyDepartmentRankByAgencyKey.get(agencyKey) || null,
+          isTopPerformer: allTimeTopPerformerForLevels?.entry.userId === userId,
+          isWeeklyTopPerformer: weeklyTopPerformerForLevels?.entry.userId === userId,
+        })
         studyRows.push({
           userId,
           playerName: profile.username,
           avatarUrl: profile.avatarUrl,
           supporterTier: profile.supporterTier,
+          profileDecorationKey: details.profileDecorationKey,
           themeId: details.themeId || appThemePresets[0].id,
           nameStyle: details.nameStyle,
           bio: details.bio,
@@ -5269,6 +5594,7 @@ function App() {
           playerName: profile.username,
           avatarUrl: profile.avatarUrl,
           supporterTier: profile.supporterTier,
+          profileDecorationKey: details.profileDecorationKey,
           themeId: details.themeId || appThemePresets[0].id,
           nameStyle: details.nameStyle,
           bio: details.bio,
@@ -5289,6 +5615,7 @@ function App() {
           playerName: profile.username,
           avatarUrl: profile.avatarUrl,
           supporterTier: profile.supporterTier,
+          profileDecorationKey: details.profileDecorationKey,
           themeId: details.themeId || appThemePresets[0].id,
           nameStyle: details.nameStyle,
           bio: details.bio,
@@ -5313,6 +5640,7 @@ function App() {
               playerName: profile.username,
               avatarUrl: profile.avatarUrl,
               supporterTier: profile.supporterTier,
+              profileDecorationKey: details.profileDecorationKey,
               themeId: details.themeId || appThemePresets[0].id,
               nameStyle: details.nameStyle,
               bio: details.bio,
@@ -5335,6 +5663,7 @@ function App() {
               playerName: profile.username,
               avatarUrl: profile.avatarUrl,
               supporterTier: profile.supporterTier,
+              profileDecorationKey: details.profileDecorationKey,
               themeId: details.themeId || appThemePresets[0].id,
               nameStyle: details.nameStyle,
               bio: details.bio,
@@ -5357,6 +5686,7 @@ function App() {
       setHomeStudyTimeLeaders(studyRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
       setHomeStudyStreakLeaders(studyStreakRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
       setHomeMostMasteredLeaders(masteredRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
+      setLevelProfilesByUserId(nextLevelProfilesByUserId)
       setHomeDuelWinsLeadersByMode({
         all: duelWinsRowsByMode.all
           .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
@@ -5519,6 +5849,7 @@ function App() {
         homeLeaderboardRotationMs: nextState.profileDetails.homeLeaderboardRotationMs,
         homeLeaderboardPreferences: nextState.profileDetails.homeLeaderboardPreferences,
         themeId: nextState.profileDetails.themeId,
+        profileDecorationKey: nextState.profileDetails.profileDecorationKey,
         nameStyle: nextState.profileDetails.nameStyle,
         namePresets: nextState.profileDetails.namePresets,
         systemNoticesSeen: nextState.profileDetails.systemNoticesSeen,
@@ -5642,6 +5973,7 @@ function App() {
             homeLeaderboardRotationMs: previous.homeLeaderboardRotationMs,
             homeLeaderboardPreferences: previous.homeLeaderboardPreferences,
             themeId: previous.themeId,
+            profileDecorationKey: previous.profileDecorationKey,
             nameStyle: previous.nameStyle,
             namePresets: previous.namePresets,
             systemNoticesSeen: previous.systemNoticesSeen,
@@ -5954,8 +6286,85 @@ function App() {
   const weeklyTopPerformer = useMemo<WeeklyPerformanceLeader | null>(() => {
     return buildWeeklyTopPerformer(weeklyLeaderboardEntries)
   }, [weeklyLeaderboardEntries])
+  const allTimeTopPerformer = useMemo<WeeklyPerformanceLeader | null>(() => {
+    return buildWeeklyTopPerformer(leaderboard)
+  }, [leaderboard])
+  const allTimeDepartmentLeaders = useMemo(() => buildDepartmentLeaders(leaderboard), [leaderboard])
   const weeklyDepartmentLeaders = useMemo(() => buildDepartmentLeaders(weeklyLeaderboardEntries), [weeklyLeaderboardEntries])
   const bestWeeklyDepartment = weeklyDepartmentLeaders[0] || null
+  const allTimeLeaderboardAppearanceCountsByUser = useMemo(
+    () => buildLeaderboardAppearanceCountMap(allTimeLeaderboardBoards),
+    [allTimeLeaderboardBoards],
+  )
+  const currentUserLevelProfile = useMemo(() => {
+    if (!currentUserId) {
+      return buildUserLevelProfile({
+        studySeconds: 0,
+        studyDayStreak: 0,
+        bestStudyDayStreak: 0,
+        masteredCodes: 0,
+        highScores: gameHighScoreSeed,
+        gamePlays: defaultUserStats.gamePlays,
+        flashcardsReviewed: 0,
+        scenariosReviewed: 0,
+        duelWins: 0,
+        duelLosses: 0,
+        duelCurrentWinStreak: 0,
+        leaderboardFirstPlaces: 0,
+        leaderboardAppearances: 0,
+        weeklyFirstPlaces: 0,
+        departmentRank: null,
+        weeklyDepartmentRank: null,
+        isTopPerformer: false,
+        isWeeklyTopPerformer: false,
+      })
+    }
+    const existing = levelProfilesByUserId[currentUserId]
+    if (existing) return existing
+    const agencyKey = normalizeAgencyKey(canonicalAgencyName(profileDetails.agency || ''))
+    const departmentRank = allTimeDepartmentLeaders.findIndex((entry) => entry.key === agencyKey)
+    const weeklyDepartmentRank = weeklyDepartmentLeaders.findIndex((entry) => entry.key === agencyKey)
+    return buildUserLevelProfile({
+      studySeconds: profileDetails.stats.studySeconds,
+      studyDayStreak: profileDetails.stats.studyDayStreak,
+      bestStudyDayStreak: Math.max(profileDetails.stats.bestStudyDayStreak, bestStreak),
+      masteredCodes: countMasteredCodesFromPerformanceMap(performance),
+      highScores,
+      gamePlays: profileDetails.stats.gamePlays,
+      flashcardsReviewed: profileDetails.stats.flashcardsReviewed,
+      scenariosReviewed: profileDetails.stats.scenariosReviewed,
+      duelWins: 0,
+      duelLosses: 0,
+      duelCurrentWinStreak: 0,
+      leaderboardFirstPlaces: allTimeFirstSpotCountsByUser[currentUserId] || 0,
+      leaderboardAppearances: allTimeLeaderboardAppearanceCountsByUser[currentUserId] || 0,
+      weeklyFirstPlaces: weeklyFirstSpotCountsByUser[currentUserId] || 0,
+      departmentRank: departmentRank >= 0 ? departmentRank + 1 : null,
+      weeklyDepartmentRank: weeklyDepartmentRank >= 0 ? weeklyDepartmentRank + 1 : null,
+      isTopPerformer: allTimeTopPerformer?.entry.userId === currentUserId,
+      isWeeklyTopPerformer: weeklyTopPerformer?.entry.userId === currentUserId,
+    })
+  }, [
+    allTimeDepartmentLeaders,
+    allTimeFirstSpotCountsByUser,
+    allTimeLeaderboardAppearanceCountsByUser,
+    allTimeTopPerformer,
+    bestStreak,
+    currentUserId,
+    highScores,
+    levelProfilesByUserId,
+    performance,
+    profileDetails.agency,
+    profileDetails.stats,
+    weeklyDepartmentLeaders,
+    weeklyFirstSpotCountsByUser,
+    weeklyTopPerformer,
+  ])
+  const unlockedDecorationsForCurrentUser = useMemo(
+    () => unlockedProfileDecorations(currentUserLevelProfile.level),
+    [currentUserLevelProfile.level],
+  )
+  const selectedProfileDecoration = getProfileDecoration(profileDetails.profileDecorationKey)
   const visibleLeaderboardBoards = leaderboardsScope === 'weekly' ? weeklyLeaderboardBoards : allTimeLeaderboardBoards
   const visibleMatchingBoards = useMemo(
     () => visibleLeaderboardBoards.filter((board) => board.game === 'Matching'),
@@ -8264,6 +8673,7 @@ function App() {
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
       themeId: appThemePresets[0].id,
+      profileDecorationKey: 'auto',
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
       systemNoticesSeen: [],
@@ -9465,9 +9875,30 @@ function App() {
       mainLabel: 'Offline',
       subLabel: 'No recent activity',
     }
+  const selectedLeaderboardLevelProfile = selectedLeaderboardEntry
+    ? levelProfilesByUserId[selectedLeaderboardEntry.userId]
+    : null
+  const renderLevelBadge = (levelProfile: UserLevelProfile, compact = false) => (
+    <span className={compact ? 'level-badge level-badge-compact' : 'level-badge'}>
+      <span className="level-badge-level">Lv {levelProfile.level}</span>
+      <span className="level-badge-tier">{levelProfile.tierName}</span>
+    </span>
+  )
+  const renderLevelDecoration = (levelProfile?: UserLevelProfile | null, selectedKey?: string) => {
+    if (!levelProfile) return null
+    const decorationIcon = decorationIconForLevelProfile(levelProfile, selectedKey)
+    return decorationIcon ? (
+      <span className="level-avatar-decoration" aria-label={`${levelProfile.tierName} decoration`}>
+        {decorationIcon}
+      </span>
+    ) : null
+  }
   const leaderAvatarFrameClass = (userId?: string, extraClassName?: string) => {
     const classes = ['leader-avatar-frame']
     if (extraClassName) classes.push(extraClassName)
+    if (userId && levelProfilesByUserId[userId]) {
+      classes.push('level-halo-frame', levelProfilesByUserId[userId].haloClass)
+    }
     if (userId) {
       const presence = onlinePresenceByUserId[userId]
       if (presence === 'active') classes.push('leader-avatar-frame-online')
@@ -9979,6 +10410,7 @@ function App() {
       playerName: entry.playerName,
       avatarUrl: entry.avatarUrl,
       supporterTier: entry.supporterTier,
+      profileDecorationKey: entry.profileDecorationKey,
       themeId: entry.themeId,
       bio: entry.bio,
       agency: entry.agency,
@@ -11094,12 +11526,15 @@ function App() {
             {profile ? (
               <div className="taskbar-profile-wrap" ref={profileMenuRef}>
                 <button className="taskbar-profile" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="Open profile menu">
-                  <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="taskbar-profile-image" onError={handleAvatarImageError} />
+                  <span className={`taskbar-profile-avatar-ring level-halo-frame ${currentUserLevelProfile.haloClass}`}>
+                    <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="taskbar-profile-image" onError={handleAvatarImageError} />
+                    {renderLevelDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
+                  </span>
                   <span className="taskbar-profile-info">
                     <span className={`taskbar-profile-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
                       {profile.username || 'Profile'}
                     </span>
-                    <span className="taskbar-profile-tier">{tierLabel[activeProfileTier]}</span>
+                    <span className="taskbar-profile-tier">{tierLabel[activeProfileTier]} • Lv {currentUserLevelProfile.level}</span>
                   </span>
                 </button>
                 {profileMenuOpen ? (
@@ -13957,6 +14392,9 @@ function App() {
                 <button className={settingsTab === 'profile' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('profile')}>
                   Profile
                 </button>
+                <button className={settingsTab === 'progression' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('progression')}>
+                  Level & Rewards
+                </button>
                 <button className={settingsTab === 'customization' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('customization')}>
                   Customization
                 </button>
@@ -13994,8 +14432,13 @@ function App() {
               <div className="settings-panel">
               {settingsTab === 'profile' ? (
                 <div className="settings-section-card">
-                  <div className="avatar-frame">
+                  <div className={`avatar-frame level-halo-frame ${currentUserLevelProfile.haloClass}`}>
                     <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
+                    {renderLevelDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
+                  </div>
+                  <div className="profile-level-preview">
+                    {renderLevelBadge(currentUserLevelProfile)}
+                    <span>{currentUserLevelProfile.totalXp.toLocaleString()} XP</span>
                   </div>
                   {isOwner ? <p className="owner-pill">Owner</p> : null}
                   <label>
@@ -14081,6 +14524,95 @@ function App() {
                   </button>
                   {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
                   {authError ? <p className="bad">{authError}</p> : null}
+                </div>
+              ) : null}
+
+              {settingsTab === 'progression' ? (
+                <div className="settings-section-card progression-card">
+                  <div className="progression-hero">
+                    <div className={`avatar-frame progression-avatar level-halo-frame ${currentUserLevelProfile.haloClass}`}>
+                      <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
+                      {renderLevelDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
+                    </div>
+                    <div>
+                      <p className="eyebrow">Progression</p>
+                      <h3>Level {currentUserLevelProfile.level} • {currentUserLevelProfile.tierName}</h3>
+                      <p className="muted">{currentUserLevelProfile.totalXp.toLocaleString()} total XP earned from studying, games, leaderboards, 1v1s, and department performance.</p>
+                    </div>
+                  </div>
+                  <div className="level-progress-bar" aria-label={`Level progress ${currentUserLevelProfile.progressPercent}%`}>
+                    <span style={{ width: `${currentUserLevelProfile.progressPercent}%` }} />
+                  </div>
+                  <div className="level-progress-copy">
+                    <span>{currentUserLevelProfile.currentLevelXp.toLocaleString()} / {currentUserLevelProfile.nextLevelXp.toLocaleString()} XP to Level {currentUserLevelProfile.level + 1}</span>
+                    {currentUserLevelProfile.nextReward ? <span>Next reward: {currentUserLevelProfile.nextReward.icon} {currentUserLevelProfile.nextReward.title} at Lv {currentUserLevelProfile.nextReward.level}</span> : <span>All planned rewards unlocked.</span>}
+                  </div>
+                  <div className="profile-decoration-picker">
+                    <div className="profile-decoration-heading">
+                      <div>
+                        <h3>Profile Overlay</h3>
+                        <p className="muted">
+                          Pick a cute, funny, or elite decoration for your profile picture. Current: {selectedProfileDecoration.icon} {selectedProfileDecoration.title}
+                        </p>
+                      </div>
+                      <span className="level-badge level-badge-compact">{unlockedDecorationsForCurrentUser.length}/{profileDecorationCatalog.length} unlocked</span>
+                    </div>
+                    <div className="profile-decoration-grid">
+                      {profileDecorationCatalog.map((decoration) => {
+                        const unlocked = decoration.unlockLevel <= currentUserLevelProfile.level
+                        const active = profileDetails.profileDecorationKey === decoration.key
+                        return (
+                          <button
+                            key={decoration.key}
+                            type="button"
+                            className={`profile-decoration-card ${active ? 'active' : ''} ${unlocked ? 'unlocked' : 'locked'}`}
+                            onClick={() => {
+                              if (!unlocked) return
+                              setProfileDetails((previous) => ({ ...previous, profileDecorationKey: decoration.key }))
+                            }}
+                            disabled={!unlocked}
+                            aria-label={`${decoration.title}${unlocked ? '' : ` locked until level ${decoration.unlockLevel}`}`}
+                          >
+                            <span className="profile-decoration-icon">{decoration.icon}</span>
+                            <span className="profile-decoration-copy">
+                              <strong>{decoration.title}</strong>
+                              <small>{decoration.tone} • Lv {decoration.unlockLevel}</small>
+                              <span>{unlocked ? decoration.description : `Unlocks at Level ${decoration.unlockLevel}`}</span>
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
+                      Save Overlay
+                    </button>
+                  </div>
+                  <div className="level-reward-grid">
+                    {levelRewards.map((reward) => {
+                      const unlocked = reward.level <= currentUserLevelProfile.level
+                      return (
+                        <div key={reward.key} className={unlocked ? 'level-reward-card unlocked' : 'level-reward-card locked'}>
+                          <span className="level-reward-icon">{reward.icon}</span>
+                          <div>
+                            <strong>{reward.title}</strong>
+                            <p>Lv {reward.level} • {reward.description}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="level-xp-breakdown">
+                    <h3>What counts the most</h3>
+                    {currentUserLevelProfile.breakdown.slice(0, 8).map((item) => (
+                      <div key={item.label} className="level-xp-row">
+                        <div>
+                          <strong>{item.label}</strong>
+                          <p>{item.description}</p>
+                        </div>
+                        <span>{item.xp.toLocaleString()} XP</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
 
@@ -15228,6 +15760,7 @@ function App() {
                 {selectedLeaderboardIsTop ? <span className="leader-crown leader-crown-modal" aria-label="Top Player">👑</span> : null}
                 <span className={leaderAvatarFrameClass(selectedLeaderboardEntry.userId, 'modal-avatar')}>
                   <img src={avatarFor(selectedLeaderboardEntry.avatarUrl)} alt={selectedLeaderboardEntry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
+                  {renderLevelDecoration(selectedLeaderboardLevelProfile, selectedLeaderboardEntry.profileDecorationKey)}
                 </span>
               </span>
               <div className="leader-profile-head">
@@ -15241,6 +15774,7 @@ function App() {
                 </div>
                 <div className="leader-profile-pills">
                   <p className="leader-theme-pill">Tier: {tierLabel[selectedLeaderboardEntry.supporterTier]}</p>
+                  {selectedLeaderboardLevelProfile ? renderLevelBadge(selectedLeaderboardLevelProfile, true) : null}
                   {selectedLeaderboardEntry.isOwner ? <p className="owner-pill owner-pill-inline">Owner</p> : null}
                 </div>
               </div>
@@ -15304,7 +15838,26 @@ function App() {
                 <strong>{selectedLeaderboardAllTimeFirstSpots}</strong>
                 <span className="leader-profile-substat">Weekly: {selectedLeaderboardWeeklyFirstSpots}</span>
               </div>
+              {selectedLeaderboardLevelProfile ? (
+                <div className="leader-profile-stat">
+                  <p className="leader-profile-label">Level</p>
+                  <strong>Lv {selectedLeaderboardLevelProfile.level}</strong>
+                  <span className="leader-profile-substat">{selectedLeaderboardLevelProfile.totalXp.toLocaleString()} XP</span>
+                </div>
+              ) : null}
             </div>
+            {selectedLeaderboardLevelProfile ? (
+              <div className="leader-level-card">
+                <div className="level-progress-bar">
+                  <span style={{ width: `${selectedLeaderboardLevelProfile.progressPercent}%` }} />
+                </div>
+                <p className="muted">
+                  {selectedLeaderboardLevelProfile.nextReward
+                    ? `Next reward: ${selectedLeaderboardLevelProfile.nextReward.icon} ${selectedLeaderboardLevelProfile.nextReward.title} at Level ${selectedLeaderboardLevelProfile.nextReward.level}`
+                    : 'All planned level rewards unlocked.'}
+                </p>
+              </div>
+            ) : null}
             <div className="leader-profile-footer">
               <p className="muted">
                 {selectedLeaderboardEntry.round > 0

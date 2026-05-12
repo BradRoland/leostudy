@@ -102,6 +102,8 @@ type ReadyRpcState = {
   ready_count?: number
   player_count?: number
   rematch_started?: boolean
+  rematch_cancelled?: boolean
+  message?: string
   started_at?: string | null
   room_id?: string
 }
@@ -560,6 +562,8 @@ function parseReadyRpcState(value: unknown): ReadyRpcState {
     ready_count: typeof row.ready_count === 'number' ? Number(row.ready_count) : undefined,
     player_count: typeof row.player_count === 'number' ? Number(row.player_count) : undefined,
     rematch_started: Boolean(row.rematch_started),
+    rematch_cancelled: Boolean(row.rematch_cancelled),
+    message: typeof row.message === 'string' ? row.message : undefined,
     started_at: typeof row.started_at === 'string' ? row.started_at : null,
     room_id: typeof row.room_id === 'string' ? row.room_id : undefined,
   }
@@ -665,6 +669,7 @@ export function OneVsOnePanel(props: {
   const refreshQueuedRef = useRef(false)
   const roundSubmitQueueRef = useRef<Promise<void>>(Promise.resolve())
   const waitingChatEndRef = useRef<HTMLDivElement | null>(null)
+  const rematchHandoffRoomIdRef = useRef('')
   const duelProfileCacheRef = useRef<Record<string, DuelProfileSnapshot>>({})
   const duelLeaderboardRequestRef = useRef(0)
   const winsLeaderboardRef = useRef<DuelStatsLeaderboardEntry[]>(winsLeaderboard)
@@ -1508,12 +1513,56 @@ export function OneVsOnePanel(props: {
     initializedRoundKeyRef.current = ''
     roundStartedAtRef.current = 0
     autoForfeitRoundKeyRef.current = ''
+    rematchHandoffRoomIdRef.current = room.rematch_room_id
     setNotice('Rematch accepted. Moving into the new room…')
     setRoomId(room.rematch_room_id)
     setRoom(null)
     setPlayers([])
     setResults([])
   }, [room, roomId])
+
+  useEffect(() => {
+    if (!room || !rematchHandoffRoomIdRef.current || room.id !== rematchHandoffRoomIdRef.current) return
+    if (room.status === 'completed' || room.status === 'cancelled' || players.length >= 2) return
+
+    const abandonedRoomId = room.id
+    rematchHandoffRoomIdRef.current = ''
+    initializedRoundKeyRef.current = ''
+    autoForfeitRoundKeyRef.current = ''
+    roundStartedAtRef.current = 0
+    quizSpamHistoryRef.current = []
+    quizSpamStrikeRef.current = 0
+    previousPlayersRef.current = []
+    previousRoomStatusRef.current = null
+    activityBootstrappedRef.current = false
+
+    setRoomId(null)
+    setRoom(null)
+    setPlayers([])
+    setResults([])
+    setRoundStartedAt(0)
+    setQuizChoice(null)
+    setQuizLocked(false)
+    setMatchingCards([])
+    setSelectedMatchingCards([])
+    setWrongMatchingCardIds([])
+    setMatchedPairIds([])
+    setMatchingMistakes(0)
+    setMatchingRoundPoints(0)
+    setMatchingSubmitted(false)
+    setRematchLoading(false)
+    setError('')
+    setNotice('Opponent left the rematch. Rematch cancelled.')
+
+    if (supabase) {
+      void supabase.rpc('leave_1v1_room', { p_room_id: abandonedRoomId })
+        .then(({ error: rpcError }) => {
+          if (!rpcError) return
+          console.warn('[1v1] Could not leave abandoned rematch room:', rpcError.message)
+        })
+    }
+    void loadPublicRooms()
+  }, [loadPublicRooms, players.length, room])
 
   const canStartRound = Boolean(
     room
@@ -2009,6 +2058,13 @@ export function OneVsOnePanel(props: {
     }
 
     const state = parseReadyRpcState(data)
+    if (state.rematch_cancelled) {
+      rematchHandoffRoomIdRef.current = ''
+      setRematchLoading(false)
+      setNotice(state.message || 'Opponent left the rematch. Rematch cancelled.')
+      void refreshRoomSnapshot()
+      return
+    }
     const nextRoomId = state.room_id || roomId
     const switchingRooms = Boolean(nextRoomId && nextRoomId !== roomId)
     if ((state.status === 'in_progress' || state.rematch_started) && roomId) {
@@ -2031,6 +2087,7 @@ export function OneVsOnePanel(props: {
       initializedRoundKeyRef.current = ''
       roundStartedAtRef.current = 0
       autoForfeitRoundKeyRef.current = ''
+      rematchHandoffRoomIdRef.current = nextRoomId
       setRoomId(nextRoomId)
       setRoom(null)
       setPlayers([])
@@ -2255,6 +2312,7 @@ export function OneVsOnePanel(props: {
     setMatchingRoundPoints(0)
     setMatchingSubmitted(false)
     setRematchLoading(false)
+    rematchHandoffRoomIdRef.current = ''
     setWaitingChatMessages([])
     setWaitingChatInput('')
     setWaitingChatSending(false)
