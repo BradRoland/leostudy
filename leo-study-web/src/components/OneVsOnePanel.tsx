@@ -102,6 +102,8 @@ type ReadyRpcState = {
   ready_count?: number
   player_count?: number
   rematch_started?: boolean
+  started_at?: string | null
+  room_id?: string
 }
 
 type DuelStatsMode = 'all' | DuelGameType
@@ -558,6 +560,8 @@ function parseReadyRpcState(value: unknown): ReadyRpcState {
     ready_count: typeof row.ready_count === 'number' ? Number(row.ready_count) : undefined,
     player_count: typeof row.player_count === 'number' ? Number(row.player_count) : undefined,
     rematch_started: Boolean(row.rematch_started),
+    started_at: typeof row.started_at === 'string' ? row.started_at : null,
+    room_id: typeof row.room_id === 'string' ? row.room_id : undefined,
   }
 }
 
@@ -641,7 +645,7 @@ export function OneVsOnePanel(props: {
 
   const [roundStartedAt, setRoundStartedAt] = useState<number>(0)
   const [hudNow, setHudNow] = useState<number>(() => Date.now())
-  const [submittingRound, setSubmittingRound] = useState(false)
+  const [, setSubmittingRound] = useState(false)
   const [quizChoice, setQuizChoice] = useState<number | null>(null)
   const [quizLocked, setQuizLocked] = useState(false)
 
@@ -1325,6 +1329,11 @@ export function OneVsOnePanel(props: {
   }, [externalJoinRoomId, onExternalJoinHandled, roomId])
 
   useEffect(() => {
+    if (!roomId || !isSignedIn) return
+    void refreshRoomSnapshot()
+  }, [isSignedIn, refreshRoomSnapshot, roomId])
+
+  useEffect(() => {
     if (!isSignedIn) return
     void loadDuelLeaderboards()
     const timer = window.setInterval(() => {
@@ -1468,30 +1477,43 @@ export function OneVsOnePanel(props: {
     ? `${room.id}:${room.game_type}:${room.status}:${room.started_at || ''}:${myPlayer.current_round}:${currentRoundPayloadNumber}`
     : ''
   const countdownSeconds = 3
-  const countdownRemaining = useMemo(() => {
+  const serverStartRemainingMs = useMemo(() => {
     if (!room || room.status !== 'in_progress') return 0
     const startedAtMs = room.started_at ? Date.parse(room.started_at) : NaN
     if (!Number.isFinite(startedAtMs)) return 0
-    const timeUntilServerStartMs = startedAtMs - hudNow
-    const remainingMs = timeUntilServerStartMs > 0
-      ? timeUntilServerStartMs
-      : countdownSeconds * 1000 - Math.max(0, hudNow - startedAtMs)
-    if (remainingMs <= 0) return 0
-    return Math.ceil(remainingMs / 1000)
+    return Math.max(0, startedAtMs - hudNow)
   }, [hudNow, room])
-  const countdownActive = countdownRemaining > 0
+  const countdownRemaining = useMemo(() => {
+    if (serverStartRemainingMs <= 0) return 0
+    return Math.ceil(Math.min(serverStartRemainingMs, countdownSeconds * 1000) / 1000)
+  }, [serverStartRemainingMs])
+  const countdownActive = serverStartRemainingMs > 0
+  const syncingBeforeCountdown = serverStartRemainingMs > countdownSeconds * 1000
+  const currentRoomStatus = room?.status
 
   useEffect(() => {
     if (!roomId || !isSignedIn) return
-    const shouldPollLobby = !room || room.status === 'waiting' || (room.status === 'in_progress' && countdownActive)
+    const shouldPollLobby = !currentRoomStatus || currentRoomStatus === 'waiting' || (currentRoomStatus === 'in_progress' && countdownActive)
     if (!shouldPollLobby) return
 
     const timer = window.setInterval(() => {
       void refreshRoomSnapshot()
-    }, 1200)
+    }, countdownActive ? 650 : 1000)
 
     return () => window.clearInterval(timer)
-  }, [countdownActive, isSignedIn, refreshRoomSnapshot, room?.status, roomId])
+  }, [countdownActive, currentRoomStatus, isSignedIn, refreshRoomSnapshot, roomId])
+
+  useEffect(() => {
+    if (!room || room.status !== 'completed' || !room.rematch_room_id || room.rematch_room_id === roomId) return
+    initializedRoundKeyRef.current = ''
+    roundStartedAtRef.current = 0
+    autoForfeitRoundKeyRef.current = ''
+    setNotice('Rematch accepted. Moving into the new room…')
+    setRoomId(room.rematch_room_id)
+    setRoom(null)
+    setPlayers([])
+    setResults([])
+  }, [room, roomId])
 
   const canStartRound = Boolean(
     room
@@ -1795,7 +1817,7 @@ export function OneVsOnePanel(props: {
   }, [canStartRound, currentRound, initializedRoundKey, myPlayer, room])
 
   useEffect(() => {
-    if (!room || room.status === 'in_progress') return
+    if (!currentRoomStatus || currentRoomStatus === 'in_progress') return
     initializedRoundKeyRef.current = ''
     roundStartedAtRef.current = 0
     autoForfeitRoundKeyRef.current = ''
@@ -1809,7 +1831,7 @@ export function OneVsOnePanel(props: {
     setMatchingRoundPoints(0)
     setMatchingSubmitted(false)
     setMatchingCards([])
-  }, [room?.id, room?.status])
+  }, [currentRoomStatus, room?.id])
 
   const createRoom = async () => {
     if (!supabase || !isSignedIn) return
@@ -1987,9 +2009,38 @@ export function OneVsOnePanel(props: {
     }
 
     const state = parseReadyRpcState(data)
-    void refreshRoomSnapshot()
-    window.setTimeout(() => void refreshRoomSnapshot(), 250)
-    window.setTimeout(() => void refreshRoomSnapshot(), 900)
+    const nextRoomId = state.room_id || roomId
+    const switchingRooms = Boolean(nextRoomId && nextRoomId !== roomId)
+    if ((state.status === 'in_progress' || state.rematch_started) && roomId) {
+      const nextStartedAt = state.started_at || new Date(Date.now() + 4000).toISOString()
+      setRoom((previous) => previous && previous.id === roomId
+        ? {
+          ...previous,
+          status: 'in_progress',
+          current_round: 1,
+          started_at: nextStartedAt,
+        }
+        : previous)
+      setPlayers((previous) => previous.map((player) => ({
+        ...player,
+        is_ready: false,
+        current_round: state.rematch_started ? 1 : player.current_round,
+      })))
+    }
+    if (switchingRooms && nextRoomId) {
+      initializedRoundKeyRef.current = ''
+      roundStartedAtRef.current = 0
+      autoForfeitRoundKeyRef.current = ''
+      setRoomId(nextRoomId)
+      setRoom(null)
+      setPlayers([])
+      setResults([])
+    }
+    if (!switchingRooms) {
+      void refreshRoomSnapshot()
+      window.setTimeout(() => void refreshRoomSnapshot(), 250)
+      window.setTimeout(() => void refreshRoomSnapshot(), 900)
+    }
 
     if (state.rematch_started) {
       initializedRoundKeyRef.current = ''
@@ -2007,7 +2058,9 @@ export function OneVsOnePanel(props: {
       setMatchingRoundPoints(0)
       setMatchingSubmitted(false)
       setMatchingCards([])
-      setNotice('2/2 agreed. Starting rematch in 3…')
+      setNotice(nextRoomId && nextRoomId !== roomId
+        ? 'Rematch accepted. Moving both players into a fresh room…'
+        : 'Syncing rematch with your opponent…')
       return
     }
 
@@ -2022,7 +2075,7 @@ export function OneVsOnePanel(props: {
     }
 
     if ((previousRoomStatus === 'waiting' || state.status === 'waiting') && ready && state.player_count === 2 && state.ready_count === 2) {
-      setNotice('2/2 ready. Match starts in 3…')
+      setNotice('Syncing with your opponent…')
     }
   }
 
@@ -2332,7 +2385,9 @@ export function OneVsOnePanel(props: {
   const rematchReadyCount = room?.status === 'completed' ? players.filter((player) => player.is_ready).length : 0
   const myRematchRequested = room?.status === 'completed' ? Boolean(myPlayer?.is_ready) : false
   const rematchStatusText = room?.status === 'completed'
-    ? rematchReadyCount >= 2
+    ? players.length < 2
+      ? 'Opponent exited this match. Start a new 1v1 when they are back.'
+      : rematchReadyCount >= 2
       ? '2/2 agreed. Starting rematch…'
       : rematchReadyCount === 1
         ? '1/2 agreed. Waiting for opponent…'
@@ -2560,7 +2615,7 @@ export function OneVsOnePanel(props: {
     })
 
     if (previousRoomStatusRef.current === 'waiting' && room.status === 'in_progress') {
-      updates.push('Both players ready. Match started.')
+      updates.push('Both players ready. Syncing match start.')
     }
 
     if (updates.length > 0) {
@@ -3279,9 +3334,17 @@ export function OneVsOnePanel(props: {
 
                 {countdownActive ? (
                   <div className="onevone-countdown">
-                    <small className="muted">Both players ready</small>
-                    <strong>{countdownRemaining}</strong>
-                    <p className="muted tiny">Match starts in…</p>
+                    <small className="muted">
+                      {syncingBeforeCountdown ? 'Syncing with opponent' : 'Starting together'}
+                    </small>
+                    {syncingBeforeCountdown ? (
+                      <strong className="onevone-syncing-dots">•••</strong>
+                    ) : (
+                      <strong>{countdownRemaining}</strong>
+                    )}
+                    <p className="muted tiny">
+                      {syncingBeforeCountdown ? 'Locking the shared start time…' : 'Match starts in…'}
+                    </p>
                   </div>
                 ) : null}
 
@@ -3414,9 +3477,17 @@ export function OneVsOnePanel(props: {
                 </div>
                 {countdownActive ? (
                   <div className="onevone-countdown">
-                    <small className="muted">Both players ready</small>
-                    <strong>{countdownRemaining}</strong>
-                    <p className="muted tiny">Match starts in…</p>
+                    <small className="muted">
+                      {syncingBeforeCountdown ? 'Syncing with opponent' : 'Starting together'}
+                    </small>
+                    {syncingBeforeCountdown ? (
+                      <strong className="onevone-syncing-dots">•••</strong>
+                    ) : (
+                      <strong>{countdownRemaining}</strong>
+                    )}
+                    <p className="muted tiny">
+                      {syncingBeforeCountdown ? 'Locking the shared start time…' : 'Match starts in…'}
+                    </p>
                   </div>
                 ) : null}
                 {canStartRound && isMatchingRound(currentRound) ? (

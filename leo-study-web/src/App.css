@@ -9031,6 +9031,23 @@ button.study-session-top-action-start:active:not(:disabled) {
   line-height: 1;
 }
 
+.onevone-syncing-dots {
+  letter-spacing: 0.16em;
+  animation: onevone-sync-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes onevone-sync-pulse {
+  from {
+    opacity: 0.45;
+    transform: translateY(1px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
+
 .onevone-spectator-banner {
   background: linear-gradient(135deg, rgba(75, 164, 255, 0.15), rgba(75, 164, 255, 0.05));
   border: 1px solid rgba(75, 164, 255, 0.3);
