@@ -1,4 +1,6 @@
 import { type CSSProperties, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
+import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
 
 type DuelGameType = 'quiz' | 'matching'
@@ -137,6 +139,9 @@ type DuelStatsLeaderboardEntry = {
   avatarUrl: string
   supporterTier: SupporterTier
   nameStyle: NameStyle
+  level: number
+  haloClass: string
+  profileDecorationKey: string
   wins: number
   losses: number
   matches_played: number
@@ -158,6 +163,9 @@ type DuelProfileSnapshot = {
   avatarUrl: string
   supporterTier: SupporterTier
   nameStyle: NameStyle
+  level: number
+  haloClass: string
+  profileDecorationKey: string
   agency: string
   bio: string
   currentActivity: {
@@ -381,6 +389,29 @@ function isFallbackUsername(username: string, userId: string) {
   return username.trim().toLowerCase() === fallbackUsername(userId).toLowerCase()
 }
 
+function fallbackLevelHaloClass(level: number) {
+  if (level >= 50) return 'level-halo-legend'
+  if (level >= 40) return 'level-halo-inferno'
+  if (level >= 30) return 'level-halo-diamond'
+  if (level >= 20) return 'level-halo-neon'
+  if (level >= 15) return 'level-halo-siren'
+  if (level >= 10) return 'level-halo-gold'
+  if (level >= 5) return 'level-halo-blue'
+  if (level >= 2) return 'level-halo-bronze'
+  return 'level-halo-recruit'
+}
+
+function parseDuelProfileLevelSnapshot(details: Record<string, unknown>) {
+  const snapshot = details.levelSnapshot && typeof details.levelSnapshot === 'object'
+    ? (details.levelSnapshot as Record<string, unknown>)
+    : {}
+  const level = Math.max(1, Math.floor(Number(snapshot.level || 1)))
+  const haloClass = typeof snapshot.haloClass === 'string' && snapshot.haloClass.trim()
+    ? snapshot.haloClass
+    : fallbackLevelHaloClass(level)
+  return { level, haloClass }
+}
+
 function emptyDuelProfileSnapshot(userId: string): DuelProfileSnapshot {
   return {
     user_id: userId,
@@ -388,6 +419,9 @@ function emptyDuelProfileSnapshot(userId: string): DuelProfileSnapshot {
     avatarUrl: defaultAvatarUrl,
     supporterTier: 'free',
     nameStyle: { ...defaultNameStyle },
+    level: 1,
+    haloClass: 'level-halo-recruit',
+    profileDecorationKey: 'auto',
     agency: '',
     bio: '',
     currentActivity: null,
@@ -463,6 +497,11 @@ function parseDuelLeaderboardEntry(value: unknown): DuelStatsLeaderboardEntry | 
     avatarUrl,
     supporterTier: sanitizeSupporterTier(row.supporterTier),
     nameStyle: sanitizeNameStyle(row.nameStyle),
+    level: Math.max(1, Math.floor(Number(row.level || 1))),
+    haloClass: typeof row.haloClass === 'string' && row.haloClass.trim()
+      ? row.haloClass
+      : fallbackLevelHaloClass(Number(row.level || 1)),
+    profileDecorationKey: typeof row.profileDecorationKey === 'string' ? row.profileDecorationKey : 'auto',
     wins: Math.max(0, Number(row.wins || 0)),
     losses: Math.max(0, Number(row.losses || 0)),
     matches_played: Math.max(0, Number(row.matches_played || 0)),
@@ -848,6 +887,9 @@ export function OneVsOnePanel(props: {
         avatarUrl: profile?.avatarUrl || defaultAvatarUrl,
         supporterTier: profile?.supporterTier || 'free',
         nameStyle: profile?.nameStyle || { ...defaultNameStyle },
+        level: profile?.level || 1,
+        haloClass: profile?.haloClass || 'level-halo-recruit',
+        profileDecorationKey: profile?.profileDecorationKey || 'auto',
         wins: row.wins,
         losses: row.losses,
         matches_played: row.matches_played,
@@ -889,6 +931,9 @@ export function OneVsOnePanel(props: {
       }
       next.supporterTier = entry.supporterTier || next.supporterTier
       next.nameStyle = entry.nameStyle || next.nameStyle
+      next.level = entry.level || next.level
+      next.haloClass = entry.haloClass || next.haloClass
+      next.profileDecorationKey = entry.profileDecorationKey || next.profileDecorationKey
       cachedProfiles[entry.user_id] = next
     })
     const quickEntries = mappedStats.map((row) => toLeaderboardEntry(row, cachedProfiles))
@@ -967,6 +1012,9 @@ export function OneVsOnePanel(props: {
       bio: string
       agency: string
       nameStyle: NameStyle
+      level: number
+      haloClass: string
+      profileDecorationKey: string
       currentActivity: DuelProfileSnapshot['currentActivity']
     }>>((accumulator, row) => {
       const value = row as Record<string, unknown>
@@ -978,10 +1026,14 @@ export function OneVsOnePanel(props: {
       const rawCurrentActivity = details.currentActivity && typeof details.currentActivity === 'object'
         ? (details.currentActivity as Record<string, unknown>)
         : null
+      const levelSnapshot = parseDuelProfileLevelSnapshot(details)
       accumulator[userId] = {
         bio: String(details.bio || '').trim(),
         agency: String(details.agency || '').trim(),
         nameStyle: sanitizeNameStyle(details.nameStyle),
+        level: levelSnapshot.level,
+        haloClass: levelSnapshot.haloClass,
+        profileDecorationKey: typeof details.profileDecorationKey === 'string' ? details.profileDecorationKey : 'auto',
         currentActivity:
           rawCurrentActivity && typeof rawCurrentActivity.label === 'string' && rawCurrentActivity.label.trim().length > 0
             ? {
@@ -1007,6 +1059,9 @@ export function OneVsOnePanel(props: {
         avatarUrl: profile?.avatarUrl || fallbackProfile.avatarUrl,
         supporterTier: profile?.supporterTier || fallbackProfile.supporterTier,
         nameStyle: details?.nameStyle || fallbackProfile.nameStyle,
+        level: details?.level || fallbackProfile.level,
+        haloClass: details?.haloClass || fallbackProfile.haloClass,
+        profileDecorationKey: details?.profileDecorationKey || fallbackProfile.profileDecorationKey,
         agency: details?.agency || fallbackProfile.agency,
         bio: details?.bio || fallbackProfile.bio,
         currentActivity: details?.currentActivity || fallbackProfile.currentActivity,
@@ -1096,6 +1151,107 @@ export function OneVsOnePanel(props: {
     })
   }, [room, waitingChatInput, waitingChatSending])
 
+  const loadRoomPlayerProfiles = useCallback(async (userIds: string[]) => {
+    if (!supabase || !isSignedIn) return
+    const uniqueUserIds = [...new Set(userIds.map((userId) => userId.trim()).filter(Boolean))]
+    if (uniqueUserIds.length === 0) return
+
+    const [{ data: profileRows }, { data: appStateRows }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('user_id,username,avatar_path,supporter_tier')
+        .in('user_id', uniqueUserIds),
+      supabase
+        .from('app_state')
+        .select('user_id,profile_details')
+        .in('user_id', uniqueUserIds),
+    ])
+
+    const profileMap = (Array.isArray(profileRows) ? profileRows : []).reduce<Record<string, {
+      username: string
+      avatarUrl: string
+      supporterTier: SupporterTier
+    }>>((accumulator, row) => {
+      const value = row as Record<string, unknown>
+      const userId = String(value.user_id || '')
+      if (!userId) return accumulator
+      accumulator[userId] = {
+        username: String(value.username || '').trim() || fallbackUsername(userId),
+        avatarUrl: toPublicAvatarUrl(String(value.avatar_path || '')),
+        supporterTier: sanitizeSupporterTier(value.supporter_tier),
+      }
+      return accumulator
+    }, {})
+
+    const detailsMap = (Array.isArray(appStateRows) ? appStateRows : []).reduce<Record<string, {
+      bio: string
+      agency: string
+      nameStyle: NameStyle
+      level: number
+      haloClass: string
+      profileDecorationKey: string
+      currentActivity: DuelProfileSnapshot['currentActivity']
+    }>>((accumulator, row) => {
+      const value = row as Record<string, unknown>
+      const userId = String(value.user_id || '')
+      if (!userId) return accumulator
+      const details = value.profile_details && typeof value.profile_details === 'object'
+        ? (value.profile_details as Record<string, unknown>)
+        : {}
+      const rawCurrentActivity = details.currentActivity && typeof details.currentActivity === 'object'
+        ? (details.currentActivity as Record<string, unknown>)
+        : null
+      const levelSnapshot = parseDuelProfileLevelSnapshot(details)
+      accumulator[userId] = {
+        bio: String(details.bio || '').trim(),
+        agency: String(details.agency || '').trim(),
+        nameStyle: sanitizeNameStyle(details.nameStyle),
+        level: levelSnapshot.level,
+        haloClass: levelSnapshot.haloClass,
+        profileDecorationKey: typeof details.profileDecorationKey === 'string' ? details.profileDecorationKey : 'auto',
+        currentActivity:
+          rawCurrentActivity && typeof rawCurrentActivity.label === 'string' && rawCurrentActivity.label.trim().length > 0
+            ? {
+              label: String(rawCurrentActivity.label || '').trim(),
+              updatedAt: String(rawCurrentActivity.updatedAt || ''),
+            }
+            : null,
+      }
+      return accumulator
+    }, {})
+
+    const nameMap = uniqueUserIds.reduce<Record<string, string>>((accumulator, userId) => {
+      accumulator[userId] = profileMap[userId]?.username || fallbackUsername(userId)
+      return accumulator
+    }, {})
+    setUsernameByUserId((previous) => ({ ...previous, ...nameMap }))
+
+    setDuelProfileByUserId((previous) => {
+      const next: Record<string, DuelProfileSnapshot> = { ...duelProfileCacheRef.current, ...previous }
+      uniqueUserIds.forEach((userId) => {
+        const profile = profileMap[userId]
+        const details = detailsMap[userId]
+        const fallbackProfile = next[userId] || emptyDuelProfileSnapshot(userId)
+        next[userId] = {
+          ...fallbackProfile,
+          user_id: userId,
+          username: profile?.username || fallbackProfile.username,
+          avatarUrl: profile?.avatarUrl || fallbackProfile.avatarUrl,
+          supporterTier: profile?.supporterTier || fallbackProfile.supporterTier,
+          nameStyle: details?.nameStyle || fallbackProfile.nameStyle,
+          level: details?.level || fallbackProfile.level,
+          haloClass: details?.haloClass || fallbackProfile.haloClass,
+          profileDecorationKey: details?.profileDecorationKey || fallbackProfile.profileDecorationKey,
+          agency: details?.agency || fallbackProfile.agency,
+          bio: details?.bio || fallbackProfile.bio,
+          currentActivity: details?.currentActivity || fallbackProfile.currentActivity,
+        }
+      })
+      duelProfileCacheRef.current = next
+      return next
+    })
+  }, [isSignedIn])
+
   const refreshRoomSnapshot = useCallback(async () => {
     if (!supabase || !roomId || !isSignedIn) return
     if (refreshInFlightRef.current) {
@@ -1180,15 +1336,7 @@ export function OneVsOnePanel(props: {
         }))
         setResults(mappedResults)
         const userIds = mappedPlayers.map((p) => p.user_id)
-        if (userIds.length > 0) {
-          const { data: profileRows } = await supabase.from('profiles').select('user_id,username').in('user_id', userIds)
-          const nameMap: Record<string, string> = {}
-          ;(profileRows || []).forEach((row) => {
-            const uid = String(row.user_id || '')
-            nameMap[uid] = row.username || `User ${uid.slice(0, 8)}`
-          })
-          setUsernameByUserId(nameMap)
-        }
+        await loadRoomPlayerProfiles(userIds)
         return
       }
 
@@ -1272,21 +1420,7 @@ export function OneVsOnePanel(props: {
       setResults(mappedResults)
 
       const userIds = mappedPlayers.map((player) => player.user_id)
-      if (userIds.length > 0) {
-        const { data: profileRows } = await supabase
-          .from('profiles')
-          .select('user_id,username')
-          .in('user_id', userIds)
-
-        const nameMap: Record<string, string> = {}
-        ;(Array.isArray(profileRows) ? profileRows : []).forEach((row) => {
-          const value = row as Record<string, unknown>
-          const userId = String(value.user_id || '')
-          const username = String(value.username || '').trim()
-          if (userId) nameMap[userId] = username || `User ${userId.slice(0, 8)}`
-        })
-        setUsernameByUserId(nameMap)
-      }
+      await loadRoomPlayerProfiles(userIds)
     } finally {
       refreshInFlightRef.current = false
       if (refreshQueuedRef.current) {
@@ -1296,7 +1430,7 @@ export function OneVsOnePanel(props: {
         }, 60)
       }
     }
-  }, [isSignedIn, roomId])
+  }, [isSignedIn, loadRoomPlayerProfiles, roomId])
 
   useEffect(() => {
     if (!isSignedIn) return
@@ -1391,6 +1525,12 @@ export function OneVsOnePanel(props: {
         void refreshRoomSnapshot()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_results', filter: `room_id=eq.${roomId}` }, () => {
+        void refreshRoomSnapshot()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        void refreshRoomSnapshot()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, () => {
         void refreshRoomSnapshot()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'duel_room_messages', filter: `room_id=eq.${roomId}` }, () => {
@@ -1509,12 +1649,15 @@ export function OneVsOnePanel(props: {
   }, [countdownActive, currentRoomStatus, isSignedIn, refreshRoomSnapshot, roomId])
 
   useEffect(() => {
-    if (!room || room.status !== 'completed' || !room.rematch_room_id || room.rematch_room_id === roomId) return
+    if (!room || !room.rematch_room_id || room.rematch_room_id === roomId) return
+    if (room.status !== 'completed' && room.status !== 'cancelled') return
     initializedRoundKeyRef.current = ''
     roundStartedAtRef.current = 0
     autoForfeitRoundKeyRef.current = ''
     rematchHandoffRoomIdRef.current = room.rematch_room_id
-    setNotice('Rematch accepted. Moving into the new room…')
+    setNotice(room.status === 'completed'
+      ? 'Rematch accepted. Moving into the new room…'
+      : 'Match is starting in a fresh room…')
     setRoomId(room.rematch_room_id)
     setRoom(null)
     setPlayers([])
@@ -2547,6 +2690,22 @@ export function OneVsOnePanel(props: {
       mainLabel: 'Offline',
       subLabel: 'No recent activity',
     }
+  const renderDuelPlayerAvatar = (userId: string, username: string) => {
+    const profile = duelProfileByUserId[userId] || emptyDuelProfileSnapshot(userId)
+    return (
+      <span className={`onevone-player-slot-avatar-frame avatar-decoration-wrap level-halo-frame ${profile.haloClass}`}>
+        <img
+          src={profile.avatarUrl || defaultAvatarUrl}
+          alt={username}
+          className="onevone-player-slot-avatar"
+          onError={handleAvatarImageError}
+        />
+        <ProfileAvatarDecoration
+          decoration={getEffectiveProfileDecorationForLevel(profile.level, profile.profileDecorationKey)}
+        />
+      </span>
+    )
+  }
 
   const myRoundsCompleted = useMemo(() => {
     if (!room) return 0
@@ -3212,6 +3371,7 @@ export function OneVsOnePanel(props: {
                   <span className="onevone-player-slot-label">You</span>
                   {myPlayer ? (
                     <>
+                      {renderDuelPlayerAvatar(myPlayer.user_id, currentUsername)}
                       <span className="onevone-player-slot-name">{currentUsername}</span>
                       <span className={`onevone-player-slot-status ${myPlayer.is_ready ? 'ready' : ''}`}>
                         {myPlayer.is_ready ? 'Ready' : 'Waiting'}
@@ -3228,6 +3388,7 @@ export function OneVsOnePanel(props: {
                   <span className="onevone-player-slot-label">Opponent</span>
                   {opponentPlayer ? (
                     <>
+                      {renderDuelPlayerAvatar(opponentPlayer.user_id, usernameByUserId[opponentPlayer.user_id] || 'Player')}
                       <span className="onevone-player-slot-name">
                         {usernameByUserId[opponentPlayer.user_id] || 'Player'}
                       </span>
@@ -3746,12 +3907,15 @@ export function OneVsOnePanel(props: {
             <div className="onevone-profile-head">
               <div className="onevone-profile-identity">
                 <span className="leader-avatar-wrap">
-                  <span className="leader-avatar-frame">
+                  <span className={`leader-avatar-frame avatar-decoration-wrap level-halo-frame ${selectedDuelProfile.haloClass}`}>
                     <img
                       src={selectedDuelProfile.avatarUrl}
                       alt={selectedDuelProfile.username}
                       className="leader-avatar"
                       onError={handleAvatarImageError}
+                    />
+                    <ProfileAvatarDecoration
+                      decoration={getEffectiveProfileDecorationForLevel(selectedDuelProfile.level, selectedDuelProfile.profileDecorationKey)}
                     />
                   </span>
                 </span>

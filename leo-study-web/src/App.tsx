@@ -152,6 +152,7 @@ type HomeLeaderboardEntry = {
   playerName: string
   avatarUrl: string
   supporterTier: SupporterTier
+  profileDecorationKey: string
   themeId: string
   nameStyle: NameStyle
   bio: string
@@ -255,6 +256,7 @@ type LeaderboardEntry = {
   playerName: string
   avatarUrl: string
   supporterTier: SupporterTier
+  profileDecorationKey: string
   bio: string
   agency: string
   nameStyle: NameStyle
@@ -350,12 +352,26 @@ type ProfileDetails = {
   homeLeaderboardRotationMs: number
   homeLeaderboardPreferences: HomeLeaderboardPreferences
   themeId: string
+  profileDecorationKey: string
   nameStyle: NameStyle
   namePresets: NameStylePreset[]
   systemNoticesSeen: string[]
   stats: UserStats
   algorithmSnapshot?: Record<string, PersistedAlgorithmStat>
+  levelSnapshot?: ProfileLevelSnapshot
   currentActivity: CurrentUserActivity | null
+}
+
+type ProfileLevelSnapshot = {
+  level: number
+  totalXp: number
+  currentLevelXp: number
+  nextLevelXp: number
+  progressPercent: number
+  tierName: string
+  haloClass: string
+  autoDecorationKey: string
+  updatedAt: string
 }
 
 type NameStyle = {
@@ -381,6 +397,7 @@ type UserStats = {
   gamePlays: Record<'matching' | 'speed' | 'blaster', number>
   flashcardsReviewed: number
   scenariosReviewed: number
+  lifetimeMasteredCodes: number
   studyModeCounts: Record<CodeFilter, number>
   sessionTracks: Record<string, SessionTrack>
   sessionTimeline: SessionTimelinePoint[]
@@ -472,6 +489,7 @@ type SessionPerformanceReport = {
 
 type SettingsTab =
   | 'profile'
+  | 'progression'
   | 'customization'
   | 'support'
   | 'security'
@@ -583,6 +601,26 @@ function sanitizeBugStatus(value: unknown): BugStatus {
   return 'open'
 }
 
+function sanitizeProfileLevelSnapshot(input: unknown): ProfileLevelSnapshot | undefined {
+  if (!input || typeof input !== 'object') return undefined
+  const value = input as Partial<ProfileLevelSnapshot>
+  const level = Math.max(1, Math.floor(Number(value.level || 1)))
+  const totalXp = Math.max(0, Math.floor(Number(value.totalXp || 0)))
+  const nextLevelXp = Math.max(1, Math.floor(Number(value.nextLevelXp || 1)))
+  const currentLevelXp = Math.max(0, Math.min(nextLevelXp, Math.floor(Number(value.currentLevelXp || 0))))
+  return {
+    level,
+    totalXp,
+    currentLevelXp,
+    nextLevelXp,
+    progressPercent: Math.max(0, Math.min(100, Math.round(Number(value.progressPercent || 0)))),
+    tierName: typeof value.tierName === 'string' && value.tierName.trim() ? value.tierName : levelTierName(level),
+    haloClass: typeof value.haloClass === 'string' && value.haloClass.trim() ? value.haloClass : levelHaloClass(level),
+    autoDecorationKey: sanitizeProfileDecorationKey(value.autoDecorationKey),
+    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : '',
+  }
+}
+
 function sanitizeAppBannerSettings(input: unknown): AppBannerSettings {
   if (!input || typeof input !== 'object') return { ...defaultAppBannerSettings }
   const value = input as Partial<AppBannerSettings> & {
@@ -646,14 +684,76 @@ type LeaderboardProfileSnapshot = {
   bio: string
   agency: string
   themeId: string
+  profileDecorationKey: string
   nameStyle: NameStyle
   homeLeaderboardRotationMs: number
   studySeconds: number
   studyDayStreak: number
+  bestStudyDayStreak: number
+  gamePlays: UserStats['gamePlays']
+  flashcardsReviewed: number
+  scenariosReviewed: number
   studyModeCounts: Record<CodeFilter, number>
   masteredCodes: number | null
   currentActivity: CurrentUserActivity | null
 }
+
+type ProfileDecoration = {
+  key: string
+  title: string
+  unlockLevel: number
+  description: string
+  cssClass: string
+  tone: 'classic' | 'cute' | 'funny' | 'elite'
+  animated: boolean
+  modalEffect: 'none' | 'sparkle' | 'sirens' | 'cosmic' | 'inferno' | 'legend'
+}
+
+type UserLevelProfile = {
+  level: number
+  totalXp: number
+  currentLevelXp: number
+  nextLevelXp: number
+  progressPercent: number
+  tierName: string
+  haloClass: string
+  autoDecorationKey: string
+  nextReward: ProfileDecoration | null
+}
+
+type UserLevelInput = {
+  studySeconds: number
+  studyDayStreak: number
+  bestStudyDayStreak: number
+  masteredCodes: number
+  highScores: PersistedState['highScores']
+  gamePlays: UserStats['gamePlays']
+  flashcardsReviewed: number
+  scenariosReviewed: number
+  duelWins: number
+  duelLosses: number
+  duelCurrentWinStreak: number
+  allTimeFirstPlaceCount: number
+  weeklyFirstPlaceCount: number
+  allTimeLeaderboardAppearances: number
+  weeklyLeaderboardAppearances: number
+  isAllTimeTopPerformer: boolean
+  isWeeklyTopPerformer: boolean
+  isWeeklyDepartmentLeader: boolean
+}
+
+type XpGainFeedback = {
+  id: number
+  amount: number
+  level: number
+  progressPercent: number
+  currentLevelXp: number
+  nextLevelXp: number
+  leveledUp: boolean
+  mode: 'bar' | 'toast'
+}
+
+type SessionXpReward = Omit<XpGainFeedback, 'mode'>
 
 type AppThemePreset = {
   id: string
@@ -1037,6 +1137,16 @@ function buildLeaderboardFirstPlaceCountMap(boards: LeaderboardBoard[]) {
     const topUserId = board.entries[0]?.userId
     if (!topUserId) continue
     counts[topUserId] = (counts[topUserId] || 0) + 1
+  }
+  return counts
+}
+
+function buildLeaderboardAppearanceCountMap(boards: LeaderboardBoard[]) {
+  const counts: Record<string, number> = {}
+  for (const board of boards) {
+    for (const entry of board.entries) {
+      counts[entry.userId] = (counts[entry.userId] || 0) + 1
+    }
   }
   return counts
 }
@@ -1527,6 +1637,7 @@ const defaultUserStats: UserStats = {
   },
   flashcardsReviewed: 0,
   scenariosReviewed: 0,
+  lifetimeMasteredCodes: 0,
   studyModeCounts: {
     all: 0,
     penal: 0,
@@ -1537,12 +1648,54 @@ const defaultUserStats: UserStats = {
   sessionTimeline: [],
 }
 
+const profileDecorationCatalog: ProfileDecoration[] = [
+  { key: 'auto', title: 'Auto Rank', unlockLevel: 1, description: 'Automatically wears your highest unlocked rank frame.', cssClass: 'avatar-decor-auto', tone: 'classic', animated: false, modalEffect: 'none' },
+  { key: 'none', title: 'Clean Avatar', unlockLevel: 1, description: 'Halo only. No rank frame overlay.', cssClass: 'avatar-decor-none', tone: 'classic', animated: false, modalEffect: 'none' },
+  { key: 'rank_01', title: 'Bronze Recruit', unlockLevel: 1, description: 'Your first academy rank frame.', cssClass: 'avatar-decor-rank-01', tone: 'classic', animated: false, modalEffect: 'none' },
+  { key: 'rank_02', title: 'Bronze Star', unlockLevel: 2, description: 'Adds a first-star badge to your profile ring.', cssClass: 'avatar-decor-rank-02', tone: 'classic', animated: false, modalEffect: 'none' },
+  { key: 'rank_03', title: 'Silver Shield', unlockLevel: 4, description: 'A clean silver shield frame for early momentum.', cssClass: 'avatar-decor-rank-03', tone: 'classic', animated: false, modalEffect: 'none' },
+  { key: 'rank_04', title: 'Silver Laurel', unlockLevel: 6, description: 'Silver laurels for consistent study habits.', cssClass: 'avatar-decor-rank-04', tone: 'classic', animated: false, modalEffect: 'sparkle' },
+  { key: 'rank_05', title: 'Blue Chevron', unlockLevel: 8, description: 'A blue chevron frame for stronger progress.', cssClass: 'avatar-decor-rank-05', tone: 'classic', animated: false, modalEffect: 'sparkle' },
+  { key: 'rank_06', title: 'Study Cadet', unlockLevel: 10, description: 'Notebook-and-book frame for serious study reps.', cssClass: 'avatar-decor-rank-06', tone: 'cute', animated: false, modalEffect: 'sparkle' },
+  { key: 'rank_07', title: 'Gold Sergeant', unlockLevel: 12, description: 'Gold chevrons for players leveling with purpose.', cssClass: 'avatar-decor-rank-07', tone: 'elite', animated: false, modalEffect: 'sparkle' },
+  { key: 'rank_08', title: 'Code 3', unlockLevel: 15, description: 'Animated red-and-blue rank frame.', cssClass: 'avatar-decor-rank-08', tone: 'elite', animated: true, modalEffect: 'sirens' },
+  { key: 'rank_09', title: 'Crystal Vanguard', unlockLevel: 18, description: 'Crystal glow frame for sharp test performance.', cssClass: 'avatar-decor-rank-09', tone: 'elite', animated: true, modalEffect: 'cosmic' },
+  { key: 'rank_10', title: 'Command Elite', unlockLevel: 22, description: 'Gold command frame with ribbon finish.', cssClass: 'avatar-decor-rank-10', tone: 'elite', animated: true, modalEffect: 'sparkle' },
+  { key: 'rank_11', title: 'Winged Silver', unlockLevel: 26, description: 'Silver wing frame for high performers.', cssClass: 'avatar-decor-rank-11', tone: 'elite', animated: true, modalEffect: 'cosmic' },
+  { key: 'rank_12', title: 'Radiant Gold', unlockLevel: 30, description: 'Radiant gold frame with animated glow.', cssClass: 'avatar-decor-rank-12', tone: 'elite', animated: true, modalEffect: 'inferno' },
+  { key: 'rank_13', title: 'Tactical Neon', unlockLevel: 35, description: 'Animated tactical neon frame for elite grinders.', cssClass: 'avatar-decor-rank-13', tone: 'elite', animated: true, modalEffect: 'cosmic' },
+  { key: 'rank_14', title: 'Crown Commander', unlockLevel: 42, description: 'Crowned gold commander frame.', cssClass: 'avatar-decor-rank-14', tone: 'elite', animated: true, modalEffect: 'legend' },
+  { key: 'rank_15', title: 'Legend Ascendant', unlockLevel: 50, description: 'The highest animated legend frame.', cssClass: 'avatar-decor-rank-15', tone: 'elite', animated: true, modalEffect: 'legend' },
+]
+
+const profileDecorationAssetByKey: Record<string, string> = {
+  rank_01: '/avatar-decorations/rank-01.png',
+  rank_02: '/avatar-decorations/rank-02.png',
+  rank_03: '/avatar-decorations/rank-03.png',
+  rank_04: '/avatar-decorations/rank-04.png',
+  rank_05: '/avatar-decorations/rank-05.png',
+  rank_06: '/avatar-decorations/rank-06.png',
+  rank_07: '/avatar-decorations/rank-07.png',
+  rank_08: '/avatar-decorations/rank-08.png',
+  rank_09: '/avatar-decorations/rank-09.png',
+  rank_10: '/avatar-decorations/rank-10.png',
+  rank_11: '/avatar-decorations/rank-11.png',
+  rank_12: '/avatar-decorations/rank-12.png',
+  rank_13: '/avatar-decorations/rank-13.png',
+  rank_14: '/avatar-decorations/rank-14.png',
+  rank_15: '/avatar-decorations/rank-15.png',
+}
+
+function profileDecorationAssetPath(decorationKey: string) {
+  return profileDecorationAssetByKey[decorationKey] || ''
+}
+
 const stripeTierLinks: Partial<Record<Exclude<SupporterTier, 'free'>, string>> = {
   tier2: (import.meta.env.VITE_STRIPE_LINK_TIER2 || '').trim(),
   tier5: (import.meta.env.VITE_STRIPE_LINK_TIER5 || '').trim(),
   tier10: (import.meta.env.VITE_STRIPE_LINK_TIER10 || '').trim(),
 }
-const appContentSource = String(import.meta.env.VITE_CONTENT_SOURCE || 'local')
+const appContentSource = String(import.meta.env.VITE_CONTENT_SOURCE || 'supabase')
   .trim()
   .toLowerCase()
 
@@ -1631,6 +1784,137 @@ function describeProfileCurrentActivity(
     mainLabel: 'Offline',
     subLabel: fallbackLabel,
   }
+}
+
+function getProfileDecoration(key?: string) {
+  return profileDecorationCatalog.find((decoration) => decoration.key === key) || profileDecorationCatalog[0]
+}
+
+function sanitizeProfileDecorationKey(value: unknown) {
+  const key = typeof value === 'string' ? value : 'auto'
+  return getProfileDecoration(key).key
+}
+
+function unlockedProfileDecorations(level: number) {
+  return profileDecorationCatalog.filter((decoration) => decoration.unlockLevel <= level)
+}
+
+function sanitizeHighScores(input: unknown): PersistedState['highScores'] {
+  const value = input && typeof input === 'object' ? input as Partial<PersistedState['highScores']> : {}
+  const sanitizeScore = (rawValue: unknown) =>
+    typeof rawValue === 'number' && Number.isFinite(rawValue) ? Math.max(0, Math.floor(rawValue)) : 0
+  return {
+    matching: sanitizeScore(value.matching),
+    blaster: sanitizeScore(value.blaster),
+    caseFile: sanitizeScore(value.caseFile),
+    rapidFire: sanitizeScore(value.rapidFire),
+    gravity: sanitizeScore(value.gravity),
+  }
+}
+
+function xpRequiredForLevel(level: number) {
+  if (level <= 1) return 0
+  let total = 0
+  for (let currentLevel = 1; currentLevel < level; currentLevel += 1) {
+    total += 260 + currentLevel * 70 + Math.floor(Math.pow(currentLevel, 1.52) * 24)
+  }
+  return total
+}
+
+function levelFromXp(totalXp: number) {
+  let level = 1
+  while (level < 100 && totalXp >= xpRequiredForLevel(level + 1)) level += 1
+  return level
+}
+
+function levelTierName(level: number) {
+  if (level >= 50) return 'Legend'
+  if (level >= 40) return 'Inferno'
+  if (level >= 30) return 'Diamond'
+  if (level >= 25) return 'Neon'
+  if (level >= 15) return 'Gold'
+  if (level >= 10) return 'Siren'
+  if (level >= 5) return 'Academy Blue'
+  if (level >= 2) return 'Bronze'
+  return 'Recruit'
+}
+
+function levelHaloClass(level: number) {
+  if (level >= 50) return 'level-halo-legend'
+  if (level >= 40) return 'level-halo-inferno'
+  if (level >= 30) return 'level-halo-diamond'
+  if (level >= 25) return 'level-halo-neon'
+  if (level >= 15) return 'level-halo-gold'
+  if (level >= 10) return 'level-halo-siren'
+  if (level >= 5) return 'level-halo-blue'
+  if (level >= 2) return 'level-halo-bronze'
+  return 'level-halo-recruit'
+}
+
+function cappedLevelXp(value: number, multiplier: number, cap: number) {
+  const safeValue = Math.max(0, Math.floor(Number(value) || 0))
+  return Math.min(cap, safeValue * multiplier)
+}
+
+function autoDecorationKeyForLevel(level: number) {
+  const unlocked = profileDecorationCatalog
+    .filter((decoration) => decoration.key !== 'auto' && decoration.key !== 'none' && decoration.unlockLevel <= level)
+    .sort((left, right) => right.unlockLevel - left.unlockLevel)
+  return unlocked[0]?.key || 'rank_01'
+}
+
+function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
+  const duelStreakXp =
+    cappedLevelXp(input.duelCurrentWinStreak, 18, 180) +
+    cappedLevelXp(Math.max(0, input.duelCurrentWinStreak - 10), 7, 105)
+  const competitiveXp =
+    duelStreakXp +
+    cappedLevelXp(input.allTimeFirstPlaceCount, 22, 176) +
+    cappedLevelXp(input.weeklyFirstPlaceCount, 18, 144) +
+    cappedLevelXp(input.allTimeLeaderboardAppearances, 5, 120) +
+    cappedLevelXp(input.weeklyLeaderboardAppearances, 7, 140) +
+    (input.isAllTimeTopPerformer ? 60 : 0) +
+    (input.isWeeklyTopPerformer ? 45 : 0) +
+    (input.isWeeklyDepartmentLeader ? 35 : 0)
+  const xp =
+    Math.floor(input.studySeconds / 60) +
+    input.studyDayStreak * 28 +
+    input.bestStudyDayStreak * 16 +
+    input.masteredCodes * 70 +
+    Math.floor(input.flashcardsReviewed / 4) +
+    input.scenariosReviewed * 6 +
+    (input.gamePlays.matching + input.gamePlays.speed + input.gamePlays.blaster) * 6 +
+    Math.floor(input.highScores.matching / 18) +
+    Math.floor(input.highScores.blaster / 20) +
+    Math.floor((input.highScores.caseFile + input.highScores.rapidFire + input.highScores.gravity) / 24) +
+    input.duelWins * 95 +
+    input.duelLosses * 12 +
+    competitiveXp
+  const totalXp = Math.max(0, Math.round(xp))
+  const level = levelFromXp(totalXp)
+  const levelFloor = xpRequiredForLevel(level)
+  const levelCeiling = xpRequiredForLevel(level + 1)
+  const currentLevelXp = Math.max(0, totalXp - levelFloor)
+  const nextLevelXp = Math.max(1, levelCeiling - levelFloor)
+  return {
+    level,
+    totalXp,
+    currentLevelXp,
+    nextLevelXp,
+    progressPercent: Math.round(Math.min(100, (currentLevelXp / nextLevelXp) * 100)),
+    tierName: levelTierName(level),
+    haloClass: levelHaloClass(level),
+    autoDecorationKey: autoDecorationKeyForLevel(level),
+    nextReward: profileDecorationCatalog.find((decoration) => decoration.unlockLevel > level && decoration.key !== 'auto' && decoration.key !== 'none') || null,
+  }
+}
+
+function getEffectiveProfileDecoration(levelProfile: UserLevelProfile, selectedKey = 'auto') {
+  const decoration = getProfileDecoration(selectedKey)
+  if (decoration.key === 'none') return decoration
+  if (decoration.key === 'auto') return getProfileDecoration(levelProfile.autoDecorationKey)
+  if (decoration.unlockLevel <= levelProfile.level) return decoration
+  return getProfileDecoration(levelProfile.autoDecorationKey)
 }
 
 function sanitizeHomeLeaderboardPreferences(input: unknown): HomeLeaderboardPreferences {
@@ -2360,10 +2644,15 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
     bio: '',
     agency: defaultAgency,
     themeId: appThemePresets[0].id,
+    profileDecorationKey: 'auto',
     nameStyle: { ...defaultNameStyle },
     homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
     studySeconds: 0,
     studyDayStreak: 0,
+    bestStudyDayStreak: 0,
+    gamePlays: { ...defaultUserStats.gamePlays },
+    flashcardsReviewed: 0,
+    scenariosReviewed: 0,
     studyModeCounts: { ...defaultUserStats.studyModeCounts },
     masteredCodes: null,
     currentActivity: null,
@@ -2378,22 +2667,35 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
       : {}
   const normalizeCount = (rawValue: unknown) =>
     typeof rawValue === 'number' && Number.isFinite(rawValue) ? Math.max(0, Math.floor(rawValue)) : 0
+  const lifetimeMasteredCodes = normalizeCount(statsRaw.lifetimeMasteredCodes)
+  const snapshotMasteredCodes = countMasteredCodesFromSnapshot(value.algorithmSnapshot)
 
   return {
     bio: typeof value.bio === 'string' ? value.bio : fallback.bio,
     agency: typeof value.agency === 'string' && value.agency.trim().length > 0 ? value.agency : fallback.agency,
     themeId: getThemePreset(typeof value.themeId === 'string' ? value.themeId : fallback.themeId).id,
+    profileDecorationKey: sanitizeProfileDecorationKey(value.profileDecorationKey),
     nameStyle: sanitizeNameStyle(value.nameStyle),
     homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs(value.homeLeaderboardRotationMs),
     studySeconds: normalizeCount(statsRaw.studySeconds),
     studyDayStreak: normalizeCount(statsRaw.studyDayStreak),
+    bestStudyDayStreak: normalizeCount(statsRaw.bestStudyDayStreak),
+    gamePlays: {
+      matching: normalizeCount((statsRaw.gamePlays as Record<string, unknown> | undefined)?.matching),
+      speed: normalizeCount((statsRaw.gamePlays as Record<string, unknown> | undefined)?.speed),
+      blaster: normalizeCount((statsRaw.gamePlays as Record<string, unknown> | undefined)?.blaster),
+    },
+    flashcardsReviewed: normalizeCount(statsRaw.flashcardsReviewed),
+    scenariosReviewed: normalizeCount(statsRaw.scenariosReviewed),
     studyModeCounts: {
       all: normalizeCount(studyModeCountsRaw.all),
       penal: normalizeCount(studyModeCountsRaw.penal),
       hs: normalizeCount(studyModeCountsRaw.hs),
       vehicle: normalizeCount(studyModeCountsRaw.vehicle),
     },
-    masteredCodes: countMasteredCodesFromSnapshot(value.algorithmSnapshot),
+    masteredCodes: lifetimeMasteredCodes > 0 || snapshotMasteredCodes !== null
+      ? Math.max(lifetimeMasteredCodes, snapshotMasteredCodes ?? 0)
+      : null,
     currentActivity: sanitizeCurrentUserActivity(value.currentActivity),
   }
 }
@@ -2516,6 +2818,7 @@ function sanitizeUserStats(input: unknown): UserStats {
     },
     flashcardsReviewed: typeof value.flashcardsReviewed === 'number' ? Math.max(0, Math.floor(value.flashcardsReviewed)) : 0,
     scenariosReviewed: typeof value.scenariosReviewed === 'number' ? Math.max(0, Math.floor(value.scenariosReviewed)) : 0,
+    lifetimeMasteredCodes: typeof value.lifetimeMasteredCodes === 'number' ? Math.max(0, Math.floor(value.lifetimeMasteredCodes)) : 0,
     studyModeCounts: {
       all: typeof (studyModeCounts as Record<string, unknown>).all === 'number' ? Math.max(0, Math.floor((studyModeCounts as Record<string, number>).all)) : 0,
       penal: typeof (studyModeCounts as Record<string, unknown>).penal === 'number' ? Math.max(0, Math.floor((studyModeCounts as Record<string, number>).penal)) : 0,
@@ -2584,6 +2887,7 @@ function sanitizeState(input: unknown): PersistedState {
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
       themeId: appThemePresets[0].id,
+      profileDecorationKey: 'auto',
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
       systemNoticesSeen: [],
@@ -2599,10 +2903,7 @@ function sanitizeState(input: unknown): PersistedState {
   const state = input as Partial<PersistedState>
   return {
     performance: state.performance && typeof state.performance === 'object' ? state.performance : {},
-    highScores: {
-      ...gameHighScoreSeed,
-      ...(state.highScores && typeof state.highScores === 'object' ? state.highScores : {}),
-    },
+    highScores: sanitizeHighScores(state.highScores),
     bestStreak: typeof state.bestStreak === 'number' ? Math.max(0, Math.floor(state.bestStreak)) : 0,
     profileDetails:
       state.profileDetails && typeof state.profileDetails === 'object'
@@ -2613,10 +2914,12 @@ function sanitizeState(input: unknown): PersistedState {
             homeLeaderboardRotationMs: sanitizeLeaderboardRotationMs((state.profileDetails as Partial<ProfileDetails>).homeLeaderboardRotationMs),
             homeLeaderboardPreferences: sanitizeHomeLeaderboardPreferences((state.profileDetails as Partial<ProfileDetails>).homeLeaderboardPreferences),
             themeId: getThemePreset(String((state.profileDetails as Partial<ProfileDetails>).themeId || appThemePresets[0].id)).id,
+            profileDecorationKey: sanitizeProfileDecorationKey((state.profileDetails as Partial<ProfileDetails>).profileDecorationKey),
             nameStyle: sanitizeNameStyle((state.profileDetails as Partial<ProfileDetails>).nameStyle),
             namePresets: sanitizeNamePresets((state.profileDetails as Partial<ProfileDetails>).namePresets),
             systemNoticesSeen: sanitizeSystemNoticesSeen((state.profileDetails as Partial<ProfileDetails>).systemNoticesSeen),
             stats: sanitizeUserStats((state.profileDetails as Partial<ProfileDetails>).stats),
+            levelSnapshot: sanitizeProfileLevelSnapshot((state.profileDetails as Partial<ProfileDetails>).levelSnapshot),
             currentActivity: sanitizeCurrentUserActivity((state.profileDetails as Partial<ProfileDetails>).currentActivity),
             algorithmSnapshot:
               (state.profileDetails as Partial<ProfileDetails>).algorithmSnapshot &&
@@ -2631,6 +2934,7 @@ function sanitizeState(input: unknown): PersistedState {
             homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
             homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
             themeId: appThemePresets[0].id,
+            profileDecorationKey: 'auto',
             nameStyle: { ...defaultNameStyle },
             namePresets: [],
             systemNoticesSeen: [],
@@ -2793,15 +3097,6 @@ function localBundleToEditorItems(): ContentEditorItem[] {
   )
 
   return [...codeItems, ...scenarioEditorItems]
-}
-
-function mergeContentById<T extends { id: string }>(primary: T[], fallback: T[]) {
-  const merged = new Map<string, T>()
-  for (const item of primary) merged.set(item.id, item)
-  for (const item of fallback) {
-    if (!merged.has(item.id)) merged.set(item.id, item)
-  }
-  return [...merged.values()]
 }
 
 function tierNameClass(tier: SupporterTier) {
@@ -3794,6 +4089,7 @@ function App() {
     homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
     homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
     themeId: appThemePresets[0].id,
+    profileDecorationKey: 'auto',
     nameStyle: { ...defaultNameStyle },
     namePresets: [],
     systemNoticesSeen: [],
@@ -3842,6 +4138,7 @@ function App() {
     matching: [],
     quiz: [],
   })
+  const [levelProfilesByUserId, setLevelProfilesByUserId] = useState<Record<string, UserLevelProfile>>({})
   const [homeMatchingDurationFilter, setHomeMatchingDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeMatchingCodeFilter, setHomeMatchingCodeFilter] = useState<CodeFilter>('all')
   const [homeSpeedDurationFilter, setHomeSpeedDurationFilter] = useState<HomeDurationFilter>(15)
@@ -3868,8 +4165,14 @@ function App() {
   const [reduceVisualEffects, setReduceVisualEffects] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [mobileNavMenuOpen, setMobileNavMenuOpen] = useState(false)
+  const [xpGainFeedback, setXpGainFeedback] = useState<XpGainFeedback | null>(null)
+  const [sessionXpReward, setSessionXpReward] = useState<SessionXpReward | null>(null)
+  const [studyPracticeSessionState, setStudyPracticeSessionState] = useState({ active: false, complete: false })
   const [taskbarCollapsedGroups, setTaskbarCollapsedGroups] = useState(() => loadTaskbarCollapsedGroups())
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
+  const taskbarXpBarRef = useRef<HTMLSpanElement | null>(null)
+  const previousXpSnapshotRef = useRef<{ userId: string; totalXp: number; level: number } | null>(null)
+  const xpGainTimerRef = useRef<number | null>(null)
   const streakLossNoticeRef = useRef('')
 
   const [quizDeck, setQuizDeck] = useState<QuizQuestion[]>([])
@@ -4725,22 +5028,26 @@ function App() {
           return
         }
         try {
-          const supabaseContent = await loadFromSupabase()
-          const localBundle = loadLocalContentBundle()
-          for (const warning of localBundle.warnings) console.warn(warning)
-          const mergedCodeItems = mergeContentById(supabaseContent.codeItems, localBundle.codeItems)
-          const mergedScenarios = mergeContentById(supabaseContent.scenarios, localBundle.scenarioItems)
           setContentWarning('')
-          applyLoadedContentToRuntime(mergedCodeItems, mergedScenarios)
+          const supabaseContent = await loadFromSupabase()
+          applyLoadedContentToRuntime(supabaseContent.codeItems, supabaseContent.scenarios)
           return
         } catch (error) {
           console.warn('[content] supabase content unavailable, falling back to local content.', error)
           setContentWarning('Content editor source unavailable, retrying Supabase. Showing local content for now.')
         }
 
-        const localBundle = loadLocalContentBundle()
-        for (const warning of localBundle.warnings) console.warn(warning)
-        applyLoadedContentToRuntime(localBundle.codeItems, localBundle.scenarioItems)
+        try {
+          const localBundle = loadLocalContentBundle()
+          for (const warning of localBundle.warnings) console.warn(warning)
+          applyLoadedContentToRuntime(localBundle.codeItems, localBundle.scenarioItems)
+        } catch (localError) {
+          console.warn('[content] local fallback failed after Supabase load failure.', localError)
+          setSections([])
+          setQuestions([])
+          setScenarioItems([])
+          setContentWarning('Could not load Supabase content. Retrying automatically.')
+        }
         queueRetry()
         return
       }
@@ -4756,7 +5063,11 @@ function App() {
       setSections([])
       setQuestions([])
       setScenarioItems([])
-      setContentWarning('Could not load content source. Check local content files.')
+      setContentWarning(
+        appContentSource === 'supabase'
+          ? 'Could not load Supabase content. Retrying automatically.'
+          : 'Could not load content source. Check local content files.',
+      )
     })
     return () => {
       cancelled = true
@@ -4933,10 +5244,15 @@ function App() {
             bio: String(entry.bio || ''),
             agency: String(entry.agency || defaultAgency),
             themeId: appThemePresets[0].id,
+            profileDecorationKey: 'auto',
             nameStyle: { ...defaultNameStyle },
             homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
             studySeconds: 0,
             studyDayStreak: 0,
+            bestStudyDayStreak: 0,
+            gamePlays: { ...defaultUserStats.gamePlays },
+            flashcardsReviewed: 0,
+            scenariosReviewed: 0,
             studyModeCounts: { ...defaultUserStats.studyModeCounts },
             masteredCodes: null,
             currentActivity: null,
@@ -4958,10 +5274,15 @@ function App() {
             bio: '',
             agency: defaultAgency,
             themeId: appThemePresets[0].id,
+            profileDecorationKey: 'auto',
             nameStyle: { ...defaultNameStyle },
             homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
             studySeconds: 0,
             studyDayStreak: 0,
+            bestStudyDayStreak: 0,
+            gamePlays: { ...defaultUserStats.gamePlays },
+            flashcardsReviewed: 0,
+            scenariosReviewed: 0,
             studyModeCounts: { ...defaultUserStats.studyModeCounts },
             masteredCodes: null,
             currentActivity: null,
@@ -4971,10 +5292,15 @@ function App() {
             bio: parsedDetails.bio || existing.bio,
             agency: existing.agency && existing.agency !== defaultAgency ? existing.agency : parsedDetails.agency,
             themeId: parsedDetails.themeId || existing.themeId,
+            profileDecorationKey: parsedDetails.profileDecorationKey || existing.profileDecorationKey,
             nameStyle: parsedDetails.nameStyle,
             homeLeaderboardRotationMs: parsedDetails.homeLeaderboardRotationMs,
             studySeconds: parsedDetails.studySeconds,
             studyDayStreak: parsedDetails.studyDayStreak,
+            bestStudyDayStreak: parsedDetails.bestStudyDayStreak,
+            gamePlays: parsedDetails.gamePlays,
+            flashcardsReviewed: parsedDetails.flashcardsReviewed,
+            scenariosReviewed: parsedDetails.scenariosReviewed,
             studyModeCounts: parsedDetails.studyModeCounts,
             masteredCodes: parsedDetails.masteredCodes,
             currentActivity: parsedDetails.currentActivity,
@@ -5052,6 +5378,7 @@ function App() {
               playerName: profilesByUserId[userId]?.username || 'Player',
               avatarUrl: profilesByUserId[userId]?.avatarUrl || defaultAvatarUrl,
               supporterTier: profilesByUserId[userId]?.supporterTier || 'free',
+              profileDecorationKey: detailsByUserId[userId]?.profileDecorationKey || 'auto',
               bio: detailsByUserId[userId]?.bio || '',
               agency: detailsByUserId[userId]?.agency || '',
               nameStyle: detailsByUserId[userId]?.nameStyle || { ...defaultNameStyle },
@@ -5113,7 +5440,7 @@ function App() {
     const refreshPromise = (async () => {
       const { data: states, error } = await supabase
         .from('app_state')
-        .select('user_id,profile_details')
+        .select('user_id,profile_details,high_scores,performance,best_streak')
         .limit(400)
       if (error || !states) return
 
@@ -5123,6 +5450,15 @@ function App() {
       let ownerUserIds = new Set<string>()
       const detailsByUserId: Record<string, LeaderboardProfileSnapshot> = {}
       const masteredCodesByUserId: Record<string, number> = {}
+      const allTimeBoardsForLevels = buildLeaderboardBoards(leaderboardRef.current, 0)
+      const weeklyBoardsForLevels = buildLeaderboardBoards(weeklyLeaderboardRef.current, 0)
+      const allTimeFirstsForLevels = buildLeaderboardFirstPlaceCountMap(allTimeBoardsForLevels)
+      const weeklyFirstsForLevels = buildLeaderboardFirstPlaceCountMap(weeklyBoardsForLevels)
+      const allTimeAppearancesForLevels = buildLeaderboardAppearanceCountMap(allTimeBoardsForLevels)
+      const weeklyAppearancesForLevels = buildLeaderboardAppearanceCountMap(weeklyBoardsForLevels)
+      const allTimeTopPerformerForLevels = buildWeeklyTopPerformer(leaderboardRef.current)
+      const weeklyTopPerformerForLevels = buildWeeklyTopPerformer(weeklyLeaderboardRef.current)
+      const bestWeeklyDepartmentForLevels = buildDepartmentLeaders(weeklyLeaderboardRef.current)[0] || null
 
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -5204,6 +5540,7 @@ function App() {
       const studyRows: HomeLeaderboardEntry[] = []
       const studyStreakRows: HomeLeaderboardEntry[] = []
       const masteredRows: HomeLeaderboardEntry[] = []
+      const nextLevelProfilesByUserId: Record<string, UserLevelProfile> = {}
       const duelWinsRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
         all: [],
         matching: [],
@@ -5222,10 +5559,15 @@ function App() {
           bio: '',
           agency: defaultAgency,
           themeId: appThemePresets[0].id,
+          profileDecorationKey: 'auto',
           nameStyle: { ...defaultNameStyle },
           homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
           studySeconds: 0,
           studyDayStreak: 0,
+          bestStudyDayStreak: 0,
+          gamePlays: { ...defaultUserStats.gamePlays },
+          flashcardsReviewed: 0,
+          scenariosReviewed: 0,
           studyModeCounts: { ...defaultUserStats.studyModeCounts },
           masteredCodes: null,
           currentActivity: null,
@@ -5244,11 +5586,37 @@ function App() {
           quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
         }
         const duelStats = duelStatsByMode.all
+        const weeklyDepartmentKey = bestWeeklyDepartmentForLevels
+          ? normalizeAgencyKey(bestWeeklyDepartmentForLevels.agency)
+          : ''
+        const userDepartmentKey = normalizeAgencyKey(canonicalAgencyName(details.agency || '') || '')
+        const highScoresForUser = sanitizeHighScores((row as Record<string, unknown>).high_scores)
+        nextLevelProfilesByUserId[userId] = buildUserLevelProfile({
+          studySeconds,
+          studyDayStreak,
+          bestStudyDayStreak: Math.max(details.bestStudyDayStreak, Number((row as Record<string, unknown>).best_streak || 0)),
+          masteredCodes: masteredCount,
+          highScores: highScoresForUser,
+          gamePlays: details.gamePlays,
+          flashcardsReviewed: details.flashcardsReviewed,
+          scenariosReviewed: details.scenariosReviewed,
+          duelWins: duelStats.wins,
+          duelLosses: duelStats.losses,
+          duelCurrentWinStreak: duelStats.currentWinStreak,
+          allTimeFirstPlaceCount: allTimeFirstsForLevels[userId] || 0,
+          weeklyFirstPlaceCount: weeklyFirstsForLevels[userId] || 0,
+          allTimeLeaderboardAppearances: allTimeAppearancesForLevels[userId] || 0,
+          weeklyLeaderboardAppearances: weeklyAppearancesForLevels[userId] || 0,
+          isAllTimeTopPerformer: allTimeTopPerformerForLevels?.entry.userId === userId,
+          isWeeklyTopPerformer: weeklyTopPerformerForLevels?.entry.userId === userId,
+          isWeeklyDepartmentLeader: Boolean(weeklyDepartmentKey && userDepartmentKey && weeklyDepartmentKey === userDepartmentKey),
+        })
         studyRows.push({
           userId,
           playerName: profile.username,
           avatarUrl: profile.avatarUrl,
           supporterTier: profile.supporterTier,
+          profileDecorationKey: details.profileDecorationKey,
           themeId: details.themeId || appThemePresets[0].id,
           nameStyle: details.nameStyle,
           bio: details.bio,
@@ -5269,6 +5637,7 @@ function App() {
           playerName: profile.username,
           avatarUrl: profile.avatarUrl,
           supporterTier: profile.supporterTier,
+          profileDecorationKey: details.profileDecorationKey,
           themeId: details.themeId || appThemePresets[0].id,
           nameStyle: details.nameStyle,
           bio: details.bio,
@@ -5289,6 +5658,7 @@ function App() {
           playerName: profile.username,
           avatarUrl: profile.avatarUrl,
           supporterTier: profile.supporterTier,
+          profileDecorationKey: details.profileDecorationKey,
           themeId: details.themeId || appThemePresets[0].id,
           nameStyle: details.nameStyle,
           bio: details.bio,
@@ -5313,6 +5683,7 @@ function App() {
               playerName: profile.username,
               avatarUrl: profile.avatarUrl,
               supporterTier: profile.supporterTier,
+              profileDecorationKey: details.profileDecorationKey,
               themeId: details.themeId || appThemePresets[0].id,
               nameStyle: details.nameStyle,
               bio: details.bio,
@@ -5335,6 +5706,7 @@ function App() {
               playerName: profile.username,
               avatarUrl: profile.avatarUrl,
               supporterTier: profile.supporterTier,
+              profileDecorationKey: details.profileDecorationKey,
               themeId: details.themeId || appThemePresets[0].id,
               nameStyle: details.nameStyle,
               bio: details.bio,
@@ -5357,6 +5729,7 @@ function App() {
       setHomeStudyTimeLeaders(studyRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
       setHomeStudyStreakLeaders(studyStreakRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
       setHomeMostMasteredLeaders(masteredRows.filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 5))
+      setLevelProfilesByUserId(nextLevelProfilesByUserId)
       setHomeDuelWinsLeadersByMode({
         all: duelWinsRowsByMode.all
           .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
@@ -5519,10 +5892,12 @@ function App() {
         homeLeaderboardRotationMs: nextState.profileDetails.homeLeaderboardRotationMs,
         homeLeaderboardPreferences: nextState.profileDetails.homeLeaderboardPreferences,
         themeId: nextState.profileDetails.themeId,
+        profileDecorationKey: nextState.profileDetails.profileDecorationKey,
         nameStyle: nextState.profileDetails.nameStyle,
         namePresets: nextState.profileDetails.namePresets,
         systemNoticesSeen: nextState.profileDetails.systemNoticesSeen,
         stats: nextState.profileDetails.stats,
+        levelSnapshot: nextState.profileDetails.levelSnapshot,
         currentActivity: nextState.profileDetails.currentActivity,
       })
 
@@ -5642,10 +6017,12 @@ function App() {
             homeLeaderboardRotationMs: previous.homeLeaderboardRotationMs,
             homeLeaderboardPreferences: previous.homeLeaderboardPreferences,
             themeId: previous.themeId,
+            profileDecorationKey: previous.profileDecorationKey,
             nameStyle: previous.nameStyle,
             namePresets: previous.namePresets,
             systemNoticesSeen: previous.systemNoticesSeen,
             stats: previous.stats,
+            levelSnapshot: previous.levelSnapshot,
             currentActivity: previous.currentActivity,
           }))
         },
@@ -5713,6 +6090,8 @@ function App() {
       .channel('leaderboard-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, queueRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_leaderboard' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_player_stats' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, queueRefresh)
       .subscribe()
 
     return () => {
@@ -5954,8 +6333,249 @@ function App() {
   const weeklyTopPerformer = useMemo<WeeklyPerformanceLeader | null>(() => {
     return buildWeeklyTopPerformer(weeklyLeaderboardEntries)
   }, [weeklyLeaderboardEntries])
+  const allTimeTopPerformer = useMemo<WeeklyPerformanceLeader | null>(() => {
+    return buildWeeklyTopPerformer(leaderboard)
+  }, [leaderboard])
+  const allTimeLeaderboardAppearanceCountsByUser = useMemo(
+    () => buildLeaderboardAppearanceCountMap(allTimeLeaderboardBoards),
+    [allTimeLeaderboardBoards],
+  )
+  const weeklyLeaderboardAppearanceCountsByUser = useMemo(
+    () => buildLeaderboardAppearanceCountMap(weeklyLeaderboardBoards),
+    [weeklyLeaderboardBoards],
+  )
   const weeklyDepartmentLeaders = useMemo(() => buildDepartmentLeaders(weeklyLeaderboardEntries), [weeklyLeaderboardEntries])
   const bestWeeklyDepartment = weeklyDepartmentLeaders[0] || null
+  const currentMasteredCodeCount = useMemo(() => countMasteredCodesFromPerformanceMap(performance), [performance])
+  useEffect(() => {
+    if (!stateHydrated || !currentUserId) return
+    const lifetimeMasteredCodes = profileDetails.stats.lifetimeMasteredCodes || 0
+    if (currentMasteredCodeCount <= lifetimeMasteredCodes) return
+    setProfileDetails((previous) => ({
+      ...previous,
+      stats: {
+        ...previous.stats,
+        lifetimeMasteredCodes: Math.max(previous.stats.lifetimeMasteredCodes || 0, currentMasteredCodeCount),
+      },
+    }))
+  }, [currentMasteredCodeCount, currentUserId, profileDetails.stats.lifetimeMasteredCodes, stateHydrated])
+
+  const currentUserLevelProfile = useMemo(() => {
+    const currentLeaderboardEntry = currentUserId
+      ? duelHubLeaderboard.find((entry) => entry.userId === currentUserId) || leaderboard.find((entry) => entry.userId === currentUserId)
+      : null
+    const weeklyDepartmentKey = bestWeeklyDepartment ? normalizeAgencyKey(bestWeeklyDepartment.agency) : ''
+    const currentDepartmentKey = normalizeAgencyKey(canonicalAgencyName(profileDetails.agency || '') || '')
+    return buildUserLevelProfile({
+      studySeconds: profileDetails.stats.studySeconds,
+      studyDayStreak: profileDetails.stats.studyDayStreak,
+      bestStudyDayStreak: Math.max(profileDetails.stats.bestStudyDayStreak, bestStreak),
+      masteredCodes: Math.max(profileDetails.stats.lifetimeMasteredCodes || 0, currentMasteredCodeCount),
+      highScores,
+      gamePlays: profileDetails.stats.gamePlays,
+      flashcardsReviewed: profileDetails.stats.flashcardsReviewed,
+      scenariosReviewed: profileDetails.stats.scenariosReviewed,
+      duelWins: currentLeaderboardEntry?.duelWins || 0,
+      duelLosses: currentLeaderboardEntry?.duelLosses || 0,
+      duelCurrentWinStreak: currentLeaderboardEntry?.duelCurrentWinStreak || 0,
+      allTimeFirstPlaceCount: currentUserId ? allTimeFirstSpotCountsByUser[currentUserId] || 0 : 0,
+      weeklyFirstPlaceCount: currentUserId ? weeklyFirstSpotCountsByUser[currentUserId] || 0 : 0,
+      allTimeLeaderboardAppearances: currentUserId ? allTimeLeaderboardAppearanceCountsByUser[currentUserId] || 0 : 0,
+      weeklyLeaderboardAppearances: currentUserId ? weeklyLeaderboardAppearanceCountsByUser[currentUserId] || 0 : 0,
+      isAllTimeTopPerformer: Boolean(currentUserId && allTimeTopPerformer?.entry.userId === currentUserId),
+      isWeeklyTopPerformer: Boolean(currentUserId && weeklyTopPerformer?.entry.userId === currentUserId),
+      isWeeklyDepartmentLeader: Boolean(weeklyDepartmentKey && currentDepartmentKey && weeklyDepartmentKey === currentDepartmentKey),
+    })
+  }, [
+    allTimeFirstSpotCountsByUser,
+    allTimeLeaderboardAppearanceCountsByUser,
+    allTimeTopPerformer,
+    bestWeeklyDepartment,
+    bestStreak,
+    currentMasteredCodeCount,
+    currentUserId,
+    duelHubLeaderboard,
+    highScores,
+    leaderboard,
+    profileDetails.agency,
+    profileDetails.stats,
+    weeklyFirstSpotCountsByUser,
+    weeklyLeaderboardAppearanceCountsByUser,
+    weeklyTopPerformer,
+  ])
+  const unlockedDecorationsForCurrentUser = useMemo(
+    () => unlockedProfileDecorations(currentUserLevelProfile.level),
+    [currentUserLevelProfile.level],
+  )
+  useEffect(() => {
+    if (!stateHydrated || !currentUserId) return
+    const nextLevelSnapshot: ProfileLevelSnapshot = {
+      level: currentUserLevelProfile.level,
+      totalXp: currentUserLevelProfile.totalXp,
+      currentLevelXp: currentUserLevelProfile.currentLevelXp,
+      nextLevelXp: currentUserLevelProfile.nextLevelXp,
+      progressPercent: currentUserLevelProfile.progressPercent,
+      tierName: currentUserLevelProfile.tierName,
+      haloClass: currentUserLevelProfile.haloClass,
+      autoDecorationKey: sanitizeProfileDecorationKey(currentUserLevelProfile.autoDecorationKey),
+      updatedAt: new Date().toISOString(),
+    }
+    setProfileDetails((previous) => {
+      const current = previous.levelSnapshot
+      const hasChanged =
+        !current ||
+        current.level !== nextLevelSnapshot.level ||
+        current.totalXp !== nextLevelSnapshot.totalXp ||
+        current.currentLevelXp !== nextLevelSnapshot.currentLevelXp ||
+        current.nextLevelXp !== nextLevelSnapshot.nextLevelXp ||
+        current.progressPercent !== nextLevelSnapshot.progressPercent ||
+        current.tierName !== nextLevelSnapshot.tierName ||
+        current.haloClass !== nextLevelSnapshot.haloClass ||
+        current.autoDecorationKey !== nextLevelSnapshot.autoDecorationKey
+      return hasChanged ? { ...previous, levelSnapshot: nextLevelSnapshot } : previous
+    })
+  }, [
+    currentUserId,
+    currentUserLevelProfile.autoDecorationKey,
+    currentUserLevelProfile.currentLevelXp,
+    currentUserLevelProfile.haloClass,
+    currentUserLevelProfile.level,
+    currentUserLevelProfile.nextLevelXp,
+    currentUserLevelProfile.progressPercent,
+    currentUserLevelProfile.tierName,
+    currentUserLevelProfile.totalXp,
+    stateHydrated,
+  ])
+  const selectedProfileDecoration = getEffectiveProfileDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)
+  const chatLevelProfiles = useMemo(() => {
+    const next: Record<string, { level: number; tierName: string; totalXp: number; haloClass: string }> = {}
+    for (const [userId, levelProfile] of Object.entries(levelProfilesByUserId)) {
+      next[userId] = {
+        level: levelProfile.level,
+        tierName: levelProfile.tierName,
+        totalXp: levelProfile.totalXp,
+        haloClass: levelProfile.haloClass,
+      }
+    }
+    if (currentUserId) {
+      next[currentUserId] = {
+        level: currentUserLevelProfile.level,
+        tierName: currentUserLevelProfile.tierName,
+        totalXp: currentUserLevelProfile.totalXp,
+        haloClass: currentUserLevelProfile.haloClass,
+      }
+    }
+    return next
+  }, [currentUserId, currentUserLevelProfile, levelProfilesByUserId])
+  const xpSessionFeedbackContext = (
+    (routePath === '/games/matching' && (matchRunning || matchDone)) ||
+    (routePath === '/games/speed' && (speedRunning || speedDone)) ||
+    (routePath === '/games/blaster' && (blasterRunning || blasterDone)) ||
+    (routePath === '/study/test' && studyTestSessionOpen) ||
+    (routePath === '/study/practice-test' && (studyPracticeSessionState.active || studyPracticeSessionState.complete))
+  )
+  const mergeSessionXpReward = useCallback((feedback: XpGainFeedback) => {
+    setSessionXpReward((previous) => ({
+      id: feedback.id,
+      amount: (previous?.amount || 0) + feedback.amount,
+      level: feedback.level,
+      progressPercent: feedback.progressPercent,
+      currentLevelXp: feedback.currentLevelXp,
+      nextLevelXp: feedback.nextLevelXp,
+      leveledUp: Boolean(previous?.leveledUp || feedback.leveledUp),
+    }))
+  }, [])
+
+  useEffect(() => {
+    if (!currentUserId || !stateHydrated) {
+      previousXpSnapshotRef.current = currentUserId
+        ? { userId: currentUserId, totalXp: currentUserLevelProfile.totalXp, level: currentUserLevelProfile.level }
+        : null
+      return
+    }
+
+    const previous = previousXpSnapshotRef.current
+    const currentSnapshot = {
+      userId: currentUserId,
+      totalXp: currentUserLevelProfile.totalXp,
+      level: currentUserLevelProfile.level,
+    }
+
+    if (!previous || previous.userId !== currentUserId) {
+      previousXpSnapshotRef.current = currentSnapshot
+      return
+    }
+
+    const xpDelta = currentSnapshot.totalXp - previous.totalXp
+    const leveledUp = currentSnapshot.level > previous.level
+    previousXpSnapshotRef.current = currentSnapshot
+    if (xpDelta <= 0) return
+
+    const xpBarElement = taskbarXpBarRef.current
+    const xpBarVisible = Boolean(
+      xpBarElement &&
+      (() => {
+        const rect = xpBarElement.getBoundingClientRect()
+        const style = window.getComputedStyle(xpBarElement)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.bottom > 0 &&
+          rect.right > 0 &&
+          rect.top < window.innerHeight &&
+          rect.left < window.innerWidth &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0'
+        )
+      })(),
+    )
+
+    const feedback = {
+      id: Date.now(),
+      amount: xpDelta,
+      level: currentUserLevelProfile.level,
+      progressPercent: currentUserLevelProfile.progressPercent,
+      currentLevelXp: currentUserLevelProfile.currentLevelXp,
+      nextLevelXp: currentUserLevelProfile.nextLevelXp,
+      leveledUp,
+      mode: xpBarVisible ? 'bar' as const : 'toast' as const,
+    }
+    if (xpSessionFeedbackContext) {
+      if (xpGainTimerRef.current) {
+        window.clearTimeout(xpGainTimerRef.current)
+        xpGainTimerRef.current = null
+      }
+      setXpGainFeedback(null)
+      mergeSessionXpReward(feedback)
+      return
+    }
+    setXpGainFeedback(feedback)
+    if (xpGainTimerRef.current) window.clearTimeout(xpGainTimerRef.current)
+    xpGainTimerRef.current = window.setTimeout(() => {
+      setXpGainFeedback((current) => current?.id === feedback.id ? null : current)
+      xpGainTimerRef.current = null
+    }, xpBarVisible ? 1800 : 2800)
+  }, [
+    currentUserId,
+    currentUserLevelProfile.currentLevelXp,
+    currentUserLevelProfile.level,
+    currentUserLevelProfile.nextLevelXp,
+    currentUserLevelProfile.progressPercent,
+    currentUserLevelProfile.totalXp,
+    mergeSessionXpReward,
+    stateHydrated,
+    xpSessionFeedbackContext,
+  ])
+
+  useEffect(() => {
+    if (!xpSessionFeedbackContext) setSessionXpReward(null)
+  }, [xpSessionFeedbackContext])
+
+  useEffect(() => () => {
+    if (xpGainTimerRef.current) window.clearTimeout(xpGainTimerRef.current)
+  }, [])
+
   const visibleLeaderboardBoards = leaderboardsScope === 'weekly' ? weeklyLeaderboardBoards : allTimeLeaderboardBoards
   const visibleMatchingBoards = useMemo(
     () => visibleLeaderboardBoards.filter((board) => board.game === 'Matching'),
@@ -6213,6 +6833,7 @@ function App() {
       setStudyTestSessionOpen(false)
       return
     }
+    setSessionXpReward(null)
     const [first, ...remaining] = deck
     setStudyTestSessionFilter(studyTestFilter)
     setStudyTestSessionTotal(deck.length)
@@ -6702,6 +7323,24 @@ function App() {
     const previousBest = highScoresRef.current.matching
     const isPersonalBest = finalMatchScore > previousBest
     setHighScores((previous) => ({ ...previous, matching: Math.max(previous.matching, finalMatchScore) }))
+    const baseReport: SessionPerformanceReport = {
+      mode: 'matching',
+      title: 'Matching',
+      contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
+      accuracy: finalAccuracy,
+      correct: finalCorrect,
+      incorrect: finalIncorrect,
+      score: finalMatchScore,
+      deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+      deltaScore: previousAttempt ? finalMatchScore - previousAttempt.score : null,
+      trend,
+      scoreTrend,
+      focusTips,
+      leaderboardPreview: [],
+      currentRank: null,
+      previousRank: previousAttempt?.rank ?? null,
+    }
+    setMatchingReport(baseReport)
 
     if (supabase && currentUserId) {
       void (async () => {
@@ -6767,23 +7406,7 @@ function App() {
           sessionFilter,
           currentUserId,
         )
-        setMatchingReport({
-          mode: 'matching',
-          title: 'Matching',
-          contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
-          accuracy: finalAccuracy,
-          correct: finalCorrect,
-          incorrect: finalIncorrect,
-          score: finalMatchScore,
-          deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
-          deltaScore: previousAttempt ? finalMatchScore - previousAttempt.score : null,
-          trend,
-          scoreTrend,
-          focusTips,
-          leaderboardPreview: preview,
-          currentRank,
-          previousRank: previousAttempt?.rank ?? null,
-        })
+        setMatchingReport({ ...baseReport, leaderboardPreview: preview, currentRank })
         saveSessionAttempt(trackKey, {
           accuracy: finalAccuracy,
           score: finalMatchScore,
@@ -6796,23 +7419,6 @@ function App() {
         })
       })()
     } else {
-      setMatchingReport({
-        mode: 'matching',
-        title: 'Matching',
-        contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
-        accuracy: finalAccuracy,
-        correct: finalCorrect,
-        incorrect: finalIncorrect,
-        score: finalMatchScore,
-        deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
-        deltaScore: previousAttempt ? finalMatchScore - previousAttempt.score : null,
-        trend,
-        scoreTrend,
-        focusTips,
-        leaderboardPreview: [],
-        currentRank: null,
-        previousRank: previousAttempt?.rank ?? null,
-      })
       saveSessionAttempt(trackKey, {
         accuracy: finalAccuracy,
         score: finalMatchScore,
@@ -6981,6 +7587,7 @@ function App() {
   }, [recentMatchSections, sections])
 
   const startMatching = () => {
+    setSessionXpReward(null)
     const selectedDuration = gamesSelection.duration
     const selectedFilter = gamesSelection.filter
     matchSessionDurationRef.current = selectedDuration
@@ -7016,6 +7623,7 @@ function App() {
   }
 
   const exitMatchingSession = () => {
+    setSessionXpReward(null)
     setMatchRunning(false)
     setMatchDone(false)
     matchTimerDeadlineRef.current = 0
@@ -7047,6 +7655,7 @@ function App() {
   }, [speedSessionQuestions])
 
   const startSpeedTest = () => {
+    setSessionXpReward(null)
     const selectedDuration = gamesSelection.duration
     const selectedFilter = gamesSelection.filter
     const pool = selectedFilter === 'all'
@@ -7100,6 +7709,7 @@ function App() {
   }
 
   const exitSpeedSession = () => {
+    setSessionXpReward(null)
     resetSpeedSpamState()
     if (speedAdvanceTimerRef.current !== null) {
       window.clearTimeout(speedAdvanceTimerRef.current)
@@ -7202,6 +7812,7 @@ function App() {
       currentRank: null,
       previousRank: previousAttempt?.rank ?? null,
     }
+    setBlasterReport(baseReport)
 
     if (supabase && currentUserId) {
       void (async () => {
@@ -7312,6 +7923,7 @@ function App() {
   }, [finalizeBlasterSession])
 
   const startBlaster = () => {
+    setSessionXpReward(null)
     const selectedDuration = codeBlasterFixedDuration
     const selectedFilter = gamesSelection.filter
     const pool = selectedFilter === 'all' ? sections : sections.filter((section) => section.codeSet === selectedFilter)
@@ -7353,6 +7965,7 @@ function App() {
   }
 
   const exitBlasterSession = () => {
+    setSessionXpReward(null)
     setBlasterRunning(false)
     setBlasterDone(false)
     blasterSessionFinalizedRef.current = false
@@ -7667,6 +8280,24 @@ function App() {
           const previousBest = highScoresRef.current.rapidFire
           const isPersonalBest = finalSpeedScore > previousBest
           setHighScores((previous) => ({ ...previous, rapidFire: Math.max(previous.rapidFire, finalSpeedScore) }))
+          const baseReport: SessionPerformanceReport = {
+            mode: 'speed',
+            title: 'Speed Test',
+            contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
+            accuracy: finalAccuracy,
+            correct: finalCorrect,
+            incorrect: finalIncorrect,
+            score: finalSpeedScore,
+            deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
+            deltaScore: previousAttempt ? finalSpeedScore - previousAttempt.score : null,
+            trend,
+            scoreTrend,
+            focusTips,
+            leaderboardPreview: [],
+            currentRank: null,
+            previousRank: previousAttempt?.rank ?? null,
+          }
+          setSpeedReport(baseReport)
 
           if (supabase && currentUserId) {
             void (async () => {
@@ -7732,23 +8363,7 @@ function App() {
                 sessionFilter,
                 currentUserId,
               )
-              setSpeedReport({
-                mode: 'speed',
-                title: 'Speed Test',
-                contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
-                accuracy: finalAccuracy,
-                correct: finalCorrect,
-                incorrect: finalIncorrect,
-                score: finalSpeedScore,
-                deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
-                deltaScore: previousAttempt ? finalSpeedScore - previousAttempt.score : null,
-                trend,
-                scoreTrend,
-                focusTips,
-                leaderboardPreview: preview,
-                currentRank,
-                previousRank: previousAttempt?.rank ?? null,
-              })
+              setSpeedReport({ ...baseReport, leaderboardPreview: preview, currentRank })
               saveSessionAttempt(trackKey, {
                 accuracy: finalAccuracy,
                 score: finalSpeedScore,
@@ -7761,23 +8376,6 @@ function App() {
               })
             })()
           } else {
-            setSpeedReport({
-              mode: 'speed',
-              title: 'Speed Test',
-              contextLabel: `${sessionDuration}s • ${leaderboardCodeSetLabel(sessionFilter)}`,
-              accuracy: finalAccuracy,
-              correct: finalCorrect,
-              incorrect: finalIncorrect,
-              score: finalSpeedScore,
-              deltaAccuracy: previousAttempt ? finalAccuracy - previousAttempt.accuracy : null,
-              deltaScore: previousAttempt ? finalSpeedScore - previousAttempt.score : null,
-              trend,
-              scoreTrend,
-              focusTips,
-              leaderboardPreview: [],
-              currentRank: null,
-              previousRank: previousAttempt?.rank ?? null,
-            })
             saveSessionAttempt(trackKey, {
               accuracy: finalAccuracy,
               score: finalSpeedScore,
@@ -8264,6 +8862,7 @@ function App() {
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
       themeId: appThemePresets[0].id,
+      profileDecorationKey: 'auto',
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
       systemNoticesSeen: [],
@@ -9465,9 +10064,68 @@ function App() {
       mainLabel: 'Offline',
       subLabel: 'No recent activity',
     }
+  const selectedLeaderboardLevelProfile = selectedLeaderboardEntry
+    ? levelProfilesByUserId[selectedLeaderboardEntry.userId]
+    : null
+  const renderLevelBadge = (levelProfile: UserLevelProfile, compact = false) => (
+    <span className={compact ? 'level-badge level-badge-compact' : 'level-badge'}>
+      <span className="level-badge-level">Lv {levelProfile.level}</span>
+      <span className="level-badge-tier">{levelProfile.tierName}</span>
+    </span>
+  )
+  const renderDecorationLayer = (decoration: ProfileDecoration) => {
+    if (decoration.key === 'none') return null
+    const decorationAssetPath = profileDecorationAssetPath(decoration.key)
+    if (!decorationAssetPath) return null
+    return (
+      <span
+        className={`avatar-decoration-layer has-generated-art ${decoration.cssClass} ${decoration.animated ? 'is-animated' : ''}`}
+        aria-label={decoration.title}
+      >
+        <img
+          src={decorationAssetPath}
+          alt=""
+          className="avatar-decoration-image"
+          loading="lazy"
+          decoding="async"
+        />
+        <span className="avatar-decoration-particle one" />
+        <span className="avatar-decoration-particle two" />
+      </span>
+    )
+  }
+  const renderAvatarDecoration = (levelProfile?: UserLevelProfile | null, selectedKey = 'auto') => {
+    if (!levelProfile) return null
+    return renderDecorationLayer(getEffectiveProfileDecoration(levelProfile, selectedKey))
+  }
+  const avatarDecorationEffectClass = (levelProfile?: UserLevelProfile | null, selectedKey = 'auto') => {
+    if (!levelProfile) return ''
+    const decoration = getEffectiveProfileDecoration(levelProfile, selectedKey)
+    return decoration.modalEffect === 'none' ? '' : `profile-effect-${decoration.modalEffect}`
+  }
+  const renderSessionXpReward = () => {
+    if (!sessionXpReward) return null
+    return (
+      <article className={`session-xp-reward-card ${sessionXpReward.leveledUp ? 'leveled-up' : ''}`}>
+        <div className="session-xp-reward-head">
+          <span>{sessionXpReward.leveledUp ? `Level ${sessionXpReward.level} reached` : `+${sessionXpReward.amount.toLocaleString()} XP earned`}</span>
+          <strong>{sessionXpReward.progressPercent}%</strong>
+        </div>
+        <div className="session-xp-reward-track" aria-label={`Level ${sessionXpReward.level} progress ${sessionXpReward.progressPercent}%`}>
+          <span style={{ width: `${sessionXpReward.progressPercent}%` }} />
+        </div>
+        <p>
+          {sessionXpReward.currentLevelXp.toLocaleString()} / {sessionXpReward.nextLevelXp.toLocaleString()} XP to Level {sessionXpReward.level + 1}
+        </p>
+      </article>
+    )
+  }
   const leaderAvatarFrameClass = (userId?: string, extraClassName?: string) => {
     const classes = ['leader-avatar-frame']
     if (extraClassName) classes.push(extraClassName)
+    if (userId && levelProfilesByUserId[userId]) {
+      classes.push('level-halo-frame', levelProfilesByUserId[userId].haloClass)
+    }
     if (userId) {
       const presence = onlinePresenceByUserId[userId]
       if (presence === 'active') classes.push('leader-avatar-frame-online')
@@ -9971,35 +10629,170 @@ function App() {
       setAuthError(error instanceof Error ? error.message : 'Could not crop image.')
     }
   }
+  const homeEntryToLeaderboardEntry = useCallback((entry: HomeLeaderboardEntry, metric: string): LeaderboardEntry => ({
+    id: `home-${metric}-${entry.userId}`,
+    userId: entry.userId,
+    game: metric,
+    playerName: entry.playerName,
+    avatarUrl: entry.avatarUrl,
+    supporterTier: entry.supporterTier,
+    profileDecorationKey: entry.profileDecorationKey,
+    themeId: entry.themeId,
+    bio: entry.bio,
+    agency: entry.agency,
+    nameStyle: entry.nameStyle,
+    isOwner: entry.isOwner,
+    matchDuration: null,
+    matchFilter: null,
+    score: entry.value,
+    round: 0,
+    createdAt: clockNowMs,
+    masteredCodes: entry.masteredCodes,
+    studySeconds: entry.studySeconds,
+    studyDayStreak: entry.studyDayStreak,
+    mostStudiedMode: entry.mostStudiedMode,
+    duelWins: entry.duelWins,
+    duelLosses: entry.duelLosses,
+    duelCurrentWinStreak: entry.duelCurrentWinStreak,
+    currentActivity: entry.currentActivity,
+  }), [clockNowMs])
   const openHomeProfile = (entry: HomeLeaderboardEntry, metric: string, isTop: boolean) => {
-    setSelectedLeaderboardEntry({
-      id: `home-${metric}-${entry.userId}`,
-      userId: entry.userId,
-      game: metric,
-      playerName: entry.playerName,
-      avatarUrl: entry.avatarUrl,
-      supporterTier: entry.supporterTier,
-      themeId: entry.themeId,
-      bio: entry.bio,
-      agency: entry.agency,
-      nameStyle: entry.nameStyle,
-      isOwner: entry.isOwner,
-      matchDuration: null,
-      matchFilter: null,
-      score: entry.value,
-      round: 0,
-      createdAt: clockNowMs,
-      masteredCodes: entry.masteredCodes,
-      studySeconds: entry.studySeconds,
-      studyDayStreak: entry.studyDayStreak,
-      mostStudiedMode: entry.mostStudiedMode,
-      duelWins: entry.duelWins,
-      duelLosses: entry.duelLosses,
-      duelCurrentWinStreak: entry.duelCurrentWinStreak,
-      currentActivity: entry.currentActivity,
-    })
+    setSelectedLeaderboardEntry(homeEntryToLeaderboardEntry(entry, metric))
     setSelectedLeaderboardIsTop(isTop)
   }
+
+  const openLeaderboardStyleProfileByUserId = useCallback(async (targetUserId: string) => {
+    const userId = targetUserId.trim()
+    if (!userId) return
+
+    const knownLeaderboardEntry = [...leaderboard, ...weeklyLeaderboardEntries]
+      .filter((entry) => entry.userId === userId)
+      .sort((left, right) => right.score - left.score || right.createdAt - left.createdAt)[0]
+    if (knownLeaderboardEntry) {
+      setSelectedLeaderboardEntry(knownLeaderboardEntry)
+      setSelectedLeaderboardIsTop(false)
+      return
+    }
+
+    const knownHomeEntry = [
+      ...homeStudyTimeLeaders,
+      ...homeStudyStreakLeaders,
+      ...homeMostMasteredLeaders,
+      ...Object.values(homeDuelWinsLeadersByMode).flat(),
+      ...Object.values(homeDuelStreakLeadersByMode).flat(),
+    ].find((entry) => entry.userId === userId)
+    if (knownHomeEntry) {
+      setSelectedLeaderboardEntry(homeEntryToLeaderboardEntry(knownHomeEntry, 'Profile'))
+      setSelectedLeaderboardIsTop(false)
+      return
+    }
+
+    if (!supabase) return
+
+    const [{ data: profileRow }, { data: stateRow }, { data: duelStats }, { data: ownerRows }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('user_id,username,avatar_path,supporter_tier,agency,bio')
+        .eq('user_id', userId)
+        .maybeSingle(),
+      supabase
+        .from('app_state')
+        .select('profile_details,high_scores,performance,best_streak')
+        .eq('user_id', userId)
+        .maybeSingle(),
+      supabase
+        .from('duel_player_stats')
+        .select('wins,losses,current_win_streak')
+        .eq('user_id', userId)
+        .eq('game_type', 'all')
+        .maybeSingle(),
+      supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('user_id', userId)
+        .eq('role', 'owner')
+        .limit(1),
+    ])
+
+    const details = parseLeaderboardProfileSnapshot((stateRow as Record<string, unknown> | null)?.profile_details)
+    const masteredCodes = details.masteredCodes ?? countMasteredCodesFromPerformanceMap((stateRow as Record<string, unknown> | null)?.performance)
+    const rawTier = String((profileRow as Record<string, unknown> | null)?.supporter_tier || 'free')
+    const supporterTier = (['free', 'tier2', 'tier5', 'tier10'].includes(rawTier) ? rawTier : 'free') as SupporterTier
+    const duelWins = Number((duelStats as Record<string, unknown> | null)?.wins || 0)
+    const duelLosses = Number((duelStats as Record<string, unknown> | null)?.losses || 0)
+    const duelCurrentWinStreak = Number((duelStats as Record<string, unknown> | null)?.current_win_streak || 0)
+    const weeklyDepartmentKey = bestWeeklyDepartment ? normalizeAgencyKey(bestWeeklyDepartment.agency) : ''
+    const profileAgency = String((profileRow as Record<string, unknown> | null)?.agency || '').trim() || details.agency
+    const userDepartmentKey = normalizeAgencyKey(canonicalAgencyName(profileAgency || '') || '')
+    const fetchedLevelProfile = buildUserLevelProfile({
+      studySeconds: details.studySeconds,
+      studyDayStreak: details.studyDayStreak,
+      bestStudyDayStreak: Math.max(details.bestStudyDayStreak, Number((stateRow as Record<string, unknown> | null)?.best_streak || 0)),
+      masteredCodes,
+      highScores: sanitizeHighScores((stateRow as Record<string, unknown> | null)?.high_scores),
+      gamePlays: details.gamePlays,
+      flashcardsReviewed: details.flashcardsReviewed,
+      scenariosReviewed: details.scenariosReviewed,
+      duelWins,
+      duelLosses,
+      duelCurrentWinStreak,
+      allTimeFirstPlaceCount: allTimeFirstSpotCountsByUser[userId] || 0,
+      weeklyFirstPlaceCount: weeklyFirstSpotCountsByUser[userId] || 0,
+      allTimeLeaderboardAppearances: allTimeLeaderboardAppearanceCountsByUser[userId] || 0,
+      weeklyLeaderboardAppearances: weeklyLeaderboardAppearanceCountsByUser[userId] || 0,
+      isAllTimeTopPerformer: allTimeTopPerformer?.entry.userId === userId,
+      isWeeklyTopPerformer: weeklyTopPerformer?.entry.userId === userId,
+      isWeeklyDepartmentLeader: Boolean(weeklyDepartmentKey && userDepartmentKey && weeklyDepartmentKey === userDepartmentKey),
+    })
+    setLevelProfilesByUserId((previous) => ({ ...previous, [userId]: fetchedLevelProfile }))
+
+    setSelectedLeaderboardEntry({
+      id: `chat-profile-${userId}`,
+      userId,
+      game: 'Study Time',
+      playerName: String((profileRow as Record<string, unknown> | null)?.username || '').trim() || `User ${userId.slice(0, 8)}`,
+      avatarUrl: toPublicAvatarUrl(String((profileRow as Record<string, unknown> | null)?.avatar_path || '')) || defaultAvatarUrl,
+      supporterTier,
+      profileDecorationKey: details.profileDecorationKey,
+      themeId: details.themeId,
+      bio: String((profileRow as Record<string, unknown> | null)?.bio || '').trim() || details.bio,
+      agency: profileAgency,
+      nameStyle: details.nameStyle,
+      isOwner: Boolean(ownerRows && ownerRows.length > 0),
+      matchDuration: null,
+      matchFilter: null,
+      score: details.studySeconds,
+      round: 0,
+      createdAt: clockNowMs,
+      masteredCodes,
+      studySeconds: details.studySeconds,
+      studyDayStreak: details.studyDayStreak,
+      mostStudiedMode: mostStudiedModeFromCounts(details.studyModeCounts),
+      duelWins,
+      duelLosses,
+      duelCurrentWinStreak,
+      currentActivity: details.currentActivity,
+    })
+    setSelectedLeaderboardIsTop(false)
+  }, [
+    allTimeFirstSpotCountsByUser,
+    allTimeLeaderboardAppearanceCountsByUser,
+    allTimeTopPerformer,
+    bestWeeklyDepartment,
+    clockNowMs,
+    homeDuelStreakLeadersByMode,
+    homeDuelWinsLeadersByMode,
+    homeEntryToLeaderboardEntry,
+    homeMostMasteredLeaders,
+    homeStudyStreakLeaders,
+    homeStudyTimeLeaders,
+    leaderboard,
+    supabase,
+    weeklyFirstSpotCountsByUser,
+    weeklyLeaderboardAppearanceCountsByUser,
+    weeklyLeaderboardEntries,
+    weeklyTopPerformer,
+  ])
 
   useEffect(() => {
     if (!currentUserId) return
@@ -11094,12 +11887,31 @@ function App() {
             {profile ? (
               <div className="taskbar-profile-wrap" ref={profileMenuRef}>
                 <button className="taskbar-profile" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="Open profile menu">
-                  <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="taskbar-profile-image" onError={handleAvatarImageError} />
+                  <span className={`avatar-decoration-wrap taskbar-profile-avatar-wrap level-halo-frame ${currentUserLevelProfile.haloClass}`}>
+                    <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="taskbar-profile-image" onError={handleAvatarImageError} />
+                    {renderAvatarDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
+                  </span>
                   <span className="taskbar-profile-info">
                     <span className={`taskbar-profile-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
                       {profile.username || 'Profile'}
                     </span>
-                    <span className="taskbar-profile-tier">{tierLabel[activeProfileTier]}</span>
+                    <span className="taskbar-profile-tier">{tierLabel[activeProfileTier]} • Lv {currentUserLevelProfile.level}</span>
+                    <span className="taskbar-xp-meta">
+                      <span>{currentUserLevelProfile.currentLevelXp.toLocaleString()} / {currentUserLevelProfile.nextLevelXp.toLocaleString()} XP</span>
+                      <span>{currentUserLevelProfile.progressPercent}%</span>
+                    </span>
+                    <span
+                      ref={taskbarXpBarRef}
+                      className={`taskbar-xp-track ${xpGainFeedback?.mode === 'bar' ? 'is-gaining' : ''} ${xpGainFeedback?.leveledUp ? 'leveled-up' : ''}`}
+                      aria-label={`Level ${currentUserLevelProfile.level} progress ${currentUserLevelProfile.progressPercent}%`}
+                    >
+                      <span className="taskbar-xp-fill" style={{ width: `${currentUserLevelProfile.progressPercent}%` }} />
+                      {xpGainFeedback?.mode === 'bar' ? (
+                        <span className="taskbar-xp-pop" key={`xp-pop-${xpGainFeedback.id}`}>
+                          {xpGainFeedback.leveledUp ? 'Level up!' : `+${xpGainFeedback.amount.toLocaleString()} XP`}
+                        </span>
+                      ) : null}
+                    </span>
                   </span>
                 </button>
                 {profileMenuOpen ? (
@@ -12016,6 +12828,8 @@ function App() {
                   allTime: allTimeFirstSpotCountsByUser,
                   weekly: weeklyFirstSpotCountsByUser,
                 }}
+                userLevels={chatLevelProfiles}
+                onOpenProfile={(userId) => void openLeaderboardStyleProfileByUserId(userId)}
                 mode="full"
               />
             </div>
@@ -12309,6 +13123,8 @@ function App() {
         {isStudyPracticeTestPage ? (
           <StudyPracticeTestPage
             onStudyActivity={() => markStudyActivity('study_practice')}
+            onSessionStateChange={setStudyPracticeSessionState}
+            sessionXpReward={studyPracticeSessionState.complete ? renderSessionXpReward() : null}
           />
         ) : null}
 
@@ -12650,15 +13466,28 @@ function App() {
 
               {studyTestSessionDone ? (
                 studyTestReport ? (
-                  <div className="study-test-complete study-test-complete-single">
+                  <div className="study-test-complete study-test-complete-single session-result-card">
+                    <div className="session-result-hero session-result-hero-study">
+                      <div className="session-result-title">
+                        <span className="session-result-kicker">Quiz Complete</span>
+                        <h3>Test Complete</h3>
+                      </div>
+                      {renderSessionXpReward()}
+                    </div>
                     <SessionPerformanceReportCard report={studyTestReport} />
                     <div className="actions-row study-test-complete-actions">
                       <button className="primary" onClick={beginStudyTest}>Retake Test</button>
                     </div>
                   </div>
                 ) : (
-                  <div className="card study-test-complete">
-                    <h3>Test Complete</h3>
+                  <div className="card study-test-complete session-result-card">
+                    <div className="session-result-hero session-result-hero-study">
+                      <div className="session-result-title">
+                        <span className="session-result-kicker">Quiz Complete</span>
+                        <h3>Test Complete</h3>
+                      </div>
+                      {renderSessionXpReward()}
+                    </div>
                     <p className="muted">
                       Score: {studyTestSessionCorrect}/{studyTestSessionTotal} ({studyTestSessionTotal > 0 ? Math.round((studyTestSessionCorrect / studyTestSessionTotal) * 100) : 0}%)
                     </p>
@@ -13072,8 +13901,14 @@ function App() {
                     </div>
                   ) : null}
                   {matchDone && !matchRunning ? (
-                    <div className="card session-card">
-                      <h3>Session Complete</h3>
+                    <div className="card session-card session-result-card">
+                      <div className="session-result-hero">
+                        <div className="session-result-title">
+                          <span className="session-result-kicker">Matching Complete</span>
+                          <h3>Session Complete</h3>
+                        </div>
+                        {renderSessionXpReward()}
+                      </div>
                       <div className="match-session-top match-session-top-finished">
                         <span>Time: {matchRemaining}s</span>
                         <span>Round: {matchRound}</span>
@@ -13260,8 +14095,14 @@ function App() {
                   ) : null}
 
                   {speedDone && !speedRunning ? (
-                    <div className="card session-card">
-                      <h3>Session Complete</h3>
+                    <div className="card session-card session-result-card">
+                      <div className="session-result-hero">
+                        <div className="session-result-title">
+                          <span className="session-result-kicker">Speed Test Complete</span>
+                          <h3>Session Complete</h3>
+                        </div>
+                        {renderSessionXpReward()}
+                      </div>
                       <div className="speed-session-top speed-session-top-finished">
                         <span>Time: {speedRemaining}s</span>
                         <span>Score: {speedScore}</span>
@@ -13477,8 +14318,14 @@ function App() {
                       ) : null}
 
                       {blasterDone && !blasterRunning ? (
-                        <div className="card session-card blaster-results-card">
-                          <h3>Mission Complete</h3>
+                        <div className="card session-card session-result-card blaster-results-card">
+                          <div className="session-result-hero">
+                            <div className="session-result-title">
+                              <span className="session-result-kicker">Code Blaster Complete</span>
+                              <h3>Mission Complete</h3>
+                            </div>
+                            {renderSessionXpReward()}
+                          </div>
                           <div className="speed-session-top speed-session-top-finished">
                             <span>Time: {blasterRemaining}s</span>
                             <span>Score: {blasterScore}</span>
@@ -13957,6 +14804,9 @@ function App() {
                 <button className={settingsTab === 'profile' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('profile')}>
                   Profile
                 </button>
+                <button className={settingsTab === 'progression' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('progression')}>
+                  Level & Rewards
+                </button>
                 <button className={settingsTab === 'customization' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('customization')}>
                   Customization
                 </button>
@@ -13994,8 +14844,13 @@ function App() {
               <div className="settings-panel">
               {settingsTab === 'profile' ? (
                 <div className="settings-section-card">
-                  <div className="avatar-frame">
+                  <div className={`avatar-frame avatar-decoration-wrap level-halo-frame ${currentUserLevelProfile.haloClass}`}>
                     <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
+                    {renderAvatarDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
+                  </div>
+                  <div className="profile-level-preview">
+                    {renderLevelBadge(currentUserLevelProfile)}
+                    <span>{currentUserLevelProfile.totalXp.toLocaleString()} XP • {selectedProfileDecoration.title}</span>
                   </div>
                   {isOwner ? <p className="owner-pill">Owner</p> : null}
                   <label>
@@ -14081,6 +14936,70 @@ function App() {
                   </button>
                   {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
                   {authError ? <p className="bad">{authError}</p> : null}
+                </div>
+              ) : null}
+
+              {settingsTab === 'progression' ? (
+                <div className="settings-section-card progression-card">
+                  <div className="progression-hero">
+                    <div className={`avatar-frame progression-avatar avatar-decoration-wrap level-halo-frame ${currentUserLevelProfile.haloClass}`}>
+                      <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
+                      {renderAvatarDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
+                    </div>
+                    <div>
+                      <p className="eyebrow">Progression</p>
+                      <h3>Level {currentUserLevelProfile.level} • {currentUserLevelProfile.tierName}</h3>
+                      <p className="muted">{currentUserLevelProfile.totalXp.toLocaleString()} XP earned from study time, mastered codes, games, high scores, 1v1s, streaks, and leaderboard bonuses.</p>
+                    </div>
+                  </div>
+                  <div className="level-progress-bar" aria-label={`Level progress ${currentUserLevelProfile.progressPercent}%`}>
+                    <span style={{ width: `${currentUserLevelProfile.progressPercent}%` }} />
+                  </div>
+                  <div className="level-progress-copy">
+                    <span>{currentUserLevelProfile.currentLevelXp.toLocaleString()} / {currentUserLevelProfile.nextLevelXp.toLocaleString()} XP to Level {currentUserLevelProfile.level + 1}</span>
+                    {currentUserLevelProfile.nextReward ? <span>Next: {currentUserLevelProfile.nextReward.title} at Lv {currentUserLevelProfile.nextReward.unlockLevel}</span> : <span>All planned rewards unlocked.</span>}
+                  </div>
+                  <div className="profile-decoration-picker">
+                    <div className="profile-decoration-heading">
+                      <div>
+                        <h3>Avatar Decorations</h3>
+                        <p className="muted">Pick a full-profile decoration: hats, frames, auras, and animated high-level effects.</p>
+                      </div>
+                      <span className="level-badge level-badge-compact">{unlockedDecorationsForCurrentUser.length}/{profileDecorationCatalog.length} unlocked</span>
+                    </div>
+                    <div className="profile-decoration-grid">
+                      {profileDecorationCatalog.map((decoration) => {
+                        const unlocked = decoration.unlockLevel <= currentUserLevelProfile.level
+                        const active = profileDetails.profileDecorationKey === decoration.key
+                        const previewDecoration = decoration.key === 'auto' ? getEffectiveProfileDecoration(currentUserLevelProfile, 'auto') : decoration
+                        return (
+                          <button
+                            key={decoration.key}
+                            type="button"
+                            className={`profile-decoration-card ${active ? 'active' : ''} ${unlocked ? 'unlocked' : 'locked'}`}
+                            onClick={() => {
+                              if (!unlocked) return
+                              setProfileDetails((previous) => ({ ...previous, profileDecorationKey: decoration.key }))
+                            }}
+                            disabled={!unlocked}
+                          >
+                            <span className="profile-decoration-preview avatar-decoration-wrap">
+                              <span className="profile-decoration-preview-face" aria-hidden />
+                              {renderDecorationLayer(previewDecoration)}
+                            </span>
+                            <span className="profile-decoration-copy">
+                              <strong>{decoration.title}</strong>
+                              <small>{decoration.tone} • Lv {decoration.unlockLevel}</small>
+                              <span>{unlocked ? decoration.description : `Unlocks at Level ${decoration.unlockLevel}`}</span>
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
+                      Save Decoration
+                    </button>
+                  </div>
                 </div>
               ) : null}
 
@@ -15210,7 +16129,7 @@ function App() {
             setSelectedLeaderboardIsTop(false)
           }}
         >
-          <div className={`card profile-modal-card ${selectedLeaderboardThemeCardClass}`} onClick={(event) => event.stopPropagation()}>
+          <div className={`card profile-modal-card ${selectedLeaderboardThemeCardClass} ${avatarDecorationEffectClass(selectedLeaderboardLevelProfile, selectedLeaderboardEntry.profileDecorationKey)}`} onClick={(event) => event.stopPropagation()}>
             <div className="quiz-top">
               <h3>Player Profile</h3>
               <button
@@ -15226,8 +16145,9 @@ function App() {
             <div className="leader-player">
               <span className="leader-avatar-wrap">
                 {selectedLeaderboardIsTop ? <span className="leader-crown leader-crown-modal" aria-label="Top Player">👑</span> : null}
-                <span className={leaderAvatarFrameClass(selectedLeaderboardEntry.userId, 'modal-avatar')}>
+                <span className={`${leaderAvatarFrameClass(selectedLeaderboardEntry.userId, 'modal-avatar')} avatar-decoration-wrap`}>
                   <img src={avatarFor(selectedLeaderboardEntry.avatarUrl)} alt={selectedLeaderboardEntry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
+                  {renderAvatarDecoration(selectedLeaderboardLevelProfile, selectedLeaderboardEntry.profileDecorationKey)}
                 </span>
               </span>
               <div className="leader-profile-head">
@@ -15241,6 +16161,7 @@ function App() {
                 </div>
                 <div className="leader-profile-pills">
                   <p className="leader-theme-pill">Tier: {tierLabel[selectedLeaderboardEntry.supporterTier]}</p>
+                  {selectedLeaderboardLevelProfile ? renderLevelBadge(selectedLeaderboardLevelProfile, true) : null}
                   {selectedLeaderboardEntry.isOwner ? <p className="owner-pill owner-pill-inline">Owner</p> : null}
                 </div>
               </div>
@@ -15304,6 +16225,13 @@ function App() {
                 <strong>{selectedLeaderboardAllTimeFirstSpots}</strong>
                 <span className="leader-profile-substat">Weekly: {selectedLeaderboardWeeklyFirstSpots}</span>
               </div>
+              {selectedLeaderboardLevelProfile ? (
+                <div className="leader-profile-stat">
+                  <p className="leader-profile-label">Level</p>
+                  <strong>Lv {selectedLeaderboardLevelProfile.level}</strong>
+                  <span className="leader-profile-substat">{selectedLeaderboardLevelProfile.totalXp.toLocaleString()} XP</span>
+                </div>
+              ) : null}
             </div>
             <div className="leader-profile-footer">
               <p className="muted">
@@ -15332,6 +16260,21 @@ function App() {
               <span key={`confetti-${celebration.burst}-${index}`} className="confetti-dot" style={{ ['--i' as string]: `${index}` }} />
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {xpGainFeedback?.mode === 'toast' ? (
+        <div className="xp-gain-toast" key={`xp-toast-${xpGainFeedback.id}`} aria-live="polite">
+          <div className="xp-gain-toast-head">
+            <span>{xpGainFeedback.leveledUp ? `Level ${xpGainFeedback.level}!` : `+${xpGainFeedback.amount.toLocaleString()} XP`}</span>
+            <strong>{xpGainFeedback.progressPercent}%</strong>
+          </div>
+          <div className="xp-gain-toast-track">
+            <span style={{ width: `${xpGainFeedback.progressPercent}%` }} />
+          </div>
+          <p>
+            {xpGainFeedback.currentLevelXp.toLocaleString()} / {xpGainFeedback.nextLevelXp.toLocaleString()} XP to Level {xpGainFeedback.level + 1}
+          </p>
         </div>
       ) : null}
 
@@ -15580,6 +16523,8 @@ function App() {
             allTime: allTimeFirstSpotCountsByUser,
             weekly: weeklyFirstSpotCountsByUser,
           }}
+          userLevels={chatLevelProfiles}
+          onOpenProfile={(userId) => void openLeaderboardStyleProfileByUserId(userId)}
         />
       ) : null}
       <SpeedInsights />

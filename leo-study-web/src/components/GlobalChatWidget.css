@@ -194,6 +194,78 @@
   border-radius: 4px;
 }
 
+.global-chat-level {
+  --level-halo: rgba(129, 153, 191, 0.82);
+  --level-halo-soft: rgba(129, 153, 191, 0.22);
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--level-halo) 62%, transparent);
+  background: linear-gradient(135deg, var(--level-halo-soft), rgba(255, 255, 255, 0.06));
+  color: #f7fbff;
+  box-shadow: 0 0 10px var(--level-halo-soft);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.global-chat-level.level-halo-bronze,
+.global-chat-profile-level.level-halo-bronze,
+.global-chat-profile-halo.level-halo-bronze {
+  --level-halo: rgba(220, 156, 91, 0.9);
+  --level-halo-soft: rgba(220, 156, 91, 0.26);
+}
+
+.global-chat-level.level-halo-blue,
+.global-chat-profile-level.level-halo-blue,
+.global-chat-profile-halo.level-halo-blue {
+  --level-halo: rgba(90, 167, 255, 0.95);
+  --level-halo-soft: rgba(90, 167, 255, 0.28);
+}
+
+.global-chat-level.level-halo-siren,
+.global-chat-profile-level.level-halo-siren,
+.global-chat-profile-halo.level-halo-siren {
+  --level-halo: rgba(255, 78, 116, 0.95);
+  --level-halo-soft: rgba(64, 156, 255, 0.32);
+}
+
+.global-chat-level.level-halo-gold,
+.global-chat-profile-level.level-halo-gold,
+.global-chat-profile-halo.level-halo-gold {
+  --level-halo: rgba(255, 216, 106, 0.98);
+  --level-halo-soft: rgba(255, 190, 66, 0.34);
+}
+
+.global-chat-level.level-halo-neon,
+.global-chat-profile-level.level-halo-neon,
+.global-chat-profile-halo.level-halo-neon {
+  --level-halo: rgba(105, 255, 229, 0.98);
+  --level-halo-soft: rgba(151, 91, 255, 0.35);
+}
+
+.global-chat-level.level-halo-diamond,
+.global-chat-profile-level.level-halo-diamond,
+.global-chat-profile-halo.level-halo-diamond {
+  --level-halo: rgba(160, 231, 255, 1);
+  --level-halo-soft: rgba(115, 214, 255, 0.38);
+}
+
+.global-chat-level.level-halo-inferno,
+.global-chat-profile-level.level-halo-inferno,
+.global-chat-profile-halo.level-halo-inferno {
+  --level-halo: rgba(255, 112, 46, 1);
+  --level-halo-soft: rgba(255, 87, 30, 0.42);
+}
+
+.global-chat-level.level-halo-legend,
+.global-chat-profile-level.level-halo-legend,
+.global-chat-profile-halo.level-halo-legend {
+  --level-halo: rgba(255, 246, 169, 1);
+  --level-halo-soft: rgba(129, 104, 255, 0.42);
+}
+
 .global-chat-time {
   font-size: 11px;
   color: var(--muted, #b3bedf);
@@ -652,20 +724,51 @@
 }
 
 .profile-modal-avatar {
+  position: relative;
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
+  isolation: isolate;
+}
+
+.profile-modal-avatar img,
+.profile-modal-avatar .profile-avatar-placeholder {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--level-halo, #4ba4ff) 62%, transparent);
+  box-shadow: 0 0 0 3px var(--level-halo-soft, rgba(75, 164, 255, 0.2)), 0 0 22px var(--level-halo-soft, rgba(75, 164, 255, 0.2));
 }
 
 .profile-modal-avatar img {
-  width: 100%;
-  height: 100%;
   object-fit: cover;
+  clip-path: circle(50% at 50% 50%);
+}
+
+.profile-modal-avatar .avatar-decoration-layer.has-generated-art {
+  inset: 0;
+}
+
+.global-chat-profile-halo {
+  --level-halo: rgba(129, 153, 191, 0.82);
+  --level-halo-soft: rgba(129, 153, 191, 0.22);
+  position: absolute;
+  inset: -7px;
+  z-index: 0;
+  border-radius: 999px;
+  background: conic-gradient(from 0deg, var(--level-halo), rgba(255, 255, 255, 0.32), var(--level-halo));
+  opacity: 0.74;
+  filter: blur(0.2px) drop-shadow(0 0 12px var(--level-halo-soft));
+  animation: global-chat-profile-halo-spin 4s linear infinite;
 }
 
 .profile-avatar-placeholder {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   background: var(--accent, #4ba4ff);
@@ -675,6 +778,9 @@
   justify-content: center;
   font-size: 24px;
   font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--level-halo, #4ba4ff) 62%, transparent);
+  box-shadow: 0 0 0 3px var(--level-halo-soft, rgba(75, 164, 255, 0.2)), 0 0 22px var(--level-halo-soft, rgba(75, 164, 255, 0.2));
 }
 
 .profile-modal-info h4 {
@@ -682,12 +788,40 @@
   font-size: 1.25rem;
 }
 
+.profile-modal-info {
+  display: grid;
+  gap: 2px;
+}
+
 .profile-modal-agency {
+  display: inline-flex;
+  width: fit-content;
   font-size: 12px;
   color: var(--muted, #b3bedf);
   background: rgba(255, 255, 255, 0.1);
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+.global-chat-profile-level {
+  --level-halo: rgba(129, 153, 191, 0.82);
+  --level-halo-soft: rgba(129, 153, 191, 0.22);
+  display: inline-flex;
+  width: fit-content;
+  margin: 2px 0 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--level-halo) 58%, transparent);
+  background: linear-gradient(135deg, var(--level-halo-soft), rgba(255, 255, 255, 0.06));
+  color: #f7fbff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+@keyframes global-chat-profile-halo-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .profile-modal-stats {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   getPracticeTestModule,
@@ -10,6 +10,8 @@ import {
 
 type StudyPracticeTestPageProps = {
   onStudyActivity: () => void
+  onSessionStateChange?: (state: { active: boolean; complete: boolean }) => void
+  sessionXpReward?: ReactNode
 }
 
 const PRACTICE_TEST_LENGTH_OPTIONS = [10, 20, 50, 100] as const
@@ -176,7 +178,7 @@ function buildLdBreakdown(questions: PracticeTestQuestion[], answers: Record<str
     .sort((left, right) => Number(left.ldNumber) - Number(right.ldNumber))
 }
 
-export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPageProps) {
+export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, sessionXpReward }: StudyPracticeTestPageProps) {
   const [selectedModuleId, setSelectedModuleId] = useState<PracticeTestModuleId>('tmas2')
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<number>(20)
   const [sessionActive, setSessionActive] = useState(false)
@@ -193,6 +195,10 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
   const feedbackRef = useRef<HTMLDivElement | null>(null)
   const nextActionRef = useRef<HTMLButtonElement | null>(null)
   const setupStartRef = useRef<HTMLButtonElement | null>(null)
+
+  useEffect(() => {
+    onSessionStateChange?.({ active: sessionActive, complete: sessionComplete })
+  }, [onSessionStateChange, sessionActive, sessionComplete])
 
   const selectedModule = useMemo(() => getPracticeTestModule(selectedModuleId), [selectedModuleId])
   const availableQuestionCount = useMemo(
@@ -572,6 +578,9 @@ export function StudyPracticeTestPage({ onStudyActivity }: StudyPracticeTestPage
                 <span className="study-guide-kicker">Practice Test Complete</span>
                 <h2>{selectedModule.title} Results</h2>
                 <p className="muted">Review the weak points, then start another randomized run.</p>
+              </div>
+              <div className="study-practice-results-xp">
+                {sessionXpReward}
               </div>
               <button className="secondary study-session-exit-btn" onClick={closeSession}>
                 Close

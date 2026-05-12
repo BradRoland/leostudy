@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useCallback, type SyntheticEvent } from 'react'
+import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
+import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
 
 type PublicMessage = {
@@ -38,6 +40,21 @@ type UserProfileStats = {
   duelWins: number
   duelLosses: number
   duelCurrentWinStreak: number
+  // Level stats
+  level: number
+  tierName: string
+  totalXp: number
+  haloClass: string
+  profileDecorationKey: string
+  autoDecorationKey?: string
+}
+
+type ChatLevelProfile = {
+  level: number
+  tierName: string
+  totalXp: number
+  haloClass: string
+  autoDecorationKey?: string
 }
 
 type Props = {
@@ -49,6 +66,8 @@ type Props = {
     allTime: Record<string, number>
     weekly: Record<string, number>
   }
+  userLevels?: Record<string, ChatLevelProfile>
+  onOpenProfile?: (userId: string) => void
   mode?: 'widget' | 'full'
 }
 
@@ -163,6 +182,8 @@ export function GlobalChatWidget({
   userAgency,
   isOwner,
   leaderboardFirstSpotCounts,
+  userLevels,
+  onOpenProfile,
   mode = 'widget',
 }: Props) {
   const isFullMode = mode === 'full'
@@ -870,8 +891,16 @@ export function GlobalChatWidget({
       let studySeconds = 0
       let studyDayStreak = 0
       let mostStudiedMode = ''
+      let profileDecorationKey = 'auto'
+      let levelSnapshot: Record<string, unknown> | null = null
       if (appState?.profile_details) {
-        const details = appState.profile_details as { stats?: { studySeconds?: number; studyDayStreak?: number; studyModeCounts?: Record<string, number> } }
+        const details = appState.profile_details as {
+          profileDecorationKey?: string
+          levelSnapshot?: Record<string, unknown>
+          stats?: { studySeconds?: number; studyDayStreak?: number; studyModeCounts?: Record<string, number> }
+        }
+        profileDecorationKey = typeof details.profileDecorationKey === 'string' ? details.profileDecorationKey : 'auto'
+        levelSnapshot = details.levelSnapshot && typeof details.levelSnapshot === 'object' ? details.levelSnapshot : null
         studySeconds = details?.stats?.studySeconds ?? 0
         studyDayStreak = details?.stats?.studyDayStreak ?? 0
         
@@ -893,6 +922,13 @@ export function GlobalChatWidget({
           ? `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/avatars/${profile.avatar_path}`
           : ''
         
+        const levelProfile = userLevels?.[userId]
+        const level = levelProfile?.level ?? Math.max(1, Math.floor(Number(levelSnapshot?.level || 1)))
+        const tierName = levelProfile?.tierName ?? String(levelSnapshot?.tierName || 'Recruit')
+        const totalXp = levelProfile?.totalXp ?? Math.max(0, Math.floor(Number(levelSnapshot?.totalXp || 0)))
+        const haloClass = levelProfile?.haloClass ?? String(levelSnapshot?.haloClass || 'level-halo-recruit')
+        const autoDecorationKey = levelProfile?.autoDecorationKey ?? (typeof levelSnapshot?.autoDecorationKey === 'string' ? levelSnapshot.autoDecorationKey : undefined)
+
         setSelectedProfile({
           user_id: userId,
           username: profile.username || 'Unknown',
@@ -908,6 +944,12 @@ export function GlobalChatWidget({
           duelWins: duelStats?.wins ?? 0,
           duelLosses: duelStats?.losses ?? 0,
           duelCurrentWinStreak: duelStats?.current_win_streak ?? 0,
+          level,
+          tierName,
+          totalXp,
+          haloClass,
+          profileDecorationKey,
+          autoDecorationKey,
         })
       }
     } catch (err) {
@@ -915,7 +957,15 @@ export function GlobalChatWidget({
     } finally {
       setProfileLoading(false)
     }
-  }, [leaderboardFirstSpotCounts, supabaseClient])
+  }, [leaderboardFirstSpotCounts, supabaseClient, userLevels])
+
+  const openUserProfile = useCallback((userId: string) => {
+    if (onOpenProfile) {
+      onOpenProfile(userId)
+      return
+    }
+    void fetchUserProfile(userId)
+  }, [fetchUserProfile, onOpenProfile])
 
   // Format timestamp
   const formatTime = (dateStr: string) => {
@@ -973,6 +1023,7 @@ export function GlobalChatWidget({
               const messageDisplayName = String(msg.display_name || '').trim().toLowerCase()
               const isSystemMessage = messageDisplayName === 'system' || messageDisplayName === '🔔 system'
               const isOwnMessage = msg.user_id === currentUserId && !isSystemMessage
+              const messageLevel = userLevels?.[msg.user_id] || { level: 1, tierName: 'Recruit', totalXp: 0, haloClass: 'level-halo-recruit' }
 
               return (
                 <div key={msg.id} className={`global-chat-message ${isOwnMessage ? 'own' : ''} ${msg.is_deleted ? 'deleted' : ''}`}>
@@ -980,10 +1031,13 @@ export function GlobalChatWidget({
                     {isSystemMessage ? (
                       <span className="global-chat-name global-chat-name-system">{msg.display_name}</span>
                     ) : (
-                      <button className="global-chat-name" onClick={() => void fetchUserProfile(msg.user_id)}>
+                      <button className="global-chat-name" onClick={() => openUserProfile(msg.user_id)}>
                         {msg.display_name}
                       </button>
                     )}
+                    {!isSystemMessage ? (
+                      <span className={`global-chat-level ${messageLevel.haloClass}`}>Lv {messageLevel.level}</span>
+                    ) : null}
                     {msg.agency && <span className="global-chat-agency">{msg.agency}</span>}
                     <span className="global-chat-time">{formatTime(msg.created_at)}</span>
                   </div>
@@ -1199,18 +1253,22 @@ export function GlobalChatWidget({
           ) : (
           <div className="global-chat-modal profile-modal" onClick={(e) => e.stopPropagation()}>
             <div className="profile-modal-header">
-              <div className="profile-modal-avatar">
-                {selectedProfile.avatarUrl ? (
+	              <div className={`profile-modal-avatar avatar-decoration-wrap level-halo-frame ${selectedProfile.haloClass}`}>
+	                {selectedProfile.avatarUrl ? (
                   <img src={selectedProfile.avatarUrl} alt={selectedProfile.username} />
                 ) : (
                   <div className="profile-avatar-placeholder">
                     {selectedProfile.username.charAt(0).toUpperCase()}
                   </div>
                 )}
+                <ProfileAvatarDecoration
+                  decoration={getEffectiveProfileDecorationForLevel(selectedProfile.level, selectedProfile.profileDecorationKey)}
+                />
               </div>
-              <div className="profile-modal-info">
-                <h4>{selectedProfile.username}</h4>
-                {selectedProfile.agency && <span className="profile-modal-agency">{selectedProfile.agency}</span>}
+	              <div className="profile-modal-info">
+	                <h4>{selectedProfile.username}</h4>
+	                <span className={`global-chat-profile-level ${selectedProfile.haloClass}`}>Lv {selectedProfile.level} • {selectedProfile.tierName} • {selectedProfile.totalXp.toLocaleString()} XP</span>
+	                {selectedProfile.agency && <span className="profile-modal-agency">{selectedProfile.agency}</span>}
               </div>
             </div>
             
