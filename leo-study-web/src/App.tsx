@@ -4176,7 +4176,8 @@ function App() {
   const [taskbarCollapsedGroups, setTaskbarCollapsedGroups] = useState(() => loadTaskbarCollapsedGroups())
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const taskbarXpBarRef = useRef<HTMLSpanElement | null>(null)
-  const previousXpSnapshotRef = useRef<{ userId: string; totalXp: number; level: number } | null>(null)
+  const previousXpSnapshotRef = useRef<{ userId: string; totalXp: number; level: number; capturedAt: number } | null>(null)
+  const lastXpEligibleActivityAtRef = useRef(0)
   const xpGainTimerRef = useRef<number | null>(null)
   const streakLossNoticeRef = useRef('')
 
@@ -6555,6 +6556,7 @@ function App() {
   useEffect(() => {
     if (!currentUserId || !stateHydrated) {
       previousXpSnapshotRef.current = null
+      lastXpEligibleActivityAtRef.current = 0
       return
     }
 
@@ -6562,11 +6564,13 @@ function App() {
       userId: currentUserId,
       totalXp: currentUserLevelProfile.totalXp,
       level: currentUserLevelProfile.level,
+      capturedAt: Date.now(),
     }
     const previous = previousXpSnapshotRef.current
 
     if (!previous || previous.userId !== currentUserId) {
       previousXpSnapshotRef.current = currentSnapshot
+      lastXpEligibleActivityAtRef.current = 0
       return
     }
 
@@ -6574,9 +6578,11 @@ function App() {
     const leveledUp = currentSnapshot.level > previous.level
     previousXpSnapshotRef.current = currentSnapshot
     if (xpDelta <= 0) return
-    const lastStudyActivityAt = Math.max(0, ...Object.values(studyActivityBySourceRef.current))
-    const hasRecentStudyActivity = Date.now() - lastStudyActivityAt <= xpFeedbackActivityWindowMs
-    if (!hasRecentStudyActivity) return
+    const lastXpEligibleActivityAt = lastXpEligibleActivityAtRef.current
+    const hasRecentXpActivity =
+      lastXpEligibleActivityAt > previous.capturedAt &&
+      Date.now() - lastXpEligibleActivityAt <= xpFeedbackActivityWindowMs
+    if (!hasRecentXpActivity) return
 
     const xpBarElement = taskbarXpBarRef.current
     const xpBarVisible = Boolean(
@@ -6917,6 +6923,7 @@ function App() {
   }
 
   const incrementUserStats = useCallback((updater: (stats: UserStats) => UserStats, trackStudyDay = false) => {
+    lastXpEligibleActivityAtRef.current = Date.now()
     setProfileDetails((previous) => ({
       ...previous,
       stats: trackStudyDay ? applyStudyDayActivity(updater(previous.stats)) : updater(previous.stats),
@@ -7155,6 +7162,7 @@ function App() {
   }, [currentUserEmail, currentUserId, postPublicChatAnnouncement, profile?.username, profileDetails.agency, shouldPostLeaderboardAnnouncement, triggerCelebration])
 
   const saveSessionAttempt = useCallback((trackKey: string, snapshot: SessionAttemptSnapshot) => {
+    lastXpEligibleActivityAtRef.current = Date.now()
     const mode: SessionMode = trackKey.startsWith('study_test|')
       ? 'study_test'
       : trackKey.startsWith('matching|')
@@ -7552,6 +7560,7 @@ function App() {
       incorrectCount: current.incorrectCount + (correct ? 0 : 1),
       correctStreak: correct ? (current.correctStreak ?? 0) + 1 : 0,
     }
+    lastXpEligibleActivityAtRef.current = Date.now()
     const nextPerformance = { ...performanceRef.current, [key]: updated }
     performanceRef.current = nextPerformance
     setPerformance(nextPerformance)
