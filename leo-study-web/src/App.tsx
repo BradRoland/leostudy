@@ -853,9 +853,41 @@ const homeEncouragementQuotes = [
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
 ]
-const releaseNotesV050: Array<{ title: string; items: string[] }> = [
+const releaseNotesV055: Array<{ title: string; items: string[] }> = [
   {
-    title: 'Code Blaster Game Mode (v0.50)',
+    title: 'Leveling and XP Rewards (v0.55)',
+    items: [
+      'Added a full XP and level system that rewards studying, game sessions, 1v1 wins, leaderboard performance, study streaks, mastered codes, and overall activity.',
+      'Added a visible XP progress bar near the user profile area so learners can see how close they are to the next level.',
+      'Refined XP feedback so level-up popups do not appear after a normal page refresh and game/test XP is saved for the end-of-session results screen.',
+    ],
+  },
+  {
+    title: 'Avatar Decorations and Profile Polish',
+    items: [
+      'Added unlockable profile decorations tied to user level, including rank frames, higher-level animated effects, and automatic best-rank selection.',
+      'Improved decoration scaling in profile modals, profile settings, chat profile views, and 1v1 lobby/profile displays so frames fit the avatar more cleanly.',
+      'Cleaned up leaderboard avatars by removing decoration overlays there for now, keeping leaderboards easier to read while profile pages still show the full reward styling.',
+    ],
+  },
+  {
+    title: 'Activity Status and Social UX',
+    items: [
+      'Improved clicked-user profile cards with clearer active, idle, and offline status indicators using color-coded presence styling.',
+      'Made chat profile clicks open the same richer profile experience used from leaderboard profiles.',
+      'Added user level visibility in chat and improved profile context so users can better understand what others are doing on the site.',
+    ],
+  },
+  {
+    title: 'Performance and Database Optimizations',
+    items: [
+      'Reduced unnecessary app-state writes by only syncing changed profile, performance, streak, and high-score fields.',
+      'Debounced realtime leaderboard refreshes so leveling and home widgets feel smoother with less backend churn.',
+      'Added Supabase leaderboard indexes and app_state policy cleanup to make weekly leaderboards, profile XP, and ranking refreshes faster.',
+    ],
+  },
+  {
+    title: 'Code Blaster Game Mode',
     items: [
       'Added a new space-blaster learning game where users aim at moving code asteroids, answer fast, and level up as the timer gets tighter.',
       'Code Blaster now supports all the normal code sets, adds time bonuses for correct hits, limits asteroid clutter, and keeps motion smoother for smaller screens.',
@@ -887,7 +919,7 @@ const releaseNotesV050: Array<{ title: string; items: string[] }> = [
     ],
   },
   {
-    title: 'TMAS 3 Study Guide (v0.45)',
+    title: 'TMAS 3 Study Guide',
     items: [
       'Added TMAS 3 coverage into the Study Guide using the Class 180 blueprint LDs: 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 20, 25, 26, 28, 37, 39, 40, and 43.',
       'Kept the Study Guide simple again by removing the extra TMAS 3 focus selector and returning the left rail to the full LD list with TMAS tags still visible.',
@@ -12061,10 +12093,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 0.50"
+                    aria-label="Open what's new for version 0.55"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v0.50
+                    What's New · v0.55
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -16000,15 +16032,15 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v0.50</h3>
+                <h3>What’s New · v0.55</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV050.map((group) => (
-                <article key={`v050-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV055.map((group) => (
+                <article key={`v055-note-${group.title}`} className="home-whats-new-card">
                   <h4>{group.title}</h4>
                   <ul>
                     {group.items.map((item) => (
