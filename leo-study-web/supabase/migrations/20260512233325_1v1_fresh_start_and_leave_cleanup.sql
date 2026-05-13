@@ -116,6 +116,53 @@ $$;
 
 grant execute on function public.leave_1v1_room(uuid) to authenticated;
 
+create or replace function public.cleanup_inactive_1v1_rooms()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_deleted integer := 0;
+begin
+  with stale_rooms as (
+    select r.id
+    from public.rooms r
+    where (
+      r.status = 'waiting'
+      and r.created_at <= now() - interval '5 minutes'
+      and not exists (
+        select 1
+        from public.room_players rp
+        where rp.room_id = r.id
+          and rp.last_seen >= now() - interval '5 minutes'
+      )
+    ) or (
+      r.status = 'in_progress'
+      and coalesce(r.started_at, r.updated_at, r.created_at) <= now() - interval '2 hours'
+      and not exists (
+        select 1
+        from public.room_players rp
+        where rp.room_id = r.id
+          and rp.last_seen >= now() - interval '10 minutes'
+      )
+    ) or (
+      r.status in ('completed', 'cancelled')
+      and coalesce(r.ended_at, r.updated_at, r.created_at) <= now() - interval '5 minutes'
+      and r.rematch_room_id is null
+    )
+  )
+  delete from public.rooms r
+  using stale_rooms s
+  where r.id = s.id;
+
+  get diagnostics v_deleted = row_count;
+  return coalesce(v_deleted, 0);
+end;
+$$;
+
+grant execute on function public.cleanup_inactive_1v1_rooms() to authenticated;
+
 create or replace function public.set_1v1_ready(p_room_id uuid, p_ready boolean)
 returns jsonb
 language plpgsql
@@ -394,5 +441,7 @@ where exists (
   where r.id = rp.room_id
     and r.status in ('cancelled', 'completed')
 );
+
+select public.cleanup_inactive_1v1_rooms();
 
 select pg_notify('pgrst', 'reload schema');
