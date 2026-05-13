@@ -62,8 +62,13 @@ type HomeTmasCountdownDisplay = {
 
 const studyTrackingTickMs = 5000
 const studyActivityWindowMs = 20000
+const xpFeedbackActivityWindowMs = 120000
 const leaderboardRefreshThrottleMs = 5000
-const homeLeaderboardRefreshThrottleMs = 7000
+const homeLeaderboardRefreshThrottleMs = 12000
+const leaderboardRealtimeDebounceMs = 450
+const homeLeaderboardRealtimeDebounceMs = 2600
+const activitySyncIntervalMs = 45000
+const activitySyncMinGapMs = 40000
 const historyHydrateLimit = 4000
 const remoteTrackHistoryMaxPoints = 900
 const remoteTimelineMaxPoints = 2400
@@ -4249,6 +4254,17 @@ function App() {
   const leaderboardAnnouncementDedupRef = useRef<Map<string, number>>(new Map())
   const leaderboardRefreshMetaRef = useRef<{ lastAt: number; promise: Promise<LeaderboardRefreshResult> | null }>({ lastAt: 0, promise: null })
   const homeLeaderboardRefreshMetaRef = useRef<{ lastAt: number; promise: Promise<void> | null }>({ lastAt: 0, promise: null })
+  const lastPersistedAppStateRef = useRef<{
+    performance: PersistedState['performance'] | null
+    highScores: PersistedState['highScores'] | null
+    bestStreak: number | null
+    profileDetails: ProfileDetails | null
+  }>({
+    performance: null,
+    highScores: null,
+    bestStreak: null,
+    profileDetails: null,
+  })
   const matchScoreRef = useRef(0)
   const matchRoundRef = useRef(1)
   const matchSessionDurationRef = useRef(30)
@@ -5440,7 +5456,7 @@ function App() {
     const refreshPromise = (async () => {
       const { data: states, error } = await supabase
         .from('app_state')
-        .select('user_id,profile_details,high_scores,performance,best_streak')
+        .select('user_id,profile_details,high_scores,best_streak')
         .limit(400)
       if (error || !states) return
 
@@ -5803,6 +5819,12 @@ function App() {
         setCurrentUserEmail('')
         setCurrentUserProvider('email')
         setProfile(null)
+        lastPersistedAppStateRef.current = {
+          performance: null,
+          highScores: null,
+          bestStreak: null,
+          profileDetails: null,
+        }
         setRemoteTrackScoreHistory({})
         setRemoteScoreTimeline([])
         setStateHydrated(false)
@@ -5841,6 +5863,12 @@ function App() {
         setCurrentUserEmail('')
         setCurrentUserProvider('email')
         setProfile(null)
+        lastPersistedAppStateRef.current = {
+          performance: null,
+          highScores: null,
+          bestStreak: null,
+          profileDetails: null,
+        }
         setStateHydrated(false)
         navigate('/signin', { replace: true })
         return
@@ -5885,7 +5913,7 @@ function App() {
       setBestStreak(nextState.bestStreak)
       const profileBio = String(profileRow?.bio || '')
       const profileAgency = String(profileRow?.agency || '')
-      setProfileDetails({
+      const hydratedProfileDetails: ProfileDetails = {
         bio: profileBio || nextState.profileDetails.bio,
         agency: profileAgency || nextState.profileDetails.agency,
         displayMode: nextState.profileDetails.displayMode,
@@ -5899,7 +5927,14 @@ function App() {
         stats: nextState.profileDetails.stats,
         levelSnapshot: nextState.profileDetails.levelSnapshot,
         currentActivity: nextState.profileDetails.currentActivity,
-      })
+      }
+      setProfileDetails(hydratedProfileDetails)
+      lastPersistedAppStateRef.current = {
+        performance: nextState.performance,
+        highScores: nextState.highScores,
+        bestStreak: nextState.bestStreak,
+        profileDetails: hydratedProfileDetails,
+      }
 
       const { data: historyRows, error: historyError } = await client
         .from('game_attempt_history')
@@ -5948,28 +5983,43 @@ function App() {
 
     const timeout = setTimeout(() => {
       void (async () => {
-        const algorithmSnapshot = buildAlgorithmSnapshot(sections, performance)
-        const { data } = await client
+        const lastPersisted = lastPersistedAppStateRef.current
+        const shouldPersistPerformance = lastPersisted.performance !== performance
+        const shouldPersistHighScores = lastPersisted.highScores !== highScores
+        const shouldPersistBestStreak = lastPersisted.bestStreak !== bestStreak
+        const shouldPersistProfileDetails = lastPersisted.profileDetails !== profileDetails || shouldPersistPerformance
+        if (!shouldPersistPerformance && !shouldPersistHighScores && !shouldPersistBestStreak && !shouldPersistProfileDetails) return
+
+        const profileDetailsForPersist = shouldPersistProfileDetails
+          ? {
+              ...profileDetails,
+              algorithmSnapshot: buildAlgorithmSnapshot(sections, performance),
+            }
+          : null
+        const payload: Record<string, unknown> = {
+          user_id: currentUserId,
+          updated_at: new Date().toISOString(),
+        }
+        if (shouldPersistPerformance) payload.performance = performance
+        if (shouldPersistHighScores) payload.high_scores = highScores
+        if (shouldPersistBestStreak) payload.best_streak = bestStreak
+        if (profileDetailsForPersist) payload.profile_details = profileDetailsForPersist
+
+        const { data, error } = await client
           .from('app_state')
-          .upsert(
-            {
-              user_id: currentUserId,
-              performance,
-              high_scores: highScores,
-              best_streak: bestStreak,
-              profile_details: {
-                ...profileDetails,
-                algorithmSnapshot,
-              },
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'user_id' },
-          )
+          .upsert(payload, { onConflict: 'user_id' })
           .select('updated_at')
           .maybeSingle()
+        if (error) return
 
         const next = Date.parse(String(data?.updated_at || '')) || Date.now()
         lastAppStateUpdateRef.current = Math.max(lastAppStateUpdateRef.current, next)
+        lastPersistedAppStateRef.current = {
+          performance: shouldPersistPerformance ? performance : lastPersisted.performance,
+          highScores: shouldPersistHighScores ? highScores : lastPersisted.highScores,
+          bestStreak: shouldPersistBestStreak ? bestStreak : lastPersisted.bestStreak,
+          profileDetails: profileDetailsForPersist ? profileDetails : lastPersisted.profileDetails,
+        }
       })()
     }, 500)
 
@@ -5999,6 +6049,12 @@ function App() {
           setHighScores(nextState.highScores)
           setBestStreak(nextState.bestStreak)
           setProfileDetails(nextState.profileDetails)
+          lastPersistedAppStateRef.current = {
+            performance: nextState.performance,
+            highScores: nextState.highScores,
+            bestStreak: nextState.bestStreak,
+            profileDetails: nextState.profileDetails,
+          }
           lastAppStateUpdateRef.current = nextUpdatedAt
         },
       )
@@ -6075,27 +6131,37 @@ function App() {
   useEffect(() => {
     if (!supabase) return
     const client = supabase
-    let refreshTimer: number | null = null
+    let leaderboardRefreshTimer: number | null = null
+    let homeRefreshTimer: number | null = null
 
-    const queueRefresh = () => {
-      if (refreshTimer !== null) window.clearTimeout(refreshTimer)
-      refreshTimer = window.setTimeout(() => {
-        refreshTimer = null
+    const queueLeaderboardRefresh = (delayMs = leaderboardRealtimeDebounceMs) => {
+      if (leaderboardRefreshTimer !== null) window.clearTimeout(leaderboardRefreshTimer)
+      leaderboardRefreshTimer = window.setTimeout(() => {
+        leaderboardRefreshTimer = null
         void refreshLeaderboard({ force: true })
         void refreshHomeLeaderboards({ force: true })
-      }, 140)
+      }, delayMs)
+    }
+
+    const queueHomeRefresh = (delayMs = homeLeaderboardRealtimeDebounceMs) => {
+      if (homeRefreshTimer !== null) window.clearTimeout(homeRefreshTimer)
+      homeRefreshTimer = window.setTimeout(() => {
+        homeRefreshTimer = null
+        void refreshHomeLeaderboards()
+      }, delayMs)
     }
 
     const channel = client
       .channel('leaderboard-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, queueRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_leaderboard' }, queueRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_player_stats' }, queueRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, queueRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, () => queueLeaderboardRefresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_leaderboard' }, () => queueLeaderboardRefresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_player_stats' }, () => queueLeaderboardRefresh(900))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, () => queueHomeRefresh())
       .subscribe()
 
     return () => {
-      if (refreshTimer !== null) window.clearTimeout(refreshTimer)
+      if (leaderboardRefreshTimer !== null) window.clearTimeout(leaderboardRefreshTimer)
+      if (homeRefreshTimer !== null) window.clearTimeout(homeRefreshTimer)
       client.removeChannel(channel)
     }
   }, [currentUserId, supabase])
@@ -6488,18 +6554,16 @@ function App() {
 
   useEffect(() => {
     if (!currentUserId || !stateHydrated) {
-      previousXpSnapshotRef.current = currentUserId
-        ? { userId: currentUserId, totalXp: currentUserLevelProfile.totalXp, level: currentUserLevelProfile.level }
-        : null
+      previousXpSnapshotRef.current = null
       return
     }
 
-    const previous = previousXpSnapshotRef.current
     const currentSnapshot = {
       userId: currentUserId,
       totalXp: currentUserLevelProfile.totalXp,
       level: currentUserLevelProfile.level,
     }
+    const previous = previousXpSnapshotRef.current
 
     if (!previous || previous.userId !== currentUserId) {
       previousXpSnapshotRef.current = currentSnapshot
@@ -6510,6 +6574,9 @@ function App() {
     const leveledUp = currentSnapshot.level > previous.level
     previousXpSnapshotRef.current = currentSnapshot
     if (xpDelta <= 0) return
+    const lastStudyActivityAt = Math.max(0, ...Object.values(studyActivityBySourceRef.current))
+    const hasRecentStudyActivity = Date.now() - lastStudyActivityAt <= xpFeedbackActivityWindowMs
+    if (!hasRecentStudyActivity) return
 
     const xpBarElement = taskbarXpBarRef.current
     const xpBarVisible = Boolean(
@@ -9658,7 +9725,7 @@ function App() {
           previous.currentActivity?.key === publicCurrentActivity.key &&
           previous.currentActivity?.label === publicCurrentActivity.label &&
           Number.isFinite(previousUpdatedAtMs) &&
-          Date.now() - previousUpdatedAtMs < 12_000
+          Date.now() - previousUpdatedAtMs < activitySyncMinGapMs
         ) {
           return previous
         }
@@ -9674,7 +9741,7 @@ function App() {
     }
 
     syncCurrentActivity()
-    const interval = window.setInterval(syncCurrentActivity, 15_000)
+    const interval = window.setInterval(syncCurrentActivity, activitySyncIntervalMs)
     return () => window.clearInterval(interval)
   }, [currentUserId, publicCurrentActivity.key, publicCurrentActivity.label, stateHydrated])
   const toggleHomeLeaderboardDraftCard = useCallback((card: HomeLeaderboardCardKey) => {
@@ -10150,6 +10217,24 @@ function App() {
       image.src = defaultAvatarPngUrl
     }
   }
+  const renderLeaderboardAvatar = (
+    entry: Pick<LeaderboardEntry, 'userId' | 'avatarUrl' | 'playerName'>,
+    isTop = false,
+  ) => (
+    <span className="leader-avatar-wrap">
+      {isTop ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
+      <span className={leaderAvatarFrameClass(entry.userId)}>
+        <img
+          src={avatarFor(entry.avatarUrl)}
+          alt={entry.playerName}
+          className="leader-avatar"
+          loading="lazy"
+          decoding="async"
+          onError={handleAvatarImageError}
+        />
+      </span>
+    </span>
+  )
   useEffect(() => {
     const root = document.documentElement
     const vars = isUiLightMode
@@ -12187,12 +12272,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -12223,12 +12303,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -12297,12 +12372,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -12371,12 +12441,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -12433,12 +12498,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -12469,12 +12529,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -12505,12 +12560,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -12551,12 +12601,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -12595,12 +12640,7 @@ function App() {
                     >
                       <span className="leader-rank">#1</span>
                       <span className="leader-player">
-                        <span className="leader-avatar-wrap">
-                          <span className="leader-crown" aria-label="Top Player">👑</span>
-                          <span className={leaderAvatarFrameClass(weeklyTopPerformer.entry.userId)}>
-                            <img src={avatarFor(weeklyTopPerformer.entry.avatarUrl)} alt={weeklyTopPerformer.entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                          </span>
-                        </span>
+                        {renderLeaderboardAvatar(weeklyTopPerformer.entry, true)}
                         <LeaderboardPlayerName entry={weeklyTopPerformer.entry} />
                       </span>
                       <span className="leader-result">
@@ -12791,12 +12831,7 @@ function App() {
                           >
                             <span className="leader-rank">#{index + 1}</span>
                             <span className="leader-player">
-                              <span className="leader-avatar-wrap">
-                                {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                                <span className={leaderAvatarFrameClass(entry.userId)}>
-                                  <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                                </span>
-                              </span>
+                              {renderLeaderboardAvatar(entry, index === 0)}
                               <LeaderboardPlayerName entry={entry} />
                             </span>
                             <span className="leader-result">
@@ -13603,12 +13638,7 @@ function App() {
                         >
                           <span className="leader-rank">#{index + 1}</span>
                           <span className="leader-player">
-                            <span className="leader-avatar-wrap">
-                              {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                              <span className={leaderAvatarFrameClass(entry.userId)}>
-                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                              </span>
-                            </span>
+                            {renderLeaderboardAvatar(entry, index === 0)}
                             <LeaderboardPlayerName entry={entry} />
                           </span>
                           <span className="leader-result">
@@ -13641,12 +13671,7 @@ function App() {
                         >
                           <span className="leader-rank">#{index + 1}</span>
                           <span className="leader-player">
-                            <span className="leader-avatar-wrap">
-                              {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                              <span className={leaderAvatarFrameClass(entry.userId)}>
-                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                              </span>
-                            </span>
+                            {renderLeaderboardAvatar(entry, index === 0)}
                             <LeaderboardPlayerName entry={entry} />
                           </span>
                           <span className="leader-result">
@@ -13679,12 +13704,7 @@ function App() {
                         >
                           <span className="leader-rank">#{index + 1}</span>
                           <span className="leader-player">
-                            <span className="leader-avatar-wrap">
-                              {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                              <span className={leaderAvatarFrameClass(entry.userId)}>
-                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                              </span>
-                            </span>
+                            {renderLeaderboardAvatar(entry, index === 0)}
                             <LeaderboardPlayerName entry={entry} />
                           </span>
                           <span className="leader-result">
@@ -13716,12 +13736,7 @@ function App() {
                         >
                           <span className="leader-rank">#{index + 1}</span>
                           <span className="leader-player">
-                            <span className="leader-avatar-wrap">
-                              {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                              <span className={leaderAvatarFrameClass(entry.userId)}>
-                                <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                              </span>
-                            </span>
+                            {renderLeaderboardAvatar(entry, index === 0)}
                             <LeaderboardPlayerName entry={entry} />
                           </span>
                           <span className="leader-result">
@@ -13816,12 +13831,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -14017,12 +14027,7 @@ function App() {
                       >
                         <span className="leader-rank">#{index + 1}</span>
                         <span className="leader-player">
-                          <span className="leader-avatar-wrap">
-                            {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                            <span className={leaderAvatarFrameClass(entry.userId)}>
-                              <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                            </span>
-                          </span>
+                          {renderLeaderboardAvatar(entry, index === 0)}
                           <LeaderboardPlayerName entry={entry} />
                         </span>
                         <span className="leader-result">
@@ -14192,12 +14197,7 @@ function App() {
                           >
                             <span className="leader-rank">#{index + 1}</span>
                             <span className="leader-player">
-                              <span className="leader-avatar-wrap">
-                                {index === 0 ? <span className="leader-crown" aria-label="Top Player">👑</span> : null}
-                                <span className={leaderAvatarFrameClass(entry.userId)}>
-                                  <img src={avatarFor(entry.avatarUrl)} alt={entry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                                </span>
-                              </span>
+                              {renderLeaderboardAvatar(entry, index === 0)}
                               <LeaderboardPlayerName entry={entry} />
                             </span>
                             <span className="leader-result">

@@ -343,7 +343,7 @@ body {
   border-radius: 14px;
   background: color-mix(in srgb, var(--panel) 90%, transparent);
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 40px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   padding: 8px;
@@ -357,8 +357,8 @@ body {
 }
 
 .taskbar-profile-image {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   object-fit: cover;
   object-position: center;
@@ -3586,8 +3586,8 @@ button:active:not(:disabled):not(.study-session-flashcard) {
 }
 
 .taskbar-profile-avatar-wrap {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
 }
 
@@ -3598,6 +3598,22 @@ button:active:not(:disabled):not(.study-session-flashcard) {
 .taskbar-profile-avatar-wrap .avatar-decoration-layer.has-generated-art {
   inset: 0;
 }
+
+.taskbar-profile-avatar-wrap .avatar-decor-rank-01 { --avatar-decoration-offset: -12%; --avatar-decoration-size: 124%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-02 { --avatar-decoration-offset: -23%; --avatar-decoration-size: 146%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-03 { --avatar-decoration-offset: -19%; --avatar-decoration-size: 139%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-04 { --avatar-decoration-offset: -22%; --avatar-decoration-size: 144%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-05 { --avatar-decoration-offset: -27%; --avatar-decoration-size: 155%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-06 { --avatar-decoration-offset: -36%; --avatar-decoration-size: 173%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-07 { --avatar-decoration-offset: -36%; --avatar-decoration-size: 173%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-08 { --avatar-decoration-offset: -28%; --avatar-decoration-size: 157%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-09 { --avatar-decoration-offset: -32%; --avatar-decoration-size: 164%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-10 { --avatar-decoration-offset: -41%; --avatar-decoration-size: 182%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-11 { --avatar-decoration-offset: -39%; --avatar-decoration-size: 178%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-12 { --avatar-decoration-offset: -36%; --avatar-decoration-size: 171%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-13 { --avatar-decoration-offset: -24%; --avatar-decoration-size: 148%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-14 { --avatar-decoration-offset: -45%; --avatar-decoration-size: 191%; }
+.taskbar-profile-avatar-wrap .avatar-decor-rank-15 { --avatar-decoration-offset: -45%; --avatar-decoration-size: 189%; }
 
 .avatar-frame.avatar-decoration-wrap .avatar-decoration-layer.has-generated-art {
   inset: 0;

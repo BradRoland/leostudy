@@ -2706,6 +2706,17 @@ export function OneVsOnePanel(props: {
       </span>
     )
   }
+  const renderDuelLeaderboardAvatar = (
+    entry: Pick<DuelStatsLeaderboardEntry, 'avatarUrl' | 'username'>,
+    variant: 'rail' | 'spotlight' = 'rail',
+  ) => (
+    <img
+      src={entry.avatarUrl || defaultAvatarUrl}
+      alt={entry.username}
+      className={variant === 'spotlight' ? 'onevone-spotlight-avatar' : 'onevone-rail-avatar'}
+      onError={handleAvatarImageError}
+    />
+  )
 
   const myRoundsCompleted = useMemo(() => {
     if (!room) return 0
@@ -2918,12 +2929,7 @@ export function OneVsOnePanel(props: {
 	                      onClick={() => setSelectedDuelProfileUserId(topCurrentStreakEntry.user_id)}
 	                    >
 	                      <div className="onevone-spotlight-user">
-	                        <img
-	                          src={topCurrentStreakEntry.avatarUrl}
-	                          alt={topCurrentStreakEntry.username}
-	                          className="onevone-spotlight-avatar"
-	                          onError={handleAvatarImageError}
-	                        />
+	                        {renderDuelLeaderboardAvatar(topCurrentStreakEntry, 'spotlight')}
 	                        <div className="onevone-spotlight-copy">
 	                          <span
 	                            className={`onevone-rail-name ${displayNameClass(topCurrentStreakEntry.supporterTier, true)}`}
@@ -2957,7 +2963,7 @@ export function OneVsOnePanel(props: {
                           onClick={() => setSelectedDuelProfileUserId(entry.user_id)}
                         >
 	                          <span className="onevone-rail-rank">#{index + 1}</span>
-                          <img src={entry.avatarUrl} alt={entry.username} className="onevone-rail-avatar" onError={handleAvatarImageError} />
+                          {renderDuelLeaderboardAvatar(entry)}
                           <span className="onevone-rail-name-wrap">
                             <span
                               className={`onevone-rail-name ${displayNameClass(entry.supporterTier, true)}`}
@@ -2992,7 +2998,7 @@ export function OneVsOnePanel(props: {
                           onClick={() => setSelectedDuelProfileUserId(entry.user_id)}
                         >
 	                          <span className="onevone-rail-rank">#{index + 2}</span>
-                          <img src={entry.avatarUrl} alt={entry.username} className="onevone-rail-avatar" onError={handleAvatarImageError} />
+                          {renderDuelLeaderboardAvatar(entry)}
                           <span className="onevone-rail-name-wrap">
                             <span
 	                              className={`onevone-rail-name ${displayNameClass(entry.supporterTier, true)}`}

@@ -1,0 +1,15 @@
+*
+!leo-study-web
+!leo-study-web/**
+leo-study-web/.env
+leo-study-web/.env.*
+leo-study-web/node_modules
+leo-study-web/dist
+leo-study-web/.tmp-post-*
+leo-study-web/.playwright-cli
+leo-study-web/backend/data/db.json
+leo-study-web/*.log
+leo-study-web/**/.DS_Store
+.git
+CodeReady
+CodeReady.xcodeproj
