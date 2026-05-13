@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
+import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
+import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
 
 type DuelInviteBannerProps = {
@@ -12,6 +14,9 @@ type PendingDuelInvite = {
   senderUserId: string
   senderUsername: string
   senderAvatarUrl: string
+  senderLevel: number
+  senderHaloClass: string
+  senderProfileDecorationKey: string
   gameType: 'quiz' | 'matching'
   category: 'all' | 'pc' | 'vc' | 'hs' | 'scenarios'
   rounds: number
@@ -44,6 +49,29 @@ function toCategoryLabel(value: PendingDuelInvite['category']) {
   return 'ALL'
 }
 
+function fallbackLevelHaloClass(level: number) {
+  if (level >= 50) return 'level-halo-legend'
+  if (level >= 40) return 'level-halo-inferno'
+  if (level >= 30) return 'level-halo-diamond'
+  if (level >= 20) return 'level-halo-neon'
+  if (level >= 15) return 'level-halo-siren'
+  if (level >= 10) return 'level-halo-gold'
+  if (level >= 5) return 'level-halo-blue'
+  if (level >= 2) return 'level-halo-bronze'
+  return 'level-halo-recruit'
+}
+
+function parseLevelSnapshot(details: Record<string, unknown>) {
+  const snapshot = details.levelSnapshot && typeof details.levelSnapshot === 'object'
+    ? (details.levelSnapshot as Record<string, unknown>)
+    : {}
+  const level = Math.max(1, Math.floor(Number(snapshot.level || 1)))
+  const haloClass = typeof snapshot.haloClass === 'string' && snapshot.haloClass.trim()
+    ? snapshot.haloClass
+    : fallbackLevelHaloClass(level)
+  return { level, haloClass }
+}
+
 export function DuelInviteBanner(props: DuelInviteBannerProps) {
   const { currentUserId, onJoinRoom } = props
   const [pendingInvites, setPendingInvites] = useState<PendingDuelInvite[]>([])
@@ -62,7 +90,7 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
       // Keep this silent for passive polling/realtime refresh to avoid noisy mid-match banners.
       return
     }
-    const mapped: PendingDuelInvite[] = (Array.isArray(data) ? data : []).map((row) => {
+    const mappedBase: PendingDuelInvite[] = (Array.isArray(data) ? data : []).map((row) => {
       const value = row as Record<string, unknown>
       const gameTypeRaw = String(value.game_type || 'quiz')
       const categoryRaw = String(value.category || 'all')
@@ -78,12 +106,50 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
         senderUserId: String(value.sender_user_id || ''),
         senderUsername: String(value.sender_username || '').trim() || 'User',
         senderAvatarUrl: toPublicAvatarUrl(String(value.sender_avatar_path || '')),
+        senderLevel: 1,
+        senderHaloClass: 'level-halo-recruit',
+        senderProfileDecorationKey: 'auto',
         gameType,
         category,
         rounds: Number(value.rounds || 10),
         expiresAt: String(value.expires_at || ''),
       }
     }).filter((invite) => invite.inviteId && invite.roomId)
+
+    const senderIds = [...new Set(mappedBase.map((invite) => invite.senderUserId).filter(Boolean))]
+    const { data: appStateRows } = senderIds.length > 0
+      ? await supabase
+        .from('app_state')
+        .select('user_id,profile_details')
+        .in('user_id', senderIds)
+      : { data: [] }
+
+    const detailsMap = (Array.isArray(appStateRows) ? appStateRows : []).reduce<Record<string, {
+      level: number
+      haloClass: string
+      profileDecorationKey: string
+    }>>((accumulator, row) => {
+      const value = row as Record<string, unknown>
+      const userId = String(value.user_id || '')
+      if (!userId) return accumulator
+      const details = value.profile_details && typeof value.profile_details === 'object'
+        ? (value.profile_details as Record<string, unknown>)
+        : {}
+      const levelSnapshot = parseLevelSnapshot(details)
+      accumulator[userId] = {
+        level: levelSnapshot.level,
+        haloClass: levelSnapshot.haloClass,
+        profileDecorationKey: typeof details.profileDecorationKey === 'string' ? details.profileDecorationKey : 'auto',
+      }
+      return accumulator
+    }, {})
+
+    const mapped = mappedBase.map((invite) => ({
+      ...invite,
+      senderLevel: detailsMap[invite.senderUserId]?.level || invite.senderLevel,
+      senderHaloClass: detailsMap[invite.senderUserId]?.haloClass || invite.senderHaloClass,
+      senderProfileDecorationKey: detailsMap[invite.senderUserId]?.profileDecorationKey || invite.senderProfileDecorationKey,
+    }))
 
     const nextIds = mapped.map((invite) => invite.inviteId)
     const previousIds = new Set(previousInviteIdsRef.current)
@@ -221,12 +287,17 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
           >
             <div className="duel-invite-head">
               <div className="duel-invite-sender">
-                <img
-                  src={invite.senderAvatarUrl}
-                  alt={invite.senderUsername}
-                  className="duel-invite-avatar"
-                  onError={handleAvatarImageError}
-                />
+                <span className={`duel-invite-avatar-frame avatar-decoration-wrap level-halo-frame ${invite.senderHaloClass}`}>
+                  <img
+                    src={invite.senderAvatarUrl}
+                    alt={invite.senderUsername}
+                    className="duel-invite-avatar"
+                    onError={handleAvatarImageError}
+                  />
+                  <ProfileAvatarDecoration
+                    decoration={getEffectiveProfileDecorationForLevel(invite.senderLevel, invite.senderProfileDecorationKey)}
+                  />
+                </span>
                 <div className="duel-invite-copy">
                   <strong>{invite.senderUsername} invited you to 1v1</strong>
                   <span className="muted tiny">

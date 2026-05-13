@@ -203,6 +203,9 @@ type OnlineInviteUser = {
   username: string
   avatarUrl: string
   supporterTier: SupporterTier
+  level: number
+  haloClass: string
+  profileDecorationKey: string
   last_active: string
 }
 
@@ -802,12 +805,12 @@ export function OneVsOnePanel(props: {
     if (!supabase || !isSignedIn) return
     setOnlineInviteLoading(true)
     const { data, error: rpcError } = await supabase.rpc('list_online_1v1_users', { p_minutes_interval: 5 })
-    setOnlineInviteLoading(false)
     if (rpcError) {
+      setOnlineInviteLoading(false)
       setError(rpcError.message || 'Could not load online users.')
       return
     }
-    const mapped: OnlineInviteUser[] = (Array.isArray(data) ? data : []).map((row) => {
+    const baseUsers: OnlineInviteUser[] = (Array.isArray(data) ? data : []).map((row) => {
       const value = row as Record<string, unknown>
       const userId = String(value.user_id || '')
       const username = String(value.username || '').trim()
@@ -818,10 +821,52 @@ export function OneVsOnePanel(props: {
         username: username || `User ${userId.slice(0, 8)}`,
         avatarUrl: toPublicAvatarUrl(avatarPath),
         supporterTier: sanitizeSupporterTier(value.supporter_tier),
+        level: 1,
+        haloClass: 'level-halo-recruit',
+        profileDecorationKey: 'auto',
         last_active: lastActive,
       }
     }).filter((row) => row.user_id)
-    setOnlineInviteUsers(mapped)
+
+    const userIds = baseUsers.map((user) => user.user_id)
+    if (userIds.length === 0) {
+      setOnlineInviteUsers([])
+      setOnlineInviteLoading(false)
+      return
+    }
+
+    const { data: appStateRows } = await supabase
+      .from('app_state')
+      .select('user_id,profile_details')
+      .in('user_id', userIds)
+
+    const detailsMap = (Array.isArray(appStateRows) ? appStateRows : []).reduce<Record<string, {
+      level: number
+      haloClass: string
+      profileDecorationKey: string
+    }>>((accumulator, row) => {
+      const value = row as Record<string, unknown>
+      const userId = String(value.user_id || '')
+      if (!userId) return accumulator
+      const details = value.profile_details && typeof value.profile_details === 'object'
+        ? (value.profile_details as Record<string, unknown>)
+        : {}
+      const levelSnapshot = parseDuelProfileLevelSnapshot(details)
+      accumulator[userId] = {
+        level: levelSnapshot.level,
+        haloClass: levelSnapshot.haloClass,
+        profileDecorationKey: typeof details.profileDecorationKey === 'string' ? details.profileDecorationKey : 'auto',
+      }
+      return accumulator
+    }, {})
+
+    setOnlineInviteUsers(baseUsers.map((user) => ({
+      ...user,
+      level: detailsMap[user.user_id]?.level || user.level,
+      haloClass: detailsMap[user.user_id]?.haloClass || user.haloClass,
+      profileDecorationKey: detailsMap[user.user_id]?.profileDecorationKey || user.profileDecorationKey,
+    })))
+    setOnlineInviteLoading(false)
   }, [isSignedIn])
 
   const loadDuelLeaderboards = useCallback(async () => {
@@ -2706,6 +2751,19 @@ export function OneVsOnePanel(props: {
       </span>
     )
   }
+  const renderOnlineInviteAvatar = (user: OnlineInviteUser) => (
+    <span className={`onevone-online-avatar-frame avatar-decoration-wrap level-halo-frame ${user.haloClass}`}>
+      <img
+        src={user.avatarUrl || defaultAvatarUrl}
+        alt={user.username}
+        className="onevone-online-avatar"
+        onError={handleAvatarImageError}
+      />
+      <ProfileAvatarDecoration
+        decoration={getEffectiveProfileDecorationForLevel(user.level, user.profileDecorationKey)}
+      />
+    </span>
+  )
   const renderDuelLeaderboardAvatar = (
     entry: Pick<DuelStatsLeaderboardEntry, 'avatarUrl' | 'username'>,
     variant: 'rail' | 'spotlight' = 'rail',
@@ -3248,7 +3306,7 @@ export function OneVsOnePanel(props: {
                     {onlineInviteUsers.map((user) => (
                       <article key={`online-user-${user.user_id}`} className="onevone-online-row">
                         <div className="onevone-online-user">
-                          <img src={user.avatarUrl} alt={user.username} className="onevone-online-avatar" onError={handleAvatarImageError} />
+                          {renderOnlineInviteAvatar(user)}
                           <div className="onevone-online-copy">
                             <strong>{user.username}</strong>
                             <span className="muted tiny">
