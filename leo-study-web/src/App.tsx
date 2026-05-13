@@ -4093,6 +4093,7 @@ function App() {
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [profileHydrated, setProfileHydrated] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile')
   const [agencyOptions, setAgencyOptions] = useState<string[]>(() => sanitizeAgencyOptions(fallbackAgencyOptions))
   const [agencySettingsId, setAgencySettingsId] = useState(appSettingsRowId)
@@ -5852,6 +5853,8 @@ function App() {
         setCurrentUserEmail('')
         setCurrentUserProvider('email')
         setProfile(null)
+        setProfileHydrated(false)
+        setForceProfileSetup(false)
         lastPersistedAppStateRef.current = {
           performance: null,
           highScores: null,
@@ -5871,11 +5874,13 @@ function App() {
 
   useEffect(() => {
     if (!supabase || !currentUserId) {
+      setProfileHydrated(false)
       return
     }
     const client = supabase
 
     const hydrate = async () => {
+      setProfileHydrated(false)
       const { data: banRow, error: banLookupErrorRaw } = await client
         .from('banned_users')
         .select('user_id,reason')
@@ -5907,13 +5912,19 @@ function App() {
         return
       }
 
-      const { data: profileRow } = await client
+      const { data: profileRow, error: profileLookupError } = await client
         .from('profiles')
         .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')
         .eq('user_id', currentUserId)
         .maybeSingle()
 
-      if (profileRow) {
+      if (profileLookupError) {
+        console.warn('[profiles] current user lookup failed:', profileLookupError.message)
+        setAuthError('Signed in, but your profile could not be loaded. Please refresh or try signing in again.')
+        setProfile(null)
+        setProfileUsername('')
+        setForceProfileSetup(false)
+      } else if (profileRow) {
         const mapped = mapProfileRow(profileRow as Record<string, unknown>, currentUserId)
         setProfile(mapped)
         setProfileUsername(mapped.username)
@@ -5923,6 +5934,7 @@ function App() {
         setProfileUsername('')
         setForceProfileSetup(true)
       }
+      setProfileHydrated(true)
 
       const { data: stateRow } = await client
         .from('app_state')
@@ -6007,7 +6019,11 @@ function App() {
       await refreshHomeLeaderboards({ force: true })
     }
 
-    hydrate().catch(() => undefined)
+    hydrate().catch((error) => {
+      console.warn('[auth] hydration failed:', error)
+      setAuthError('Signed in, but your account data could not be loaded. Please refresh or try signing in again.')
+      setProfileHydrated(true)
+    })
   }, [currentUserId, navigate])
 
   useEffect(() => {
@@ -8623,6 +8639,11 @@ function App() {
     setAuthLoading(true)
     setAuthError('')
     setAuthSuccess('')
+    window.localStorage.removeItem('pending_profile_setup')
+    setForceProfileSetup(false)
+    setProfile(null)
+    setProfileHydrated(false)
+    setStateHydrated(false)
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: authEmail,
@@ -9182,7 +9203,7 @@ function App() {
     isSupportPage ||
     isProfilePage ||
     isStatsPage
-  const needsProfileSetup = Boolean(authReady && currentUserId && profile && !profile.username && forceProfileSetup)
+  const needsProfileSetup = Boolean(authReady && stateHydrated && profileHydrated && currentUserId && profile && !profile.username && forceProfileSetup)
 
   const goToPath = useCallback(
     (path: string, options?: { tab?: AppTab; replace?: boolean }) => {
