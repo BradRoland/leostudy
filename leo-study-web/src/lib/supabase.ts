@@ -9,4 +9,25 @@ const supabaseAnonKey =
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
-export const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null
+const browserStorage = (() => {
+  if (typeof window === 'undefined') return undefined
+  try {
+    const testKey = '__leo_study_storage_test__'
+    window.localStorage.setItem(testKey, '1')
+    window.localStorage.removeItem(testKey)
+    return window.localStorage
+  } catch {
+    return undefined
+  }
+})()
+
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        ...(browserStorage ? { storage: browserStorage } : {}),
+      },
+    })
+  : null

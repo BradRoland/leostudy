@@ -5072,11 +5072,6 @@ function App() {
 
     const loadContent = async () => {
       if (appContentSource === 'supabase') {
-        if (!authReady) return
-        if (!currentUserId) {
-          setContentWarning('')
-          return
-        }
         try {
           setContentWarning('')
           const supabaseContent = await loadFromSupabase()
@@ -5084,13 +5079,13 @@ function App() {
           return
         } catch (error) {
           console.warn('[content] supabase content unavailable, falling back to local content.', error)
-          setContentWarning('Content editor source unavailable, retrying Supabase. Showing local content for now.')
         }
 
         try {
           const localBundle = loadLocalContentBundle()
           for (const warning of localBundle.warnings) console.warn(warning)
           applyLoadedContentToRuntime(localBundle.codeItems, localBundle.scenarioItems)
+          setContentWarning('')
         } catch (localError) {
           console.warn('[content] local fallback failed after Supabase load failure.', localError)
           setSections([])
@@ -5123,7 +5118,7 @@ function App() {
       cancelled = true
       if (retryTimer !== null) window.clearTimeout(retryTimer)
     }
-  }, [authReady, currentUserId, contentLoadRetryToken])
+  }, [contentLoadRetryToken])
 
   useEffect(() => {
     const measure = () => {
@@ -5824,50 +5819,84 @@ function App() {
       return
     }
     const client = supabase
+    let mounted = true
+    let readyFallbackTimer: number | null = null
+    type CurrentSession = Awaited<ReturnType<typeof client.auth.getSession>>['data']['session']
 
-    const init = async () => {
-      const {
-        data: { session },
-      } = await client.auth.getSession()
+    const clearReadyFallback = () => {
+      if (readyFallbackTimer !== null) {
+        window.clearTimeout(readyFallbackTimer)
+        readyFallbackTimer = null
+      }
+    }
 
+    const applySession = (session: CurrentSession) => {
+      if (!mounted) return
       if (session?.user) {
         setCurrentUserId(session.user.id)
         setCurrentUserEmail(session.user.email || '')
         setCurrentUserProvider(String(session.user.app_metadata?.provider || 'email'))
+        return
       }
 
-      setAuthReady(true)
+      setCurrentUserId('')
+      setCurrentUserEmail('')
+      setCurrentUserProvider('email')
+      setProfile(null)
+      setProfileHydrated(false)
+      setForceProfileSetup(false)
+      lastPersistedAppStateRef.current = {
+        performance: null,
+        highScores: null,
+        bestStreak: null,
+        profileDetails: null,
+      }
+      setRemoteTrackScoreHistory({})
+      setRemoteScoreTimeline([])
+      setStateHydrated(false)
     }
 
-    init().catch(() => setAuthReady(true))
+    const markAuthReady = () => {
+      if (mounted) setAuthReady(true)
+    }
 
     const {
       data: { subscription },
-    } = client.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setCurrentUserId(session.user.id)
-        setCurrentUserEmail(session.user.email || '')
-        setCurrentUserProvider(String(session.user.app_metadata?.provider || 'email'))
-      } else {
-        setCurrentUserId('')
-        setCurrentUserEmail('')
-        setCurrentUserProvider('email')
-        setProfile(null)
-        setProfileHydrated(false)
-        setForceProfileSetup(false)
-        lastPersistedAppStateRef.current = {
-          performance: null,
-          highScores: null,
-          bestStreak: null,
-          profileDetails: null,
-        }
-        setRemoteTrackScoreHistory({})
-        setRemoteScoreTimeline([])
-        setStateHydrated(false)
+    } = client.auth.onAuthStateChange((event, session) => {
+      applySession(session)
+      if (event === 'INITIAL_SESSION') {
+        clearReadyFallback()
+        markAuthReady()
       }
     })
 
+    void client.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (!session) return
+        clearReadyFallback()
+        applySession(session)
+        markAuthReady()
+      })
+      .catch((error) => {
+        console.warn('[auth] session restore failed:', error)
+      })
+
+    readyFallbackTimer = window.setTimeout(async () => {
+      try {
+        const {
+          data: { session },
+        } = await client.auth.getSession()
+        applySession(session)
+      } catch (error) {
+        console.warn('[auth] session fallback failed:', error)
+      } finally {
+        markAuthReady()
+      }
+    }, 1200)
+
     return () => {
+      mounted = false
+      clearReadyFallback()
       subscription.unsubscribe()
     }
   }, [])
