@@ -1680,18 +1680,24 @@ export function OneVsOnePanel(props: {
   const countdownActive = serverStartRemainingMs > 0
   const syncingBeforeCountdown = serverStartRemainingMs > countdownSeconds * 1000
   const currentRoomStatus = room?.status
+  const myPlayerFinishedMatch = Boolean(
+    room
+    && myPlayer
+    && room.status === 'in_progress'
+    && myPlayer.current_round > room.rounds,
+  )
 
   useEffect(() => {
     if (!roomId || !isSignedIn) return
-    const shouldPollLobby = !currentRoomStatus || currentRoomStatus === 'waiting' || (currentRoomStatus === 'in_progress' && countdownActive)
-    if (!shouldPollLobby) return
+    const shouldPollRoom = !currentRoomStatus || currentRoomStatus === 'waiting' || currentRoomStatus === 'in_progress'
+    if (!shouldPollRoom) return
 
     const timer = window.setInterval(() => {
       void refreshRoomSnapshot()
-    }, countdownActive ? 650 : 1000)
+    }, countdownActive || myPlayerFinishedMatch ? 650 : currentRoomStatus === 'in_progress' ? 1500 : 1000)
 
     return () => window.clearInterval(timer)
-  }, [countdownActive, currentRoomStatus, isSignedIn, refreshRoomSnapshot, roomId])
+  }, [countdownActive, currentRoomStatus, isSignedIn, myPlayerFinishedMatch, refreshRoomSnapshot, roomId])
 
   useEffect(() => {
     if (!room || !room.rematch_room_id || room.rematch_room_id === roomId) return
@@ -1885,6 +1891,15 @@ export function OneVsOnePanel(props: {
       window.setTimeout(() => {
         void refreshRoomSnapshot()
       }, payload && String(payload.status || '') === 'completed' ? 80 : 250)
+
+      if (room?.status === 'in_progress' && params.round >= room.rounds && String(payload?.status || '') !== 'completed') {
+        const finalRoundRefreshDelaysMs = [900, 1800, 3600]
+        finalRoundRefreshDelaysMs.forEach((delayMs) => {
+          window.setTimeout(() => {
+            void refreshRoomSnapshot()
+          }, delayMs)
+        })
+      }
     }
 
     roundSubmitQueueRef.current = roundSubmitQueueRef.current
@@ -1907,7 +1922,7 @@ export function OneVsOnePanel(props: {
       })
 
     await roundSubmitQueueRef.current
-  }, [currentUserId, refreshRoomSnapshot, room?.game_type, room?.status, roomId])
+  }, [currentUserId, refreshRoomSnapshot, room?.game_type, room?.rounds, room?.status, roomId])
 
   const triggerAutoForfeit = useCallback(async (roundKey: string, reason: 'question' | 'matching' = 'question') => {
     if (!supabase || !roomId || !roundKey || !room || !myPlayer) return
