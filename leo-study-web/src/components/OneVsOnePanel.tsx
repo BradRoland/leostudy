@@ -631,6 +631,80 @@ function parseWaitingRoomMessage(value: unknown): WaitingRoomMessage | null {
   }
 }
 
+const duelRoomStatuses: DuelRoomStatus[] = ['waiting', 'in_progress', 'completed', 'cancelled']
+
+function asSnapshotRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+}
+
+function asSnapshotRecords(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.map(asSnapshotRecord).filter((row): row is Record<string, unknown> => row !== null)
+    : []
+}
+
+function normalizeDuelRoomStatus(value: unknown): DuelRoomStatus {
+  const status = String(value || '').trim()
+  return duelRoomStatuses.includes(status as DuelRoomStatus) ? (status as DuelRoomStatus) : 'waiting'
+}
+
+function getWinnerUserIdFromResults(resultRows: Record<string, unknown>[]): string | null {
+  const winner = resultRows.find((row) => Boolean(row.is_winner))
+  const userId = winner ? String(winner.user_id || '').trim() : ''
+  return userId || null
+}
+
+function mapDuelRoomSnapshot(
+  row: Record<string, unknown>,
+  options: { forceCompleted?: boolean; winnerUserId?: string | null } = {},
+): DuelRoomRow {
+  const status = options.forceCompleted ? 'completed' : normalizeDuelRoomStatus(row.status)
+  return {
+    id: String(row.id || ''),
+    host_user_id: String(row.host_user_id || ''),
+    game_type: String(row.game_type || 'quiz') as DuelGameType,
+    category: String(row.category || 'all') as DuelCategory,
+    is_public: Boolean(row.is_public),
+    join_code: row.join_code ? String(row.join_code) : null,
+    rounds: Number(row.rounds || 5),
+    question_set: row.question_set,
+    status,
+    current_round: Number(row.current_round || 1),
+    winner_user_id: row.winner_user_id ? String(row.winner_user_id) : options.winnerUserId || null,
+    rematch_room_id: row.rematch_room_id ? String(row.rematch_room_id) : null,
+    created_at: String(row.created_at || ''),
+    started_at: row.started_at ? String(row.started_at) : null,
+  }
+}
+
+function mapDuelPlayerSnapshot(row: Record<string, unknown>): DuelRoomPlayerRow {
+  return {
+    id: String(row.id || ''),
+    room_id: String(row.room_id || ''),
+    user_id: String(row.user_id || ''),
+    slot_no: Number(row.slot_no || 1),
+    is_ready: Boolean(row.is_ready),
+    score: Number(row.score || 0),
+    total_time_ms: Number(row.total_time_ms || 0),
+    fastest_round_ms: Number(row.fastest_round_ms || 0),
+    current_round: Number(row.current_round || 1),
+    last_seen: String(row.last_seen || ''),
+    finished_at: row.finished_at ? String(row.finished_at) : null,
+  }
+}
+
+function mapDuelResultSnapshot(row: Record<string, unknown>): DuelRoomResultRow {
+  return {
+    id: String(row.id || ''),
+    room_id: String(row.room_id || ''),
+    user_id: String(row.user_id || ''),
+    score: Number(row.score || 0),
+    total_time_ms: Number(row.total_time_ms || 0),
+    placement: Number(row.placement || 2),
+    is_winner: Boolean(row.is_winner),
+  }
+}
+
 export function OneVsOnePanel(props: {
   currentUserId: string
   currentUsername: string
@@ -1297,8 +1371,51 @@ export function OneVsOnePanel(props: {
     })
   }, [isSignedIn])
 
+  const applyRoomSnapshot = useCallback(async (params: {
+    roomRow: Record<string, unknown>
+    playerRows: unknown
+    resultRows: unknown
+    preferCompleted?: boolean
+  }) => {
+    const playerRecordRows = asSnapshotRecords(params.playerRows)
+    const resultRecordRows = asSnapshotRecords(params.resultRows)
+    const requiredResultCount = Math.max(2, playerRecordRows.length || 2)
+    const completedByResults = resultRecordRows.length >= requiredResultCount
+    const mappedRoom = mapDuelRoomSnapshot(params.roomRow, {
+      forceCompleted: Boolean(params.preferCompleted) || completedByResults,
+      winnerUserId: getWinnerUserIdFromResults(resultRecordRows),
+    })
+    const mappedPlayers = playerRecordRows.map(mapDuelPlayerSnapshot)
+    const mappedResults = mappedRoom.status === 'completed'
+      ? resultRecordRows.map(mapDuelResultSnapshot)
+      : []
+
+    setRoom(mappedRoom)
+    setPlayers((previous) => mappedPlayers.map((player) => {
+      const current = previous.find((item) => item.user_id === player.user_id)
+      if (!current || mappedRoom.status !== 'in_progress') return player
+      return {
+        ...player,
+        score: Math.max(player.score, current.score),
+        total_time_ms: Math.max(player.total_time_ms, current.total_time_ms),
+        fastest_round_ms: player.fastest_round_ms || current.fastest_round_ms,
+        current_round: Math.max(player.current_round, current.current_round),
+        finished_at: player.finished_at || current.finished_at || null,
+      }
+    }))
+    setResults(mappedResults)
+
+    const userIds = [
+      ...mappedPlayers.map((player) => player.user_id),
+      ...mappedResults.map((result) => result.user_id),
+    ]
+    await loadRoomPlayerProfiles(userIds)
+    return mappedRoom
+  }, [loadRoomPlayerProfiles])
+
   const refreshRoomSnapshot = useCallback(async () => {
     if (!supabase || !roomId || !isSignedIn) return
+    const client = supabase
     if (refreshInFlightRef.current) {
       refreshQueuedRef.current = true
       return
@@ -1306,166 +1423,45 @@ export function OneVsOnePanel(props: {
     refreshInFlightRef.current = true
 
     try {
-      // First try direct queries (works when user is a player in the room)
+      const loadViaRpc = async () => {
+        const { data: roomData, error: rpcError } = await client.rpc('get_1v1_room_details', { p_room_id: roomId })
+        const rpcResult = asSnapshotRecord(Array.isArray(roomData) ? roomData[0] : roomData)
+        const rpcRoom = asSnapshotRecord(rpcResult?.room)
+        if (rpcError || !rpcResult || !rpcRoom) return false
+        await applyRoomSnapshot({
+          roomRow: rpcRoom,
+          playerRows: rpcResult.players,
+          resultRows: rpcResult.results,
+        })
+        return true
+      }
+
       const [{ data: roomRow, error: roomError }, { data: playerRows, error: playersError }, { data: resultRows, error: resultsError }] = await Promise.all([
-        supabase.from('rooms').select('*').eq('id', roomId).maybeSingle(),
-        supabase.from('room_players').select('*').eq('room_id', roomId).order('slot_no', { ascending: true }),
-        supabase.from('room_results').select('*').eq('room_id', roomId).order('placement', { ascending: true }),
+        client.from('rooms').select('*').eq('id', roomId).maybeSingle(),
+        client.from('room_players').select('*').eq('room_id', roomId).order('slot_no', { ascending: true }),
+        client.from('room_results').select('*').eq('room_id', roomId).order('placement', { ascending: true }),
       ])
 
-      // If room not found via direct query, try RPC (for spectators)
-      if (!roomRow) {
-        const { data: roomData, error: rpcError } = await supabase.rpc('get_1v1_room_details', { p_room_id: roomId })
-        const rpcResult = Array.isArray(roomData) ? roomData[0] : roomData
-        if (rpcError || !rpcResult || !rpcResult.room) {
-          setError('Could not load room.')
+      const directRoom = asSnapshotRecord(roomRow)
+      if (!directRoom || roomError || playersError || resultsError) {
+        const loadedViaRpc = await loadViaRpc()
+        if (loadedViaRpc) return
+
+        setError(roomError?.message || playersError?.message || resultsError?.message || 'Could not load room.')
+        if (!directRoom) {
           setRoomId(null)
           setRoom(null)
           setPlayers([])
           setResults([])
-          return
         }
-        const r = rpcResult.room
-        const mappedRoom: DuelRoomRow = {
-          id: String(r.id || ''),
-          host_user_id: String(r.host_user_id || ''),
-          game_type: String(r.game_type || 'quiz') as DuelGameType,
-          category: String(r.category || 'all') as DuelCategory,
-          is_public: Boolean(r.is_public),
-          join_code: r.join_code ? String(r.join_code) : null,
-          rounds: Number(r.rounds || 5),
-          question_set: r.question_set,
-          status: String(r.status || 'waiting') as DuelRoomStatus,
-          current_round: Number(r.current_round || 1),
-          winner_user_id: r.winner_user_id ? String(r.winner_user_id) : null,
-          rematch_room_id: r.rematch_room_id ? String(r.rematch_room_id) : null,
-          created_at: String(r.created_at || ''),
-          started_at: r.started_at ? String(r.started_at) : null,
-        }
-        const mappedPlayers: DuelRoomPlayerRow[] = (rpcResult.players || []).map((row: Record<string, unknown>) => ({
-          id: String(row.id || ''),
-          room_id: String(row.room_id || ''),
-          user_id: String(row.user_id || ''),
-          slot_no: Number(row.slot_no || 1),
-          is_ready: Boolean(row.is_ready),
-          score: Number(row.score || 0),
-          total_time_ms: Number(row.total_time_ms || 0),
-          fastest_round_ms: Number(row.fastest_round_ms || 0),
-          current_round: Number(row.current_round || 1),
-          last_seen: String(row.last_seen || ''),
-          finished_at: row.finished_at ? String(row.finished_at) : null,
-        }))
-        const mappedResults: DuelRoomResultRow[] = mappedRoom.status === 'completed'
-          ? (rpcResult.results || []).map((row: Record<string, unknown>) => ({
-          id: String(row.id || ''),
-          room_id: String(row.room_id || ''),
-          user_id: String(row.user_id || ''),
-          score: Number(row.score || 0),
-          total_time_ms: Number(row.total_time_ms || 0),
-          placement: Number(row.placement || 2),
-          is_winner: Boolean(row.is_winner),
-        }))
-          : []
-        setRoom(mappedRoom)
-        setPlayers((previous) => mappedPlayers.map((player) => {
-          const current = previous.find((item) => item.user_id === player.user_id)
-          if (!current || mappedRoom.status !== 'in_progress') return player
-          return {
-            ...player,
-            score: Math.max(player.score, current.score),
-            total_time_ms: Math.max(player.total_time_ms, current.total_time_ms),
-            fastest_round_ms: player.fastest_round_ms || current.fastest_round_ms,
-            current_round: Math.max(player.current_round, current.current_round),
-            finished_at: player.finished_at || current.finished_at || null,
-          }
-        }))
-        setResults(mappedResults)
-        const userIds = mappedPlayers.map((p) => p.user_id)
-        await loadRoomPlayerProfiles(userIds)
         return
       }
 
-      if (roomError) {
-        setError(roomError.message || 'Could not load room.')
-        return
-      }
-      if (playersError) {
-        setError(playersError.message || 'Could not load players.')
-        return
-      }
-      if (resultsError) {
-        setError(resultsError.message || 'Could not load results.')
-        return
-      }
-
-      if (!roomRow) {
-        setRoomId(null)
-        setRoom(null)
-        setPlayers([])
-        setResults([])
-        return
-      }
-
-      const mappedRoom: DuelRoomRow = {
-        id: String((roomRow as Record<string, unknown>).id || ''),
-        host_user_id: String((roomRow as Record<string, unknown>).host_user_id || ''),
-        game_type: String((roomRow as Record<string, unknown>).game_type || 'quiz') as DuelGameType,
-        category: String((roomRow as Record<string, unknown>).category || 'all') as DuelCategory,
-        is_public: Boolean((roomRow as Record<string, unknown>).is_public),
-        join_code: (roomRow as Record<string, unknown>).join_code ? String((roomRow as Record<string, unknown>).join_code) : null,
-        rounds: Number((roomRow as Record<string, unknown>).rounds || 5),
-        question_set: (roomRow as Record<string, unknown>).question_set,
-        status: String((roomRow as Record<string, unknown>).status || 'waiting') as DuelRoomStatus,
-        current_round: Number((roomRow as Record<string, unknown>).current_round || 1),
-        winner_user_id: (roomRow as Record<string, unknown>).winner_user_id ? String((roomRow as Record<string, unknown>).winner_user_id) : null,
-        rematch_room_id: (roomRow as Record<string, unknown>).rematch_room_id ? String((roomRow as Record<string, unknown>).rematch_room_id) : null,
-        created_at: String((roomRow as Record<string, unknown>).created_at || ''),
-        started_at: (roomRow as Record<string, unknown>).started_at ? String((roomRow as Record<string, unknown>).started_at) : null,
-      }
-
-      const mappedPlayers: DuelRoomPlayerRow[] = (Array.isArray(playerRows) ? playerRows : []).map((row) => ({
-        id: String((row as Record<string, unknown>).id || ''),
-        room_id: String((row as Record<string, unknown>).room_id || ''),
-        user_id: String((row as Record<string, unknown>).user_id || ''),
-        slot_no: Number((row as Record<string, unknown>).slot_no || 1),
-        is_ready: Boolean((row as Record<string, unknown>).is_ready),
-        score: Number((row as Record<string, unknown>).score || 0),
-        total_time_ms: Number((row as Record<string, unknown>).total_time_ms || 0),
-        fastest_round_ms: Number((row as Record<string, unknown>).fastest_round_ms || 0),
-        current_round: Number((row as Record<string, unknown>).current_round || 1),
-        last_seen: String((row as Record<string, unknown>).last_seen || ''),
-        finished_at: (row as Record<string, unknown>).finished_at ? String((row as Record<string, unknown>).finished_at) : null,
-      }))
-
-      const mappedResults: DuelRoomResultRow[] = mappedRoom.status === 'completed'
-        ? (Array.isArray(resultRows) ? resultRows : []).map((row) => ({
-        id: String((row as Record<string, unknown>).id || ''),
-        room_id: String((row as Record<string, unknown>).room_id || ''),
-        user_id: String((row as Record<string, unknown>).user_id || ''),
-        score: Number((row as Record<string, unknown>).score || 0),
-        total_time_ms: Number((row as Record<string, unknown>).total_time_ms || 0),
-        placement: Number((row as Record<string, unknown>).placement || 2),
-        is_winner: Boolean((row as Record<string, unknown>).is_winner),
-      }))
-        : []
-
-      setRoom(mappedRoom)
-      setPlayers((previous) => mappedPlayers.map((player) => {
-        const current = previous.find((item) => item.user_id === player.user_id)
-        if (!current || mappedRoom.status !== 'in_progress') return player
-        return {
-          ...player,
-          score: Math.max(player.score, current.score),
-          total_time_ms: Math.max(player.total_time_ms, current.total_time_ms),
-          fastest_round_ms: player.fastest_round_ms || current.fastest_round_ms,
-          current_round: Math.max(player.current_round, current.current_round),
-          finished_at: player.finished_at || current.finished_at || null,
-        }
-      }))
-      setResults(mappedResults)
-
-      const userIds = mappedPlayers.map((player) => player.user_id)
-      await loadRoomPlayerProfiles(userIds)
+      await applyRoomSnapshot({
+        roomRow: directRoom,
+        playerRows,
+        resultRows,
+      })
     } finally {
       refreshInFlightRef.current = false
       if (refreshQueuedRef.current) {
@@ -1475,7 +1471,7 @@ export function OneVsOnePanel(props: {
         }, 60)
       }
     }
-  }, [isSignedIn, loadRoomPlayerProfiles, roomId])
+  }, [applyRoomSnapshot, isSignedIn, roomId])
 
   useEffect(() => {
     if (!isSignedIn) return

@@ -23,6 +23,11 @@ type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home' | 'leaderboar
 type HomeActionTarget = 'study' | 'games-matching' | 'games-speed' | 'games-blaster' | 'scenarios'
 type HomeDurationFilter = 15 | 30 | 60
 type DuelLeaderboardMode = 'all' | 'matching' | 'quiz'
+type DuelLevelStats = {
+  wins: number
+  losses: number
+  currentWinStreak: number
+}
 type GameModeSelection = {
   duration: HomeDurationFilter
   filter: CodeFilter
@@ -63,6 +68,8 @@ type HomeTmasCountdownDisplay = {
 const studyTrackingTickMs = 5000
 const studyActivityWindowMs = 20000
 const xpFeedbackActivityWindowMs = 120000
+const duelWinXpValue = 125
+const duelLossXpValue = 35
 const leaderboardRefreshThrottleMs = 5000
 const homeLeaderboardRefreshThrottleMs = 12000
 const leaderboardRealtimeDebounceMs = 450
@@ -1893,6 +1900,19 @@ function cappedLevelXp(value: number, multiplier: number, cap: number) {
   return Math.min(cap, safeValue * multiplier)
 }
 
+function emptyDuelLevelStats(): DuelLevelStats {
+  return { wins: 0, losses: 0, currentWinStreak: 0 }
+}
+
+function sanitizeDuelLevelStats(value: unknown): DuelLevelStats {
+  const row = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return {
+    wins: Math.max(0, Math.floor(Number(row.wins || 0))),
+    losses: Math.max(0, Math.floor(Number(row.losses || 0))),
+    currentWinStreak: Math.max(0, Math.floor(Number(row.current_win_streak ?? row.currentWinStreak ?? 0))),
+  }
+}
+
 function autoDecorationKeyForLevel(level: number) {
   const unlocked = profileDecorationCatalog
     .filter((decoration) => decoration.key !== 'auto' && decoration.key !== 'none' && decoration.unlockLevel <= level)
@@ -1924,8 +1944,8 @@ function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
     Math.floor(input.highScores.matching / 18) +
     Math.floor(input.highScores.blaster / 20) +
     Math.floor((input.highScores.caseFile + input.highScores.rapidFire + input.highScores.gravity) / 24) +
-    input.duelWins * 95 +
-    input.duelLosses * 12 +
+    input.duelWins * duelWinXpValue +
+    input.duelLosses * duelLossXpValue +
     competitiveXp
   const totalXp = Math.max(0, Math.round(xp))
   const level = levelFromXp(totalXp)
@@ -4177,6 +4197,7 @@ function App() {
     quiz: [],
   })
   const [levelProfilesByUserId, setLevelProfilesByUserId] = useState<Record<string, UserLevelProfile>>({})
+  const [currentUserDuelStats, setCurrentUserDuelStats] = useState<DuelLevelStats>(() => emptyDuelLevelStats())
   const [homeMatchingDurationFilter, setHomeMatchingDurationFilter] = useState<HomeDurationFilter>(15)
   const [homeMatchingCodeFilter, setHomeMatchingCodeFilter] = useState<CodeFilter>('all')
   const [homeSpeedDurationFilter, setHomeSpeedDurationFilter] = useState<HomeDurationFilter>(15)
@@ -4213,6 +4234,53 @@ function App() {
   const lastXpEligibleActivityAtRef = useRef(0)
   const xpGainTimerRef = useRef<number | null>(null)
   const streakLossNoticeRef = useRef('')
+
+  useEffect(() => {
+    if (!supabase || !currentUserId) {
+      setCurrentUserDuelStats(emptyDuelLevelStats())
+      return
+    }
+
+    const client = supabase
+    let cancelled = false
+
+    const loadCurrentUserDuelStats = async () => {
+      const { data, error } = await client
+        .from('duel_player_stats')
+        .select('wins,losses,current_win_streak')
+        .eq('user_id', currentUserId)
+        .eq('game_type', 'all')
+        .maybeSingle()
+
+      if (cancelled) return
+      setCurrentUserDuelStats(error || !data ? emptyDuelLevelStats() : sanitizeDuelLevelStats(data))
+    }
+
+    void loadCurrentUserDuelStats()
+
+    const channel = client
+      .channel(`current-user-duel-xp-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'duel_player_stats', filter: `user_id=eq.${currentUserId}` },
+        (payload) => {
+          const row = (payload.new || payload.old || {}) as Record<string, unknown>
+          if (String(row.game_type || '') !== 'all') return
+          if (payload.eventType === 'DELETE') {
+            setCurrentUserDuelStats(emptyDuelLevelStats())
+            return
+          }
+          lastXpEligibleActivityAtRef.current = Date.now()
+          setCurrentUserDuelStats(sanitizeDuelLevelStats(row))
+        },
+      )
+      .subscribe()
+
+    return () => {
+      cancelled = true
+      void client.removeChannel(channel)
+    }
+  }, [currentUserId])
 
   const [quizDeck, setQuizDeck] = useState<QuizQuestion[]>([])
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(null)
@@ -6305,7 +6373,7 @@ function App() {
   const duelHubLeaderboard = useMemo(() => {
     const perUser = new Map<string, LeaderboardEntry>()
     for (const entry of leaderboard) {
-      if (entry.duelWins <= 0 && entry.duelCurrentWinStreak <= 0) continue
+      if (entry.duelWins <= 0 && entry.duelLosses <= 0 && entry.duelCurrentWinStreak <= 0) continue
       const current = perUser.get(entry.userId)
       if (
         !current ||
@@ -6508,6 +6576,9 @@ function App() {
     const currentLeaderboardEntry = currentUserId
       ? duelHubLeaderboard.find((entry) => entry.userId === currentUserId) || leaderboard.find((entry) => entry.userId === currentUserId)
       : null
+    const duelWins = Math.max(currentUserDuelStats.wins, currentLeaderboardEntry?.duelWins || 0)
+    const duelLosses = Math.max(currentUserDuelStats.losses, currentLeaderboardEntry?.duelLosses || 0)
+    const duelCurrentWinStreak = Math.max(currentUserDuelStats.currentWinStreak, currentLeaderboardEntry?.duelCurrentWinStreak || 0)
     const weeklyDepartmentKey = bestWeeklyDepartment ? normalizeAgencyKey(bestWeeklyDepartment.agency) : ''
     const currentDepartmentKey = normalizeAgencyKey(canonicalAgencyName(profileDetails.agency || '') || '')
     return buildUserLevelProfile({
@@ -6519,9 +6590,9 @@ function App() {
       gamePlays: profileDetails.stats.gamePlays,
       flashcardsReviewed: profileDetails.stats.flashcardsReviewed,
       scenariosReviewed: profileDetails.stats.scenariosReviewed,
-      duelWins: currentLeaderboardEntry?.duelWins || 0,
-      duelLosses: currentLeaderboardEntry?.duelLosses || 0,
-      duelCurrentWinStreak: currentLeaderboardEntry?.duelCurrentWinStreak || 0,
+      duelWins,
+      duelLosses,
+      duelCurrentWinStreak,
       allTimeFirstPlaceCount: currentUserId ? allTimeFirstSpotCountsByUser[currentUserId] || 0 : 0,
       weeklyFirstPlaceCount: currentUserId ? weeklyFirstSpotCountsByUser[currentUserId] || 0 : 0,
       allTimeLeaderboardAppearances: currentUserId ? allTimeLeaderboardAppearanceCountsByUser[currentUserId] || 0 : 0,
@@ -6538,6 +6609,7 @@ function App() {
     bestStreak,
     currentMasteredCodeCount,
     currentUserId,
+    currentUserDuelStats,
     duelHubLeaderboard,
     highScores,
     leaderboard,
