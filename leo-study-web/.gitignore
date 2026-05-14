@@ -11,6 +11,10 @@ node_modules
 dist
 dist-ssr
 *.local
+coverage
+.playwright-cli/
+.tmp-post-*
+.vade-report
 
 # Editor directories and files
 .vscode/*
@@ -26,5 +30,6 @@ dist-ssr
 .env.*
 !.env.example
 .vercel
+backend/data/db.json
 supabase/.temp/
 supabase/supabase/

@@ -4524,7 +4524,7 @@ function App() {
     if (error) {
       const message = String(error.message || 'Could not save agencies.')
       const migrationHint = message.toLowerCase().includes('app_settings')
-        ? ' Run /supabase/migrations/20260219_app_settings.sql first.'
+        ? ' Run /supabase/migrations/00000000000000_leo_study_baseline.sql first.'
         : ''
       setAgencyError(`${message}${migrationHint}`)
       setAgencySaving(false)
@@ -4642,7 +4642,7 @@ function App() {
     if (error) {
       const message = String(error.message || 'Could not save banner settings.')
       const migrationHint = message.toLowerCase().includes('banner_') || message.toLowerCase().includes('app_settings')
-        ? ' Run /supabase/migrations/20260226_app_settings_global_banner.sql and /supabase/migrations/20260226_app_settings_global_banner_scroll_controls.sql first.'
+        ? ' Run /supabase/migrations/00000000000000_leo_study_baseline.sql first.'
         : ''
       setOwnerBannerError(`${message}${migrationHint}`)
       setOwnerBannerSaving(false)
@@ -4678,7 +4678,7 @@ function App() {
     if (error) {
       const message = String(error.message || 'Could not load bug reports.')
       const migrationHint = message.toLowerCase().includes('bug_reports')
-        ? ' Run /supabase/migrations/20260227_bug_reports.sql first.'
+        ? ' Run /supabase/migrations/00000000000000_leo_study_baseline.sql first.'
         : ''
       setOwnerBugReports([])
       setOwnerBugReportsError(`${message}${migrationHint}`)
@@ -4746,7 +4746,7 @@ function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not submit bug report.'
       const migrationHint = message.toLowerCase().includes('bug_reports')
-        ? ' Run /supabase/migrations/20260227_bug_reports.sql first.'
+        ? ' Run /supabase/migrations/00000000000000_leo_study_baseline.sql first.'
         : ''
       setBugReportError(`${message}${migrationHint}`)
     } finally {
@@ -10676,7 +10676,7 @@ function App() {
     if (error) {
       const message = error.message || 'Could not save content item.'
       const hint = message.toLowerCase().includes('content_items')
-        ? ' Run /supabase/migrations/20260215_owner_roles_and_content_items.sql first.'
+        ? ' Run /supabase/migrations/00000000000000_leo_study_baseline.sql first.'
         : ''
       setEditorError(`${message}${hint}`)
       setEditorLoading(false)
@@ -10764,7 +10764,7 @@ function App() {
     if (error) {
       const message = error.message || 'Could not delete content item.'
       const hint = message.toLowerCase().includes('content_items')
-        ? ' Run /supabase/migrations/20260215_owner_roles_and_content_items.sql first.'
+        ? ' Run /supabase/migrations/00000000000000_leo_study_baseline.sql first.'
         : ''
       setEditorError(`${message}${hint}`)
       setEditorLoading(false)
