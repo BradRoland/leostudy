@@ -70,6 +70,7 @@ Frontend variables are exposed to the browser and must start with `VITE_`.
 VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_OR_PUBLISHABLE_KEY
 VITE_CONTENT_SOURCE=local
+VITE_AUTH_REDIRECT_BASE_URL=http://localhost:5173
 VITE_OWNER_EMAIL=owner@example.com
 VITE_SUPABASE_AVATAR_BUCKET=avatars
 VITE_STRIPE_LINK_TIER2=https://buy.stripe.com/YOUR_TIER2_LINK
@@ -376,7 +377,8 @@ select public.cleanup_public_messages_48h();
 ### Users cannot sign in or get logged out after refresh
 
 - Confirm `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` match the same Supabase project.
-- Add your deployed domain and local URL to Supabase Auth redirect URLs.
+- Add your deployed domain, local URL, and `/auth/callback` URL to Supabase Auth redirect URLs.
+- Set `VITE_AUTH_REDIRECT_BASE_URL` to the public site origin in production, for example `https://example.com`.
 - Avoid mixing `.env` values from different projects.
 
 ### 1v1 invites or rooms do not update live

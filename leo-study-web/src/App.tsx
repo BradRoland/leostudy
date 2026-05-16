@@ -1029,6 +1029,63 @@ function normalizeRoutePath(path: string): string {
   return normalized.length > 0 ? normalized : '/'
 }
 
+const authCallbackPath = '/auth/callback'
+
+function getAuthRedirectBaseUrl() {
+  const configured =
+    typeof import.meta.env.VITE_AUTH_REDIRECT_BASE_URL === 'string'
+      ? import.meta.env.VITE_AUTH_REDIRECT_BASE_URL.trim()
+      : ''
+  if (configured) return configured.replace(/\/+$/, '')
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin
+  return ''
+}
+
+function buildAuthRedirectTo(nextPath = '/home') {
+  const baseUrl = getAuthRedirectBaseUrl()
+  if (!baseUrl) return undefined
+  const redirectUrl = new URL(authCallbackPath, `${baseUrl}/`)
+  const normalizedNextPath = normalizeRoutePath(nextPath)
+  if (normalizedNextPath && normalizedNextPath !== authCallbackPath) {
+    redirectUrl.searchParams.set('next', normalizedNextPath)
+  }
+  return redirectUrl.toString()
+}
+
+function getAuthCallbackNextPath(search: string) {
+  const nextPath = new URLSearchParams(search).get('next') || '/home'
+  const normalized = normalizeRoutePath(nextPath)
+  if (normalized === authCallbackPath || normalized === '/signin' || normalized === '/signup') return '/home'
+  return normalized.startsWith('/') ? normalized : '/home'
+}
+
+function readAuthRedirectMessage() {
+  if (typeof window === 'undefined') return ''
+  const params = new URLSearchParams(window.location.search || '')
+  const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''))
+  return (
+    params.get('error_description') ||
+    params.get('error') ||
+    hashParams.get('error_description') ||
+    hashParams.get('error') ||
+    ''
+  )
+}
+
+function hasAuthRedirectParams() {
+  if (typeof window === 'undefined') return false
+  const params = new URLSearchParams(window.location.search || '')
+  const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''))
+  return Boolean(
+    normalizeRoutePath(window.location.pathname) === authCallbackPath ||
+      params.get('code') ||
+      params.get('error') ||
+      hashParams.get('access_token') ||
+      hashParams.get('refresh_token') ||
+      hashParams.get('error'),
+  )
+}
+
 const supporterTierOrder: SupporterTier[] = ['free', 'tier2', 'tier5', 'tier10']
 const avatarCropFrameSize = 280
 const avatarOutputSize = 512
@@ -4049,6 +4106,7 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [authSuccess, setAuthSuccess] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  const [authRedirectPending, setAuthRedirectPending] = useState(() => hasAuthRedirectParams())
   const [currentUserId, setCurrentUserId] = useState<string>('')
   const [clockNowMs, setClockNowMs] = useState<number>(() => Date.now())
   
@@ -5889,6 +5947,7 @@ function App() {
     const client = supabase
     let mounted = true
     let readyFallbackTimer: number | null = null
+    let waitingForRedirectSession = hasAuthRedirectParams()
     type CurrentSession = Awaited<ReturnType<typeof client.auth.getSession>>['data']['session']
 
     const clearReadyFallback = () => {
@@ -5898,14 +5957,26 @@ function App() {
       }
     }
 
-    const applySession = (session: CurrentSession) => {
+    const markAuthReady = () => {
+      if (mounted) setAuthReady(true)
+    }
+
+    const finishRedirectWait = () => {
+      waitingForRedirectSession = false
+      if (mounted) setAuthRedirectPending(false)
+    }
+
+    const applySession = (session: CurrentSession, allowEmptySession = true) => {
       if (!mounted) return
       if (session?.user) {
+        finishRedirectWait()
         setCurrentUserId(session.user.id)
         setCurrentUserEmail(session.user.email || '')
         setCurrentUserProvider(String(session.user.app_metadata?.provider || 'email'))
         return
       }
+
+      if (!allowEmptySession) return
 
       setCurrentUserId('')
       setCurrentUserEmail('')
@@ -5924,15 +5995,27 @@ function App() {
       setStateHydrated(false)
     }
 
-    const markAuthReady = () => {
-      if (mounted) setAuthReady(true)
+    const redirectMessage = readAuthRedirectMessage()
+    if (redirectMessage) {
+      setAuthError(redirectMessage)
+      finishRedirectWait()
     }
 
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((event, session) => {
-      applySession(session)
-      if (event === 'INITIAL_SESSION') {
+      const shouldHoldEmptyRedirectSession =
+        waitingForRedirectSession &&
+        !session?.user &&
+        event !== 'SIGNED_OUT'
+      applySession(session, !shouldHoldEmptyRedirectSession)
+      if (session?.user || event === 'SIGNED_OUT') {
+        clearReadyFallback()
+        finishRedirectWait()
+        markAuthReady()
+        return
+      }
+      if (event === 'INITIAL_SESSION' && session?.user && !waitingForRedirectSession) {
         clearReadyFallback()
         markAuthReady()
       }
@@ -5940,13 +6023,18 @@ function App() {
 
     void client.auth.getSession()
       .then(({ data: { session } }) => {
-        if (!session) return
-        clearReadyFallback()
-        applySession(session)
-        markAuthReady()
+        const shouldHoldEmptyRedirectSession = waitingForRedirectSession && !session?.user
+        applySession(session, !shouldHoldEmptyRedirectSession)
+        if (session?.user || !shouldHoldEmptyRedirectSession) {
+          clearReadyFallback()
+          markAuthReady()
+        }
       })
       .catch((error) => {
         console.warn('[auth] session restore failed:', error)
+        if (!waitingForRedirectSession) {
+          markAuthReady()
+        }
       })
 
     readyFallbackTimer = window.setTimeout(async () => {
@@ -5958,9 +6046,10 @@ function App() {
       } catch (error) {
         console.warn('[auth] session fallback failed:', error)
       } finally {
+        finishRedirectWait()
         markAuthReady()
       }
-    }, 1200)
+    }, waitingForRedirectSession ? 8000 : 2500)
 
     return () => {
       mounted = false
@@ -8737,6 +8826,11 @@ function App() {
 
   const submitSignIn = async () => {
     if (!supabase) return
+    const normalizedEmail = authEmail.trim().toLowerCase()
+    if (!normalizedEmail) {
+      setAuthError('Enter an email address.')
+      return
+    }
     setAuthLoading(true)
     setAuthError('')
     setAuthSuccess('')
@@ -8747,7 +8841,7 @@ function App() {
     setStateHydrated(false)
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: authEmail,
+      email: normalizedEmail,
       password: authPassword,
     })
 
@@ -8758,6 +8852,7 @@ function App() {
     }
 
     if (data.user) {
+      setAuthEmail(normalizedEmail)
       setCurrentUserId(data.user.id)
       setCurrentUserEmail(data.user.email || '')
       setCurrentUserProvider(String(data.user.app_metadata?.provider || 'email'))
@@ -8830,15 +8925,18 @@ function App() {
     if (!supabase) return
     setAuthLoading(true)
     setAuthError('')
+    window.localStorage.removeItem('pending_profile_setup')
     if (isSignUpPage) {
-      window.localStorage.setItem('pending_profile_setup', '1')
       window.localStorage.setItem('pending_dev_notice', '1')
     }
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: buildAuthRedirectTo('/home'),
+        queryParams: {
+          prompt: 'select_account',
+        },
       },
     })
 
@@ -9031,7 +9129,7 @@ function App() {
 
     const { error } = await authApi.linkIdentity({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/profile` },
+      options: { redirectTo: buildAuthRedirectTo('/profile') },
     })
 
     if (error) {
@@ -9253,6 +9351,7 @@ function App() {
   const currentPath = routePath
   const isSignInPage = currentPath === '/signin'
   const isSignUpPage = currentPath === '/signup'
+  const isAuthCallbackPage = currentPath === authCallbackPath
   const isHomePage = currentPath === '/home'
   const isStudyHubPage = currentPath === '/study'
   const isStudyGuidePage = currentPath === '/study/guide'
@@ -9295,6 +9394,7 @@ function App() {
               : null
   const isKnownAuthedPage =
     isHomePage ||
+    isAuthCallbackPage ||
     isStudyPage ||
     isGamesPage ||
     isScenariosPage ||
@@ -9322,6 +9422,11 @@ function App() {
     setSettingsTab(nextTab)
     goToPath('/profile')
   }, [goToPath])
+
+  useEffect(() => {
+    if (!authReady || !currentUserId || !isAuthCallbackPage) return
+    goToPath(getAuthCallbackNextPath(location.search), { replace: true })
+  }, [authReady, currentUserId, goToPath, isAuthCallbackPage, location.search])
 
   // Flashcard keyboard controls: Space to flip, Arrow keys to navigate
   useEffect(() => {
@@ -11729,7 +11834,7 @@ function App() {
           <div className="onboarding-card">
             <p className="eyebrow">Welcome to</p>
             <h1>LEO Study</h1>
-            <p className="muted">Checking session...</p>
+            <p className="muted">{authRedirectPending ? 'Finishing secure sign-in...' : 'Checking session...'}</p>
           </div>
         </div>
       ) : null}
@@ -11909,7 +12014,20 @@ function App() {
         </div>
       ) : null}
 
-      {authReady && !currentUserId && !isSignInPage && !isSignUpPage ? <Navigate to="/signup" replace /> : null}
+      {authReady && !currentUserId && isAuthCallbackPage ? (
+        <div className="onboarding-overlay">
+          <div className="onboarding-card">
+            <p className="eyebrow">Sign-in issue</p>
+            <h1>LEO Study</h1>
+            <p className="muted">We could not finish that Google sign-in. Please try again.</p>
+            {authError ? <p className="bad">{authError}</p> : null}
+            <button type="button" className="primary" onClick={() => goToPath('/signin', { replace: true })}>
+              Back to Sign In
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {authReady && !currentUserId && !isSignInPage && !isSignUpPage && !isAuthCallbackPage ? <Navigate to="/signup" replace /> : null}
       {authReady && currentUserId && (isSignInPage || isSignUpPage) ? <Navigate to="/home" replace /> : null}
       {authReady && currentUserId && !isKnownAuthedPage ? <Navigate to="/home" replace /> : null}
       {needsProfileSetup ? (
