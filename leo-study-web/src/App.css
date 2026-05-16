@@ -10528,6 +10528,10 @@ button.study-session-top-action-start:active:not(:disabled) {
   font-variant-numeric: tabular-nums;
 }
 
+.onevone-result-xp-reward .session-xp-reward-card {
+  margin: 12px 0 4px;
+}
+
 @keyframes session-xp-card-in {
   from {
     opacity: 0;
@@ -13816,5 +13820,260 @@ textarea:focus-visible,
   .mobile-bottom-icon {
     width: 18px !important;
     height: 18px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .study-practice-page {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .study-practice-hero,
+  .study-practice-setup-card,
+  .study-practice-source-card,
+  .study-practice-results-card {
+    width: 100%;
+    min-width: 0;
+    padding: 14px !important;
+    border-radius: 20px !important;
+  }
+
+  .study-practice-module-switch {
+    display: flex !important;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .study-practice-module-switch::-webkit-scrollbar {
+    display: none;
+  }
+
+  .study-practice-module-switch .seg {
+    flex: 0 0 auto;
+    min-width: min(42vw, 150px);
+    white-space: nowrap;
+  }
+
+  .study-practice-session-overlay {
+    display: block !important;
+    height: 100dvh;
+    max-height: 100dvh;
+    width: 100vw;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      calc(108px + env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left)) !important;
+  }
+
+  .study-practice-session-shell {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 10px !important;
+    padding-bottom: 12px !important;
+    border-radius: 22px !important;
+    gap: 10px;
+    scrollbar-gutter: auto;
+  }
+
+  .study-practice-session-shell::after {
+    height: clamp(128px, 20svh, 220px) !important;
+  }
+
+  .study-practice-session-top {
+    position: static !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px;
+    padding: 10px 12px !important;
+    border-radius: 18px !important;
+  }
+
+  .study-practice-session-top .study-session-top-copy {
+    min-width: 0;
+  }
+
+  .study-practice-session-top .study-session-exit-btn,
+  .study-practice-results-card-overlay .study-session-exit-btn {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .study-practice-progress-card {
+    padding: 10px 12px !important;
+    border-radius: 16px !important;
+  }
+
+  .study-practice-progress-meta {
+    display: grid;
+    gap: 4px;
+    font-size: 0.78rem;
+  }
+
+  .study-practice-session-stage {
+    display: block;
+    width: 100%;
+  }
+
+  .study-practice-session-card {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 14px !important;
+    border-radius: 20px !important;
+    gap: 12px;
+  }
+
+  .study-practice-session-scenario {
+    width: 100%;
+    padding: 13px 14px !important;
+    border-radius: 16px !important;
+  }
+
+  .study-practice-session-scenario p {
+    font-size: clamp(0.94rem, 3.7vw, 1.04rem);
+    line-height: 1.48;
+  }
+
+  .study-practice-session-question-block {
+    align-items: stretch;
+    gap: 12px;
+    text-align: left;
+    scroll-margin-top: 18px;
+  }
+
+  .study-practice-question-head {
+    gap: 8px;
+  }
+
+  .study-practice-question-tags {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .study-practice-question-tags::-webkit-scrollbar {
+    display: none;
+  }
+
+  .study-practice-question-objective {
+    flex: 0 0 auto;
+    max-width: min(82vw, 320px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .study-practice-session-question-block h2 {
+    max-width: none;
+    text-align: left;
+    font-size: clamp(1.04rem, 4.25vw, 1.22rem);
+    line-height: 1.34;
+  }
+
+  .study-practice-choices {
+    max-width: none;
+    gap: 9px;
+  }
+
+  .study-practice-choices .choice {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    min-height: 58px !important;
+    padding: 12px 14px !important;
+    border-radius: 16px !important;
+    font-size: 0.98rem;
+    line-height: 1.36;
+    touch-action: manipulation;
+  }
+
+  .study-practice-feedback {
+    max-width: none;
+    padding: 14px !important;
+    border-radius: 16px !important;
+    scroll-margin: 24px 0 128px;
+  }
+
+  .study-practice-next-action {
+    min-height: 54px;
+    border-radius: 16px;
+  }
+
+  .study-practice-results-card-overlay {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .study-practice-results-card-overlay .study-guide-stats,
+  .study-practice-results-grid,
+  .study-practice-coaching-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .study-practice-results-actions {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .study-practice-results-actions button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .study-practice-session-overlay {
+    padding-inline: 6px !important;
+  }
+
+  .study-practice-session-shell {
+    padding: 8px !important;
+    border-radius: 18px !important;
+  }
+
+  .study-practice-session-card,
+  .study-practice-session-scenario,
+  .study-practice-feedback {
+    padding: 12px !important;
+  }
+
+  .study-practice-choices .choice {
+    min-height: 54px !important;
+    padding: 10px 12px !important;
+    font-size: 0.94rem;
+  }
+}
+
+@media (max-width: 760px) and (max-height: 720px) {
+  .study-practice-session-shell {
+    gap: 8px;
+  }
+
+  .study-practice-session-top .study-guide-kicker,
+  .study-practice-choice-hint {
+    display: none;
+  }
+
+  .study-practice-session-scenario p {
+    line-height: 1.42;
+  }
+
+  .study-practice-choices .choice {
+    min-height: 50px !important;
   }
 }

@@ -1,4 +1,4 @@
-import { type CSSProperties, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
@@ -712,6 +712,16 @@ export function OneVsOnePanel(props: {
   externalJoinRoomId?: string | null
   onExternalJoinHandled?: () => void
   onStudyActivity?: () => void
+  onDuelPerformanceReward?: (result: {
+    roomId: string
+    gameType: DuelGameType
+    rounds: number
+    score: number
+    opponentScore: number
+    won: boolean
+    draw: boolean
+  }) => void
+  sessionXpReward?: ReactNode
 }) {
   const {
     currentUserId,
@@ -720,6 +730,8 @@ export function OneVsOnePanel(props: {
     externalJoinRoomId = null,
     onExternalJoinHandled,
     onStudyActivity,
+    onDuelPerformanceReward,
+    sessionXpReward,
   } = props
 
   const [selectedGameType, setSelectedGameType] = useState<DuelGameType>('quiz')
@@ -786,6 +798,7 @@ export function OneVsOnePanel(props: {
   const roundSubmitQueueRef = useRef<Promise<void>>(Promise.resolve())
   const waitingChatEndRef = useRef<HTMLDivElement | null>(null)
   const rematchHandoffRoomIdRef = useRef('')
+  const rewardedResultRoomIdsRef = useRef<Set<string>>(new Set())
   const duelProfileCacheRef = useRef<Record<string, DuelProfileSnapshot>>({})
   const duelLeaderboardRequestRef = useRef(0)
   const winsLeaderboardRef = useRef<DuelStatsLeaderboardEntry[]>(winsLeaderboard)
@@ -2869,6 +2882,21 @@ export function OneVsOnePanel(props: {
   const opponentFastestRoundMs = opponentResultRow ? playerByUserId.get(opponentResultRow.user_id)?.fastest_round_ms || 0 : 0
 
   useEffect(() => {
+    if (!room || room.status !== 'completed' || isSpectator || !myResultRow || !opponentResultRow) return
+    if (rewardedResultRoomIdsRef.current.has(room.id)) return
+    rewardedResultRoomIdsRef.current.add(room.id)
+    onDuelPerformanceReward?.({
+      roomId: room.id,
+      gameType: room.game_type,
+      rounds: room.rounds,
+      score: myResultRow.score,
+      opponentScore: opponentResultRow.score,
+      won: room.winner_user_id === currentUserId,
+      draw: !room.winner_user_id,
+    })
+  }, [currentUserId, isSpectator, myResultRow, onDuelPerformanceReward, opponentResultRow, room])
+
+  useEffect(() => {
     if (!inRoom || !room) {
       setActivityLog([])
       previousPlayersRef.current = []
@@ -3859,6 +3887,11 @@ export function OneVsOnePanel(props: {
                       : `Winner: ${usernameByUserId[room.winner_user_id] || opponentDisplayName}`
                     : 'Result: Draw'}
                 </div>
+                {!isSpectator && sessionXpReward ? (
+                  <div className="onevone-result-xp-reward">
+                    {sessionXpReward}
+                  </div>
+                ) : null}
                 {tieBreakerDecision && !isSpectator ? (
                   <p className="muted tiny onevone-tiebreak-note">
                     Decision: {tieBreakerDecision.rule} • {tieBreakerDecision.summary}

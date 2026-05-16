@@ -70,6 +70,16 @@ const studyActivityWindowMs = 20000
 const xpFeedbackActivityWindowMs = 120000
 const duelWinXpValue = 125
 const duelLossXpValue = 35
+const strongScoreXpValue = 45
+const excellentScoreXpValue = 90
+const perfectScoreXpValue = 170
+const personalBestXpValue = 35
+const duelCompletionBonusXpValue = 20
+const duelWinnerBonusXpValue = 35
+const duelClutchBonusXpValue = 30
+const duelDominantBonusXpValue = 40
+const duelShutoutBonusXpValue = 75
+const achievementAwardLedgerLimit = 320
 const leaderboardRefreshThrottleMs = 5000
 const homeLeaderboardRefreshThrottleMs = 12000
 const leaderboardRealtimeDebounceMs = 450
@@ -401,6 +411,17 @@ type NameStylePreset = {
   style: NameStyle
 }
 
+type AchievementCounterKey =
+  | 'strongScores'
+  | 'excellentScores'
+  | 'perfectScores'
+  | 'personalBests'
+  | 'duelCompleted'
+  | 'duelWinnerBonus'
+  | 'duelClutchMatches'
+  | 'duelDominantWins'
+  | 'duelShutouts'
+
 type UserStats = {
   studySeconds: number
   studyDayStreak: number
@@ -413,6 +434,9 @@ type UserStats = {
   studyModeCounts: Record<CodeFilter, number>
   sessionTracks: Record<string, SessionTrack>
   sessionTimeline: SessionTimelinePoint[]
+  achievementXp: number
+  achievementCounts: Record<AchievementCounterKey, number>
+  achievementAwardLedger: Record<string, number>
 }
 
 type SessionMode = 'study_test' | 'matching' | 'speed' | 'blaster'
@@ -705,6 +729,7 @@ type LeaderboardProfileSnapshot = {
   gamePlays: UserStats['gamePlays']
   flashcardsReviewed: number
   scenariosReviewed: number
+  achievementXp: number
   studyModeCounts: Record<CodeFilter, number>
   masteredCodes: number | null
   currentActivity: CurrentUserActivity | null
@@ -742,6 +767,7 @@ type UserLevelInput = {
   gamePlays: UserStats['gamePlays']
   flashcardsReviewed: number
   scenariosReviewed: number
+  achievementXp: number
   duelWins: number
   duelLosses: number
   duelCurrentWinStreak: number
@@ -766,6 +792,33 @@ type XpGainFeedback = {
 }
 
 type SessionXpReward = Omit<XpGainFeedback, 'mode'>
+
+type ScoreAchievementRewardInput = {
+  mode: SessionMode | 'practice_test'
+  title: string
+  accuracy: number
+  correct: number
+  total: number
+  score: number
+  personalBest?: boolean
+}
+
+type DuelAchievementRewardInput = {
+  roomId: string
+  gameType: DuelLeaderboardMode
+  rounds: number
+  score: number
+  opponentScore: number
+  won: boolean
+  draw: boolean
+}
+
+type AchievementRewardBuild = {
+  xp: number
+  title: string
+  detail: string
+  counters: Partial<Record<AchievementCounterKey, number>>
+}
 
 type AppThemePreset = {
   id: string
@@ -1747,6 +1800,31 @@ const defaultUserStats: UserStats = {
   },
   sessionTracks: {},
   sessionTimeline: [],
+  achievementXp: 0,
+  achievementCounts: {
+    strongScores: 0,
+    excellentScores: 0,
+    perfectScores: 0,
+    personalBests: 0,
+    duelCompleted: 0,
+    duelWinnerBonus: 0,
+    duelClutchMatches: 0,
+    duelDominantWins: 0,
+    duelShutouts: 0,
+  },
+  achievementAwardLedger: {},
+}
+
+function cloneDefaultUserStats(): UserStats {
+  return {
+    ...defaultUserStats,
+    gamePlays: { ...defaultUserStats.gamePlays },
+    studyModeCounts: { ...defaultUserStats.studyModeCounts },
+    sessionTracks: {},
+    sessionTimeline: [],
+    achievementCounts: { ...defaultUserStats.achievementCounts },
+    achievementAwardLedger: {},
+  }
 }
 
 const profileDecorationCatalog: ProfileDecoration[] = [
@@ -1997,6 +2075,7 @@ function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
     input.masteredCodes * 70 +
     Math.floor(input.flashcardsReviewed / 4) +
     input.scenariosReviewed * 6 +
+    input.achievementXp +
     (input.gamePlays.matching + input.gamePlays.speed + input.gamePlays.blaster) * 6 +
     Math.floor(input.highScores.matching / 18) +
     Math.floor(input.highScores.blaster / 20) +
@@ -2021,6 +2100,83 @@ function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
     autoDecorationKey: autoDecorationKeyForLevel(level),
     nextReward: profileDecorationCatalog.find((decoration) => decoration.unlockLevel > level && decoration.key !== 'auto' && decoration.key !== 'none') || null,
   }
+}
+
+function combineAchievementRewards(title: string, rewards: Array<{ label: string; xp: number; counter: AchievementCounterKey }>): AchievementRewardBuild | null {
+  const validRewards = rewards.filter((reward) => reward.xp > 0)
+  if (validRewards.length === 0) return null
+  return {
+    xp: validRewards.reduce((total, reward) => total + reward.xp, 0),
+    title,
+    detail: validRewards.map((reward) => reward.label).join(' + '),
+    counters: validRewards.reduce<Partial<Record<AchievementCounterKey, number>>>((accumulator, reward) => {
+      accumulator[reward.counter] = (accumulator[reward.counter] || 0) + 1
+      return accumulator
+    }, {}),
+  }
+}
+
+function buildScoreAchievementReward(input: ScoreAchievementRewardInput): AchievementRewardBuild | null {
+  const total = Math.max(0, Math.floor(input.total))
+  const accuracy = Math.max(0, Math.min(100, Math.round(input.accuracy)))
+  const rewards: Array<{ label: string; xp: number; counter: AchievementCounterKey }> = []
+  const isLongTest = input.mode === 'practice_test' || input.mode === 'study_test'
+  const perfectMin = isLongTest ? 10 : 6
+  const excellentMin = isLongTest ? 10 : 8
+  const strongMin = isLongTest ? 10 : 10
+
+  if (total >= perfectMin && accuracy === 100) {
+    rewards.push({ label: 'Perfect score', xp: perfectScoreXpValue, counter: 'perfectScores' })
+  } else if (total >= excellentMin && accuracy >= 90) {
+    rewards.push({ label: '90%+ performance', xp: excellentScoreXpValue, counter: 'excellentScores' })
+  } else if (total >= strongMin && accuracy >= 80) {
+    rewards.push({ label: '80%+ performance', xp: strongScoreXpValue, counter: 'strongScores' })
+  }
+
+  if (input.personalBest && input.score > 0) {
+    rewards.push({ label: 'New personal best', xp: personalBestXpValue, counter: 'personalBests' })
+  }
+
+  const title = rewards.some((reward) => reward.counter === 'perfectScores')
+    ? '🏆 Perfect Score Bonus'
+    : rewards.some((reward) => reward.counter === 'excellentScores')
+      ? '⭐ Excellent Score Bonus'
+      : rewards.some((reward) => reward.counter === 'strongScores')
+        ? '💪 Strong Score Bonus'
+        : '🎉 Score Bonus'
+
+  return combineAchievementRewards(title, rewards)
+}
+
+function buildDuelAchievementReward(input: DuelAchievementRewardInput): AchievementRewardBuild | null {
+  const rounds = Math.max(1, Math.floor(input.rounds || 1))
+  const score = Math.max(0, Math.round(input.score || 0))
+  const opponentScore = Math.max(0, Math.round(input.opponentScore || 0))
+  const scoreGap = Math.abs(score - opponentScore)
+  const closeMatchThreshold = Math.max(12, Math.round(Math.max(score, opponentScore, 1) * 0.14))
+  const rewards: Array<{ label: string; xp: number; counter: AchievementCounterKey }> = []
+
+  if (score > 0 && rounds >= 3) {
+    rewards.push({ label: '1v1 completed under pressure', xp: duelCompletionBonusXpValue, counter: 'duelCompleted' })
+  }
+
+  if (input.won) {
+    rewards.push({ label: '1v1 win bonus', xp: duelWinnerBonusXpValue, counter: 'duelWinnerBonus' })
+  }
+
+  if (rounds >= 5 && !input.draw && scoreGap <= closeMatchThreshold) {
+    rewards.push({ label: input.won ? 'Clutch close win' : 'Close-match grit', xp: duelClutchBonusXpValue, counter: 'duelClutchMatches' })
+  }
+
+  if (input.won && rounds >= 5 && scoreGap >= Math.max(30, Math.round(opponentScore * 0.45))) {
+    rewards.push({ label: 'Dominant 1v1 finish', xp: duelDominantBonusXpValue, counter: 'duelDominantWins' })
+  }
+
+  if (input.won && rounds >= 5 && opponentScore === 0 && score > 0) {
+    rewards.push({ label: '1v1 shutout', xp: duelShutoutBonusXpValue, counter: 'duelShutouts' })
+  }
+
+  return combineAchievementRewards('⚔️ 1v1 XP Bonus', rewards)
 }
 
 function getEffectiveProfileDecoration(levelProfile: UserLevelProfile, selectedKey = 'auto') {
@@ -2767,6 +2923,7 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
     gamePlays: { ...defaultUserStats.gamePlays },
     flashcardsReviewed: 0,
     scenariosReviewed: 0,
+    achievementXp: 0,
     studyModeCounts: { ...defaultUserStats.studyModeCounts },
     masteredCodes: null,
     currentActivity: null,
@@ -2801,6 +2958,7 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
     },
     flashcardsReviewed: normalizeCount(statsRaw.flashcardsReviewed),
     scenariosReviewed: normalizeCount(statsRaw.scenariosReviewed),
+    achievementXp: normalizeCount(statsRaw.achievementXp),
     studyModeCounts: {
       all: normalizeCount(studyModeCountsRaw.all),
       penal: normalizeCount(studyModeCountsRaw.penal),
@@ -2828,8 +2986,34 @@ function mostStudiedModeFromCounts(studyModeCounts: Record<CodeFilter, number>):
   return max > 0 ? winner : null
 }
 
+function sanitizeAchievementCounts(input: unknown): Record<AchievementCounterKey, number> {
+  const value = input && typeof input === 'object' ? input as Partial<Record<AchievementCounterKey, unknown>> : {}
+  return (Object.keys(defaultUserStats.achievementCounts) as AchievementCounterKey[]).reduce<Record<AchievementCounterKey, number>>((accumulator, key) => {
+    const count = value[key]
+    accumulator[key] = typeof count === 'number' && Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0
+    return accumulator
+  }, { ...defaultUserStats.achievementCounts })
+}
+
+function sanitizeAchievementAwardLedger(input: unknown): Record<string, number> {
+  if (!input || typeof input !== 'object') return {}
+  return Object.entries(input as Record<string, unknown>)
+    .map(([key, value]) => {
+      const cleanKey = key.trim().slice(0, 160)
+      const timestamp = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
+      return cleanKey && timestamp > 0 ? [cleanKey, timestamp] as const : null
+    })
+    .filter((entry): entry is readonly [string, number] => Boolean(entry))
+    .sort((left, right) => left[1] - right[1])
+    .slice(-achievementAwardLedgerLimit)
+    .reduce<Record<string, number>>((accumulator, [key, timestamp]) => {
+      accumulator[key] = timestamp
+      return accumulator
+    }, {})
+}
+
 function sanitizeUserStats(input: unknown): UserStats {
-  if (!input || typeof input !== 'object') return { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } }
+  if (!input || typeof input !== 'object') return cloneDefaultUserStats()
   const value = input as Partial<UserStats>
   const gamePlays = value.gamePlays && typeof value.gamePlays === 'object' ? value.gamePlays : {}
   const studyModeCounts = value.studyModeCounts && typeof value.studyModeCounts === 'object' ? value.studyModeCounts : {}
@@ -2941,6 +3125,9 @@ function sanitizeUserStats(input: unknown): UserStats {
     },
     sessionTracks: normalizedTracks,
     sessionTimeline,
+    achievementXp: typeof value.achievementXp === 'number' && Number.isFinite(value.achievementXp) ? Math.max(0, Math.floor(value.achievementXp)) : 0,
+    achievementCounts: sanitizeAchievementCounts(value.achievementCounts),
+    achievementAwardLedger: sanitizeAchievementAwardLedger(value.achievementAwardLedger),
   }
 }
 
@@ -3005,7 +3192,7 @@ function sanitizeState(input: unknown): PersistedState {
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
       systemNoticesSeen: [],
-      stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
+      stats: cloneDefaultUserStats(),
       currentActivity: null,
     },
   }
@@ -3052,7 +3239,7 @@ function sanitizeState(input: unknown): PersistedState {
             nameStyle: { ...defaultNameStyle },
             namePresets: [],
             systemNoticesSeen: [],
-            stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
+            stats: cloneDefaultUserStats(),
             currentActivity: null,
           },
   }
@@ -4209,7 +4396,7 @@ function App() {
     nameStyle: { ...defaultNameStyle },
     namePresets: [],
     systemNoticesSeen: [],
-    stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
+    stats: cloneDefaultUserStats(),
     currentActivity: null,
   })
   const [leaderboardRotateMs, setLeaderboardRotateMs] = useState(defaultLeaderboardRotationMs)
@@ -4291,7 +4478,12 @@ function App() {
   const previousXpSnapshotRef = useRef<{ userId: string; totalXp: number; level: number; capturedAt: number } | null>(null)
   const lastXpEligibleActivityAtRef = useRef(0)
   const xpGainTimerRef = useRef<number | null>(null)
+  const awardedAchievementKeysRef = useRef<Set<string>>(new Set())
   const streakLossNoticeRef = useRef('')
+
+  useEffect(() => {
+    awardedAchievementKeysRef.current.clear()
+  }, [currentUserId])
 
   useEffect(() => {
     if (!supabase || !currentUserId) {
@@ -4409,6 +4601,7 @@ function App() {
   const homeBlasterRotationIndexRef = useRef(0)
   const lastAppStateUpdateRef = useRef(0)
   const highScoresRef = useRef(gameHighScoreSeed)
+  const studyTestSessionIdRef = useRef('')
   const leaderboardRef = useRef<LeaderboardEntry[]>([])
   const weeklyLeaderboardRef = useRef<LeaderboardEntry[]>([])
   const leaderboardAnnouncementDedupRef = useRef<Map<string, number>>(new Map())
@@ -4426,14 +4619,17 @@ function App() {
     profileDetails: null,
   })
   const matchScoreRef = useRef(0)
+  const matchSessionIdRef = useRef('')
   const matchRoundRef = useRef(1)
   const matchSessionDurationRef = useRef(30)
   const matchSessionFilterRef = useRef<CodeFilter>('all')
   const speedScoreRef = useRef(0)
+  const speedSessionIdRef = useRef('')
   const speedAnsweredCountRef = useRef(0)
   const speedSessionDurationRef = useRef(30)
   const speedSessionFilterRef = useRef<CodeFilter>('all')
   const blasterScoreRef = useRef(0)
+  const blasterSessionIdRef = useRef('')
   const blasterCorrectCountRef = useRef(0)
   const blasterIncorrectCountRef = useRef(0)
   const blasterTargetsRef = useRef<BlasterTarget[]>([])
@@ -5424,6 +5620,7 @@ function App() {
             gamePlays: { ...defaultUserStats.gamePlays },
             flashcardsReviewed: 0,
             scenariosReviewed: 0,
+            achievementXp: 0,
             studyModeCounts: { ...defaultUserStats.studyModeCounts },
             masteredCodes: null,
             currentActivity: null,
@@ -5454,6 +5651,7 @@ function App() {
             gamePlays: { ...defaultUserStats.gamePlays },
             flashcardsReviewed: 0,
             scenariosReviewed: 0,
+            achievementXp: 0,
             studyModeCounts: { ...defaultUserStats.studyModeCounts },
             masteredCodes: null,
             currentActivity: null,
@@ -5472,6 +5670,7 @@ function App() {
             gamePlays: parsedDetails.gamePlays,
             flashcardsReviewed: parsedDetails.flashcardsReviewed,
             scenariosReviewed: parsedDetails.scenariosReviewed,
+            achievementXp: parsedDetails.achievementXp,
             studyModeCounts: parsedDetails.studyModeCounts,
             masteredCodes: parsedDetails.masteredCodes,
             currentActivity: parsedDetails.currentActivity,
@@ -5739,6 +5938,7 @@ function App() {
           gamePlays: { ...defaultUserStats.gamePlays },
           flashcardsReviewed: 0,
           scenariosReviewed: 0,
+          achievementXp: 0,
           studyModeCounts: { ...defaultUserStats.studyModeCounts },
           masteredCodes: null,
           currentActivity: null,
@@ -5771,6 +5971,7 @@ function App() {
           gamePlays: details.gamePlays,
           flashcardsReviewed: details.flashcardsReviewed,
           scenariosReviewed: details.scenariosReviewed,
+          achievementXp: details.achievementXp,
           duelWins: duelStats.wins,
           duelLosses: duelStats.losses,
           duelCurrentWinStreak: duelStats.currentWinStreak,
@@ -6679,6 +6880,7 @@ function App() {
       gamePlays: profileDetails.stats.gamePlays,
       flashcardsReviewed: profileDetails.stats.flashcardsReviewed,
       scenariosReviewed: profileDetails.stats.scenariosReviewed,
+      achievementXp: profileDetails.stats.achievementXp,
       duelWins,
       duelLosses,
       duelCurrentWinStreak,
@@ -6776,6 +6978,7 @@ function App() {
     (routePath === '/games/matching' && (matchRunning || matchDone)) ||
     (routePath === '/games/speed' && (speedRunning || speedDone)) ||
     (routePath === '/games/blaster' && (blasterRunning || blasterDone)) ||
+    routePath === '/games/duel' ||
     (routePath === '/study/test' && studyTestSessionOpen) ||
     (routePath === '/study/practice-test' && (studyPracticeSessionState.active || studyPracticeSessionState.complete))
   )
@@ -7145,6 +7348,7 @@ function App() {
       return
     }
     setSessionXpReward(null)
+    studyTestSessionIdRef.current = crypto.randomUUID()
     const [first, ...remaining] = deck
     setStudyTestSessionFilter(studyTestFilter)
     setStudyTestSessionTotal(deck.length)
@@ -7174,6 +7378,61 @@ function App() {
     window.setTimeout(() => {
       setCelebration((current) => (current?.burst === burst ? null : current))
     }, 2200)
+  }, [])
+
+  const awardAchievementReward = useCallback((awardKey: string, reward: AchievementRewardBuild | null) => {
+    if (!currentUserId || !reward || reward.xp <= 0) return
+    const scopedKey = `${currentUserId}|${awardKey.trim().slice(0, 140)}`
+    if (!scopedKey || awardedAchievementKeysRef.current.has(scopedKey) || profileDetails.stats.achievementAwardLedger[scopedKey]) return
+
+    awardedAchievementKeysRef.current.add(scopedKey)
+    incrementUserStats((stats) => {
+      if (stats.achievementAwardLedger[scopedKey]) return stats
+      const nextCounts = { ...stats.achievementCounts }
+      for (const [counterKey, increment] of Object.entries(reward.counters) as Array<[AchievementCounterKey, number]>) {
+        nextCounts[counterKey] = (nextCounts[counterKey] || 0) + Math.max(0, Math.floor(increment || 0))
+      }
+      return {
+        ...stats,
+        achievementXp: Math.max(0, Math.floor(stats.achievementXp || 0)) + reward.xp,
+        achievementCounts: nextCounts,
+        achievementAwardLedger: sanitizeAchievementAwardLedger({
+          ...stats.achievementAwardLedger,
+          [scopedKey]: Date.now(),
+        }),
+      }
+    }, true)
+    triggerCelebration(reward.title, `+${reward.xp.toLocaleString()} XP • ${reward.detail}`)
+  }, [currentUserId, incrementUserStats, profileDetails.stats.achievementAwardLedger, triggerCelebration])
+
+  const awardScoreMilestoneXp = useCallback((awardKey: string, input: ScoreAchievementRewardInput) => {
+    awardAchievementReward(awardKey, buildScoreAchievementReward(input))
+  }, [awardAchievementReward])
+
+  const awardDuelMilestoneXp = useCallback((input: DuelAchievementRewardInput) => {
+    awardAchievementReward(`duel|${input.roomId}|${input.score}|${input.opponentScore}`, buildDuelAchievementReward(input))
+  }, [awardAchievementReward])
+
+  const handlePracticeTestComplete = useCallback((result: {
+    sessionId: string
+    title: string
+    correct: number
+    total: number
+    accuracy: number
+  }) => {
+    awardScoreMilestoneXp(`practice-test|${result.sessionId}`, {
+      mode: 'practice_test',
+      title: result.title,
+      accuracy: result.accuracy,
+      correct: result.correct,
+      total: result.total,
+      score: result.correct,
+    })
+  }, [awardScoreMilestoneXp])
+
+  const handleStudyPracticeSessionStateChange = useCallback((state: { active: boolean; complete: boolean }) => {
+    if (state.active && !state.complete) setSessionXpReward(null)
+    setStudyPracticeSessionState(state)
   }, [])
 
   useEffect(() => {
@@ -7588,6 +7847,14 @@ function App() {
         filter: studyTestSessionFilter,
         at: Date.now(),
       })
+      awardScoreMilestoneXp(`study-test|${studyTestSessionIdRef.current || trackKey}`, {
+        mode: 'study_test',
+        title: 'Study Test',
+        accuracy,
+        correct,
+        total,
+        score: correct,
+      })
       return
     }
     const [next, ...remaining] = quizDeck
@@ -7597,6 +7864,7 @@ function App() {
     setFeedback('')
   }, [
     getFocusTips,
+    awardScoreMilestoneXp,
     profileDetails.stats,
     quizDeck,
     remoteTrackScoreHistory,
@@ -7654,6 +7922,15 @@ function App() {
       previousRank: previousAttempt?.rank ?? null,
     }
     setMatchingReport(baseReport)
+    awardScoreMilestoneXp(`matching|${matchSessionIdRef.current || trackKey}`, {
+      mode: 'matching',
+      title: 'Matching',
+      accuracy: finalAccuracy,
+      correct: finalCorrect,
+      total: finalAttempts,
+      score: finalMatchScore,
+      personalBest: isPersonalBest,
+    })
 
     if (supabase && currentUserId) {
       void (async () => {
@@ -7746,6 +8023,7 @@ function App() {
   }, [
     currentUserId,
     getFocusTips,
+    awardScoreMilestoneXp,
     handleLeaderboardTopMilestones,
     profileDetails.stats,
     remoteTrackScoreHistory,
@@ -7902,6 +8180,7 @@ function App() {
 
   const startMatching = () => {
     setSessionXpReward(null)
+    matchSessionIdRef.current = crypto.randomUUID()
     const selectedDuration = gamesSelection.duration
     const selectedFilter = gamesSelection.filter
     matchSessionDurationRef.current = selectedDuration
@@ -7970,6 +8249,7 @@ function App() {
 
   const startSpeedTest = () => {
     setSessionXpReward(null)
+    speedSessionIdRef.current = crypto.randomUUID()
     const selectedDuration = gamesSelection.duration
     const selectedFilter = gamesSelection.filter
     const pool = selectedFilter === 'all'
@@ -8127,6 +8407,15 @@ function App() {
       previousRank: previousAttempt?.rank ?? null,
     }
     setBlasterReport(baseReport)
+    awardScoreMilestoneXp(`blaster|${blasterSessionIdRef.current || trackKey}`, {
+      mode: 'blaster',
+      title: 'Code Blaster',
+      accuracy: finalAccuracy,
+      correct: finalCorrect,
+      total: finalAttempts,
+      score: finalScore,
+      personalBest: isPersonalBest,
+    })
 
     if (supabase && currentUserId) {
       void (async () => {
@@ -8221,6 +8510,7 @@ function App() {
   }, [
     currentUserId,
     getFocusTips,
+    awardScoreMilestoneXp,
     handleLeaderboardTopMilestones,
     profileDetails.stats,
     refreshHomeLeaderboards,
@@ -8238,6 +8528,7 @@ function App() {
 
   const startBlaster = () => {
     setSessionXpReward(null)
+    blasterSessionIdRef.current = crypto.randomUUID()
     const selectedDuration = codeBlasterFixedDuration
     const selectedFilter = gamesSelection.filter
     const pool = selectedFilter === 'all' ? sections : sections.filter((section) => section.codeSet === selectedFilter)
@@ -8612,6 +8903,15 @@ function App() {
             previousRank: previousAttempt?.rank ?? null,
           }
           setSpeedReport(baseReport)
+          awardScoreMilestoneXp(`speed|${speedSessionIdRef.current || trackKey}`, {
+            mode: 'speed',
+            title: 'Speed Test',
+            accuracy: finalAccuracy,
+            correct: finalCorrect,
+            total: finalAnswered,
+            score: finalSpeedScore,
+            personalBest: isPersonalBest,
+          })
 
           if (supabase && currentUserId) {
             void (async () => {
@@ -8711,6 +9011,7 @@ function App() {
   }, [
     currentUserId,
     getFocusTips,
+    awardScoreMilestoneXp,
     handleLeaderboardTopMilestones,
     profileDetails.stats,
     remoteTrackScoreHistory,
@@ -9194,7 +9495,7 @@ function App() {
       nameStyle: { ...defaultNameStyle },
       namePresets: [],
       systemNoticesSeen: [],
-      stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
+      stats: cloneDefaultUserStats(),
       currentActivity: null,
     })
     setNewPresetName('')
@@ -9316,7 +9617,7 @@ function App() {
     setProfileDetails((previous) => ({
       ...previous,
       namePresets: [],
-      stats: { ...defaultUserStats, gamePlays: { ...defaultUserStats.gamePlays }, studyModeCounts: { ...defaultUserStats.studyModeCounts } },
+      stats: cloneDefaultUserStats(),
     }))
     recentSpeedSectionsRef.current = []
     await refreshLeaderboard({ force: true })
@@ -11086,6 +11387,7 @@ function App() {
       gamePlays: details.gamePlays,
       flashcardsReviewed: details.flashcardsReviewed,
       scenariosReviewed: details.scenariosReviewed,
+      achievementXp: details.achievementXp,
       duelWins,
       duelLosses,
       duelCurrentWinStreak,
@@ -13439,7 +13741,8 @@ function App() {
         {isStudyPracticeTestPage ? (
           <StudyPracticeTestPage
             onStudyActivity={() => markStudyActivity('study_practice')}
-            onSessionStateChange={setStudyPracticeSessionState}
+            onSessionStateChange={handleStudyPracticeSessionStateChange}
+            onSessionComplete={handlePracticeTestComplete}
             sessionXpReward={studyPracticeSessionState.complete ? renderSessionXpReward() : null}
           />
         ) : null}
@@ -14639,6 +14942,8 @@ function App() {
                 externalJoinRoomId={duelInviteJoinRoomId}
                 onExternalJoinHandled={() => setDuelInviteJoinRoomId(null)}
                 onStudyActivity={() => markStudyActivity('duel')}
+                onDuelPerformanceReward={awardDuelMilestoneXp}
+                sessionXpReward={renderSessionXpReward()}
               />
             ) : null}
           </section>
@@ -15230,7 +15535,7 @@ function App() {
                     <div>
                       <p className="eyebrow">Progression</p>
                       <h3>Level {currentUserLevelProfile.level} • {currentUserLevelProfile.tierName}</h3>
-                      <p className="muted">{currentUserLevelProfile.totalXp.toLocaleString()} XP earned from study time, mastered codes, games, high scores, 1v1s, streaks, and leaderboard bonuses.</p>
+                      <p className="muted">{currentUserLevelProfile.totalXp.toLocaleString()} XP earned from study time, mastered codes, games, high scores, 1v1s, score bonuses, streaks, and leaderboard bonuses.</p>
                     </div>
                   </div>
                   <div className="level-progress-bar" aria-label={`Level progress ${currentUserLevelProfile.progressPercent}%`}>
@@ -15239,6 +15544,30 @@ function App() {
                   <div className="level-progress-copy">
                     <span>{currentUserLevelProfile.currentLevelXp.toLocaleString()} / {currentUserLevelProfile.nextLevelXp.toLocaleString()} XP to Level {currentUserLevelProfile.level + 1}</span>
                     {currentUserLevelProfile.nextReward ? <span>Next: {currentUserLevelProfile.nextReward.title} at Lv {currentUserLevelProfile.nextReward.unlockLevel}</span> : <span>All planned rewards unlocked.</span>}
+                  </div>
+                  <div className="study-guide-stats progression-achievement-stats">
+                    <div className="study-guide-stat-pill">
+                      <small>Bonus XP</small>
+                      <strong>{profileDetails.stats.achievementXp.toLocaleString()}</strong>
+                    </div>
+                    <div className="study-guide-stat-pill">
+                      <small>Perfect scores</small>
+                      <strong>{profileDetails.stats.achievementCounts.perfectScores}</strong>
+                    </div>
+                    <div className="study-guide-stat-pill">
+                      <small>90%+ scores</small>
+                      <strong>{profileDetails.stats.achievementCounts.excellentScores}</strong>
+                    </div>
+                    <div className="study-guide-stat-pill">
+                      <small>1v1 bonuses</small>
+                      <strong>{(
+                        profileDetails.stats.achievementCounts.duelCompleted +
+                        profileDetails.stats.achievementCounts.duelWinnerBonus +
+                        profileDetails.stats.achievementCounts.duelClutchMatches +
+                        profileDetails.stats.achievementCounts.duelDominantWins +
+                        profileDetails.stats.achievementCounts.duelShutouts
+                      ).toLocaleString()}</strong>
+                    </div>
                   </div>
                   <div className="profile-decoration-picker">
                     <div className="profile-decoration-heading">

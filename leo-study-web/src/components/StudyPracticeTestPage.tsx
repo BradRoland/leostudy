@@ -11,6 +11,15 @@ import {
 type StudyPracticeTestPageProps = {
   onStudyActivity: () => void
   onSessionStateChange?: (state: { active: boolean; complete: boolean }) => void
+  onSessionComplete?: (result: {
+    sessionId: string
+    moduleId: PracticeTestModuleId
+    title: string
+    correct: number
+    total: number
+    accuracy: number
+    elapsedSeconds: number
+  }) => void
   sessionXpReward?: ReactNode
 }
 
@@ -178,7 +187,7 @@ function buildLdBreakdown(questions: PracticeTestQuestion[], answers: Record<str
     .sort((left, right) => Number(left.ldNumber) - Number(right.ldNumber))
 }
 
-export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, sessionXpReward }: StudyPracticeTestPageProps) {
+export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, onSessionComplete, sessionXpReward }: StudyPracticeTestPageProps) {
   const [selectedModuleId, setSelectedModuleId] = useState<PracticeTestModuleId>('tmas2')
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<number>(20)
   const [sessionActive, setSessionActive] = useState(false)
@@ -188,6 +197,7 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, s
   const [answers, setAnswers] = useState<Record<string, number>>({})
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [completedAt, setCompletedAt] = useState<number | null>(null)
+  const [sessionId, setSessionId] = useState('')
   const [liveNowMs, setLiveNowMs] = useState<number>(() => Date.now())
   const [sessionScenarios, setSessionScenarios] = useState<PracticeTestScenario[]>([])
   const scenarioHeroRef = useRef<HTMLDivElement | null>(null)
@@ -401,6 +411,7 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, s
     setAnswers({})
     setStartedAt(null)
     setCompletedAt(null)
+    setSessionId('')
     setSessionScenarios([])
   }
 
@@ -414,6 +425,7 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, s
     setAnswers({})
     setSessionComplete(false)
     setSessionActive(true)
+    setSessionId(crypto.randomUUID())
     setStartedAt(Date.now())
     setCompletedAt(null)
   }
@@ -434,9 +446,21 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, s
     const isLastScenario = scenarioIndex >= activeScenarios.length - 1
 
     if (isLastQuestionInScenario && isLastScenario) {
+      const finishedAt = Date.now()
+      const total = flattenedQuestions.length
+      const accuracy = total > 0 ? Math.round((correctCount / total) * 100) : 0
       setSessionComplete(true)
       setSessionActive(false)
-      setCompletedAt(Date.now())
+      setCompletedAt(finishedAt)
+      onSessionComplete?.({
+        sessionId: sessionId || `${selectedModuleId}-${startedAt || finishedAt}`,
+        moduleId: selectedModuleId,
+        title: selectedModule.title,
+        correct: correctCount,
+        total,
+        accuracy,
+        elapsedSeconds: startedAt ? Math.max(0, (finishedAt - startedAt) / 1000) : 0,
+      })
       return
     }
 
