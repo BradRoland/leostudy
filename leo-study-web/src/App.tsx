@@ -4615,6 +4615,7 @@ function App() {
   const leaderboardAnnouncementDedupRef = useRef<Map<string, number>>(new Map())
   const leaderboardRefreshMetaRef = useRef<{ lastAt: number; promise: Promise<LeaderboardRefreshResult> | null }>({ lastAt: 0, promise: null })
   const homeLeaderboardRefreshMetaRef = useRef<{ lastAt: number; promise: Promise<void> | null }>({ lastAt: 0, promise: null })
+  const authHydrationRunRef = useRef(0)
   const lastPersistedAppStateRef = useRef<{
     performance: PersistedState['performance'] | null
     highScores: PersistedState['highScores'] | null
@@ -6232,32 +6233,58 @@ function App() {
       }
     })
 
+    const readCurrentSession = async () => {
+      const {
+        data: { session },
+      } = await client.auth.getSession()
+      return session
+    }
+
+    const waitForCurrentSession = async (attempts: number, delayMs: number) => {
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        const session = await readCurrentSession()
+        if (session?.user) return session
+        if (attempt < attempts - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, delayMs))
+        }
+      }
+      return null
+    }
+
     const restoreSession = async () => {
       const redirectCode = readAuthRedirectCode()
       if (redirectCode) {
+        const detectedSession = await waitForCurrentSession(4, 250)
+        if (detectedSession?.user) {
+          applySession(detectedSession)
+          clearReadyFallback()
+          markAuthReady()
+          return
+        }
+
         const { data, error } = await client.auth.exchangeCodeForSession(redirectCode)
-        if (!error) {
+        if (!error && data.session?.user) {
           applySession(data.session)
           clearReadyFallback()
           markAuthReady()
           return
         }
 
-        const { data: fallbackData } = await client.auth.getSession()
-        if (fallbackData.session?.user) {
-          applySession(fallbackData.session)
+        const recoveredSession = await waitForCurrentSession(8, 500)
+        if (recoveredSession?.user) {
+          applySession(recoveredSession)
           clearReadyFallback()
           markAuthReady()
           return
         }
 
-        setAuthError(error.message || 'Could not finish Google sign-in. Please try again.')
+        setAuthError(error?.message || 'Could not finish Google sign-in. Please try again.')
         finishRedirectWait()
         markAuthReady()
         return
       }
 
-      const { data: { session } } = await client.auth.getSession()
+      const session = await readCurrentSession()
       const shouldHoldEmptyRedirectSession = waitingForRedirectSession && !session?.user
       applySession(session, !shouldHoldEmptyRedirectSession)
       if (session?.user || !shouldHoldEmptyRedirectSession) {
@@ -6297,10 +6324,14 @@ function App() {
 
   useEffect(() => {
     if (!supabase || !currentUserId) {
+      authHydrationRunRef.current += 1
       setProfileHydrated(false)
       return
     }
     const client = supabase
+    const hydrationRunId = authHydrationRunRef.current + 1
+    authHydrationRunRef.current = hydrationRunId
+    const isStaleHydration = () => authHydrationRunRef.current !== hydrationRunId
 
     const hydrate = async () => {
       setProfileHydrated(false)
@@ -6310,8 +6341,9 @@ function App() {
         .eq('user_id', currentUserId)
         .maybeSingle()
 
+      if (isStaleHydration()) return
       const banLookupError = banLookupErrorRaw as { code?: string; message?: string } | null
-      const bannedTableMissing = banLookupError && ['42P01', '42703'].includes(String(banLookupError.code || ''))
+      const bannedTableMissing = banLookupError && ['42P01', '42703', 'PGRST205'].includes(String(banLookupError.code || ''))
       if (banLookupError && !bannedTableMissing) {
         console.warn('[banned_users] lookup failed:', banLookupError.message || banLookupError)
       }
@@ -6341,6 +6373,7 @@ function App() {
         .eq('user_id', currentUserId)
         .maybeSingle()
 
+      if (isStaleHydration()) return
       if (profileLookupError) {
         console.warn('[profiles] current user lookup failed:', profileLookupError.message)
         setAuthError('Signed in, but your profile could not be loaded. Please refresh or try signing in again.')
@@ -6365,6 +6398,7 @@ function App() {
         .eq('user_id', currentUserId)
         .maybeSingle()
 
+      if (isStaleHydration()) return
       const nextState = sanitizeState(
         stateRow
           ? {
@@ -6411,6 +6445,7 @@ function App() {
         .order('created_at', { ascending: true })
         .limit(historyHydrateLimit)
 
+      if (isStaleHydration()) return
       if (!historyError && Array.isArray(historyRows)) {
         const nextTrackHistory: Record<string, number[]> = {}
         const nextTimeline: ScoreTimelinePoint[] = []
@@ -6443,6 +6478,7 @@ function App() {
     }
 
     hydrate().catch((error) => {
+      if (isStaleHydration()) return
       console.warn('[auth] hydration failed:', error)
       setAuthError('Signed in, but your account data could not be loaded. Please refresh or try signing in again.')
       setProfileHydrated(true)
