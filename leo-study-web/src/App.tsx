@@ -1125,6 +1125,13 @@ function readAuthRedirectMessage() {
   )
 }
 
+function readAuthRedirectCode() {
+  if (typeof window === 'undefined') return ''
+  const params = new URLSearchParams(window.location.search || '')
+  const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''))
+  return params.get('code') || hashParams.get('code') || ''
+}
+
 function hasAuthRedirectParams() {
   if (typeof window === 'undefined') return false
   const params = new URLSearchParams(window.location.search || '')
@@ -4357,6 +4364,7 @@ function App() {
 
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
+  const [authSessionVersion, setAuthSessionVersion] = useState(0)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileHydrated, setProfileHydrated] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile')
@@ -6171,9 +6179,11 @@ function App() {
       if (!mounted) return
       if (session?.user) {
         finishRedirectWait()
+        setAuthError('')
         setCurrentUserId(session.user.id)
         setCurrentUserEmail(session.user.email || '')
         setCurrentUserProvider(String(session.user.app_metadata?.provider || 'email'))
+        setAuthSessionVersion((version) => version + 1)
         return
       }
 
@@ -6222,15 +6232,41 @@ function App() {
       }
     })
 
-    void client.auth.getSession()
-      .then(({ data: { session } }) => {
-        const shouldHoldEmptyRedirectSession = waitingForRedirectSession && !session?.user
-        applySession(session, !shouldHoldEmptyRedirectSession)
-        if (session?.user || !shouldHoldEmptyRedirectSession) {
+    const restoreSession = async () => {
+      const redirectCode = readAuthRedirectCode()
+      if (redirectCode) {
+        const { data, error } = await client.auth.exchangeCodeForSession(redirectCode)
+        if (!error) {
+          applySession(data.session)
           clearReadyFallback()
           markAuthReady()
+          return
         }
-      })
+
+        const { data: fallbackData } = await client.auth.getSession()
+        if (fallbackData.session?.user) {
+          applySession(fallbackData.session)
+          clearReadyFallback()
+          markAuthReady()
+          return
+        }
+
+        setAuthError(error.message || 'Could not finish Google sign-in. Please try again.')
+        finishRedirectWait()
+        markAuthReady()
+        return
+      }
+
+      const { data: { session } } = await client.auth.getSession()
+      const shouldHoldEmptyRedirectSession = waitingForRedirectSession && !session?.user
+      applySession(session, !shouldHoldEmptyRedirectSession)
+      if (session?.user || !shouldHoldEmptyRedirectSession) {
+        clearReadyFallback()
+        markAuthReady()
+      }
+    }
+
+    void restoreSession()
       .catch((error) => {
         console.warn('[auth] session restore failed:', error)
         if (!waitingForRedirectSession) {
@@ -6250,7 +6286,7 @@ function App() {
         finishRedirectWait()
         markAuthReady()
       }
-    }, waitingForRedirectSession ? 8000 : 2500)
+    }, waitingForRedirectSession ? 12000 : 2500)
 
     return () => {
       mounted = false
@@ -6411,7 +6447,7 @@ function App() {
       setAuthError('Signed in, but your account data could not be loaded. Please refresh or try signing in again.')
       setProfileHydrated(true)
     })
-  }, [currentUserId, navigate])
+  }, [authSessionVersion, currentUserId, navigate])
 
   useEffect(() => {
     if (!supabase || !stateHydrated || !currentUserId) return
@@ -9157,6 +9193,7 @@ function App() {
       setCurrentUserId(data.user.id)
       setCurrentUserEmail(data.user.email || '')
       setCurrentUserProvider(String(data.user.app_metadata?.provider || 'email'))
+      setAuthSessionVersion((version) => version + 1)
     }
 
     setAuthLoading(false)
@@ -10201,7 +10238,7 @@ function App() {
   const selectedTheme = getThemePreset(canUseThemes ? profileDetails.themeId : appThemePresets[0].id)
   const isUiLightMode = profileDetails.displayMode === 'light'
   const activeProfileTier: SupporterTier = profile?.supporterTier || 'free'
-  const activeProfileName = profile?.username || 'Officer'
+  const activeProfileName = profile?.username || (profileHydrated ? 'Officer' : 'Loading profile…')
   const pageTitle = isProfilePage
     ? 'Settings'
     : isStatsPage
