@@ -368,6 +368,7 @@ const duelBlasterDurationOptions = [30, 60, 90]
 const duelBlasterDefaultDurationSeconds = 30
 const duelBlasterRoundCap = 50
 const duelBlasterDefaultRopeLimit = 900
+const duelBlasterDefaultPowerupsEnabled = false
 const duelBlasterOvertimeOptions = [45, 60, 90] as const
 const duelBlasterDefaultOvertimeEnabled = true
 const duelBlasterDefaultOvertimeAfterSeconds = 45
@@ -1122,7 +1123,7 @@ export function OneVsOnePanel(props: {
 
   const [selectedGameType, setSelectedGameType] = useState<DuelGameType>('quiz')
   const [selectedCategory, setSelectedCategory] = useState<DuelCategory>('all')
-  const [selectedPowerupsEnabled, setSelectedPowerupsEnabled] = useState(true)
+  const [selectedPowerupsEnabled, setSelectedPowerupsEnabled] = useState(duelBlasterDefaultPowerupsEnabled)
   const [selectedBlasterMode, setSelectedBlasterMode] = useState<DuelBlasterMode>('timed')
   const [selectedBlasterDurationSeconds, setSelectedBlasterDurationSeconds] = useState(duelBlasterDefaultDurationSeconds)
   const [selectedBlasterOvertimeEnabled, setSelectedBlasterOvertimeEnabled] = useState(duelBlasterDefaultOvertimeEnabled)
@@ -1132,7 +1133,7 @@ export function OneVsOnePanel(props: {
   const [inviteGameType, setInviteGameType] = useState<DuelGameType>('quiz')
   const [inviteCategory, setInviteCategory] = useState<DuelCategory>('all')
   const [inviteQuizRounds, setInviteQuizRounds] = useState(10)
-  const [invitePowerupsEnabled, setInvitePowerupsEnabled] = useState(true)
+  const [invitePowerupsEnabled, setInvitePowerupsEnabled] = useState(duelBlasterDefaultPowerupsEnabled)
   const [inviteBlasterMode, setInviteBlasterMode] = useState<DuelBlasterMode>('timed')
   const [inviteBlasterDurationSeconds, setInviteBlasterDurationSeconds] = useState(duelBlasterDefaultDurationSeconds)
   const [inviteBlasterOvertimeEnabled, setInviteBlasterOvertimeEnabled] = useState(duelBlasterDefaultOvertimeEnabled)
@@ -2219,14 +2220,14 @@ export function OneVsOnePanel(props: {
     if (!isSignedIn) return
     setSelectedGameType('blaster')
     setSelectedCategory('all')
-    setSelectedPowerupsEnabled(true)
+    setSelectedPowerupsEnabled(duelBlasterDefaultPowerupsEnabled)
     setSelectedBlasterMode('timed')
     setSelectedBlasterDurationSeconds(duelBlasterDefaultDurationSeconds)
     setSelectedBlasterOvertimeEnabled(duelBlasterDefaultOvertimeEnabled)
     setSelectedBlasterOvertimeAfterSeconds(duelBlasterDefaultOvertimeAfterSeconds)
     setInviteGameType('blaster')
     setInviteCategory('all')
-    setInvitePowerupsEnabled(true)
+    setInvitePowerupsEnabled(duelBlasterDefaultPowerupsEnabled)
     setInviteBlasterMode('timed')
     setInviteBlasterDurationSeconds(duelBlasterDefaultDurationSeconds)
     setInviteBlasterOvertimeEnabled(duelBlasterDefaultOvertimeEnabled)
