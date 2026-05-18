@@ -15232,9 +15232,10 @@ textarea:focus-visible,
 
   .game-setup-overlay:has(.onevone-invite-modal) {
     padding: max(6px, env(safe-area-inset-top)) 6px max(6px, env(safe-area-inset-bottom)) !important;
-    align-items: stretch !important;
-    justify-items: stretch !important;
-    overflow: hidden !important;
+    align-items: start !important;
+    justify-items: center !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     z-index: 120 !important;
   }
 
@@ -15713,13 +15714,15 @@ textarea:focus-visible,
   .onevone-invite-modal {
     width: calc(100vw - 12px) !important;
     max-width: none !important;
-    height: calc(100svh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
-    max-height: calc(100svh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
-    overflow: hidden !important;
+    height: auto !important;
+    max-height: calc(100svh - max(14px, env(safe-area-inset-top)) - max(14px, env(safe-area-inset-bottom))) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     padding: 12px !important;
     gap: 10px !important;
     border-radius: 20px !important;
-    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto auto !important;
+    -webkit-overflow-scrolling: touch;
   }
 
   .onevone-invite-modal > h3 {
@@ -15739,15 +15742,14 @@ textarea:focus-visible,
 
   .onevone-invite-modal-body {
     gap: 12px !important;
-    overflow-y: auto !important;
+    align-content: start !important;
+    overflow-y: visible !important;
     overflow-x: hidden !important;
-    overscroll-behavior: contain;
-    padding: 0 1px 8px 0 !important;
-    -webkit-overflow-scrolling: touch;
+    padding: 0 !important;
   }
 
   .onevone-invite-settings {
-    order: 1;
+    order: 2;
     gap: 10px !important;
     overflow: visible !important;
     padding-right: 0 !important;
@@ -15765,7 +15767,7 @@ textarea:focus-visible,
   }
 
   .onevone-online-list-wrap {
-    order: 2;
+    order: 1;
     gap: 9px !important;
     overflow: visible !important;
     min-height: auto !important;
@@ -15791,8 +15793,11 @@ textarea:focus-visible,
 
   .onevone-online-list {
     gap: 9px !important;
-    overflow: visible !important;
+    max-height: min(38svh, 300px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     padding-right: 0 !important;
+    -webkit-overflow-scrolling: touch;
   }
 
   .onevone-online-row {
@@ -15850,13 +15855,13 @@ textarea:focus-visible,
   }
 
   .onevone-invite-modal .onevone-mode-segmented {
-    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
   .onevone-invite-modal .onevone-mode-segmented .seg {
-    justify-items: start;
-    min-height: 54px !important;
-    text-align: left;
+    justify-items: center;
+    min-height: 52px !important;
+    text-align: center;
   }
 
   .onevone-invite-modal .onevone-mode-segmented .seg small {
