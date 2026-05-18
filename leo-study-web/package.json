@@ -12,7 +12,7 @@
     "pm2:webhook:start": "pm2 start ecosystem.config.cjs --only leo-stripe-webhook",
     "pm2:webhook:restart": "pm2 restart leo-stripe-webhook",
     "pm2:webhook:logs": "pm2 logs leo-stripe-webhook",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/write-build-version.mjs && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

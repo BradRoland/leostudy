@@ -65,6 +65,11 @@ type HomeTmasCountdownDisplay = {
   supporting: string
   parts: HomeCountdownPart[]
 }
+type DeployRefreshNotice = {
+  buildId: string
+  secondsRemaining: number
+  delayedForActivity: boolean
+}
 
 const studyTrackingTickMs = 5000
 const studyActivityWindowMs = 20000
@@ -91,8 +96,37 @@ const historyHydrateLimit = 4000
 const remoteTrackHistoryMaxPoints = 900
 const remoteTimelineMaxPoints = 2400
 const interactiveTrendMaxPoints = 72
+const deployRefreshManifestUrl = `${import.meta.env.BASE_URL || '/'}app-version.json`
+const deployRefreshInitialCheckDelayMs = 15000
+const deployRefreshPollMs = 60000
+const deployRefreshQuietReloadDelayMs = 8000
+const deployRefreshActiveReloadDelayMs = 45000
 const priorityTmas2ExamStartMs = Date.parse('2026-03-24T07:00:00-07:00')
 const priorityTmas3ExamStartMs = Date.parse('2026-05-18T13:00:00-07:00')
+
+function readDeployBuildId(value: unknown) {
+  if (!value || typeof value !== 'object') return ''
+  const record = value as Record<string, unknown>
+  return String(record.buildId || record.commit || record.version || record.builtAt || '').trim()
+}
+
+function hasFocusedTextEntry() {
+  if (typeof document === 'undefined') return false
+  const activeElement = document.activeElement
+  if (!(activeElement instanceof HTMLElement)) return false
+  const tagName = activeElement.tagName.toLowerCase()
+  return tagName === 'input' || tagName === 'textarea' || tagName === 'select' || activeElement.isContentEditable
+}
+
+function isDeployRefreshSensitivePath(path: string) {
+  return (
+    path.startsWith('/games') ||
+    path.startsWith('/study/practice-test') ||
+    path.startsWith('/study/test') ||
+    path.startsWith('/study/flashcards') ||
+    path.startsWith('/scenarios')
+  )
+}
 
 function padCountdownValue(value: number) {
   return String(Math.max(0, value)).padStart(2, '0')
@@ -4415,6 +4449,7 @@ function App() {
   const [contentWarning, setContentWarning] = useState('')
   const [contentLoadRetryToken, setContentLoadRetryToken] = useState(0)
   const [globalBannerOffset, setGlobalBannerOffset] = useState(0)
+  const [deployRefreshNotice, setDeployRefreshNotice] = useState<DeployRefreshNotice | null>(null)
 
   const [performance, setPerformance] = useState<Record<string, CodePerformance>>({})
   const [highScores, setHighScores] = useState(gameHighScoreSeed)
@@ -4477,6 +4512,11 @@ function App() {
   const [taskbarCollapsedGroups, setTaskbarCollapsedGroups] = useState(() => loadTaskbarCollapsedGroups())
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const taskbarXpBarRef = useRef<HTMLSpanElement | null>(null)
+  const currentPathRef = useRef('/')
+  const deployBuildIdRef = useRef<string | null>(null)
+  const deployRefreshTimerRef = useRef<number | null>(null)
+  const deployRefreshCountdownRef = useRef<number | null>(null)
+  const deployRefreshReloadingRef = useRef(false)
   const previousXpSnapshotRef = useRef<{ userId: string; totalXp: number; level: number; capturedAt: number } | null>(null)
   const lastXpEligibleActivityAtRef = useRef(0)
   const xpGainTimerRef = useRef<number | null>(null)
@@ -9786,6 +9826,98 @@ function App() {
   const isProfilePage = currentPath === '/profile'
   const isStatsPage = currentPath === '/stats'
   useEffect(() => {
+    currentPathRef.current = currentPath
+  }, [currentPath])
+
+  useEffect(() => {
+    if (import.meta.env.DEV || typeof window === 'undefined') return
+    let cancelled = false
+    let initialCheckTimer: number | null = null
+    let pollTimer: number | null = null
+
+    const clearRefreshTimers = () => {
+      if (deployRefreshTimerRef.current !== null) {
+        window.clearTimeout(deployRefreshTimerRef.current)
+        deployRefreshTimerRef.current = null
+      }
+      if (deployRefreshCountdownRef.current !== null) {
+        window.clearInterval(deployRefreshCountdownRef.current)
+        deployRefreshCountdownRef.current = null
+      }
+    }
+
+    const reloadToLatest = () => {
+      if (deployRefreshReloadingRef.current) return
+      deployRefreshReloadingRef.current = true
+      window.location.reload()
+    }
+
+    const scheduleRefresh = (nextBuildId: string) => {
+      if (deployRefreshReloadingRef.current || deployRefreshTimerRef.current !== null) return
+      const delayedForActivity = !document.hidden && (isDeployRefreshSensitivePath(currentPathRef.current) || hasFocusedTextEntry())
+      const delayMs = document.hidden
+        ? 1500
+        : delayedForActivity
+          ? deployRefreshActiveReloadDelayMs
+          : deployRefreshQuietReloadDelayMs
+      const reloadAt = Date.now() + delayMs
+      const displayBuildId = nextBuildId.slice(0, 12)
+      const updateNotice = () => {
+        setDeployRefreshNotice({
+          buildId: displayBuildId,
+          delayedForActivity,
+          secondsRemaining: Math.max(1, Math.ceil((reloadAt - Date.now()) / 1000)),
+        })
+      }
+
+      updateNotice()
+      deployRefreshCountdownRef.current = window.setInterval(updateNotice, 1000)
+      deployRefreshTimerRef.current = window.setTimeout(reloadToLatest, delayMs)
+    }
+
+    const checkForUpdate = async () => {
+      try {
+        const response = await fetch(`${deployRefreshManifestUrl}?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        })
+        if (!response.ok) return
+        const buildId = readDeployBuildId(await response.json())
+        if (!buildId || cancelled) return
+        if (!deployBuildIdRef.current) {
+          deployBuildIdRef.current = buildId
+          return
+        }
+        if (buildId !== deployBuildIdRef.current) {
+          scheduleRefresh(buildId)
+        }
+      } catch {
+        // Ignore transient network/cache errors; the next poll will try again.
+      }
+    }
+
+    const checkWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void checkForUpdate()
+      }
+    }
+
+    initialCheckTimer = window.setTimeout(() => void checkForUpdate(), deployRefreshInitialCheckDelayMs)
+    pollTimer = window.setInterval(() => void checkForUpdate(), deployRefreshPollMs)
+    window.addEventListener('focus', checkWhenVisible)
+    document.addEventListener('visibilitychange', checkWhenVisible)
+
+    return () => {
+      cancelled = true
+      if (initialCheckTimer !== null) window.clearTimeout(initialCheckTimer)
+      if (pollTimer !== null) window.clearInterval(pollTimer)
+      window.removeEventListener('focus', checkWhenVisible)
+      document.removeEventListener('visibilitychange', checkWhenVisible)
+      clearRefreshTimers()
+    }
+  }, [])
+
+  useEffect(() => {
     if (isProfilePage) return
     setBugReportPagePath(currentPath)
   }, [currentPath, isProfilePage])
@@ -12238,6 +12370,22 @@ function App() {
       className={`app-shell ${isHomePage ? 'home-page' : ''} ${isUiLightMode ? 'ui-light-mode theme-light theme-glass' : ''} ${!isUiLightMode && selectedTheme.id === 'golden' ? 'theme-gold' : ''} ${reduceVisualEffects ? 'reduced-effects' : ''}`}
       style={{ ['--global-banner-offset' as string]: `${globalBannerOffset}px` } as CSSProperties}
     >
+      {deployRefreshNotice ? (
+        <div className="deploy-refresh-banner" role="status" aria-live="polite">
+          <span className="deploy-refresh-icon" aria-hidden>↻</span>
+          <span className="deploy-refresh-copy">
+            <strong>New update ready</strong>
+            <span>
+              Refreshing in {deployRefreshNotice.secondsRemaining}s
+              {deployRefreshNotice.delayedForActivity ? ' after giving this session a moment' : ''}.
+            </span>
+          </span>
+          <button type="button" className="secondary deploy-refresh-button" onClick={() => window.location.reload()}>
+            Update now
+          </button>
+        </div>
+      ) : null}
+
       {!isSupabaseConfigured ? (
         <div className="onboarding-overlay">
           <div className="onboarding-card">
