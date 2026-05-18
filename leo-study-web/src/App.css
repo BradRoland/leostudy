@@ -13266,20 +13266,70 @@ textarea:focus-visible,
   font-weight: 700;
 }
 
+.onevone-win-condition-segmented:hover .seg.active:not(:hover) {
+  background: var(--bg-panel) !important;
+  border-color: var(--card-border) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+}
+
+.onevone-win-condition-segmented .seg:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel-strong)) !important;
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--card-border)) !important;
+  color: var(--accent) !important;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 15%, transparent) !important;
+}
+
 .onevone-powerup-toggle {
-  grid-template-columns: 1fr auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
   border-radius: 16px;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--panel) 88%, transparent), color-mix(in srgb, var(--panel-soft) 74%, transparent)),
     radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 34%);
-  padding: 10px 12px;
+  padding: 14px 16px 14px 18px;
+  min-height: 82px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.onevone-powerup-toggle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.onevone-powerup-toggle.is-enabled {
+  border-color: color-mix(in srgb, var(--success) 58%, var(--accent));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--success) 20%, var(--panel)), color-mix(in srgb, var(--accent) 18%, var(--panel-soft))),
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--success) 32%, transparent), transparent 42%),
+    radial-gradient(circle at 100% 50%, color-mix(in srgb, var(--success) 20%, transparent), transparent 34%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 5px 0 0 color-mix(in srgb, var(--success) 82%, var(--accent)),
+    0 0 0 1px color-mix(in srgb, var(--success) 14%, transparent),
+    0 14px 26px color-mix(in srgb, var(--success) 14%, transparent);
+}
+
+.onevone-powerup-toggle.is-enabled::before {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--success) 22%, transparent), transparent 62%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 48%);
+  opacity: 1;
+}
+
+.onevone-powerup-toggle.is-disabled {
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--border));
 }
 
 .onevone-powerup-toggle:hover {
@@ -13289,25 +13339,63 @@ textarea:focus-visible,
     0 12px 24px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
+.onevone-powerup-toggle.is-enabled:hover {
+  border-color: color-mix(in srgb, var(--success) 68%, var(--accent));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 5px 0 0 color-mix(in srgb, var(--success) 82%, var(--accent)),
+    0 0 0 1px color-mix(in srgb, var(--success) 16%, transparent),
+    0 16px 30px color-mix(in srgb, var(--success) 18%, transparent);
+}
+
+.onevone-powerup-toggle > * {
+  position: relative;
+  z-index: 1;
+}
+
 .onevone-powerup-toggle span {
   display: grid;
   gap: 4px;
 }
 
+.onevone-powerup-toggle > span:first-child {
+  min-width: 0;
+}
+
+.onevone-powerup-toggle > span:first-child:not(.onevone-toggle-action) {
+  font-weight: 900;
+  line-height: 1.15;
+}
+
 .onevone-powerup-toggle small {
   color: var(--text-muted);
   font-weight: 700;
+  line-height: 1.22;
+}
+
+.onevone-powerup-toggle.is-enabled small {
+  color: color-mix(in srgb, var(--text) 78%, var(--success));
+}
+
+.onevone-toggle-action {
+  display: inline-flex !important;
+  flex-direction: row-reverse;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  min-width: 128px;
+  align-self: center;
 }
 
 .onevone-powerup-toggle input[type='checkbox'] {
   -webkit-appearance: none;
   appearance: none;
-  width: 48px;
-  height: 28px;
+  width: 58px;
+  height: 32px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
   background:
-    radial-gradient(circle at 13px 50%, #eff6ff 0 8px, transparent 9px),
+    radial-gradient(circle at 15px 50%, #eff6ff 0 10px, transparent 11px),
     linear-gradient(135deg, color-mix(in srgb, var(--panel-soft) 80%, #0f172a), color-mix(in srgb, var(--panel) 80%, #111827));
   box-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.24),
@@ -13317,18 +13405,43 @@ textarea:focus-visible,
 }
 
 .onevone-powerup-toggle input[type='checkbox']:checked {
-  border-color: color-mix(in srgb, var(--accent) 72%, white);
+  border-color: color-mix(in srgb, var(--success) 72%, white);
   background:
-    radial-gradient(circle at calc(100% - 13px) 50%, #ffffff 0 8px, transparent 9px),
+    radial-gradient(circle at calc(100% - 15px) 50%, #ffffff 0 10px, transparent 11px),
     linear-gradient(135deg, color-mix(in srgb, var(--accent) 74%, #38bdf8), color-mix(in srgb, var(--success) 54%, var(--accent)));
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent),
-    0 12px 22px color-mix(in srgb, var(--accent) 18%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--success) 20%, transparent),
+    0 12px 22px color-mix(in srgb, var(--success) 20%, transparent);
 }
 
 .onevone-powerup-toggle input[type='checkbox']:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
   outline-offset: 3px;
+}
+
+.onevone-toggle-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  text-align: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 28%, var(--border));
+  background: color-mix(in srgb, var(--panel-soft) 72%, transparent);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  min-height: 26px;
+  line-height: 1;
+}
+
+.onevone-powerup-toggle.is-enabled .onevone-toggle-state {
+  border-color: color-mix(in srgb, var(--success) 60%, white);
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+  color: color-mix(in srgb, var(--success) 72%, white);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--success) 42%, transparent);
 }
 
 .onevone-overtime-control {
@@ -13337,7 +13450,7 @@ textarea:focus-visible,
 
 .onevone-overtime-control .onevone-powerup-toggle {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .onevone-overtime-slider {

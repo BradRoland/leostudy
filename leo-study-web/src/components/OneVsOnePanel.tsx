@@ -4865,7 +4865,7 @@ export function OneVsOnePanel(props: {
               <>
                 <label className="game-control">
                   Win Condition
-                  <div className="segmented">
+                  <div className="segmented onevone-win-condition-segmented">
                     {duelBlasterDurationOptions.map((seconds) => (
                       <button
                         key={`duel-blaster-duration-${seconds}`}
@@ -4889,28 +4889,36 @@ export function OneVsOnePanel(props: {
                   </div>
                   <small className="muted">Timed matches end on the clock or by rope KO. To the Death removes the clock and ends by rope KO.</small>
                 </label>
-                <label className="game-control onevone-powerup-toggle">
+                <label className={`game-control onevone-powerup-toggle ${selectedPowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
                   <span>
                     Enable Power-Ups
                     <small>{selectedBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Correct power shots tug harder and build streak pressure.'}</small>
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={selectedPowerupsEnabled}
-                    onChange={(event) => setSelectedPowerupsEnabled(event.target.checked)}
-                  />
+                  <span className="onevone-toggle-action">
+                    <input
+                      type="checkbox"
+                      checked={selectedPowerupsEnabled}
+                      onChange={(event) => setSelectedPowerupsEnabled(event.target.checked)}
+                      aria-label="Enable power-ups"
+                    />
+                    <strong className="onevone-toggle-state">{selectedPowerupsEnabled ? 'ON ✓' : 'OFF'}</strong>
+                  </span>
                 </label>
                 <div className="game-control onevone-overtime-control">
-                  <label className="onevone-powerup-toggle">
+                  <label className={`onevone-powerup-toggle ${selectedBlasterOvertimeEnabled ? 'is-enabled' : 'is-disabled'}`}>
                     <span>
                       Enable Overtime
                       <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
                     </span>
-                    <input
-                      type="checkbox"
-                      checked={selectedBlasterOvertimeEnabled}
-                      onChange={(event) => setSelectedBlasterOvertimeEnabled(event.target.checked)}
-                    />
+                    <span className="onevone-toggle-action">
+                      <input
+                        type="checkbox"
+                        checked={selectedBlasterOvertimeEnabled}
+                        onChange={(event) => setSelectedBlasterOvertimeEnabled(event.target.checked)}
+                        aria-label="Enable overtime"
+                      />
+                      <strong className="onevone-toggle-state">{selectedBlasterOvertimeEnabled ? 'ON ✓' : 'OFF'}</strong>
+                    </span>
                   </label>
                   <div className={selectedBlasterOvertimeEnabled ? 'onevone-overtime-slider' : 'onevone-overtime-slider disabled'}>
                     <div className="onevone-overtime-slider-head">
@@ -5065,7 +5073,7 @@ export function OneVsOnePanel(props: {
                   <>
                     <label className="game-control">
                       Win Condition
-                      <div className="segmented">
+                      <div className="segmented onevone-win-condition-segmented">
                         {duelBlasterDurationOptions.map((seconds) => (
                           <button
                             key={`invite-blaster-duration-${seconds}`}
@@ -5089,28 +5097,36 @@ export function OneVsOnePanel(props: {
                       </div>
                       <small className="muted">Default is 30 seconds. Rope KO can still end either mode early.</small>
                     </label>
-                    <label className="game-control onevone-powerup-toggle">
+                    <label className={`game-control onevone-powerup-toggle ${invitePowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
                       <span>
                         Enable Power-Ups
                         <small>{inviteBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Power shots make the tug-of-war swing harder.'}</small>
                       </span>
-                      <input
-                        type="checkbox"
-                        checked={invitePowerupsEnabled}
-                        onChange={(event) => setInvitePowerupsEnabled(event.target.checked)}
-                      />
+                      <span className="onevone-toggle-action">
+                        <input
+                          type="checkbox"
+                          checked={invitePowerupsEnabled}
+                          onChange={(event) => setInvitePowerupsEnabled(event.target.checked)}
+                          aria-label="Enable power-ups"
+                        />
+                        <strong className="onevone-toggle-state">{invitePowerupsEnabled ? 'ON ✓' : 'OFF'}</strong>
+                      </span>
                     </label>
                     <div className="game-control onevone-overtime-control">
-                      <label className="onevone-powerup-toggle">
+                      <label className={`onevone-powerup-toggle ${inviteBlasterOvertimeEnabled ? 'is-enabled' : 'is-disabled'}`}>
                         <span>
                           Enable Overtime
                           <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
                         </span>
-                        <input
-                          type="checkbox"
-                          checked={inviteBlasterOvertimeEnabled}
-                          onChange={(event) => setInviteBlasterOvertimeEnabled(event.target.checked)}
-                        />
+                        <span className="onevone-toggle-action">
+                          <input
+                            type="checkbox"
+                            checked={inviteBlasterOvertimeEnabled}
+                            onChange={(event) => setInviteBlasterOvertimeEnabled(event.target.checked)}
+                            aria-label="Enable overtime"
+                          />
+                          <strong className="onevone-toggle-state">{inviteBlasterOvertimeEnabled ? 'ON ✓' : 'OFF'}</strong>
+                        </span>
                       </label>
                       <div className={inviteBlasterOvertimeEnabled ? 'onevone-overtime-slider' : 'onevone-overtime-slider disabled'}>
                         <div className="onevone-overtime-slider-head">
