@@ -14969,6 +14969,11 @@ textarea:focus-visible,
     overflow: hidden !important;
   }
 
+  .app-shell:has(.onevone-invite-modal) {
+    padding: max(4px, env(safe-area-inset-top)) 4px max(4px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
   .workspace-layout {
     display: block !important;
     width: 100%;
@@ -14988,6 +14993,11 @@ textarea:focus-visible,
   }
 
   .app-shell:has(.onevone-blaster-overlay) .workspace-main {
+    padding-bottom: max(4px, env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  .app-shell:has(.onevone-invite-modal) .workspace-main {
     padding-bottom: max(4px, env(safe-area-inset-bottom)) !important;
     overflow: hidden !important;
   }
@@ -15218,6 +15228,14 @@ textarea:focus-visible,
     justify-items: stretch !important;
     overflow: hidden !important;
     z-index: 100 !important;
+  }
+
+  .game-setup-overlay:has(.onevone-invite-modal) {
+    padding: max(6px, env(safe-area-inset-top)) 6px max(6px, env(safe-area-inset-bottom)) !important;
+    align-items: stretch !important;
+    justify-items: stretch !important;
+    overflow: hidden !important;
+    z-index: 120 !important;
   }
 
   .profile-modal-card,
@@ -15693,10 +15711,22 @@ textarea:focus-visible,
   }
 
   .onevone-invite-modal {
-    width: calc(100vw - 16px) !important;
+    width: calc(100vw - 12px) !important;
     max-width: none !important;
-    max-height: calc(100svh - 20px) !important;
-    overflow: auto !important;
+    height: calc(100svh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    max-height: calc(100svh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+    padding: 12px !important;
+    gap: 10px !important;
+    border-radius: 20px !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+  }
+
+  .onevone-invite-modal > h3 {
+    margin: 0;
+    padding: 2px 2px 6px;
+    font-size: clamp(1.25rem, 7vw, 1.8rem);
+    line-height: 1;
   }
 
   .onevone-invite-modal-body,
@@ -15705,6 +15735,181 @@ textarea:focus-visible,
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) !important;
     min-height: 0 !important;
+  }
+
+  .onevone-invite-modal-body {
+    gap: 12px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+    padding: 0 1px 8px 0 !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .onevone-invite-settings {
+    order: 1;
+    gap: 10px !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+  }
+
+  .onevone-invite-settings > .muted {
+    margin: 0;
+    border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--panel-soft) 74%, transparent);
+    padding: 9px 10px;
+    color: color-mix(in srgb, var(--text) 70%, var(--text-muted));
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+
+  .onevone-online-list-wrap {
+    order: 2;
+    gap: 9px !important;
+    overflow: visible !important;
+    min-height: auto !important;
+  }
+
+  .onevone-online-list-head {
+    position: sticky;
+    top: -1px;
+    z-index: 4;
+    border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--panel-strong) 94%, transparent);
+    padding: 8px;
+    backdrop-filter: blur(12px);
+  }
+
+  .onevone-online-list-head .secondary {
+    width: auto !important;
+    min-height: 38px !important;
+    padding: 7px 11px !important;
+    border-radius: 11px !important;
+  }
+
+  .onevone-online-list {
+    gap: 9px !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+  }
+
+  .onevone-online-row {
+    padding: 10px !important;
+    border-radius: 15px !important;
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--panel-soft) 88%, transparent), color-mix(in srgb, var(--panel) 74%, transparent)),
+      radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 42%);
+  }
+
+  .onevone-online-user {
+    display: grid !important;
+    grid-template-columns: 48px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  .onevone-online-avatar-frame {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+  }
+
+  .onevone-online-copy span {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.24;
+  }
+
+  .onevone-online-row .primary {
+    width: 100% !important;
+    min-height: 46px !important;
+    border-radius: 13px !important;
+  }
+
+  .onevone-invite-modal .game-control {
+    gap: 8px !important;
+    border-radius: 15px !important;
+    padding: 10px !important;
+  }
+
+  .onevone-invite-modal .game-control > small {
+    line-height: 1.25;
+  }
+
+  .onevone-invite-modal .segmented {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    overflow: visible !important;
+    padding: 5px !important;
+  }
+
+  .onevone-invite-modal .onevone-mode-segmented {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .onevone-invite-modal .onevone-mode-segmented .seg {
+    justify-items: start;
+    min-height: 54px !important;
+    text-align: left;
+  }
+
+  .onevone-invite-modal .onevone-mode-segmented .seg small {
+    font-size: 0.72rem;
+    line-height: 1.16;
+  }
+
+  .onevone-invite-modal .seg {
+    min-width: 0 !important;
+    min-height: 44px !important;
+    padding: 8px 9px !important;
+    border-radius: 12px !important;
+    white-space: normal !important;
+  }
+
+  .onevone-invite-modal .onevone-powerup-toggle {
+    grid-template-columns: minmax(0, 1fr) !important;
+    min-height: auto !important;
+    gap: 10px !important;
+    padding: 12px !important;
+    border-radius: 15px !important;
+  }
+
+  .onevone-invite-modal .onevone-toggle-action {
+    width: 100%;
+    min-width: 0;
+    justify-content: space-between;
+  }
+
+  .onevone-invite-modal .onevone-overtime-control {
+    gap: 9px !important;
+  }
+
+  .onevone-invite-modal .onevone-overtime-slider {
+    padding: 10px !important;
+    border-radius: 14px !important;
+  }
+
+  .onevone-invite-modal .actions-row {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin: 0 -4px -4px !important;
+    padding: 10px 4px max(4px, env(safe-area-inset-bottom)) !important;
+    background:
+      linear-gradient(180deg, transparent, color-mix(in srgb, var(--card-bg) 92%, transparent) 18%),
+      color-mix(in srgb, var(--card-bg) 94%, transparent);
+  }
+
+  .app-shell:has(.onevone-invite-modal) .mobile-bottom-nav,
+  .app-shell:has(.onevone-invite-modal) .mobile-quick-strip {
+    display: none !important;
+    pointer-events: none !important;
   }
 
   .profile-modal-card,
