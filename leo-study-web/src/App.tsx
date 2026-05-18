@@ -20,9 +20,10 @@ type ScoreGameName = 'Matching' | 'Speed Test' | 'Code Blaster'
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 type DisplayMode = 'dark' | 'light'
 type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home' | 'leaderboards' | 'chat'
-type HomeActionTarget = 'study' | 'games-matching' | 'games-speed' | 'games-blaster' | 'scenarios'
+type HomeActionTarget = 'study' | 'games-matching' | 'games-speed' | 'games-blaster' | 'games-duel-blaster' | 'scenarios'
 type HomeDurationFilter = 15 | 30 | 60
-type DuelLeaderboardMode = 'all' | 'matching' | 'quiz'
+type DuelLeaderboardMode = 'all' | 'matching' | 'quiz' | 'blaster'
+type DuelInvitePreset = 'rope-blaster'
 type DuelLevelStats = {
   wins: number
   losses: number
@@ -858,11 +859,12 @@ const codeSetLabel: Record<CodeSet, string> = {
 
 const homeLeaderboardRotationDurations: Array<15 | 30 | 60> = [15, 30, 60]
 const homeLeaderboardRotationCodeSets: CodeFilter[] = ['all', 'penal', 'hs', 'vehicle']
-const duelLeaderboardModeOrder: DuelLeaderboardMode[] = ['all', 'matching', 'quiz']
+const duelLeaderboardModeOrder: DuelLeaderboardMode[] = ['all', 'matching', 'quiz', 'blaster']
 const duelLeaderboardModeLabel: Record<DuelLeaderboardMode, string> = {
   all: 'All',
   matching: 'Matching',
   quiz: 'Quiz',
+  blaster: 'Blaster',
 }
 const homeLeaderboardRotationSteps = homeLeaderboardRotationDurations.flatMap((duration) =>
   homeLeaderboardRotationCodeSets.map((codeSet) => ({ duration, codeSet })),
@@ -913,101 +915,79 @@ const homeEncouragementQuotes = [
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
 ]
-const releaseNotesV055: Array<{ title: string; items: string[] }> = [
+type ReleaseNoteVisual = 'blaster' | 'latency' | 'powerups' | 'flow' | 'gameUi' | 'mobile' | 'xp' | 'validation'
+
+const releaseNotesV060: Array<{ title: string; visual: ReleaseNoteVisual; items: string[] }> = [
   {
-    title: 'Leveling and XP Rewards (v0.55)',
+    title: '1v1 Rope Blaster (v0.60)',
+    visual: 'blaster',
     items: [
-      'Added a full XP and level system that rewards studying, game sessions, 1v1 wins, leaderboard performance, study streaks, mastered codes, and overall activity.',
-      'Added a visible XP progress bar near the user profile area so learners can see how close they are to the next level.',
-      'Refined XP feedback so level-up popups do not appear after a normal page refresh and game/test XP is saved for the end-of-session results screen.',
+      'Added the new Rope Blaster 1v1 mode where correct answers push a lit bomb across the tug-of-war rope toward the opponent.',
+      'Added timed and To the Death match rules, rope KO logic, configurable overtime, and a shorter visible rope during overtime.',
+      'Improved the blaster play zone so asteroids scale to the screen, stay readable, bounce correctly, avoid overlapping, and no longer reset the whole field after every correct hit.',
     ],
   },
   {
-    title: 'Avatar Decorations and Profile Polish',
+    title: 'Low-Latency Multiplayer',
+    visual: 'latency',
     items: [
-      'Added unlockable profile decorations tied to user level, including rank frames, higher-level animated effects, and automatic best-rank selection.',
-      'Improved decoration scaling in profile modals, profile settings, chat profile views, and 1v1 lobby/profile displays so frames fit the avatar more cleanly.',
-      'Cleaned up leaderboard avatars by removing decoration overlays there for now, keeping leaderboards easier to read while profile pages still show the full reward styling.',
+      'Added a Cloudflare Worker realtime path for Rope Blaster so tug-of-war movement and power-up effects feel much faster than the normal database path.',
+      'Simplified the in-game latency badge to show only Ping and the current ping value.',
+      'Kept Supabase as the production content source while adding safer local-IP development behavior for LAN testing.',
     ],
   },
   {
-    title: 'Activity Status and Social UX',
+    title: 'Power-Ups and Disruptions',
+    visual: 'powerups',
     items: [
-      'Improved clicked-user profile cards with clearer active, idle, and offline status indicators using color-coded presence styling.',
-      'Made chat profile clicks open the same richer profile experience used from leaderboard profiles.',
-      'Added user level visibility in chat and improved profile context so users can better understand what others are doing on the site.',
+      'Added Clone Jammer, which briefly makes all of the opponent’s asteroids show the same code so they have to slow down and think.',
+      'Strengthened Paperwork Storm so reports flood the opponent’s field and actually block visibility for a short burst.',
+      'Renamed Spike Strip to Pursuit Panic and changed it to speed up the opponent’s asteroid field, making targets much harder to click.',
     ],
   },
   {
-    title: 'Performance and Database Optimizations',
+    title: '1v1 Flow and Fairness',
+    visual: 'flow',
     items: [
-      'Reduced unnecessary app-state writes by only syncing changed profile, performance, streak, and high-score fields.',
-      'Debounced realtime leaderboard refreshes so leveling and home widgets feel smoother with less backend churn.',
-      'Added Supabase leaderboard indexes and app_state policy cleanup to make weekly leaderboards, profile XP, and ranking refreshes faster.',
+      'Removed the broken rematch flow and replaced it with Start New Game so players can create a clean new room and invite someone again.',
+      'Fixed invite, ready-up, and round-sync behavior so accepted invites move both players into the correct room and completed rounds stop hanging on sync.',
+      'Added wrong-answer penalties and winner/loser XP handling so both players earn XP, but winning still pays more.',
     ],
   },
   {
-    title: 'Code Blaster Game Mode',
+    title: 'Cleaner Game UI',
+    visual: 'gameUi',
     items: [
-      'Added a new space-blaster learning game where users aim at moving code asteroids, answer fast, and level up as the timer gets tighter.',
-      'Code Blaster now supports all the normal code sets, adds time bonuses for correct hits, limits asteroid clutter, and keeps motion smoother for smaller screens.',
-      'Added Code Blaster all-time and weekly leaderboards, level display, high-score celebrations, and system chat announcements when someone takes #1.',
+      'Removed the answer-revealing code label under the Rope Blaster prompt so the game only shows the crime name users need to match.',
+      'Improved asteroid motion, collision behavior, border sizing, and readability by stopping asteroid rotation.',
+      'Removed golden power-up targets so power-up rounds do not give away the correct answer.',
     ],
   },
   {
-    title: 'Leaderboard and Weekly Performer Updates',
+    title: 'Practice Test and Mobile Polish',
+    visual: 'mobile',
     items: [
-      'Code Blaster now counts toward Top Performer This Week alongside Matching and Speed Test.',
-      'Weekly performer scoring now uses normalized board points so one high-scoring mode does not overpower the rest of the leaderboard system.',
-      'Leaderboard cards now show Code Blaster mode details, including time, code set, and achieved level.',
+      'Improved practice-test scaling on mobile so the question, answers, and submit flow are easier to use on smaller screens.',
+      'Made explanations expandable after answering so users can quickly skim or open the full reasoning.',
+      'Kept the test layout tighter on desktop while preserving scrolling on small windows.',
     ],
   },
   {
-    title: '1v1 and Game Stability',
+    title: 'Leveling and Profile Rewards',
+    visual: 'xp',
     items: [
-      'Improved 1v1 room behavior, invite flow, rematch reliability, spectator publishing, and ready-state updates.',
-      'Added stronger matching-game timing behavior so timers keep running correctly even while users click quickly.',
-      'Improved mobile scaling for 1v1 matching and regular matching so the tiles stay usable on smaller screens.',
+      'Added a full XP and level system that rewards studying, games, 1v1 matches, leaderboards, streaks, mastered codes, and overall activity.',
+      'Added profile decoration rewards, better avatar-frame scaling, user-level display in chat, and clearer clicked-profile cards.',
+      'Prevented level-up popups from appearing again after a normal refresh and moved game/test XP feedback to end screens.',
     ],
   },
   {
-    title: 'Polish and Quality Fixes',
+    title: 'Pre-Push Validation',
+    visual: 'validation',
     items: [
-      'Improved chat reaction visibility, hover details, system announcements, and duplicate announcement prevention.',
-      'Added owner banner controls, bug reporting tools, and cleaner release notes from the home screen.',
-      'Updated the LEO Study favicon and tightened visual polish across games, study, and leaderboard pages.',
-    ],
-  },
-  {
-    title: 'TMAS 3 Study Guide',
-    items: [
-      'Added TMAS 3 coverage into the Study Guide using the Class 180 blueprint LDs: 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 20, 25, 26, 28, 37, 39, 40, and 43.',
-      'Kept the Study Guide simple again by removing the extra TMAS 3 focus selector and returning the left rail to the full LD list with TMAS tags still visible.',
-      'TMAS 3 study material stays aligned to the official POST TTS and workbook breakdowns already shown inside each LD.',
-    ],
-  },
-  {
-    title: 'TMAS 3 Practice Test',
-    items: [
-      'Added TMAS 3 as a live Practice Test option inside Study Hub with the same full-screen randomized test flow used for TMAS 2.',
-      'Built 50 TMAS 3 scenario sets with 200 multiple-choice questions, matching the TMAS 2 scenario-bank size.',
-      'Each scenario keeps the academy-style grouped format, with realistic stems and four application questions tied to the scenario.',
-    ],
-  },
-  {
-    title: 'Harder, More Realistic Questions',
-    items: [
-      'TMAS 3 questions now use more plausible distractors so more than one answer can feel tempting, forcing users to choose the strongest legal answer.',
-      'Added mixed-LD scenario sets that combine arrest, search, force, DV, juvenile, controlled substances, weapons, traffic, critical incidents, and terrorism-awareness issues.',
-      'Every TMAS 3 multiple-choice question is tagged back to explicit POST TTS references for better results coaching and review.',
-    ],
-  },
-  {
-    title: 'Question Volume and Randomization',
-    items: [
-      'TMAS 3 now produces 332 runtime questions after the true / false follow-up generator is applied.',
-      'TMAS 3 supports the existing 10, 20, 50, and 100 question test lengths and pulls a fresh randomized mix each run.',
-      'Results now label the added TMAS 3 LDs correctly, including Juvenile Law, Controlled Substances, Domestic Violence, Critical Incidents, Traffic, Disabilities, Weapons, and Terrorism Awareness.',
+      'Ran build, lint, content integrity, Supabase REST, 1v1 invite/ready-up, and Cloudflare WebSocket smoke tests before this release.',
+      'Confirmed temporary smoke-test users were cleaned up after validation.',
+      'Kept existing lint output at warnings only with no build-blocking errors.',
     ],
   },
 ]
@@ -1884,6 +1864,18 @@ const stripeTierLinks: Partial<Record<Exclude<SupporterTier, 'free'>, string>> =
 const appContentSource = String(import.meta.env.VITE_CONTENT_SOURCE || 'supabase')
   .trim()
   .toLowerCase()
+
+function isPrivateNetworkHost(hostname: string) {
+  if (/^(10|192\.168|169\.254)\./.test(hostname)) return true
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) return true
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(hostname)) return true
+  return false
+}
+
+function shouldPrimeBundledContentBeforeSupabase() {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return false
+  return window.location.protocol === 'http:' && isPrivateNetworkHost(window.location.hostname)
+}
 
 function sanitizeDisplayMode(value: unknown): DisplayMode {
   return value === 'light' ? 'light' : 'dark'
@@ -4360,7 +4352,7 @@ function App() {
     fetchOnlinePresence()
 
     return () => clearInterval(interval)
-  }, [currentUserId, supabase])
+  }, [currentUserId])
 
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
@@ -4443,11 +4435,13 @@ function App() {
     all: [],
     matching: [],
     quiz: [],
+    blaster: [],
   })
   const [homeDuelStreakLeadersByMode, setHomeDuelStreakLeadersByMode] = useState<Record<DuelLeaderboardMode, HomeLeaderboardEntry[]>>({
     all: [],
     matching: [],
     quiz: [],
+    blaster: [],
   })
   const [levelProfilesByUserId, setLevelProfilesByUserId] = useState<Record<string, UserLevelProfile>>({})
   const [currentUserDuelStats, setCurrentUserDuelStats] = useState<DuelLevelStats>(() => emptyDuelLevelStats())
@@ -4604,6 +4598,7 @@ function App() {
   const [scenarioSelectedChoice, setScenarioSelectedChoice] = useState<number | null>(null)
   const [scenarioStreak, setScenarioStreak] = useState(0)
   const [duelInviteJoinRoomId, setDuelInviteJoinRoomId] = useState<string | null>(null)
+  const [duelInvitePreset, setDuelInvitePreset] = useState<DuelInvitePreset | null>(null)
   const homeMatchingRotationIndexRef = useRef(0)
   const homeSpeedRotationIndexRef = useRef(0)
   const homeBlasterRotationIndexRef = useRef(0)
@@ -5147,7 +5142,7 @@ function App() {
       cancelled = true
       client.removeChannel(channel)
     }
-  }, [currentUserId, supabase])
+  }, [currentUserId])
 
   useEffect(() => {
     setProfileDetails((previous) => {
@@ -5401,37 +5396,66 @@ function App() {
       return { codeItems, scenarios }
     }
 
-    const loadContent = async () => {
-      if (appContentSource === 'supabase') {
-        try {
-          setContentWarning('')
-          const supabaseContent = await loadFromSupabase()
-          applyLoadedContentToRuntime(supabaseContent.codeItems, supabaseContent.scenarios)
-          return
-        } catch (error) {
-          console.warn('[content] supabase content unavailable, falling back to local content.', error)
-        }
+    const loadBundledContent = () => {
+      const localBundle = loadLocalContentBundle()
+      for (const warning of localBundle.warnings) console.warn(warning)
+      applyLoadedContentToRuntime(localBundle.codeItems, localBundle.scenarioItems)
+    }
 
+    const loadContent = async () => {
+      const shouldPrimeBundledContent = appContentSource === 'supabase' && shouldPrimeBundledContentBeforeSupabase()
+      let bundledContentApplied = false
+      setContentWarning('')
+
+      if (shouldPrimeBundledContent) {
         try {
-          const localBundle = loadLocalContentBundle()
-          for (const warning of localBundle.warnings) console.warn(warning)
-          applyLoadedContentToRuntime(localBundle.codeItems, localBundle.scenarioItems)
-          setContentWarning('')
+          loadBundledContent()
+          bundledContentApplied = true
         } catch (localError) {
-          console.warn('[content] local fallback failed after Supabase load failure.', localError)
+          console.warn('[content] local content failed to load.', localError)
           setSections([])
           setQuestions([])
           setScenarioItems([])
-          setContentWarning('Could not load Supabase content. Retrying automatically.')
         }
+      }
+
+      if (appContentSource === 'supabase') {
+        try {
+          const supabaseContent = await loadFromSupabase()
+          applyLoadedContentToRuntime(supabaseContent.codeItems, supabaseContent.scenarios)
+          setContentWarning('')
+          return
+        } catch (error) {
+          console.warn('[content] supabase content unavailable, falling back to bundled local content.', error)
+        }
+
+        if (!bundledContentApplied) {
+          try {
+            loadBundledContent()
+            bundledContentApplied = true
+            setContentWarning('')
+          } catch (localError) {
+            console.warn('[content] local fallback failed after Supabase load failure.', localError)
+            setSections([])
+            setQuestions([])
+            setScenarioItems([])
+            setContentWarning('Could not load Supabase content. Retrying automatically.')
+          }
+        }
+
         queueRetry()
         return
       }
 
-      setContentWarning('')
-      const localBundle = loadLocalContentBundle()
-      for (const warning of localBundle.warnings) console.warn(warning)
-      applyLoadedContentToRuntime(localBundle.codeItems, localBundle.scenarioItems)
+      try {
+        loadBundledContent()
+      } catch (localError) {
+        console.warn('[content] local content failed to load.', localError)
+        setSections([])
+        setQuestions([])
+        setScenarioItems([])
+        setContentWarning('Could not load content source. Check local content files.')
+      }
     }
 
     loadContent().catch((error) => {
@@ -5732,6 +5756,7 @@ function App() {
               all: { wins: 0, losses: 0, currentWinStreak: 0 },
               matching: { wins: 0, losses: 0, currentWinStreak: 0 },
               quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+              blaster: { wins: 0, losses: 0, currentWinStreak: 0 },
             }
             current[gameType] = {
               wins: Number(entry.wins || 0),
@@ -5875,6 +5900,7 @@ function App() {
               all: { wins: 0, losses: 0, currentWinStreak: 0 },
               matching: { wins: 0, losses: 0, currentWinStreak: 0 },
               quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+              blaster: { wins: 0, losses: 0, currentWinStreak: 0 },
             }
             current[gameType] = {
               wins: Number(entry.wins || 0),
@@ -5924,11 +5950,13 @@ function App() {
         all: [],
         matching: [],
         quiz: [],
+        blaster: [],
       }
       const duelStreakRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
         all: [],
         matching: [],
         quiz: [],
+        blaster: [],
       }
       let ownerRotationMs: number | null = null
       for (const row of states) {
@@ -5964,6 +5992,7 @@ function App() {
           all: { wins: 0, losses: 0, currentWinStreak: 0 },
           matching: { wins: 0, losses: 0, currentWinStreak: 0 },
           quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
+          blaster: { wins: 0, losses: 0, currentWinStreak: 0 },
         }
         const duelStats = duelStatsByMode.all
         const weeklyDepartmentKey = bestWeeklyDepartmentForLevels
@@ -6121,6 +6150,9 @@ function App() {
         quiz: duelWinsRowsByMode.quiz
           .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
           .slice(0, 5),
+        blaster: duelWinsRowsByMode.blaster
+          .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
       })
       setHomeDuelStreakLeadersByMode({
         all: duelStreakRowsByMode.all
@@ -6130,6 +6162,9 @@ function App() {
           .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
           .slice(0, 5),
         quiz: duelStreakRowsByMode.quiz
+          .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
+        blaster: duelStreakRowsByMode.blaster
           .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
           .slice(0, 5),
       })
@@ -6148,6 +6183,14 @@ function App() {
       }
     }
   }
+
+  const refreshLeaderboardRef = useRef(refreshLeaderboard)
+  const refreshHomeLeaderboardsRef = useRef(refreshHomeLeaderboards)
+
+  useEffect(() => {
+    refreshLeaderboardRef.current = refreshLeaderboard
+    refreshHomeLeaderboardsRef.current = refreshHomeLeaderboards
+  })
 
   useEffect(() => {
     if (!supabase) {
@@ -6617,7 +6660,7 @@ function App() {
     return () => {
       client.removeChannel(channel)
     }
-  }, [currentUserId, supabase])
+  }, [currentUserId])
 
   useEffect(() => {
     if (!supabase || !currentUserId) return
@@ -6634,7 +6677,7 @@ function App() {
     }, 20000)
 
     return () => clearInterval(timer)
-  }, [currentUserId, supabase])
+  }, [currentUserId])
 
   useEffect(() => {
     if (!supabase) return
@@ -6672,7 +6715,7 @@ function App() {
       if (homeRefreshTimer !== null) window.clearTimeout(homeRefreshTimer)
       client.removeChannel(channel)
     }
-  }, [currentUserId, supabase])
+  }, [currentUserId])
 
   const filteredSections = useMemo(
     () => sections.filter((section) => section.codeSet === libraryFilter),
@@ -7550,7 +7593,7 @@ function App() {
     } catch (error) {
       console.error('Could not post leaderboard announcement:', error)
     }
-  }, [currentUserId, supabase])
+  }, [currentUserId])
 
   const shouldPostLeaderboardAnnouncement = useCallback((key: string) => {
     const now = Date.now()
@@ -7809,7 +7852,7 @@ function App() {
           }
         })
     }
-  }, [currentUserId, supabase])
+  }, [currentUserId])
 
   const syncWeeklyLeaderboardEntry = useCallback(async (options: {
     game: ScoreGameName
@@ -8044,8 +8087,8 @@ function App() {
           filter: sessionFilter,
         })
 
-        const refreshed = await refreshLeaderboard({ force: true })
-        await refreshHomeLeaderboards({ force: true })
+        const refreshed = await refreshLeaderboardRef.current({ force: true })
+        await refreshHomeLeaderboardsRef.current({ force: true })
         const leaderboardAfterSave = refreshed.allTimeEntries.length > 0 ? refreshed.allTimeEntries : leaderboardRef.current
         const weeklyLeaderboardAfterSave = refreshed.weeklyEntries.length > 0 ? refreshed.weeklyEntries : weeklyLeaderboardRef.current
         const milestone = await handleLeaderboardTopMilestones({
@@ -8101,7 +8144,6 @@ function App() {
     remoteTrackScoreHistory,
     saveSessionAttempt,
     syncWeeklyLeaderboardEntry,
-    supabase,
     triggerCelebration,
   ])
 
@@ -8585,11 +8627,8 @@ function App() {
     awardScoreMilestoneXp,
     handleLeaderboardTopMilestones,
     profileDetails.stats,
-    refreshHomeLeaderboards,
-    refreshLeaderboard,
     remoteTrackScoreHistory,
     saveSessionAttempt,
-    supabase,
     syncWeeklyLeaderboardEntry,
     triggerCelebration,
   ])
@@ -8740,7 +8779,7 @@ function App() {
     })
     markPerformance(blasterPrompt.codeSet, blasterPrompt.sectionNumber, false)
     setBlasterFeedback('Missile missed -10')
-  }, [blasterDone, blasterLevel, blasterPrompt, blasterRunning, blasterStreak, finalizeBlasterSession, markPerformance, markStudyActivity, setNextBlasterPrompt])
+  }, [blasterDone, blasterPrompt, blasterRunning, blasterStreak, finalizeBlasterSession, markPerformance, markStudyActivity, setNextBlasterPrompt])
 
   const answerSpeedQuestion = useCallback((choiceIndex: number) => {
     if (!speedRunning || !speedCurrentQuestion || speedAnswerLockRef.current) return
@@ -11515,7 +11554,6 @@ function App() {
     homeStudyStreakLeaders,
     homeStudyTimeLeaders,
     leaderboard,
-    supabase,
     weeklyFirstSpotCountsByUser,
     weeklyLeaderboardAppearanceCountsByUser,
     weeklyLeaderboardEntries,
@@ -12185,6 +12223,12 @@ function App() {
       navigate('/games/blaster')
       return
     }
+    if (target === 'games-duel-blaster') {
+      setActiveTab('games')
+      setDuelInvitePreset('rope-blaster')
+      navigate('/games/duel')
+      return
+    }
     setActiveTab('scenarios')
     navigate('/scenarios')
   }
@@ -12708,10 +12752,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 0.55"
+                    aria-label="Open what's new for version 0.60"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v0.55
+                    What's New · v0.60
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -12780,17 +12824,17 @@ function App() {
               <button
                 className="home-blaster-cta"
                 type="button"
-                onClick={() => handleHomeAction('games-blaster', { forceAllTime: true })}
+                onClick={() => handleHomeAction('games-duel-blaster', { forceAllTime: true })}
               >
                 <span className="home-blaster-cta-icon">
                   <AppIcon name="blaster" />
                 </span>
                 <span className="home-blaster-cta-copy">
                   <span className="home-blaster-cta-kicker">New Game Mode</span>
-                  <strong>Try Code Blaster</strong>
-                  <span>Blast code asteroids, build your score, and chase the new weekly leaderboard.</span>
+                  <strong>Try 1v1 Rope Blaster</strong>
+                  <span>Invite a friend, push the lit bomb across the rope, and win by time or rope KO.</span>
                 </span>
-                <span className="home-blaster-cta-action">Launch</span>
+                <span className="home-blaster-cta-action">Invite</span>
               </button>
               <div className="home-actions">
                 <button className="primary" onClick={() => { setActiveTab('study'); navigate('/study') }}>
@@ -15014,6 +15058,8 @@ function App() {
                 isOwner={isOwner}
                 externalJoinRoomId={duelInviteJoinRoomId}
                 onExternalJoinHandled={() => setDuelInviteJoinRoomId(null)}
+                invitePreset={duelInvitePreset}
+                onInvitePresetHandled={() => setDuelInvitePreset(null)}
                 onStudyActivity={() => markStudyActivity('duel')}
                 onDuelPerformanceReward={awardDuelMilestoneXp}
                 sessionXpReward={renderSessionXpReward()}
@@ -16674,15 +16720,21 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v0.55</h3>
+                <h3>What’s New · v0.60</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV055.map((group) => (
-                <article key={`v055-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV060.map((group) => (
+                <article key={`v060-note-${group.title}`} className="home-whats-new-card">
+                  <div className={`home-whats-new-visual home-whats-new-visual-${group.visual}`} aria-hidden>
+                    <span className="home-whats-new-visual-screen" />
+                    <span className="home-whats-new-visual-main" />
+                    <span className="home-whats-new-visual-chip home-whats-new-visual-chip-a" />
+                    <span className="home-whats-new-visual-chip home-whats-new-visual-chip-b" />
+                  </div>
                   <h4>{group.title}</h4>
                   <ul>
                     {group.items.map((item) => (

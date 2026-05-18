@@ -1,0 +1,14 @@
+name = "leo-rope-blaster"
+main = "worker.js"
+compatibility_date = "2026-05-17"
+
+[observability]
+enabled = true
+
+[[durable_objects.bindings]]
+name = "ROPE_BLASTER_ROOMS"
+class_name = "RopeBlasterRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RopeBlasterRoom"]

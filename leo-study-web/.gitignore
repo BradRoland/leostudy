@@ -30,6 +30,7 @@ coverage
 .env.*
 !.env.example
 .vercel
+cloudflare/**/.wrangler/
 backend/data/db.json
 supabase/.temp/
 supabase/supabase/

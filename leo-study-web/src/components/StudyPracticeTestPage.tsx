@@ -101,6 +101,11 @@ function randomizeSessionScenarios(scenarios: PracticeTestScenario[]) {
   }))
 }
 
+function isCompactPracticeViewport() {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(max-width: 760px), (max-height: 620px)').matches
+}
+
 function buildSessionScenarios(scenarios: PracticeTestScenario[], questionTarget: number) {
   const randomizedScenarios = randomizeSessionScenarios(scenarios)
   const sessionScenarios: PracticeTestScenario[] = []
@@ -195,6 +200,7 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
   const [scenarioIndex, setScenarioIndex] = useState(0)
   const [questionIndex, setQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, number>>({})
+  const [expandedExplanationIds, setExpandedExplanationIds] = useState<Record<string, boolean>>({})
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [completedAt, setCompletedAt] = useState<number | null>(null)
   const [sessionId, setSessionId] = useState('')
@@ -248,6 +254,7 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
   const currentScenario = activeScenarios[scenarioIndex] ?? null
   const currentQuestion = currentScenario?.questions[questionIndex] ?? null
   const selectedChoice = currentQuestion ? answers[currentQuestion.id] ?? null : null
+  const isExplanationExpanded = currentQuestion ? expandedExplanationIds[currentQuestion.id] === true : false
   const currentQuestionNumber = useMemo(() => {
     if (!currentScenario || !currentQuestion) return 0
     const previousScenarioQuestions = activeScenarios
@@ -296,6 +303,8 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
     [ldBreakdown],
   )
   const overlayThemeClasses = useMemo(() => {
+    const sessionThemeRefreshToken = `${sessionActive}:${sessionComplete}`
+    void sessionThemeRefreshToken
     if (typeof document === 'undefined') return ''
     const appShell = document.querySelector('.app-shell')
     if (!appShell) return ''
@@ -366,6 +375,8 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
     if (!sessionActive || sessionComplete || !currentQuestion) return
 
     const frame = window.requestAnimationFrame(() => {
+      if (isCompactPracticeViewport()) return
+
       if (selectedChoice === null) {
         scenarioHeroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         return
@@ -409,6 +420,7 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
     setScenarioIndex(0)
     setQuestionIndex(0)
     setAnswers({})
+    setExpandedExplanationIds({})
     setStartedAt(null)
     setCompletedAt(null)
     setSessionId('')
@@ -423,6 +435,7 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
     setScenarioIndex(0)
     setQuestionIndex(0)
     setAnswers({})
+    setExpandedExplanationIds({})
     setSessionComplete(false)
     setSessionActive(true)
     setSessionId(crypto.randomUUID())
@@ -493,7 +506,17 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
     ? `Press 1–${currentQuestion.choices.length} or tap a choice. ${currentQuestion.format === 'true_false' ? 'These true / false checks are intentionally close-call items.' : 'The question is centered and the answer set stays directly beneath it.'}`
     : ''
   const sessionOverlay = (sessionActive || sessionComplete) ? (
-    <div className={`study-session-overlay study-practice-session-overlay ${overlayThemeClasses}`.trim()}>
+    <div
+      className={[
+        'study-session-overlay',
+        'study-practice-session-overlay',
+        sessionActive ? 'study-practice-session-active' : '',
+        sessionComplete ? 'study-practice-session-complete' : '',
+        overlayThemeClasses,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="study-practice-session-shell">
         {sessionActive && currentScenario && currentQuestion ? (
           <>
@@ -570,7 +593,7 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
                           }}
                         >
                           <span className="choice-key">{index + 1}</span>
-                          {choice}
+                          <span className="study-practice-choice-text">{choice}</span>
                         </button>
                       )
                     })}
@@ -583,7 +606,23 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
                       <p className={selectedChoice === currentQuestion.correctIndex ? 'good' : 'bad'}>
                         {selectedChoice === currentQuestion.correctIndex ? 'Correct answer.' : 'Incorrect answer.'}
                       </p>
-                      <p className="muted">{currentQuestion.explanation}</p>
+                      <button
+                        type="button"
+                        className={`study-practice-explanation-toggle muted ${isExplanationExpanded ? 'is-expanded' : ''}`}
+                        aria-expanded={isExplanationExpanded}
+                        onClick={() => {
+                          onStudyActivity()
+                          setExpandedExplanationIds((current) => ({
+                            ...current,
+                            [currentQuestion.id]: !current[currentQuestion.id],
+                          }))
+                        }}
+                      >
+                        <span className="study-practice-explanation-text">{currentQuestion.explanation}</span>
+                        <span className="study-practice-explanation-more">
+                          {isExplanationExpanded ? 'Tap to collapse' : 'Tap to expand full explanation'}
+                        </span>
+                      </button>
                       <button className="primary study-practice-next-action" onClick={advanceQuestion} ref={nextActionRef}>
                         {nextButtonLabel}
                       </button>

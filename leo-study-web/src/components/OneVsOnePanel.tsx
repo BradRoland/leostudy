@@ -1,11 +1,13 @@
-import { type CSSProperties, type ReactNode, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type MouseEvent, type ReactNode, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type RealtimeChannel } from '@supabase/supabase-js'
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
 
-type DuelGameType = 'quiz' | 'matching'
+type DuelGameType = 'quiz' | 'matching' | 'blaster'
 type DuelCategory = 'all' | 'pc' | 'vc' | 'hs' | 'scenarios'
 type DuelRoomStatus = 'waiting' | 'in_progress' | 'completed' | 'cancelled'
+type DuelBlasterMode = 'timed' | 'death'
 
 type DuelRoomRow = {
   id: string
@@ -16,10 +18,10 @@ type DuelRoomRow = {
   join_code: string | null
   rounds: number
   question_set: unknown
+  settings: Record<string, unknown>
   status: DuelRoomStatus
   current_round: number
   winner_user_id: string | null
-  rematch_room_id: string | null
   created_at: string
   started_at: string | null
 }
@@ -46,6 +48,7 @@ type DuelRoomResultRow = {
   total_time_ms: number
   placement: number
   is_winner: boolean
+  finished_at?: string | null
 }
 
 type LobbyRoomItem = {
@@ -53,6 +56,7 @@ type LobbyRoomItem = {
   game_type: DuelGameType
   category: DuelCategory
   rounds: number
+  settings: Record<string, unknown>
   created_at: string
   host_user_id: string
   player_count: number
@@ -86,6 +90,127 @@ type MatchingRoundPayload = {
   pairs: MatchingPairPayload[]
 }
 
+type BlasterRoundPayload = {
+  round: number
+  prompt: string
+  targets: string[]
+  correctIndex: number
+  correctCode: string
+  explanation?: string
+  sourceLabel?: string
+}
+
+type BlasterShotBurst = {
+  id: string
+  tone: 'good' | 'bad' | 'power'
+  x: number
+  y: number
+}
+
+type BlasterScoreBroadcastPayload = {
+  room_id: string
+  user_id: string
+  score: number
+  delta: number
+  round: number
+  current_round: number
+  total_time_ms: number
+  fastest_round_ms: number
+  correct: boolean
+  sent_at: number
+  elapsed_ms?: number
+  powerup_key?: DuelBlasterPowerupKey | null
+  powerup_effect?: DuelBlasterDisruptionKey | null
+  disguise_code?: string | null
+}
+
+type BlasterPowerupEffectPayload = {
+  room_id: string
+  user_id: string
+  powerup_key: DuelBlasterPowerupKey
+  powerup_effect: DuelBlasterDisruptionKey
+  disguise_code?: string | null
+  sent_at: number
+}
+
+type RopeBlasterCloudStatus = 'disabled' | 'connecting' | 'connected' | 'fallback'
+
+type RopeBlasterCloudPlayer = {
+  userId: string
+  score: number
+  currentRound: number
+  totalTimeMs: number
+  fastestRoundMs: number
+}
+
+type RopeBlasterCloudState = {
+  type: 'state'
+  reason?: string
+  sequence?: number
+  serverNow?: number
+  effectiveRopeLimit?: number
+  ropeRemainingPercent?: number
+  ko?: boolean
+  connected?: number
+  players?: RopeBlasterCloudPlayer[]
+  lastEvent?: {
+    userId?: string
+    delta?: number
+    eventDelayMs?: number
+    clientSentAt?: number
+    powerupKey?: DuelBlasterPowerupKey | string | null
+    powerupEffect?: DuelBlasterDisruptionKey | string | null
+    disguiseCode?: string | null
+  } | null
+}
+
+type BlasterAsteroidBody = {
+  key: string
+  element: HTMLElement
+  x: number
+  y: number
+  velocityX: number
+  velocityY: number
+  halfWidth: number
+  halfHeight: number
+  collisionGlowUntil: number
+  isColliding: boolean
+}
+
+type DuelBlasterPowerupKey =
+  | 'radio'
+  | 'coffee'
+  | 'donut'
+  | 'code3'
+  | 'k9'
+  | 'backup'
+  | 'vest'
+  | 'evidence'
+  | 'clone'
+  | 'paperwork'
+  | 'radar'
+  | 'spikes'
+
+type DuelBlasterDisruptionKey = 'clone' | 'paperwork' | 'speedtrap' | 'shake'
+
+type DuelBlasterPowerup = {
+  key: DuelBlasterPowerupKey
+  label: string
+  points: number
+  icon: string
+  description: string
+}
+
+type DuelBlasterDisruption = {
+  id: string
+  key: DuelBlasterDisruptionKey
+  label: string
+  icon: string
+  cloneText?: string
+}
+
+const BLASTER_PAPERWORK_STORM_LABELS = ['RPT', 'SUPP', 'CAD', 'PC', 'VC', 'BWC', 'CASE', 'EVID', 'NARR', 'CYA', 'LOG', 'TOW']
+
 type DuelMatchCard = {
   id: string
   pairId: string
@@ -103,14 +228,13 @@ type ReadyRpcState = {
   status?: DuelRoomStatus
   ready_count?: number
   player_count?: number
-  rematch_started?: boolean
-  rematch_cancelled?: boolean
   message?: string
   started_at?: string | null
   room_id?: string
 }
 
 type DuelStatsMode = 'all' | DuelGameType
+const duelStatsModes: DuelStatsMode[] = ['all', 'matching', 'quiz', 'blaster']
 
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 
@@ -189,6 +313,11 @@ type DuelProfileSnapshot = {
     losses: number
     matches: number
   }
+  blaster: {
+    wins: number
+    losses: number
+    matches: number
+  }
 }
 
 type DuelProfileActivityDisplay = {
@@ -235,6 +364,32 @@ const supporterTierLabel: Record<SupporterTier, string> = {
 const duelQuizRoundOptions = [5, 10, 20, 30]
 const duelQuizRoundTimeLimitMs = 30_000
 const duelScenarioQuizRoundTimeLimitMs = 120_000
+const duelBlasterDurationOptions = [30, 60, 90]
+const duelBlasterDefaultDurationSeconds = 30
+const duelBlasterRoundCap = 50
+const duelBlasterDefaultRopeLimit = 900
+const duelBlasterOvertimeOptions = [45, 60, 90] as const
+const duelBlasterDefaultOvertimeEnabled = true
+const duelBlasterDefaultOvertimeAfterSeconds = 45
+const duelBlasterSuddenDeathRopeMultiplier = 0.45
+const duelBlasterSuddenDeathMinimumRopeLimit = 260
+const duelBlasterMissPenalty = 85
+const defaultRopeBlasterWorkerUrl = 'https://leo-rope-blaster.brad-e22.workers.dev'
+const ropeBlasterWorkerUrl = String(
+  import.meta.env.VITE_ROPE_BLASTER_WORKER_URL ||
+  import.meta.env.VITE_CLOUDFLARE_ROPE_BLASTER_URL ||
+  defaultRopeBlasterWorkerUrl,
+).replace(/\/+$/, '')
+const duelGameTypeLabels: Record<DuelGameType, string> = {
+  quiz: 'Quiz',
+  matching: 'Matching',
+  blaster: 'Code Blaster',
+}
+const duelGameTypeOptions: Array<{ value: DuelGameType; label: string; subtitle: string }> = [
+  { value: 'quiz', label: '1v1 Quiz', subtitle: 'Classic question duel' },
+  { value: 'matching', label: '1v1 Matching', subtitle: 'Pair codes and definitions' },
+  { value: 'blaster', label: 'Rope Blaster', subtitle: 'Timed code blasts or rope KO' },
+]
 const duelCategoryOptions: Array<{ value: DuelCategory; label: string; quizOnly?: boolean }> = [
   { value: 'all', label: 'ALL' },
   { value: 'pc', label: 'PC' },
@@ -339,6 +494,153 @@ function seededShuffle<T>(items: T[], seedInput: string) {
   return copy
 }
 
+const blasterTargetAnchors = [
+  { x: 18, y: 22 },
+  { x: 50, y: 18 },
+  { x: 82, y: 24 },
+  { x: 25, y: 63 },
+  { x: 58, y: 70 },
+  { x: 78, y: 56 },
+]
+const blasterFieldWallInsetPx = 28
+const blasterAsteroidMinHalfWidthPx = 30
+const blasterAsteroidMinHalfHeightPx = 22
+const blasterAsteroidMinSpeed = 0.022
+const blasterAsteroidMaxSpeed = 0.048
+const blasterAsteroidCollisionGapPx = 12
+const blasterAsteroidSeparationPasses = 4
+
+function getBlasterWallInset(safeWidth: number, safeHeight: number) {
+  return Math.max(12, Math.min(blasterFieldWallInsetPx, Math.min(safeWidth, safeHeight) * 0.045))
+}
+
+function blasterTargetDomKey(index: number) {
+  return `slot-${index}`
+}
+
+function normalizeBlasterTarget(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, ' ')
+}
+
+function getBlasterRoundCorrectCode(round: BlasterRoundPayload) {
+  return String(round.correctCode || round.targets[round.correctIndex] || '').trim()
+}
+
+function buildBlasterVisibleTargetsForRound(
+  previousTargets: string[],
+  nextRound: BlasterRoundPayload,
+  replacementIndex: number | null,
+) {
+  const nextRoundTargets = nextRound.targets.map((target) => String(target)).filter((target) => target.trim().length > 0)
+  if (previousTargets.length === 0 || previousTargets.length !== nextRoundTargets.length) {
+    return nextRoundTargets
+  }
+
+  const nextTargets = [...previousTargets]
+  const safeReplacementIndex = replacementIndex !== null && replacementIndex >= 0 && replacementIndex < nextTargets.length
+    ? replacementIndex
+    : 0
+  const correctCode = getBlasterRoundCorrectCode(nextRound)
+  const normalizedCorrect = normalizeBlasterTarget(correctCode)
+  const usedWithoutReplacement = new Set(
+    nextTargets
+      .filter((_target, index) => index !== safeReplacementIndex)
+      .map((target) => normalizeBlasterTarget(target)),
+  )
+  const replacement = correctCode && !usedWithoutReplacement.has(normalizedCorrect)
+    ? correctCode
+    : nextRoundTargets.find((target) => !usedWithoutReplacement.has(normalizeBlasterTarget(target)))
+      || correctCode
+      || nextTargets[safeReplacementIndex]
+      || nextRoundTargets[0]
+      || ''
+
+  nextTargets[safeReplacementIndex] = replacement
+  if (correctCode && !nextTargets.some((target) => normalizeBlasterTarget(target) === normalizedCorrect)) {
+    nextTargets[safeReplacementIndex] = correctCode
+  }
+
+  const usedTargets = new Set<string>()
+  return nextTargets.map((target, index) => {
+    const normalized = normalizeBlasterTarget(target)
+    if (target && !usedTargets.has(normalized)) {
+      usedTargets.add(normalized)
+      return target
+    }
+    const fallback = nextRoundTargets.find((candidate) => !usedTargets.has(normalizeBlasterTarget(candidate)))
+      || target
+      || nextRoundTargets[index]
+      || ''
+    usedTargets.add(normalizeBlasterTarget(fallback))
+    return fallback
+  })
+}
+
+function blasterTargetStyle(seedInput: string, index: number): CSSProperties {
+  const seed = hashStringToInt(`${seedInput}:${index}`)
+  const anchors = seededShuffle(blasterTargetAnchors, `${seedInput}:target-layout`)
+  const anchor = anchors[index % anchors.length] || blasterTargetAnchors[index % blasterTargetAnchors.length]
+  const jitterX = ((seed % 7) - 3) * 2
+  const jitterY = ((Math.floor(seed / 13) % 7) - 3) * 2
+  const drift = 5 + (seed % 10)
+  const orbitX = 7 + (Math.floor(seed / 17) % 12)
+  const orbitY = 6 + (Math.floor(seed / 29) % 11)
+  const duration = 6.2 + ((seed % 1800) / 1000)
+  const delay = -((seed % 2400) / 1000)
+  return {
+    left: `calc(${anchor.x}% + ${jitterX}px)`,
+    top: `calc(${anchor.y}% + ${jitterY}px)`,
+    ['--duel-blaster-drift' as string]: `${drift}px`,
+    ['--duel-blaster-orbit-x' as string]: `${orbitX}px`,
+    ['--duel-blaster-orbit-y' as string]: `${orbitY}px`,
+    ['--duel-blaster-orbit-duration' as string]: `${duration}s`,
+    ['--duel-blaster-delay' as string]: `${delay}s`,
+  } as CSSProperties
+}
+
+function duelBlasterPowerupForRound(round: number, powerupsEnabled: boolean, mode: DuelBlasterMode = 'timed'): DuelBlasterPowerup | null {
+  if (!powerupsEnabled) return null
+  if (mode === 'death') {
+    if (round % 11 === 0) return { key: 'clone', label: 'Clone Jammer', points: 160, icon: '🌀', description: 'Correct blast clones your opponent’s labels.' }
+    if (round % 10 === 0) return { key: 'paperwork', label: 'Paperwork Storm', points: 150, icon: '📄', description: 'Correct blast rains fake reports on them.' }
+    if (round % 8 === 0) return { key: 'spikes', label: 'Pursuit Panic', points: 175, icon: '🚓', description: 'Correct blast makes their asteroid field go Code 3 fast.' }
+    if (round % 7 === 0) return { key: 'code3', label: 'Code 3 Surge', points: 230, icon: '🚨', description: 'A huge correct blast yanks the rope hard.' }
+    if (round % 5 === 0) return { key: 'vest', label: 'Ballistic Vest', points: 135, icon: '🦺', description: 'A miss hurts less and keeps you alive.' }
+    if (round % 4 === 0) return { key: 'radar', label: 'Spotlight Sweep', points: 145, icon: '🔦', description: 'A quick scanner glow marks the right asteroid.' }
+    if (round % 3 === 0) return { key: 'radio', label: 'Radio Boost', points: 140, icon: '📻', description: 'Your streak bonus counts double.' }
+    return null
+  }
+  if (round % 17 === 0) return { key: 'clone', label: 'Clone Jammer', points: 160, icon: '🌀', description: 'Correct blast clones your opponent’s labels.' }
+  if (round % 16 === 0) return { key: 'paperwork', label: 'Paperwork Storm', points: 150, icon: '📄', description: 'Correct blast rains fake reports on them.' }
+  if (round % 14 === 0) return { key: 'radar', label: 'Spotlight Sweep', points: 145, icon: '🔦', description: 'A quick scanner glow marks the right asteroid.' }
+  if (round % 13 === 0) return { key: 'backup', label: 'Backup Unit', points: 170, icon: '🚔', description: 'Correct blast gets an extra shove.' }
+  if (round % 12 === 0) return { key: 'spikes', label: 'Pursuit Panic', points: 175, icon: '🚓', description: 'Correct blast makes their asteroid field go Code 3 fast.' }
+  if (round % 11 === 0) return { key: 'k9', label: 'K-9 Sniff', points: 150, icon: '🐕', description: 'A paw glow hints at the best target.' }
+  if (round % 9 === 0) return { key: 'evidence', label: 'Evidence Bag', points: 150, icon: '🧾', description: 'Chain the streak into bonus pressure.' }
+  if (round % 7 === 0) return { key: 'code3', label: 'Code 3 Surge', points: 230, icon: '🚨', description: 'A huge correct blast yanks the rope hard.' }
+  if (round % 6 === 0) return { key: 'vest', label: 'Ballistic Vest', points: 135, icon: '🦺', description: 'A miss hurts less and keeps you alive.' }
+  if (round % 5 === 0) return { key: 'donut', label: 'Donut Armor', points: 165, icon: '🍩', description: 'A miss keeps your streak from breaking.' }
+  if (round % 4 === 0) return { key: 'coffee', label: 'Coffee Rush', points: 145, icon: '☕️', description: 'Answer in 4 seconds for a speed bonus.' }
+  if (round % 3 === 0) return { key: 'radio', label: 'Radio Boost', points: 140, icon: '📻', description: 'Your streak bonus counts double.' }
+  return null
+}
+
+function duelBlasterDisruptionForPowerup(powerup: DuelBlasterPowerup | null): DuelBlasterDisruptionKey | null {
+  if (!powerup) return null
+  if (powerup.key === 'clone') return 'clone'
+  if (powerup.key === 'paperwork') return 'paperwork'
+  if (powerup.key === 'spikes') return 'speedtrap'
+  if (powerup.key === 'code3') return 'shake'
+  return null
+}
+
+function getDuelBlasterDisruptionMeta(key: DuelBlasterDisruptionKey) {
+  if (key === 'clone') return { label: 'Clone Jammer', icon: '🌀', durationMs: 2300 }
+  if (key === 'paperwork') return { label: 'Paperwork Storm', icon: '📄', durationMs: 1850 }
+  if (key === 'speedtrap') return { label: 'Pursuit Panic', icon: '🚓', durationMs: 1650 }
+  return { label: 'Code 3 Shockwave', icon: '🚨', durationMs: 720 }
+}
+
 function formatElapsed(ms: number) {
   const safe = Math.max(0, Number.isFinite(ms) ? ms : 0)
   const seconds = Math.round(safe / 1000)
@@ -355,6 +657,77 @@ function formatClock(ms: number) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
+function readNumberSetting(
+  settings: Record<string, unknown> | null | undefined,
+  key: string,
+  fallback: number,
+  min: number,
+  max: number,
+) {
+  const value = Number(settings?.[key] ?? fallback)
+  const safe = Number.isFinite(value) ? value : fallback
+  return Math.max(min, Math.min(max, Math.round(safe)))
+}
+
+function getBlasterMode(settings: Record<string, unknown> | null | undefined): DuelBlasterMode {
+  return settings?.blaster_win_condition === 'death' || settings?.blaster_sudden_death === true ? 'death' : 'timed'
+}
+
+function getBlasterDurationSeconds(settings: Record<string, unknown> | null | undefined) {
+  return readNumberSetting(settings, 'blaster_duration_seconds', duelBlasterDefaultDurationSeconds, 15, 300)
+}
+
+function getBlasterRopeLimit(settings: Record<string, unknown> | null | undefined) {
+  return readNumberSetting(settings, 'blaster_rope_limit', duelBlasterDefaultRopeLimit, 300, 3000)
+}
+
+function getBlasterOvertimeEnabled(settings: Record<string, unknown> | null | undefined) {
+  if (!settings || settings.blaster_overtime_enabled === undefined) return duelBlasterDefaultOvertimeEnabled
+  return settings.blaster_overtime_enabled !== false && String(settings.blaster_overtime_enabled).toLowerCase() !== 'false'
+}
+
+function getBlasterOvertimeAfterSeconds(settings: Record<string, unknown> | null | undefined) {
+  const rawSeconds = readNumberSetting(
+    settings,
+    'blaster_overtime_after_seconds',
+    duelBlasterDefaultOvertimeAfterSeconds,
+    duelBlasterOvertimeOptions[0],
+    duelBlasterOvertimeOptions[duelBlasterOvertimeOptions.length - 1],
+  )
+  return duelBlasterOvertimeOptions.reduce(
+    (closest, option) => Math.abs(option - rawSeconds) < Math.abs(closest - rawSeconds) ? option : closest,
+    duelBlasterDefaultOvertimeAfterSeconds,
+  )
+}
+
+function getBlasterSuddenDeathRopeLimit(baseLimit: number) {
+  return Math.max(
+    duelBlasterSuddenDeathMinimumRopeLimit,
+    Math.round(Math.max(1, baseLimit) * duelBlasterSuddenDeathRopeMultiplier),
+  )
+}
+
+function formatBlasterRuleLabel(settings: Record<string, unknown> | null | undefined) {
+  const mode = getBlasterMode(settings)
+  const overtimeLabel = getBlasterOvertimeEnabled(settings)
+    ? `OT ${getBlasterOvertimeAfterSeconds(settings)}s`
+    : 'No OT'
+  return `${mode === 'death' ? 'To the Death' : `${getBlasterDurationSeconds(settings)}s`} · Rope KO · ${overtimeLabel}`
+}
+
+function toRopeBlasterWebSocketUrl(baseUrl: string, roomId: string, userId: string, displayName: string) {
+  if (!baseUrl || !roomId || !userId) return ''
+  const url = new URL(`${baseUrl}/room/${encodeURIComponent(roomId)}`)
+  url.protocol = url.protocol === 'http:' ? 'ws:' : 'wss:'
+  url.searchParams.set('userId', userId)
+  url.searchParams.set('name', displayName || 'Player')
+  return url.toString()
+}
+
+function formatDuelRoomRuleLabel(room: Pick<LobbyRoomItem, 'game_type' | 'rounds' | 'settings'>) {
+  return room.game_type === 'blaster' ? formatBlasterRuleLabel(room.settings) : `${room.rounds} rounds`
 }
 
 function formatActivityTime(value: number) {
@@ -431,6 +804,7 @@ function emptyDuelProfileSnapshot(userId: string): DuelProfileSnapshot {
     all: { wins: 0, losses: 0, matches: 0, currentStreak: 0, bestStreak: 0 },
     matching: { wins: 0, losses: 0, matches: 0 },
     quiz: { wins: 0, losses: 0, matches: 0 },
+    blaster: { wins: 0, losses: 0, matches: 0 },
   }
 }
 
@@ -585,6 +959,15 @@ function isMatchingRound(value: unknown): value is MatchingRoundPayload {
   return typeof row.round === 'number' && Array.isArray(row.pairs)
 }
 
+function isBlasterRound(value: unknown): value is BlasterRoundPayload {
+  if (!value || typeof value !== 'object') return false
+  const row = value as Partial<BlasterRoundPayload>
+  return typeof row.round === 'number'
+    && typeof row.prompt === 'string'
+    && Array.isArray(row.targets)
+    && typeof row.correctIndex === 'number'
+}
+
 function parseReadyRpcState(value: unknown): ReadyRpcState {
   if (typeof value === 'string') {
     const rawStatus = value.trim()
@@ -603,8 +986,6 @@ function parseReadyRpcState(value: unknown): ReadyRpcState {
     status: validStatuses.includes(rawStatus as DuelRoomStatus) ? (rawStatus as DuelRoomStatus) : undefined,
     ready_count: typeof row.ready_count === 'number' ? Number(row.ready_count) : undefined,
     player_count: typeof row.player_count === 'number' ? Number(row.player_count) : undefined,
-    rematch_started: Boolean(row.rematch_started),
-    rematch_cancelled: Boolean(row.rematch_cancelled),
     message: typeof row.message === 'string' ? row.message : undefined,
     started_at: typeof row.started_at === 'string' ? row.started_at : null,
     room_id: typeof row.room_id === 'string' ? row.room_id : undefined,
@@ -671,9 +1052,9 @@ function mapDuelRoomSnapshot(
     status,
     current_round: Number(row.current_round || 1),
     winner_user_id: row.winner_user_id ? String(row.winner_user_id) : options.winnerUserId || null,
-    rematch_room_id: row.rematch_room_id ? String(row.rematch_room_id) : null,
     created_at: String(row.created_at || ''),
     started_at: row.started_at ? String(row.started_at) : null,
+    settings: row.settings && typeof row.settings === 'object' ? (row.settings as Record<string, unknown>) : {},
   }
 }
 
@@ -702,6 +1083,7 @@ function mapDuelResultSnapshot(row: Record<string, unknown>): DuelRoomResultRow 
     total_time_ms: Number(row.total_time_ms || 0),
     placement: Number(row.placement || 2),
     is_winner: Boolean(row.is_winner),
+    finished_at: row.finished_at ? String(row.finished_at) : null,
   }
 }
 
@@ -711,6 +1093,8 @@ export function OneVsOnePanel(props: {
   isOwner?: boolean
   externalJoinRoomId?: string | null
   onExternalJoinHandled?: () => void
+  invitePreset?: 'rope-blaster' | null
+  onInvitePresetHandled?: () => void
   onStudyActivity?: () => void
   onDuelPerformanceReward?: (result: {
     roomId: string
@@ -729,6 +1113,8 @@ export function OneVsOnePanel(props: {
     isOwner = false,
     externalJoinRoomId = null,
     onExternalJoinHandled,
+    invitePreset = null,
+    onInvitePresetHandled,
     onStudyActivity,
     onDuelPerformanceReward,
     sessionXpReward,
@@ -736,11 +1122,21 @@ export function OneVsOnePanel(props: {
 
   const [selectedGameType, setSelectedGameType] = useState<DuelGameType>('quiz')
   const [selectedCategory, setSelectedCategory] = useState<DuelCategory>('all')
+  const [selectedPowerupsEnabled, setSelectedPowerupsEnabled] = useState(true)
+  const [selectedBlasterMode, setSelectedBlasterMode] = useState<DuelBlasterMode>('timed')
+  const [selectedBlasterDurationSeconds, setSelectedBlasterDurationSeconds] = useState(duelBlasterDefaultDurationSeconds)
+  const [selectedBlasterOvertimeEnabled, setSelectedBlasterOvertimeEnabled] = useState(duelBlasterDefaultOvertimeEnabled)
+  const [selectedBlasterOvertimeAfterSeconds, setSelectedBlasterOvertimeAfterSeconds] = useState(duelBlasterDefaultOvertimeAfterSeconds)
   const [isPublicRoom, setIsPublicRoom] = useState(true)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteGameType, setInviteGameType] = useState<DuelGameType>('quiz')
   const [inviteCategory, setInviteCategory] = useState<DuelCategory>('all')
   const [inviteQuizRounds, setInviteQuizRounds] = useState(10)
+  const [invitePowerupsEnabled, setInvitePowerupsEnabled] = useState(true)
+  const [inviteBlasterMode, setInviteBlasterMode] = useState<DuelBlasterMode>('timed')
+  const [inviteBlasterDurationSeconds, setInviteBlasterDurationSeconds] = useState(duelBlasterDefaultDurationSeconds)
+  const [inviteBlasterOvertimeEnabled, setInviteBlasterOvertimeEnabled] = useState(duelBlasterDefaultOvertimeEnabled)
+  const [inviteBlasterOvertimeAfterSeconds, setInviteBlasterOvertimeAfterSeconds] = useState(duelBlasterDefaultOvertimeAfterSeconds)
   const [onlineInviteUsers, setOnlineInviteUsers] = useState<OnlineInviteUser[]>([])
   const [onlineInviteLoading, setOnlineInviteLoading] = useState(false)
   const [inviteSendingUserId, setInviteSendingUserId] = useState<string | null>(null)
@@ -770,7 +1166,6 @@ export function OneVsOnePanel(props: {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null)
-  const [rematchLoading, setRematchLoading] = useState(false)
   const [waitingChatMessages, setWaitingChatMessages] = useState<WaitingRoomMessage[]>([])
   const [waitingChatInput, setWaitingChatInput] = useState('')
   const [waitingChatSending, setWaitingChatSending] = useState(false)
@@ -788,16 +1183,34 @@ export function OneVsOnePanel(props: {
   const [, setMatchingMistakes] = useState(0)
   const [matchingRoundPoints, setMatchingRoundPoints] = useState(0)
   const [matchingSubmitted, setMatchingSubmitted] = useState(false)
+  const [blasterChoice, setBlasterChoice] = useState<number | null>(null)
+  const [blasterChoiceRound, setBlasterChoiceRound] = useState<number | null>(null)
+  const [blasterLocked, setBlasterLocked] = useState(false)
+  const [blasterStreak, setBlasterStreak] = useState(0)
+  const [, setBlasterFeedback] = useState('')
+  const [blasterVisibleTargets, setBlasterVisibleTargets] = useState<string[]>([])
+  const [blasterShotBursts, setBlasterShotBursts] = useState<BlasterShotBurst[]>([])
+  const [blasterTugPulse, setBlasterTugPulse] = useState<'pull' | 'miss' | ''>('')
+  const [blasterDisruption, setBlasterDisruption] = useState<DuelBlasterDisruption | null>(null)
+  const [blasterCloudStatus, setBlasterCloudStatus] = useState<RopeBlasterCloudStatus>(ropeBlasterWorkerUrl ? 'connecting' : 'disabled')
+  const [blasterCloudLatencyMs, setBlasterCloudLatencyMs] = useState<number | null>(null)
   const previousPlayersRef = useRef<DuelRoomPlayerRow[]>([])
   const previousRoomStatusRef = useRef<DuelRoomStatus | null>(null)
   const activityBootstrappedRef = useRef(false)
   const initializedRoundKeyRef = useRef('')
+  const activeRoomIdRef = useRef<string | null>(roomId)
+  const liveRoomRef = useRef<DuelRoomRow | null>(null)
   const livePlayersRef = useRef<DuelRoomPlayerRow[]>([])
   const refreshInFlightRef = useRef(false)
   const refreshQueuedRef = useRef(false)
   const roundSubmitQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const roomRealtimeChannelRef = useRef<RealtimeChannel | null>(null)
+  const ropeBlasterSocketRef = useRef<WebSocket | null>(null)
+  const ropeBlasterPingTimerRef = useRef<number | null>(null)
+  const ropeBlasterReconnectTimerRef = useRef<number | null>(null)
+  const ropeBlasterSequenceRef = useRef(0)
+  const latestBlasterBroadcastRef = useRef<Record<string, { currentRound: number; sentAt: number }>>({})
   const waitingChatEndRef = useRef<HTMLDivElement | null>(null)
-  const rematchHandoffRoomIdRef = useRef('')
   const rewardedResultRoomIdsRef = useRef<Set<string>>(new Set())
   const duelProfileCacheRef = useRef<Record<string, DuelProfileSnapshot>>({})
   const duelLeaderboardRequestRef = useRef(0)
@@ -808,11 +1221,32 @@ export function OneVsOnePanel(props: {
   const autoForfeitRoundKeyRef = useRef('')
   const quizSpamHistoryRef = useRef<QuizSpamSample[]>([])
   const quizSpamStrikeRef = useRef(0)
+  const blasterTugPulseTimerRef = useRef<number | null>(null)
+  const blasterDisruptionTimerRef = useRef<number | null>(null)
+  const blasterDisruptionRef = useRef<DuelBlasterDisruption | null>(null)
+  const blasterFieldRef = useRef<HTMLDivElement | null>(null)
+  const blasterTargetRefs = useRef<Record<string, HTMLElement | null>>({})
+  const blasterAnimationFrameRef = useRef<number | null>(null)
+  const blasterBodiesRef = useRef<BlasterAsteroidBody[]>([])
+  const blasterMotionRoundRef = useRef(0)
+  const blasterMotionTargetsRef = useRef<string[]>([])
+  const blasterRespawnTargetIndexRef = useRef<number | null>(null)
+  const blasterVisibleTargetsRef = useRef<string[]>([])
+  const blasterVisibleRoundKeyRef = useRef('')
+  const blasterPendingReplacementIndexRef = useRef<number | null>(null)
 
   const isSignedIn = currentUserId.trim().length > 0
   const markStudyActivity = useCallback(() => {
     onStudyActivity?.()
   }, [onStudyActivity])
+
+  useEffect(() => {
+    activeRoomIdRef.current = roomId
+  }, [roomId])
+
+  useEffect(() => {
+    liveRoomRef.current = room
+  }, [room])
 
   useEffect(() => {
     livePlayersRef.current = players
@@ -821,6 +1255,10 @@ export function OneVsOnePanel(props: {
   useEffect(() => {
     duelProfileCacheRef.current = duelProfileByUserId
   }, [duelProfileByUserId])
+
+  useEffect(() => {
+    latestBlasterBroadcastRef.current = {}
+  }, [roomId])
 
   useEffect(() => {
     winsLeaderboardRef.current = winsLeaderboard
@@ -833,6 +1271,18 @@ export function OneVsOnePanel(props: {
   useEffect(() => {
     myDuelStatsRef.current = myDuelStats
   }, [myDuelStats])
+
+  useEffect(() => () => {
+    if (blasterTugPulseTimerRef.current !== null) {
+      window.clearTimeout(blasterTugPulseTimerRef.current)
+      blasterTugPulseTimerRef.current = null
+    }
+    if (blasterAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(blasterAnimationFrameRef.current)
+      blasterAnimationFrameRef.current = null
+    }
+    blasterBodiesRef.current = []
+  }, [])
 
   useEffect(() => {
     if (!isSignedIn) return
@@ -862,6 +1312,9 @@ export function OneVsOnePanel(props: {
         game_type: String((row as Record<string, unknown>).game_type || 'quiz') as DuelGameType,
         category: String((row as Record<string, unknown>).category || 'all') as DuelCategory,
         rounds: Number((row as Record<string, unknown>).rounds || 5),
+        settings: (row as Record<string, unknown>).settings && typeof (row as Record<string, unknown>).settings === 'object'
+          ? (row as Record<string, unknown>).settings as Record<string, unknown>
+          : {},
         created_at: String((row as Record<string, unknown>).created_at || ''),
         host_user_id: String((row as Record<string, unknown>).host_user_id || ''),
         status: String((row as Record<string, unknown>).status || 'waiting') as DuelRoomStatus,
@@ -1116,7 +1569,7 @@ export function OneVsOnePanel(props: {
       const value = row as Record<string, unknown>
       const userId = String(value.user_id || '')
       const gameType = String(value.game_type || 'all') as DuelStatsMode
-      if (!userId || !['all', 'quiz', 'matching'].includes(gameType)) return
+      if (!userId || !duelStatsModes.includes(gameType)) return
       allStatsByKey.set(`${userId}:${gameType}`, {
         user_id: userId,
         game_type: gameType,
@@ -1182,6 +1635,7 @@ export function OneVsOnePanel(props: {
       const all = allStatsByKey.get(`${userId}:all`)
       const matching = allStatsByKey.get(`${userId}:matching`)
       const quiz = allStatsByKey.get(`${userId}:quiz`)
+      const blaster = allStatsByKey.get(`${userId}:blaster`)
       const profile = profileMap[userId]
       const details = detailsMap[userId]
       const fallbackProfile = nextProfileSnapshotByUserId[userId] || emptyDuelProfileSnapshot(userId)
@@ -1213,6 +1667,11 @@ export function OneVsOnePanel(props: {
           wins: quiz?.wins || 0,
           losses: quiz?.losses || 0,
           matches: quiz?.matches_played || 0,
+        },
+        blaster: {
+          wins: blaster?.wins || 0,
+          losses: blaster?.losses || 0,
+          matches: blaster?.matches_played || 0,
         },
       }
     })
@@ -1388,8 +1847,14 @@ export function OneVsOnePanel(props: {
     roomRow: Record<string, unknown>
     playerRows: unknown
     resultRows: unknown
+    expectedRoomId?: string
     preferCompleted?: boolean
   }) => {
+    const snapshotRoomId = String(params.roomRow.id || '').trim()
+    const expectedRoomId = String(params.expectedRoomId || activeRoomIdRef.current || '').trim()
+    if (!snapshotRoomId || (expectedRoomId && snapshotRoomId !== expectedRoomId)) return null
+    if (activeRoomIdRef.current && snapshotRoomId !== activeRoomIdRef.current) return null
+
     const playerRecordRows = asSnapshotRecords(params.playerRows)
     const resultRecordRows = asSnapshotRecords(params.resultRows)
     const requiredResultCount = Math.max(2, playerRecordRows.length || 2)
@@ -1409,7 +1874,11 @@ export function OneVsOnePanel(props: {
       if (!current || mappedRoom.status !== 'in_progress') return player
       return {
         ...player,
-        score: Math.max(player.score, current.score),
+        score: mappedRoom.game_type === 'blaster'
+          ? player.current_round >= current.current_round
+            ? player.score
+            : current.score
+          : Math.max(player.score, current.score),
         total_time_ms: Math.max(player.total_time_ms, current.total_time_ms),
         fastest_round_ms: player.fastest_round_ms || current.fastest_round_ms,
         current_round: Math.max(player.current_round, current.current_round),
@@ -1428,6 +1897,7 @@ export function OneVsOnePanel(props: {
 
   const refreshRoomSnapshot = useCallback(async () => {
     if (!supabase || !roomId || !isSignedIn) return
+    const requestedRoomId = roomId
     const client = supabase
     if (refreshInFlightRef.current) {
       refreshQueuedRef.current = true
@@ -1437,28 +1907,31 @@ export function OneVsOnePanel(props: {
 
     try {
       const loadViaRpc = async () => {
-        const { data: roomData, error: rpcError } = await client.rpc('get_1v1_room_details', { p_room_id: roomId })
+        const { data: roomData, error: rpcError } = await client.rpc('get_1v1_room_details', { p_room_id: requestedRoomId })
         const rpcResult = asSnapshotRecord(Array.isArray(roomData) ? roomData[0] : roomData)
         const rpcRoom = asSnapshotRecord(rpcResult?.room)
         if (rpcError || !rpcResult || !rpcRoom) return false
+        if (activeRoomIdRef.current !== requestedRoomId) return true
         await applyRoomSnapshot({
           roomRow: rpcRoom,
           playerRows: rpcResult.players,
           resultRows: rpcResult.results,
+          expectedRoomId: requestedRoomId,
         })
         return true
       }
 
       const [{ data: roomRow, error: roomError }, { data: playerRows, error: playersError }, { data: resultRows, error: resultsError }] = await Promise.all([
-        client.from('rooms').select('*').eq('id', roomId).maybeSingle(),
-        client.from('room_players').select('*').eq('room_id', roomId).order('slot_no', { ascending: true }),
-        client.from('room_results').select('*').eq('room_id', roomId).order('placement', { ascending: true }),
+        client.from('rooms').select('*').eq('id', requestedRoomId).maybeSingle(),
+        client.from('room_players').select('*').eq('room_id', requestedRoomId).order('slot_no', { ascending: true }),
+        client.from('room_results').select('*').eq('room_id', requestedRoomId).order('placement', { ascending: true }),
       ])
 
       const directRoom = asSnapshotRecord(roomRow)
       if (!directRoom || roomError || playersError || resultsError) {
         const loadedViaRpc = await loadViaRpc()
         if (loadedViaRpc) return
+        if (activeRoomIdRef.current !== requestedRoomId) return
 
         setError(roomError?.message || playersError?.message || resultsError?.message || 'Could not load room.')
         if (!directRoom) {
@@ -1474,17 +1947,242 @@ export function OneVsOnePanel(props: {
         roomRow: directRoom,
         playerRows,
         resultRows,
+        expectedRoomId: requestedRoomId,
       })
     } finally {
       refreshInFlightRef.current = false
       if (refreshQueuedRef.current) {
         refreshQueuedRef.current = false
         window.setTimeout(() => {
-          void refreshRoomSnapshot()
+          if (activeRoomIdRef.current === requestedRoomId) {
+            void refreshRoomSnapshot()
+          }
         }, 60)
       }
     }
   }, [applyRoomSnapshot, isSignedIn, roomId])
+
+  const triggerBlasterDisruption = useCallback((effect: DuelBlasterDisruptionKey, cloneText?: string | null) => {
+    if (blasterDisruptionTimerRef.current !== null) {
+      window.clearTimeout(blasterDisruptionTimerRef.current)
+      blasterDisruptionTimerRef.current = null
+    }
+    const meta = getDuelBlasterDisruptionMeta(effect)
+    const nextEffect: DuelBlasterDisruption = {
+      id: `${effect}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      key: effect,
+      label: meta.label,
+      icon: meta.icon,
+      cloneText: cloneText?.trim() || 'PC 404',
+    }
+    blasterDisruptionRef.current = nextEffect
+    setBlasterDisruption(nextEffect)
+    blasterDisruptionTimerRef.current = window.setTimeout(() => {
+      blasterDisruptionRef.current = null
+      setBlasterDisruption(null)
+      blasterDisruptionTimerRef.current = null
+    }, meta.durationMs)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (blasterDisruptionTimerRef.current !== null) {
+        window.clearTimeout(blasterDisruptionTimerRef.current)
+        blasterDisruptionTimerRef.current = null
+      }
+    }
+  }, [])
+
+  const applyBlasterScoreBroadcast = useCallback((payloadLike: unknown) => {
+    const payload = payloadLike && typeof payloadLike === 'object'
+      ? payloadLike as Partial<BlasterScoreBroadcastPayload>
+      : null
+    const broadcastRoomId = typeof payload?.room_id === 'string' ? payload.room_id : ''
+    const userId = typeof payload?.user_id === 'string' ? payload.user_id : ''
+    if (!payload || broadcastRoomId !== roomId || !userId || userId === currentUserId) return
+
+    const currentRoom = liveRoomRef.current
+    if (!currentRoom || currentRoom.status !== 'in_progress' || currentRoom.game_type !== 'blaster') return
+
+    const nextScore = Number(payload.score)
+    const nextDelta = Number(payload.delta)
+    const nextRound = Number(payload.current_round)
+    const answeredRound = Number(payload.round)
+    const sentAt = Number(payload.sent_at)
+    if (!Number.isFinite(nextScore) || !Number.isFinite(nextRound) || !Number.isFinite(sentAt)) return
+    const safeAnsweredRound = Number.isFinite(answeredRound) ? answeredRound : nextRound - 1
+
+    const latest = latestBlasterBroadcastRef.current[userId]
+    if (
+      latest
+      && (
+        nextRound < latest.currentRound
+        || (nextRound === latest.currentRound && sentAt <= latest.sentAt)
+      )
+    ) {
+      return
+    }
+    latestBlasterBroadcastRef.current[userId] = { currentRound: nextRound, sentAt }
+
+    const totalTimeMs = Number(payload.total_time_ms)
+    const fastestRoundMs = Number(payload.fastest_round_ms)
+    setPlayers((previous) => previous.map((player) => {
+      if (player.user_id !== userId) return player
+      if (nextRound < player.current_round) return player
+      return {
+        ...player,
+        score: nextScore,
+        total_time_ms: Number.isFinite(totalTimeMs) ? Math.max(player.total_time_ms, totalTimeMs) : player.total_time_ms,
+        fastest_round_ms: Number.isFinite(fastestRoundMs) && fastestRoundMs > 0
+          ? player.fastest_round_ms > 0
+            ? Math.min(player.fastest_round_ms, fastestRoundMs)
+            : fastestRoundMs
+          : player.fastest_round_ms,
+        current_round: Math.max(player.current_round, nextRound, safeAnsweredRound + 1),
+        last_seen: new Date(sentAt).toISOString(),
+      }
+    }))
+
+    if (Number.isFinite(nextDelta) && nextDelta !== 0) {
+      setBlasterTugPulse(nextDelta > 0 ? 'miss' : 'pull')
+      if (blasterTugPulseTimerRef.current !== null) {
+        window.clearTimeout(blasterTugPulseTimerRef.current)
+      }
+      blasterTugPulseTimerRef.current = window.setTimeout(() => {
+        setBlasterTugPulse('')
+        blasterTugPulseTimerRef.current = null
+      }, 360)
+    }
+
+    const powerupEffect = typeof payload.powerup_effect === 'string' ? payload.powerup_effect as DuelBlasterDisruptionKey : null
+    if (payload.correct && powerupEffect) {
+      triggerBlasterDisruption(powerupEffect, typeof payload.disguise_code === 'string' ? payload.disguise_code : null)
+    }
+  }, [currentUserId, roomId, triggerBlasterDisruption])
+
+  const applyBlasterPowerupEffectBroadcast = useCallback((payloadLike: unknown) => {
+    const payload = payloadLike && typeof payloadLike === 'object'
+      ? payloadLike as Partial<BlasterPowerupEffectPayload>
+      : null
+    if (!payload || payload.room_id !== roomId || !payload.user_id || payload.user_id === currentUserId) return
+    const currentRoom = liveRoomRef.current
+    if (!currentRoom || currentRoom.status !== 'in_progress' || currentRoom.game_type !== 'blaster') return
+    if (!payload.powerup_effect) return
+    triggerBlasterDisruption(payload.powerup_effect, typeof payload.disguise_code === 'string' ? payload.disguise_code : null)
+  }, [currentUserId, roomId, triggerBlasterDisruption])
+
+  const applyRopeBlasterCloudState = useCallback((payloadLike: unknown) => {
+    const payload = payloadLike && typeof payloadLike === 'object'
+      ? payloadLike as RopeBlasterCloudState
+      : null
+    if (!payload || payload.type !== 'state') return
+
+    const nextSequence = Number(payload.sequence || 0)
+    if (nextSequence > 0 && nextSequence < ropeBlasterSequenceRef.current) return
+    ropeBlasterSequenceRef.current = Math.max(ropeBlasterSequenceRef.current, nextSequence)
+
+    const lastEvent = payload.lastEvent && typeof payload.lastEvent === 'object' ? payload.lastEvent : null
+    const currentRoom = liveRoomRef.current
+    if (!currentRoom || currentRoom.status !== 'in_progress' || currentRoom.game_type !== 'blaster') return
+    const cloudPlayers = Array.isArray(payload.players) ? payload.players : []
+    if (cloudPlayers.length === 0) return
+
+    const byUserId = new Map(cloudPlayers.map((player) => [player.userId, player]))
+    setPlayers((previous) => previous.map((player) => {
+      const cloudPlayer = byUserId.get(player.user_id)
+      if (!cloudPlayer) return player
+
+      const cloudRound = Math.max(1, Math.round(Number(cloudPlayer.currentRound || 1)))
+      if (cloudRound < player.current_round) return player
+
+      const cloudFastest = Number(cloudPlayer.fastestRoundMs || 0)
+      return {
+        ...player,
+        score: Math.round(Number(cloudPlayer.score || 0)),
+        current_round: Math.max(player.current_round, cloudRound),
+        total_time_ms: Math.max(player.total_time_ms, Math.round(Number(cloudPlayer.totalTimeMs || 0))),
+        fastest_round_ms: cloudFastest > 0
+          ? player.fastest_round_ms > 0
+            ? Math.min(player.fastest_round_ms, Math.round(cloudFastest))
+            : Math.round(cloudFastest)
+          : player.fastest_round_ms,
+        last_seen: new Date(Number(payload.serverNow) || Date.now()).toISOString(),
+      }
+    }))
+
+    if (lastEvent?.userId && lastEvent.userId !== currentUserId && Number.isFinite(Number(lastEvent.delta))) {
+      const delta = Number(lastEvent.delta)
+      setBlasterTugPulse(delta > 0 ? 'miss' : 'pull')
+      if (blasterTugPulseTimerRef.current !== null) {
+        window.clearTimeout(blasterTugPulseTimerRef.current)
+      }
+      blasterTugPulseTimerRef.current = window.setTimeout(() => {
+        setBlasterTugPulse('')
+        blasterTugPulseTimerRef.current = null
+      }, 260)
+    }
+
+    if (
+      lastEvent?.userId
+      && lastEvent.userId !== currentUserId
+      && typeof lastEvent.powerupEffect === 'string'
+    ) {
+      triggerBlasterDisruption(lastEvent.powerupEffect as DuelBlasterDisruptionKey, lastEvent.disguiseCode || null)
+    }
+
+    if (payload.ko) {
+      window.setTimeout(() => {
+        void refreshRoomSnapshot()
+      }, 80)
+    }
+  }, [currentUserId, refreshRoomSnapshot, triggerBlasterDisruption])
+
+  const sendRopeBlasterCloudMessage = useCallback((payload: Record<string, unknown>) => {
+    const socket = ropeBlasterSocketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false
+    try {
+      socket.send(JSON.stringify(payload))
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
+  const sendRopeBlasterShot = useCallback((payload: BlasterScoreBroadcastPayload) => {
+    return sendRopeBlasterCloudMessage({
+      type: 'shot',
+      delta: payload.delta,
+      round: payload.round,
+      currentRound: payload.current_round,
+      elapsedMs: payload.elapsed_ms,
+      correct: payload.correct,
+      sentAt: payload.sent_at,
+      powerupKey: payload.powerup_key,
+      powerupEffect: payload.powerup_effect,
+      disguiseCode: payload.disguise_code,
+    })
+  }, [sendRopeBlasterCloudMessage])
+
+  const broadcastBlasterScore = useCallback((payload: BlasterScoreBroadcastPayload) => {
+    if (sendRopeBlasterShot(payload)) return
+    const channel = roomRealtimeChannelRef.current
+    if (!channel) return
+    void channel.send({
+      type: 'broadcast',
+      event: 'blaster-score',
+      payload,
+    })
+  }, [sendRopeBlasterShot])
+
+  const broadcastBlasterPowerupEffect = useCallback((payload: BlasterPowerupEffectPayload) => {
+    const channel = roomRealtimeChannelRef.current
+    if (!channel) return
+    void channel.send({
+      type: 'broadcast',
+      event: 'blaster-powerup-effect',
+      payload,
+    })
+  }, [])
 
   useEffect(() => {
     if (!isSignedIn) return
@@ -1505,21 +2203,40 @@ export function OneVsOnePanel(props: {
   }, [isSignedIn, loadOnlineInviteUsers, showInviteModal])
 
   useEffect(() => {
-    if (inviteGameType === 'matching' && inviteCategory === 'scenarios') {
+    if (inviteGameType !== 'quiz' && inviteCategory === 'scenarios') {
       setInviteCategory('all')
     }
   }, [inviteCategory, inviteGameType])
 
   useEffect(() => {
-    if (!externalJoinRoomId) return
-    if (roomId === externalJoinRoomId) {
-      onExternalJoinHandled?.()
-      return
+    if (selectedGameType !== 'quiz' && selectedCategory === 'scenarios') {
+      setSelectedCategory('all')
     }
-    setRoomId(externalJoinRoomId)
-    setNotice('Invite accepted. Joined 1v1 room.')
-    onExternalJoinHandled?.()
-  }, [externalJoinRoomId, onExternalJoinHandled, roomId])
+  }, [selectedCategory, selectedGameType])
+
+  useEffect(() => {
+    if (invitePreset !== 'rope-blaster') return
+    if (!isSignedIn) return
+    setSelectedGameType('blaster')
+    setSelectedCategory('all')
+    setSelectedPowerupsEnabled(true)
+    setSelectedBlasterMode('timed')
+    setSelectedBlasterDurationSeconds(duelBlasterDefaultDurationSeconds)
+    setSelectedBlasterOvertimeEnabled(duelBlasterDefaultOvertimeEnabled)
+    setSelectedBlasterOvertimeAfterSeconds(duelBlasterDefaultOvertimeAfterSeconds)
+    setInviteGameType('blaster')
+    setInviteCategory('all')
+    setInvitePowerupsEnabled(true)
+    setInviteBlasterMode('timed')
+    setInviteBlasterDurationSeconds(duelBlasterDefaultDurationSeconds)
+    setInviteBlasterOvertimeEnabled(duelBlasterDefaultOvertimeEnabled)
+    setInviteBlasterOvertimeAfterSeconds(duelBlasterDefaultOvertimeAfterSeconds)
+    setShowInviteModal(true)
+    setError('')
+    setNotice('')
+    void loadOnlineInviteUsers()
+    onInvitePresetHandled?.()
+  }, [invitePreset, isSignedIn, loadOnlineInviteUsers, onInvitePresetHandled])
 
   useEffect(() => {
     if (!roomId || !isSignedIn) return
@@ -1567,10 +2284,20 @@ export function OneVsOnePanel(props: {
     const channel = client
       .channel(`room-${roomId}`, {
         config: {
+          broadcast: {
+            self: false,
+            ack: false,
+          },
           presence: {
             key: currentUserId,
           },
         },
+      })
+      .on('broadcast', { event: 'blaster-score' }, ({ payload }) => {
+        applyBlasterScoreBroadcast(payload)
+      })
+      .on('broadcast', { event: 'blaster-powerup-effect' }, ({ payload }) => {
+        applyBlasterPowerupEffectBroadcast(payload)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, () => {
         void refreshRoomSnapshot()
@@ -1601,6 +2328,7 @@ export function OneVsOnePanel(props: {
 
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
+        roomRealtimeChannelRef.current = channel
         void channel.track({
           user_id: currentUserId,
           online_at: new Date().toISOString(),
@@ -1609,9 +2337,12 @@ export function OneVsOnePanel(props: {
     })
 
     return () => {
+      if (roomRealtimeChannelRef.current === channel) {
+        roomRealtimeChannelRef.current = null
+      }
       void client.removeChannel(channel)
     }
-  }, [currentUserId, isSignedIn, loadWaitingChatMessages, refreshRoomSnapshot, roomId])
+  }, [applyBlasterPowerupEffectBroadcast, applyBlasterScoreBroadcast, currentUserId, isSignedIn, loadWaitingChatMessages, refreshRoomSnapshot, roomId])
 
   useEffect(() => {
     const client = supabase
@@ -1669,12 +2400,55 @@ export function OneVsOnePanel(props: {
 
   const roundIndex = Math.max(0, currentRoundNumber - 1)
   const currentRound = roundList[roundIndex]
-  const currentRoundPayloadNumber = isQuizRound(currentRound) || isMatchingRound(currentRound)
+  const currentRoundPayloadNumber = isQuizRound(currentRound) || isMatchingRound(currentRound) || isBlasterRound(currentRound)
     ? currentRound.round
     : currentRoundNumber
   const initializedRoundKey = room && myPlayer
     ? `${room.id}:${room.game_type}:${room.status}:${room.started_at || ''}:${myPlayer.current_round}:${currentRoundPayloadNumber}`
     : ''
+
+  useEffect(() => {
+    if (isBlasterRound(currentRound)) {
+      blasterMotionRoundRef.current = currentRound.round
+      const visualRoundKey = `${room?.id || 'room'}:${currentRound.round}`
+      setBlasterVisibleTargets((previousTargets) => {
+        if (blasterVisibleRoundKeyRef.current === visualRoundKey && previousTargets.length > 0) {
+          return previousTargets
+        }
+
+        const replacementIndex = blasterPendingReplacementIndexRef.current
+        const shouldStartFresh = previousTargets.length === 0
+          || previousTargets.length !== currentRound.targets.length
+          || currentRound.round <= 1
+          || !blasterVisibleRoundKeyRef.current.startsWith(`${room?.id || 'room'}:`)
+
+        if (shouldStartFresh) {
+          const nextRoundTargets = currentRound.targets.map((target) => String(target)).filter((target) => target.trim().length > 0)
+          blasterVisibleRoundKeyRef.current = visualRoundKey
+          blasterPendingReplacementIndexRef.current = null
+          return nextRoundTargets
+        }
+
+        const nextTargets = buildBlasterVisibleTargetsForRound(previousTargets, currentRound, replacementIndex)
+        blasterVisibleRoundKeyRef.current = visualRoundKey
+        blasterPendingReplacementIndexRef.current = null
+        return nextTargets
+      })
+      return
+    }
+    blasterMotionRoundRef.current = 0
+    blasterMotionTargetsRef.current = []
+    blasterRespawnTargetIndexRef.current = null
+    blasterPendingReplacementIndexRef.current = null
+    blasterVisibleRoundKeyRef.current = ''
+    setBlasterVisibleTargets([])
+  }, [currentRound, room?.id])
+
+  useEffect(() => {
+    blasterVisibleTargetsRef.current = blasterVisibleTargets
+    blasterMotionTargetsRef.current = blasterVisibleTargets
+  }, [blasterVisibleTargets])
+
   const countdownSeconds = 3
   const serverStartRemainingMs = useMemo(() => {
     if (!room || room.status !== 'in_progress') return 0
@@ -1708,65 +2482,6 @@ export function OneVsOnePanel(props: {
     return () => window.clearInterval(timer)
   }, [countdownActive, currentRoomStatus, isSignedIn, myPlayerFinishedMatch, refreshRoomSnapshot, roomId])
 
-  useEffect(() => {
-    if (!room || !room.rematch_room_id || room.rematch_room_id === roomId) return
-    if (room.status !== 'completed' && room.status !== 'cancelled') return
-    initializedRoundKeyRef.current = ''
-    roundStartedAtRef.current = 0
-    autoForfeitRoundKeyRef.current = ''
-    rematchHandoffRoomIdRef.current = room.rematch_room_id
-    setNotice(room.status === 'completed'
-      ? 'Rematch accepted. Moving into the new room…'
-      : 'Match is starting in a fresh room…')
-    setRoomId(room.rematch_room_id)
-    setRoom(null)
-    setPlayers([])
-    setResults([])
-  }, [room, roomId])
-
-  useEffect(() => {
-    if (!room || !rematchHandoffRoomIdRef.current || room.id !== rematchHandoffRoomIdRef.current) return
-    if (room.status === 'completed' || room.status === 'cancelled' || players.length >= 2) return
-
-    const abandonedRoomId = room.id
-    rematchHandoffRoomIdRef.current = ''
-    initializedRoundKeyRef.current = ''
-    autoForfeitRoundKeyRef.current = ''
-    roundStartedAtRef.current = 0
-    quizSpamHistoryRef.current = []
-    quizSpamStrikeRef.current = 0
-    previousPlayersRef.current = []
-    previousRoomStatusRef.current = null
-    activityBootstrappedRef.current = false
-
-    setRoomId(null)
-    setRoom(null)
-    setPlayers([])
-    setResults([])
-    setRoundStartedAt(0)
-    setQuizChoice(null)
-    setQuizLocked(false)
-    setMatchingCards([])
-    setSelectedMatchingCards([])
-    setWrongMatchingCardIds([])
-    setMatchedPairIds([])
-    setMatchingMistakes(0)
-    setMatchingRoundPoints(0)
-    setMatchingSubmitted(false)
-    setRematchLoading(false)
-    setError('')
-    setNotice('Opponent left the rematch. Rematch cancelled.')
-
-    if (supabase) {
-      void supabase.rpc('leave_1v1_room', { p_room_id: abandonedRoomId })
-        .then(({ error: rpcError }) => {
-          if (!rpcError) return
-          console.warn('[1v1] Could not leave abandoned rematch room:', rpcError.message)
-        })
-    }
-    void loadPublicRooms()
-  }, [loadPublicRooms, players.length, room])
-
   const canStartRound = Boolean(
     room
     && myPlayer
@@ -1794,7 +2509,7 @@ export function OneVsOnePanel(props: {
         : player.fastest_round_ms
       return {
         ...player,
-        score: player.score + Math.max(0, params.points),
+        score: player.score + params.points,
         total_time_ms: player.total_time_ms + safeElapsedMs,
         fastest_round_ms: nextFastest,
         current_round: nextRound,
@@ -1833,6 +2548,11 @@ export function OneVsOnePanel(props: {
         if (room?.status === 'in_progress' && room.game_type === 'matching') {
           setMatchingSubmitted(false)
         }
+        if (room?.status === 'in_progress' && room.game_type === 'blaster') {
+          setBlasterLocked(false)
+          setBlasterChoice(null)
+          setBlasterChoiceRound(null)
+        }
         void refreshRoomSnapshot()
         return
       }
@@ -1851,7 +2571,9 @@ export function OneVsOnePanel(props: {
             if (!current) return null
             const nextPlayer: DuelRoomPlayerRow = {
               ...current,
-              score: Math.max(Number(value.score || 0), current.score || 0),
+              score: Number.isFinite(Number(value.score))
+                ? Number(value.score)
+                : current.score || 0,
               total_time_ms: Math.max(Number(value.total_time_ms || 0), current.total_time_ms || 0),
               fastest_round_ms: Number(value.fastest_round_ms || current.fastest_round_ms || 0),
               current_round: Math.max(Number(value.current_round || 1), current.current_round || 1),
@@ -1896,6 +2618,11 @@ export function OneVsOnePanel(props: {
         setQuizLocked(false)
         setQuizChoice(null)
       }
+      if (room?.status === 'in_progress' && room.game_type === 'blaster' && selfAdvanced) {
+        setBlasterLocked(false)
+        setBlasterChoice(null)
+        setBlasterChoiceRound(null)
+      }
 
       window.setTimeout(() => {
         void refreshRoomSnapshot()
@@ -1921,10 +2648,15 @@ export function OneVsOnePanel(props: {
           setQuizLocked(false)
           setQuizChoice(null)
         }
-        if (room?.status === 'in_progress' && room.game_type === 'matching') {
-          setMatchingSubmitted(false)
-        }
-        void refreshRoomSnapshot()
+      if (room?.status === 'in_progress' && room.game_type === 'matching') {
+        setMatchingSubmitted(false)
+      }
+      if (room?.status === 'in_progress' && room.game_type === 'blaster') {
+        setBlasterLocked(false)
+        setBlasterChoice(null)
+        setBlasterChoiceRound(null)
+      }
+      void refreshRoomSnapshot()
       })
       .finally(() => {
         setSubmittingRound(false)
@@ -1933,7 +2665,7 @@ export function OneVsOnePanel(props: {
     await roundSubmitQueueRef.current
   }, [currentUserId, refreshRoomSnapshot, room?.game_type, room?.rounds, room?.status, roomId])
 
-  const triggerAutoForfeit = useCallback(async (roundKey: string, reason: 'question' | 'matching' = 'question') => {
+  const triggerAutoForfeit = useCallback(async (roundKey: string, reason: 'question' | 'matching' | 'blaster' = 'question') => {
     if (!supabase || !roomId || !roundKey || !room || !myPlayer) return
     if (room.status !== 'in_progress' || myPlayer.current_round > room.rounds) {
       void refreshRoomSnapshot()
@@ -1945,6 +2677,8 @@ export function OneVsOnePanel(props: {
     setNotice(
       reason === 'matching'
         ? '30-second round limit reached. You forfeited the match.'
+        : reason === 'blaster'
+          ? 'Blaster shot timer reached zero. You forfeited the match.'
         : `${quizRoundTimeLimitLabel} question limit reached. You forfeited the match.`,
     )
 
@@ -1959,6 +2693,20 @@ export function OneVsOnePanel(props: {
 
     void refreshRoomSnapshot()
   }, [myPlayer, quizRoundTimeLimitLabel, refreshRoomSnapshot, room, roomId])
+
+  const finishBlasterByTimeout = useCallback(async () => {
+    if (!supabase || !roomId) return
+    const { error: rpcError } = await supabase.rpc('finish_1v1_blaster_timeout', { p_room_id: roomId })
+    if (rpcError) {
+      const normalized = String(rpcError.message || '').toLowerCase()
+      if (!normalized.includes('countdown') && !normalized.includes('not active') && !normalized.includes('completed')) {
+        setError(rpcError.message || 'Could not finish blaster match.')
+      }
+      return
+    }
+    setNotice('Time expired. Final tug score locked.')
+    void refreshRoomSnapshot()
+  }, [refreshRoomSnapshot, roomId])
 
   const submitQuizAnswer = useCallback((choiceIndex: number) => {
     if (!room || room.status !== 'in_progress' || room.game_type !== 'quiz') return
@@ -2033,6 +2781,173 @@ export function OneVsOnePanel(props: {
     triggerAutoForfeit,
   ])
 
+  const triggerBlasterShotBurst = useCallback((event: MouseEvent<HTMLButtonElement>, tone: BlasterShotBurst['tone']) => {
+    const targetBounds = event.currentTarget.getBoundingClientRect()
+    const burstId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+    const nextBurst: BlasterShotBurst = {
+      id: burstId,
+      tone,
+      x: targetBounds.left + targetBounds.width / 2,
+      y: targetBounds.top + targetBounds.height / 2,
+    }
+
+    setBlasterShotBursts((previous) => [...previous.slice(-5), nextBurst])
+    window.setTimeout(() => {
+      setBlasterShotBursts((previous) => previous.filter((burst) => burst.id !== burstId))
+    }, 820)
+  }, [])
+
+  const triggerBlasterTugPulse = useCallback((tone: 'pull' | 'miss') => {
+    if (blasterTugPulseTimerRef.current !== null) {
+      window.clearTimeout(blasterTugPulseTimerRef.current)
+    }
+    setBlasterTugPulse(tone)
+    blasterTugPulseTimerRef.current = window.setTimeout(() => {
+      setBlasterTugPulse('')
+      blasterTugPulseTimerRef.current = null
+    }, tone === 'pull' ? 520 : 420)
+  }, [])
+
+  const submitBlasterAnswer = useCallback((targetIndex: number, event?: MouseEvent<HTMLButtonElement>) => {
+    if (!room || room.status !== 'in_progress' || room.game_type !== 'blaster') return
+    if (!canStartRound || !isBlasterRound(currentRound) || blasterLocked) return
+
+    const startedAt = roundStartedAtRef.current || roundStartedAt
+    if (startedAt <= 0 || initializedRoundKeyRef.current !== initializedRoundKey) return
+
+    const selectedTarget = blasterVisibleTargetsRef.current[targetIndex] || currentRound.targets[targetIndex] || ''
+    const correctCode = getBlasterRoundCorrectCode(currentRound)
+    const correct = normalizeBlasterTarget(selectedTarget) === normalizeBlasterTarget(correctCode)
+    const elapsedMs = Math.max(0, Date.now() - startedAt)
+    const powerup = duelBlasterPowerupForRound(currentRound.round, Boolean(room.settings?.powerups_enabled), getBlasterMode(room.settings))
+    const powerupEffect = correct ? duelBlasterDisruptionForPowerup(powerup) : null
+    const nextStreak = correct ? blasterStreak + 1 : powerup?.key === 'donut' || powerup?.key === 'vest' ? blasterStreak : 0
+    let streakBonus = correct ? Math.min(80, Math.floor(nextStreak / 3) * 20) : 0
+    if (correct && powerup?.key === 'radio') {
+      streakBonus *= 2
+    }
+    const quickDrawBonus = correct && powerup?.key === 'coffee' && getBlasterMode(room.settings) === 'timed' && elapsedMs <= 4000 ? 75 : 0
+    const backupBonus = correct && powerup?.key === 'backup' ? 65 : 0
+    const evidenceBonus = correct && powerup?.key === 'evidence' ? Math.min(90, Math.max(30, Math.floor(nextStreak / 2) * 30)) : 0
+    const basePoints = correct ? powerup?.points || 120 : 0
+    const missPenalty = powerup?.key === 'vest' ? 35 : duelBlasterMissPenalty
+    const points = correct ? basePoints + streakBonus + quickDrawBonus + backupBonus + evidenceBonus : -missPenalty
+    const selfPlayer = livePlayersRef.current.find((player) => player.user_id === currentUserId)
+    const nextSelfCurrentRound = Math.max(
+      selfPlayer?.current_round || 1,
+      Math.min(room.rounds + 1, currentRound.round + 1),
+    )
+    const nextSelfScore = (selfPlayer?.score || 0) + points
+    const nextSelfTotalTimeMs = (selfPlayer?.total_time_ms || 0) + elapsedMs
+    const nextSelfFastestMs = elapsedMs > 0
+      ? selfPlayer?.fastest_round_ms && selfPlayer.fastest_round_ms > 0
+        ? Math.min(selfPlayer.fastest_round_ms, elapsedMs)
+        : elapsedMs
+      : selfPlayer?.fastest_round_ms || 0
+    const bonusNotes = [
+      quickDrawBonus > 0 ? 'coffee speed bonus' : '',
+      backupBonus > 0 ? 'backup shove' : '',
+      evidenceBonus > 0 ? 'evidence chain' : '',
+      powerup?.key === 'clone' && powerupEffect ? 'clone jammer' : '',
+      powerup?.key === 'paperwork' && powerupEffect ? 'paperwork storm' : '',
+      powerup?.key === 'spikes' && powerupEffect ? 'pursuit panic' : '',
+      powerup?.key === 'radar' ? 'spotlight sweep' : '',
+      streakBonus > 0 ? `${powerup?.key === 'radio' ? 'double ' : ''}streak bonus` : '',
+    ].filter(Boolean)
+
+    markStudyActivity()
+    if (event) triggerBlasterShotBurst(event, correct ? (powerup ? 'power' : 'good') : 'bad')
+    triggerBlasterTugPulse(correct ? 'pull' : 'miss')
+    blasterRespawnTargetIndexRef.current = targetIndex
+    blasterPendingReplacementIndexRef.current = targetIndex
+    setBlasterChoice(targetIndex)
+    setBlasterChoiceRound(currentRound.round)
+    setBlasterLocked(true)
+    setBlasterStreak(nextStreak)
+    setBlasterFeedback(correct
+      ? `${powerup ? `${powerup.icon} ${powerup.label}! ` : ''}+${points} tug pressure${bonusNotes.length ? ` (${bonusNotes.join(', ')})` : ''}`
+      : `${powerup?.key === 'donut' ? '🍩 Donut Armor saved your streak. ' : ''}${powerup?.key === 'vest' ? '🦺 Vest absorbed most of it. ' : ''}-${missPenalty} tug pressure. Correct target: ${correctCode}`)
+    if (currentUserId && powerup && powerupEffect) {
+      broadcastBlasterPowerupEffect({
+        room_id: room.id,
+        user_id: currentUserId,
+        powerup_key: powerup.key,
+        powerup_effect: powerupEffect,
+        disguise_code: selectedTarget || correctCode,
+        sent_at: Date.now(),
+      })
+    }
+
+    if (currentRound.round < room.rounds) {
+      const nextRound = roundList[currentRound.round]
+      if (isBlasterRound(nextRound)) {
+        const previousVisibleTargets = blasterVisibleTargetsRef.current.length > 0
+          ? blasterVisibleTargetsRef.current
+          : currentRound.targets.map((target) => String(target))
+        const nextVisibleTargets = buildBlasterVisibleTargetsForRound(previousVisibleTargets, nextRound, targetIndex)
+        const nextVisualRoundKey = `${room.id}:${nextRound.round}`
+        blasterVisibleTargetsRef.current = nextVisibleTargets
+        blasterMotionTargetsRef.current = nextVisibleTargets
+        blasterMotionRoundRef.current = nextRound.round
+        blasterVisibleRoundKeyRef.current = nextVisualRoundKey
+        blasterPendingReplacementIndexRef.current = null
+        setBlasterVisibleTargets(nextVisibleTargets)
+      }
+      window.setTimeout(() => {
+        setBlasterChoice(null)
+        setBlasterChoiceRound(null)
+        setBlasterLocked(false)
+        setBlasterFeedback('')
+      }, correct ? 360 : 560)
+    }
+
+    applyOptimisticRoundAdvance({ round: currentRound.round, points, elapsedMs })
+    if (currentUserId) {
+      broadcastBlasterScore({
+        room_id: room.id,
+        user_id: currentUserId,
+        score: nextSelfScore,
+        delta: points,
+        round: currentRound.round,
+        current_round: nextSelfCurrentRound,
+        total_time_ms: nextSelfTotalTimeMs,
+        fastest_round_ms: nextSelfFastestMs,
+        correct,
+        sent_at: Date.now(),
+        elapsed_ms: elapsedMs,
+        powerup_key: powerup?.key || null,
+        powerup_effect: powerupEffect,
+        disguise_code: selectedTarget || correctCode,
+      })
+    }
+
+    void submitRound({
+      round: currentRound.round,
+      correct,
+      elapsedMs,
+      points,
+    })
+  }, [
+    applyOptimisticRoundAdvance,
+    blasterLocked,
+    blasterStreak,
+    broadcastBlasterPowerupEffect,
+    broadcastBlasterScore,
+    canStartRound,
+    currentRound,
+    currentUserId,
+    initializedRoundKey,
+    markStudyActivity,
+    room,
+    roundList,
+    roundStartedAt,
+    submitRound,
+    triggerBlasterShotBurst,
+    triggerBlasterTugPulse,
+  ])
+
   useEffect(() => {
     if (!room || !myPlayer || !canStartRound) return
     if (!initializedRoundKey) return
@@ -2056,6 +2971,12 @@ export function OneVsOnePanel(props: {
     setMatchingRoundPoints(0)
     setMatchingSubmitted(false)
     setMatchingCards([])
+    setBlasterChoice(null)
+    setBlasterChoiceRound(null)
+    setBlasterLocked(false)
+    setBlasterFeedback('')
+    setBlasterShotBursts([])
+    setBlasterTugPulse('')
 
     if (room.game_type === 'matching' && isMatchingRound(currentRound)) {
       const cards = currentRound.pairs.flatMap((pair) => ([
@@ -2092,18 +3013,93 @@ export function OneVsOnePanel(props: {
     setMatchingRoundPoints(0)
     setMatchingSubmitted(false)
     setMatchingCards([])
+    setBlasterChoice(null)
+    setBlasterChoiceRound(null)
+    setBlasterLocked(false)
+    setBlasterStreak(0)
+    setBlasterFeedback('')
+    setBlasterShotBursts([])
+    setBlasterTugPulse('')
   }, [currentRoomStatus, room?.id])
+
+  const enterFreshRoom = useCallback((nextRoomId: string) => {
+    activeRoomIdRef.current = nextRoomId
+    refreshInFlightRef.current = false
+    refreshQueuedRef.current = false
+    initializedRoundKeyRef.current = ''
+    autoForfeitRoundKeyRef.current = ''
+    roundStartedAtRef.current = 0
+    quizSpamHistoryRef.current = []
+    quizSpamStrikeRef.current = 0
+    previousPlayersRef.current = []
+    previousRoomStatusRef.current = null
+    activityBootstrappedRef.current = false
+    setRoomId(nextRoomId)
+    setRoom(null)
+    setPlayers([])
+    setResults([])
+    setRoundStartedAt(0)
+    setQuizChoice(null)
+    setQuizLocked(false)
+    setMatchingCards([])
+    setSelectedMatchingCards([])
+    setWrongMatchingCardIds([])
+    setMatchedPairIds([])
+    setMatchingMistakes(0)
+    setMatchingRoundPoints(0)
+    setMatchingSubmitted(false)
+    setBlasterChoice(null)
+    setBlasterChoiceRound(null)
+    setBlasterLocked(false)
+    setBlasterStreak(0)
+    setBlasterFeedback('')
+    setBlasterShotBursts([])
+    setBlasterTugPulse('')
+    if (blasterDisruptionTimerRef.current !== null) {
+      window.clearTimeout(blasterDisruptionTimerRef.current)
+      blasterDisruptionTimerRef.current = null
+    }
+    blasterDisruptionRef.current = null
+    setBlasterDisruption(null)
+    setWaitingChatMessages([])
+    setWaitingChatInput('')
+    setWaitingChatSending(false)
+    setActivityLog([])
+  }, [])
+
+  useEffect(() => {
+    if (!externalJoinRoomId) return
+    if (roomId === externalJoinRoomId && room?.id === externalJoinRoomId) {
+      onExternalJoinHandled?.()
+      return
+    }
+    enterFreshRoom(externalJoinRoomId)
+    setNotice('Invite accepted. Joined 1v1 room.')
+    onExternalJoinHandled?.()
+  }, [enterFreshRoom, externalJoinRoomId, onExternalJoinHandled, room?.id, roomId])
 
   const createRoom = async () => {
     if (!supabase || !isSignedIn) return
     setLoading(true)
     setError('')
     setNotice('')
-    const { data, error: rpcError } = await supabase.rpc('create_1v1_room', {
+    const { data, error: rpcError } = await supabase.rpc('create_1v1_room_v2', {
       p_game_type: selectedGameType,
       p_category: selectedCategory,
       p_is_public: isPublicRoom,
-      p_rounds: selectedGameType === 'quiz' ? selectedQuizRounds : 5,
+      p_rounds: selectedGameType === 'matching'
+        ? 5
+        : selectedGameType === 'blaster'
+          ? duelBlasterRoundCap
+          : selectedQuizRounds,
+      p_powerups_enabled: selectedGameType === 'blaster' ? selectedPowerupsEnabled : false,
+      p_blaster_duration_seconds: selectedGameType === 'blaster'
+        ? selectedBlasterDurationSeconds
+        : duelBlasterDefaultDurationSeconds,
+      p_blaster_sudden_death: selectedGameType === 'blaster' && selectedBlasterMode === 'death',
+      p_blaster_rope_limit: duelBlasterDefaultRopeLimit,
+      p_blaster_overtime_enabled: selectedGameType === 'blaster' ? selectedBlasterOvertimeEnabled : duelBlasterDefaultOvertimeEnabled,
+      p_blaster_overtime_after_seconds: selectedGameType === 'blaster' ? selectedBlasterOvertimeAfterSeconds : duelBlasterDefaultOvertimeAfterSeconds,
     })
     setLoading(false)
     if (rpcError) {
@@ -2116,17 +3112,26 @@ export function OneVsOnePanel(props: {
       return
     }
     setShowCreateRoomModal(false)
-    setRoomId(nextRoomId)
+    enterFreshRoom(nextRoomId)
     setNotice('Room created. Waiting for opponent.')
   }
 
-  const openInviteModal = () => {
-    setInviteGameType(selectedGameType)
-    setInviteCategory(selectedCategory)
-    setInviteQuizRounds(selectedQuizRounds)
+  const openInviteModal = (sourceRoom?: DuelRoomRow | null) => {
+    const sourceGameType = sourceRoom?.game_type || selectedGameType
+    const sourceCategory = sourceRoom?.category || selectedCategory
+    const sourceSettings = sourceRoom?.settings || null
+    setInviteGameType(sourceGameType)
+    setInviteCategory(sourceGameType !== 'quiz' && sourceCategory === 'scenarios' ? 'all' : sourceCategory)
+    setInviteQuizRounds(sourceGameType === 'quiz' ? sourceRoom?.rounds || selectedQuizRounds : selectedQuizRounds)
+    setInvitePowerupsEnabled(sourceGameType === 'blaster' ? Boolean(sourceSettings?.powerups_enabled ?? selectedPowerupsEnabled) : selectedPowerupsEnabled)
+    setInviteBlasterMode(sourceGameType === 'blaster' ? getBlasterMode(sourceSettings) : selectedBlasterMode)
+    setInviteBlasterDurationSeconds(sourceGameType === 'blaster' ? getBlasterDurationSeconds(sourceSettings) : selectedBlasterDurationSeconds)
+    setInviteBlasterOvertimeEnabled(sourceGameType === 'blaster' ? getBlasterOvertimeEnabled(sourceSettings) : selectedBlasterOvertimeEnabled)
+    setInviteBlasterOvertimeAfterSeconds(sourceGameType === 'blaster' ? getBlasterOvertimeAfterSeconds(sourceSettings) : selectedBlasterOvertimeAfterSeconds)
     setShowInviteModal(true)
     setError('')
     setNotice('')
+    void loadOnlineInviteUsers()
   }
 
   const broadcastInviteCreated = useCallback(async (payload: {
@@ -2136,7 +3141,7 @@ export function OneVsOnePanel(props: {
   }) => {
     if (!supabase) return
 
-    const broadcastChannel = supabase.channel(`duel-invite-broadcast-send-${payload.inviteId || Date.now().toString()}`)
+    const broadcastChannel = supabase.channel('duel-invite-broadcast')
 
     try {
       await new Promise<void>((resolve) => {
@@ -2174,19 +3179,31 @@ export function OneVsOnePanel(props: {
     } finally {
       await supabase.removeChannel(broadcastChannel)
     }
-  }, [currentUserId, supabase])
+  }, [currentUserId])
 
   const sendInvite = async (targetUser: OnlineInviteUser) => {
     if (!supabase || !isSignedIn) return
     setInviteSendingUserId(targetUser.user_id)
     setError('')
     setNotice('')
-    const inviteRounds = inviteGameType === 'quiz' ? inviteQuizRounds : 5
-    const { data, error: rpcError } = await supabase.rpc('create_1v1_invite', {
+    const inviteRounds = inviteGameType === 'matching'
+      ? 5
+      : inviteGameType === 'blaster'
+        ? duelBlasterRoundCap
+        : inviteQuizRounds
+    const { data, error: rpcError } = await supabase.rpc('create_1v1_invite_v2', {
       p_target_user_id: targetUser.user_id,
       p_game_type: inviteGameType,
       p_category: inviteCategory,
       p_rounds: inviteRounds,
+      p_powerups_enabled: inviteGameType === 'blaster' ? invitePowerupsEnabled : false,
+      p_blaster_duration_seconds: inviteGameType === 'blaster'
+        ? inviteBlasterDurationSeconds
+        : duelBlasterDefaultDurationSeconds,
+      p_blaster_sudden_death: inviteGameType === 'blaster' && inviteBlasterMode === 'death',
+      p_blaster_rope_limit: duelBlasterDefaultRopeLimit,
+      p_blaster_overtime_enabled: inviteGameType === 'blaster' ? inviteBlasterOvertimeEnabled : duelBlasterDefaultOvertimeEnabled,
+      p_blaster_overtime_after_seconds: inviteGameType === 'blaster' ? inviteBlasterOvertimeAfterSeconds : duelBlasterDefaultOvertimeAfterSeconds,
     })
     setInviteSendingUserId(null)
     if (rpcError) {
@@ -2212,7 +3229,7 @@ export function OneVsOnePanel(props: {
     })
 
     setShowInviteModal(false)
-    setRoomId(nextRoomId)
+    enterFreshRoom(nextRoomId)
     setNotice(`Invite sent to ${targetUser.username}. Waiting for response.`)
   }
 
@@ -2263,6 +3280,10 @@ export function OneVsOnePanel(props: {
     if (!supabase || !roomId) return
     setError('')
     const previousRoomStatus = room?.status
+    if (previousRoomStatus === 'completed' || previousRoomStatus === 'cancelled') {
+      setNotice('Start a new game from the results screen to play again.')
+      return
+    }
     const { data, error: rpcError } = await supabase.rpc('set_1v1_ready', { p_room_id: roomId, p_ready: ready })
     if (rpcError) {
       setError(rpcError.message || 'Could not update ready status.')
@@ -2270,16 +3291,9 @@ export function OneVsOnePanel(props: {
     }
 
     const state = parseReadyRpcState(data)
-    if (state.rematch_cancelled) {
-      rematchHandoffRoomIdRef.current = ''
-      setRematchLoading(false)
-      setNotice(state.message || 'Opponent left the rematch. Rematch cancelled.')
-      void refreshRoomSnapshot()
-      return
-    }
     const nextRoomId = state.room_id || roomId
     const switchingRooms = Boolean(nextRoomId && nextRoomId !== roomId)
-    if ((state.status === 'in_progress' || state.rematch_started) && roomId) {
+    if (state.status === 'in_progress' && roomId) {
       const nextStartedAt = state.started_at || new Date(Date.now() + 4000).toISOString()
       setRoom((previous) => previous && previous.id === roomId
         ? {
@@ -2292,14 +3306,13 @@ export function OneVsOnePanel(props: {
       setPlayers((previous) => previous.map((player) => ({
         ...player,
         is_ready: false,
-        current_round: state.rematch_started ? 1 : player.current_round,
+        current_round: player.current_round,
       })))
     }
     if (switchingRooms && nextRoomId) {
       initializedRoundKeyRef.current = ''
       roundStartedAtRef.current = 0
       autoForfeitRoundKeyRef.current = ''
-      rematchHandoffRoomIdRef.current = nextRoomId
       setRoomId(nextRoomId)
       setRoom(null)
       setPlayers([])
@@ -2309,38 +3322,6 @@ export function OneVsOnePanel(props: {
       void refreshRoomSnapshot()
       window.setTimeout(() => void refreshRoomSnapshot(), 250)
       window.setTimeout(() => void refreshRoomSnapshot(), 900)
-    }
-
-    if (state.rematch_started) {
-      initializedRoundKeyRef.current = ''
-      roundStartedAtRef.current = 0
-      autoForfeitRoundKeyRef.current = ''
-      quizSpamHistoryRef.current = []
-      quizSpamStrikeRef.current = 0
-      setRoundStartedAt(0)
-      setQuizChoice(null)
-      setQuizLocked(false)
-      setSelectedMatchingCards([])
-      setWrongMatchingCardIds([])
-      setMatchedPairIds([])
-      setMatchingMistakes(0)
-      setMatchingRoundPoints(0)
-      setMatchingSubmitted(false)
-      setMatchingCards([])
-      setNotice(nextRoomId && nextRoomId !== roomId
-        ? 'Rematch accepted. Moving both players into a fresh room…'
-        : 'Syncing rematch with your opponent…')
-      return
-    }
-
-    if (previousRoomStatus === 'completed' || state.status === 'completed') {
-      if (ready) {
-        const readyCount = state.ready_count ?? 1
-        setNotice(`${Math.min(2, Math.max(0, readyCount))}/2 agreed. Waiting for opponent…`)
-      } else {
-        setNotice('Rematch vote removed.')
-      }
-      return
     }
 
     if ((previousRoomStatus === 'waiting' || state.status === 'waiting') && ready && state.player_count === 2 && state.ready_count === 2) {
@@ -2398,12 +3379,12 @@ export function OneVsOnePanel(props: {
     const remainingMs = quizRoundTimeLimitMs - elapsedMs
 
     if (remainingMs <= 0) {
-      void triggerAutoForfeit(roundKey, 'question')
+      void triggerAutoForfeit(roundKey, 'blaster')
       return
     }
 
     const timer = window.setTimeout(() => {
-      void triggerAutoForfeit(roundKey, 'question')
+      void triggerAutoForfeit(roundKey, 'blaster')
     }, remainingMs)
 
     return () => window.clearTimeout(timer)
@@ -2453,6 +3434,32 @@ export function OneVsOnePanel(props: {
     room,
     roundStartedAt,
     triggerAutoForfeit,
+  ])
+
+  useEffect(() => {
+    if (!room || !myPlayer || room.status !== 'in_progress' || room.game_type !== 'blaster') return
+    if (isSpectator || countdownActive || getBlasterMode(room.settings) === 'death') return
+    const startedAtMs = room.started_at ? Date.parse(room.started_at) : NaN
+    if (!Number.isFinite(startedAtMs) || hudNow < startedAtMs) return
+
+    const remainingMs = startedAtMs + (getBlasterDurationSeconds(room.settings) * 1000) - hudNow
+    if (remainingMs <= 0) {
+      void finishBlasterByTimeout()
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      void finishBlasterByTimeout()
+    }, remainingMs)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    countdownActive,
+    finishBlasterByTimeout,
+    hudNow,
+    isSpectator,
+    myPlayer,
+    room,
   ])
 
   useEffect(() => {
@@ -2523,8 +3530,13 @@ export function OneVsOnePanel(props: {
     setMatchingMistakes(0)
     setMatchingRoundPoints(0)
     setMatchingSubmitted(false)
-    setRematchLoading(false)
-    rematchHandoffRoomIdRef.current = ''
+    setBlasterChoice(null)
+    setBlasterChoiceRound(null)
+    setBlasterLocked(false)
+    setBlasterStreak(0)
+    setBlasterFeedback('')
+    setBlasterShotBursts([])
+    setBlasterTugPulse('')
     setWaitingChatMessages([])
     setWaitingChatInput('')
     setWaitingChatSending(false)
@@ -2629,14 +3641,6 @@ export function OneVsOnePanel(props: {
     }
   }, [leaveRoom, loadPublicRooms, roomId])
 
-  const toggleRematchVote = async () => {
-    if (!room || room.status !== 'completed') return
-    const nextReadyState = !myPlayer?.is_ready
-    setRematchLoading(true)
-    await setReady(nextReadyState)
-    setRematchLoading(false)
-  }
-
   const roomPlayerRowsSorted = useMemo(() => {
     if (room?.status === 'completed' && results.length > 0) {
       return [...results].sort((left, right) => left.placement - right.placement)
@@ -2652,19 +3656,8 @@ export function OneVsOnePanel(props: {
   const opponentResultRow = useMemo(() => roomPlayerRowsSorted.find((entry) => entry.user_id !== currentUserId) || null, [currentUserId, roomPlayerRowsSorted])
 
   const lobbyReadyCount = players.filter((player) => player.is_ready).length
-  const rematchReadyCount = room?.status === 'completed' ? players.filter((player) => player.is_ready).length : 0
-  const myRematchRequested = room?.status === 'completed' ? Boolean(myPlayer?.is_ready) : false
-  const rematchStatusText = room?.status === 'completed'
-    ? players.length < 2
-      ? 'Opponent exited this match. Start a new 1v1 when they are back.'
-      : rematchReadyCount >= 2
-      ? '2/2 agreed. Starting rematch…'
-      : rematchReadyCount === 1
-        ? '1/2 agreed. Waiting for opponent…'
-        : 'Both players must agree to start a rematch.'
-    : ''
   const waitingChatSendDisabled = waitingChatSending || !waitingChatInput.trim() || !room || room.status !== 'waiting'
-  const inviteGameLabel = inviteGameType === 'quiz' ? 'Quiz' : 'Matching'
+  const inviteGameLabel = duelGameTypeLabels[inviteGameType]
   const inviteCategoryLabel = inviteCategory === 'all'
     ? 'ALL'
     : inviteCategory === 'pc'
@@ -2674,7 +3667,8 @@ export function OneVsOnePanel(props: {
         : inviteCategory === 'hs'
           ? 'HS'
           : 'Scenarios'
-  const inRoom = Boolean(room && roomId)
+  const inRoom = Boolean(room && roomId && room.id === roomId)
+  const isJoiningRoom = Boolean(roomId && !inRoom)
   // const waitingPlayersCount = players.length
   // const waitingStatusMessage = waitingPlayersCount < 2
   //   ? `Waiting for ${2 - waitingPlayersCount} more player${2 - waitingPlayersCount === 1 ? '' : 's'} to join.`
@@ -2685,6 +3679,554 @@ export function OneVsOnePanel(props: {
   const matchingStatusText = matchingSubmitted
     ? 'Set complete. Waiting for next set…'
     : 'Match all 3 pairs to auto-submit this set.'
+  const blasterPowerupsEnabled = Boolean(room?.settings?.powerups_enabled)
+  const blasterMode = getBlasterMode(room?.settings)
+  const blasterPowerup = isBlasterRound(currentRound)
+    ? duelBlasterPowerupForRound(currentRound.round, blasterPowerupsEnabled, blasterMode)
+    : null
+  const blasterRoundTargets = isBlasterRound(currentRound)
+    ? blasterVisibleTargets.length > 0
+      ? blasterVisibleTargets
+      : currentRound.targets.map((target) => String(target))
+    : []
+  const blasterRoundCorrectCode = isBlasterRound(currentRound) ? getBlasterRoundCorrectCode(currentRound) : ''
+  const blasterDurationSeconds = getBlasterDurationSeconds(room?.settings)
+  const blasterRopeLimit = getBlasterRopeLimit(room?.settings)
+  const blasterOvertimeEnabled = getBlasterOvertimeEnabled(room?.settings)
+  const blasterOvertimeAfterSeconds = getBlasterOvertimeAfterSeconds(room?.settings)
+  const blasterMatchElapsedMs = useMemo(() => {
+    if (!room || room.status !== 'in_progress' || room.game_type !== 'blaster') return 0
+    const startedAtMs = room.started_at ? Date.parse(room.started_at) : NaN
+    if (!Number.isFinite(startedAtMs) || hudNow < startedAtMs || countdownActive) return 0
+    return Math.max(0, hudNow - startedAtMs)
+  }, [countdownActive, hudNow, room])
+  const blasterSuddenDeathActive = room?.status === 'in_progress'
+    && room.game_type === 'blaster'
+    && blasterOvertimeEnabled
+    && blasterMatchElapsedMs >= blasterOvertimeAfterSeconds * 1000
+  const blasterSuddenDeathRopeLimit = getBlasterSuddenDeathRopeLimit(blasterRopeLimit)
+  const effectiveBlasterRopeLimit = blasterSuddenDeathActive ? blasterSuddenDeathRopeLimit : blasterRopeLimit
+  const blasterMatchRemainingMs = useMemo(() => {
+    if (!room || room.status !== 'in_progress' || room.game_type !== 'blaster') return 0
+    if (blasterMode === 'death' || countdownActive) return 0
+    const startedAtMs = room.started_at ? Date.parse(room.started_at) : NaN
+    if (!Number.isFinite(startedAtMs)) return 0
+    return Math.max(0, startedAtMs + (blasterDurationSeconds * 1000) - hudNow)
+  }, [blasterDurationSeconds, blasterMode, countdownActive, hudNow, room])
+  const blasterMatchRemainingSeconds = blasterMatchRemainingMs > 0 ? Math.ceil(blasterMatchRemainingMs / 1000) : 0
+  const blasterMatchProgressPercent = blasterMode === 'death'
+    ? 100
+    : Math.max(0, Math.min(100, (blasterMatchRemainingMs / Math.max(1, blasterDurationSeconds * 1000)) * 100))
+  const scoreGap = (myPlayer?.score || 0) - (opponentPlayer?.score || 0)
+  const tugPercent = Math.max(2, Math.min(98, 50 + (scoreGap / effectiveBlasterRopeLimit) * 50))
+  const tugVisualWidthPercent = blasterSuddenDeathActive ? 54 : 100
+  const tugVisualStartPercent = blasterSuddenDeathActive ? (100 - tugVisualWidthPercent) / 2 : 0
+  const tugVisualPercent = blasterSuddenDeathActive
+    ? tugVisualStartPercent + (tugPercent / 100) * tugVisualWidthPercent
+    : tugPercent
+  const tugTrackStyle = blasterSuddenDeathActive
+    ? ({
+        '--short-rope-left': `${tugVisualStartPercent}%`,
+        '--short-rope-width': `${tugVisualWidthPercent}%`,
+      } as CSSProperties)
+    : undefined
+  const tugRopeStyle: CSSProperties = blasterSuddenDeathActive
+    ? {
+        left: `${tugVisualStartPercent}%`,
+        width: `${Math.max(0, tugVisualPercent - tugVisualStartPercent)}%`,
+      }
+    : { width: `${tugPercent}%` }
+  const tugHandleStyle: CSSProperties = { left: `${tugVisualPercent}%` }
+  const blasterRopeRemainingPercent = Math.max(0, Math.round(100 - (Math.abs(scoreGap) / effectiveBlasterRopeLimit) * 100))
+  const finalBlasterScoreGap = myResultRow && opponentResultRow ? myResultRow.score - opponentResultRow.score : 0
+  const finalBlasterFinishedAtMs = Math.max(
+    ...[myResultRow?.finished_at, opponentResultRow?.finished_at]
+      .map((value) => value ? Date.parse(value) : NaN)
+      .filter((value) => Number.isFinite(value)),
+    0,
+  )
+  const finalBlasterStartedAtMs = room?.started_at ? Date.parse(room.started_at) : NaN
+  const finalBlasterSuddenDeath = room?.game_type === 'blaster'
+    && blasterOvertimeEnabled
+    && Number.isFinite(finalBlasterStartedAtMs)
+    && finalBlasterFinishedAtMs > 0
+    && finalBlasterFinishedAtMs - finalBlasterStartedAtMs >= blasterOvertimeAfterSeconds * 1000
+  const finalBlasterRopeLimit = finalBlasterSuddenDeath ? blasterSuddenDeathRopeLimit : blasterRopeLimit
+  const blasterResultRule = room?.game_type !== 'blaster'
+    ? ''
+    : Math.abs(finalBlasterScoreGap) >= finalBlasterRopeLimit
+      ? finalBlasterSuddenDeath ? 'Overtime Rope KO' : 'Rope KO'
+      : blasterMode === 'death'
+        ? 'Round cap reached'
+        : 'Timer expired'
+  const tugBaseStateClass = blasterTugPulse
+    ? `onevone-tug-${blasterTugPulse}`
+    : scoreGap > 0
+      ? 'onevone-tug-leading'
+      : scoreGap < 0
+        ? 'onevone-tug-trailing'
+        : 'onevone-tug-even'
+  const tugStateClass = `${tugBaseStateClass}${blasterSuddenDeathActive ? ' onevone-tug-sudden-death' : ''}`
+  const blasterClockLabel = blasterSuddenDeathActive
+    ? 'Overtime'
+    : blasterMode === 'death'
+      ? 'Win Condition'
+      : 'Match Timer'
+  const blasterClockValue = blasterMode === 'death'
+    ? blasterSuddenDeathActive ? 'Rope Shrunk' : 'To the Death'
+    : blasterSuddenDeathActive
+      ? `${blasterMatchRemainingSeconds}s left`
+      : `${blasterMatchRemainingSeconds}s`
+  const blasterMotionRoomId = room?.id || ''
+  const blasterMotionRoomStatus = room?.status || null
+  const blasterMotionGameType = room?.game_type || null
+
+  useEffect(() => {
+    if (!room || room.status !== 'in_progress' || room.game_type !== 'blaster') return
+    if (isSpectator || !blasterSuddenDeathActive) return
+    if (Math.abs(scoreGap) < effectiveBlasterRopeLimit) return
+    void finishBlasterByTimeout()
+  }, [blasterSuddenDeathActive, effectiveBlasterRopeLimit, finishBlasterByTimeout, isSpectator, room, scoreGap])
+
+  useEffect(() => {
+    if (ropeBlasterPingTimerRef.current !== null) {
+      window.clearInterval(ropeBlasterPingTimerRef.current)
+      ropeBlasterPingTimerRef.current = null
+    }
+    if (ropeBlasterReconnectTimerRef.current !== null) {
+      window.clearTimeout(ropeBlasterReconnectTimerRef.current)
+      ropeBlasterReconnectTimerRef.current = null
+    }
+
+    const activeBlasterRoom = Boolean(
+      ropeBlasterWorkerUrl &&
+      isSignedIn &&
+      currentUserId &&
+      roomId &&
+      room?.status === 'in_progress' &&
+      room.game_type === 'blaster',
+    )
+
+    if (!activeBlasterRoom) {
+      ropeBlasterSocketRef.current?.close()
+      ropeBlasterSocketRef.current = null
+      setBlasterCloudStatus(ropeBlasterWorkerUrl ? 'connecting' : 'disabled')
+      setBlasterCloudLatencyMs(null)
+      return
+    }
+
+    let cancelled = false
+    const startedAtMs = room?.started_at ? Date.parse(room.started_at) : Date.now()
+    const socketUrl = toRopeBlasterWebSocketUrl(ropeBlasterWorkerUrl, roomId || '', currentUserId, currentUsername || 'Player')
+
+    const connect = () => {
+      if (cancelled || !socketUrl) return
+      setBlasterCloudStatus('connecting')
+      const socket = new WebSocket(socketUrl)
+      ropeBlasterSocketRef.current = socket
+
+      const sendJoin = () => {
+        sendRopeBlasterCloudMessage({
+          type: 'join',
+          displayName: currentUsername || 'Player',
+          startedAt: Number.isFinite(startedAtMs) ? startedAtMs : Date.now(),
+          settings: {
+            mode: blasterMode,
+            durationSeconds: blasterDurationSeconds,
+            ropeLimit: blasterRopeLimit,
+            powerupsEnabled: blasterPowerupsEnabled,
+            overtimeEnabled: blasterOvertimeEnabled,
+            overtimeAfterSeconds: blasterOvertimeAfterSeconds,
+          },
+          clientSentAt: Date.now(),
+        })
+      }
+
+      socket.addEventListener('open', () => {
+        if (cancelled) return
+        setBlasterCloudStatus('connected')
+        setBlasterCloudLatencyMs(null)
+        ropeBlasterSequenceRef.current = 0
+        sendJoin()
+        const sendPing = () => {
+          sendRopeBlasterCloudMessage({ type: 'ping', clientSentAt: Date.now() })
+        }
+        sendPing()
+        ropeBlasterPingTimerRef.current = window.setInterval(sendPing, 2500)
+      })
+
+      socket.addEventListener('message', (event) => {
+        let message: Record<string, unknown> | null = null
+        try {
+          message = event.data ? JSON.parse(String(event.data)) as Record<string, unknown> : null
+        } catch {
+          message = null
+        }
+        if (!message) return
+        if (message.type === 'pong') {
+          const sentAt = Number(message.clientSentAt)
+          if (Number.isFinite(sentAt)) {
+            setBlasterCloudLatencyMs(Math.max(0, Math.round(Date.now() - sentAt)))
+          }
+          return
+        }
+        if (message.type === 'hello' && message.state) {
+          applyRopeBlasterCloudState(message.state)
+          return
+        }
+        if (message.type === 'state') {
+          applyRopeBlasterCloudState(message)
+        }
+      })
+
+      socket.addEventListener('close', () => {
+        if (ropeBlasterSocketRef.current === socket) ropeBlasterSocketRef.current = null
+        if (ropeBlasterPingTimerRef.current !== null) {
+          window.clearInterval(ropeBlasterPingTimerRef.current)
+          ropeBlasterPingTimerRef.current = null
+        }
+        if (cancelled) return
+        setBlasterCloudStatus('fallback')
+        ropeBlasterReconnectTimerRef.current = window.setTimeout(connect, 1500)
+      })
+
+      socket.addEventListener('error', () => {
+        setBlasterCloudStatus('fallback')
+      })
+    }
+
+    connect()
+
+    return () => {
+      cancelled = true
+      if (ropeBlasterPingTimerRef.current !== null) {
+        window.clearInterval(ropeBlasterPingTimerRef.current)
+        ropeBlasterPingTimerRef.current = null
+      }
+      if (ropeBlasterReconnectTimerRef.current !== null) {
+        window.clearTimeout(ropeBlasterReconnectTimerRef.current)
+        ropeBlasterReconnectTimerRef.current = null
+      }
+      if (ropeBlasterSocketRef.current) {
+        ropeBlasterSocketRef.current.close()
+        ropeBlasterSocketRef.current = null
+      }
+    }
+  }, [
+    applyRopeBlasterCloudState,
+    blasterDurationSeconds,
+    blasterMode,
+    blasterOvertimeAfterSeconds,
+    blasterOvertimeEnabled,
+    blasterPowerupsEnabled,
+    blasterRopeLimit,
+    currentUserId,
+    currentUsername,
+    isSignedIn,
+    room?.game_type,
+    room?.started_at,
+    room?.status,
+    roomId,
+    sendRopeBlasterCloudMessage,
+  ])
+
+  useEffect(() => {
+    const resetBlasterMotion = () => {
+      if (blasterAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(blasterAnimationFrameRef.current)
+        blasterAnimationFrameRef.current = null
+      }
+      blasterBodiesRef.current.forEach((body) => {
+        body.element.classList.remove('motion-live', 'colliding')
+        body.element.style.transform = ''
+      })
+      blasterBodiesRef.current = []
+    }
+
+    resetBlasterMotion()
+
+    if (!blasterMotionRoomId || blasterMotionRoomStatus !== 'in_progress' || blasterMotionGameType !== 'blaster') return
+    if (!canStartRound) return
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    let stopped = false
+    let previousTimestamp = 0
+    let syncedRound = blasterMotionRoundRef.current
+    let fieldWidth = 0
+    let fieldHeight = 0
+
+    const updateFieldSize = () => {
+      const fieldElement = blasterFieldRef.current
+      if (!fieldElement) return
+      fieldWidth = fieldElement.clientWidth
+      fieldHeight = fieldElement.clientHeight
+    }
+
+    const clampVelocity = (body: BlasterAsteroidBody) => {
+      const speed = Math.hypot(body.velocityX, body.velocityY)
+      if (!Number.isFinite(speed) || speed <= 0) {
+        body.velocityX = blasterAsteroidMinSpeed
+        body.velocityY = blasterAsteroidMinSpeed * 0.65
+        return
+      }
+      if (speed < blasterAsteroidMinSpeed) {
+        const multiplier = blasterAsteroidMinSpeed / speed
+        body.velocityX *= multiplier
+        body.velocityY *= multiplier
+      } else if (speed > blasterAsteroidMaxSpeed) {
+        const multiplier = blasterAsteroidMaxSpeed / speed
+        body.velocityX *= multiplier
+        body.velocityY *= multiplier
+      }
+    }
+
+    const clampBodyToField = (body: BlasterAsteroidBody, safeWidth: number, safeHeight: number) => {
+      const wallInset = getBlasterWallInset(safeWidth, safeHeight)
+      const minX = wallInset + body.halfWidth
+      const maxX = Math.max(minX, safeWidth - wallInset - body.halfWidth)
+      const minY = wallInset + body.halfHeight
+      const maxY = Math.max(minY, safeHeight - wallInset - body.halfHeight)
+      body.x = Math.max(minX, Math.min(maxX, body.x))
+      body.y = Math.max(minY, Math.min(maxY, body.y))
+    }
+
+    const pushBodiesApart = (
+      leftBody: BlasterAsteroidBody,
+      rightBody: BlasterAsteroidBody,
+      safeWidth: number,
+      safeHeight: number,
+      timestamp: number,
+    ) => {
+      const distanceX = rightBody.x - leftBody.x
+      const distanceY = rightBody.y - leftBody.y
+      const requiredX = leftBody.halfWidth + rightBody.halfWidth + blasterAsteroidCollisionGapPx
+      const requiredY = leftBody.halfHeight + rightBody.halfHeight + blasterAsteroidCollisionGapPx
+      const overlapX = requiredX - Math.abs(distanceX)
+      const overlapY = requiredY - Math.abs(distanceY)
+      if (overlapX <= 0 || overlapY <= 0) return
+
+      if (overlapX < overlapY) {
+        const directionX = distanceX >= 0 ? 1 : -1
+        leftBody.x -= directionX * overlapX * 0.52
+        rightBody.x += directionX * overlapX * 0.52
+        const leftVelocityX = leftBody.velocityX
+        const rightVelocityX = rightBody.velocityX
+        leftBody.velocityX = directionX > 0 ? -Math.abs(rightVelocityX || leftVelocityX || blasterAsteroidMinSpeed) : Math.abs(rightVelocityX || leftVelocityX || blasterAsteroidMinSpeed)
+        rightBody.velocityX = directionX > 0 ? Math.abs(leftVelocityX || rightVelocityX || blasterAsteroidMinSpeed) : -Math.abs(leftVelocityX || rightVelocityX || blasterAsteroidMinSpeed)
+      } else {
+        const directionY = distanceY >= 0 ? 1 : -1
+        leftBody.y -= directionY * overlapY * 0.52
+        rightBody.y += directionY * overlapY * 0.52
+        const leftVelocityY = leftBody.velocityY
+        const rightVelocityY = rightBody.velocityY
+        leftBody.velocityY = directionY > 0 ? -Math.abs(rightVelocityY || leftVelocityY || blasterAsteroidMinSpeed) : Math.abs(rightVelocityY || leftVelocityY || blasterAsteroidMinSpeed)
+        rightBody.velocityY = directionY > 0 ? Math.abs(leftVelocityY || rightVelocityY || blasterAsteroidMinSpeed) : -Math.abs(leftVelocityY || rightVelocityY || blasterAsteroidMinSpeed)
+      }
+
+      clampBodyToField(leftBody, safeWidth, safeHeight)
+      clampBodyToField(rightBody, safeWidth, safeHeight)
+      clampVelocity(leftBody)
+      clampVelocity(rightBody)
+      leftBody.collisionGlowUntil = timestamp + 130
+      rightBody.collisionGlowUntil = timestamp + 130
+    }
+
+    const createBodyForSlot = (
+      index: number,
+      element: HTMLElement,
+      safeWidth: number,
+      safeHeight: number,
+      spawnFromEdge = false,
+    ): BlasterAsteroidBody => {
+      const key = blasterTargetDomKey(index)
+      const roundSeed = Math.max(1, blasterMotionRoundRef.current || 1)
+      const targetSeed = blasterMotionTargetsRef.current[index] || key
+      const layoutSeed = `${blasterMotionRoomId}:${roundSeed}:${targetSeed}`
+      const seed = hashStringToInt(`${layoutSeed}:${index}:motion`)
+      const shuffledAnchors = seededShuffle(blasterTargetAnchors, `${blasterMotionRoomId}:target-layout`)
+      const anchor = shuffledAnchors[index % shuffledAnchors.length] || blasterTargetAnchors[index % blasterTargetAnchors.length]
+      const wallInset = getBlasterWallInset(safeWidth, safeHeight)
+      const halfWidth = Math.max(blasterAsteroidMinHalfWidthPx, element.offsetWidth / 2)
+      const halfHeight = Math.max(blasterAsteroidMinHalfHeightPx, element.offsetHeight / 2)
+      const jitterX = ((seed % 17) - 8) * 3
+      const jitterY = ((Math.floor(seed / 17) % 15) - 7) * 3
+      const minX = wallInset + halfWidth
+      const maxX = Math.max(minX, safeWidth - wallInset - halfWidth)
+      const minY = wallInset + halfHeight
+      const maxY = Math.max(minY, safeHeight - wallInset - halfHeight)
+      const spawnSide = seed % 4
+      const anchoredX = (safeWidth * anchor.x) / 100 + jitterX
+      const anchoredY = (safeHeight * anchor.y) / 100 + jitterY
+      const initialX = spawnFromEdge
+        ? spawnSide === 0
+          ? minX
+          : spawnSide === 1
+            ? maxX
+            : Math.max(minX, Math.min(maxX, anchoredX))
+        : Math.max(minX, Math.min(maxX, anchoredX))
+      const initialY = spawnFromEdge
+        ? spawnSide === 2
+          ? minY
+          : spawnSide === 3
+            ? maxY
+            : Math.max(minY, Math.min(maxY, anchoredY))
+        : Math.max(minY, Math.min(maxY, anchoredY))
+      const direction = ((seed % 360) * Math.PI) / 180
+      const speed = 0.025 + ((Math.floor(seed / 23) % 20) / 1000)
+      const centerDeltaX = safeWidth / 2 - initialX
+      const centerDeltaY = safeHeight / 2 - initialY
+      const centerDistance = Math.hypot(centerDeltaX, centerDeltaY) || 1
+      const velocityX = ((centerDeltaX / centerDistance) * speed * 0.68) + (Math.cos(direction) * speed * 0.28)
+      const velocityY = ((centerDeltaY / centerDistance) * speed * 0.68) + (Math.sin(direction) * speed * 0.28)
+
+      element.classList.add('motion-live')
+      element.classList.remove('colliding')
+
+      return {
+        key,
+        element,
+        x: initialX,
+        y: initialY,
+        velocityX: Math.abs(velocityX) < 0.014 ? (velocityX < 0 ? -0.02 : 0.02) : velocityX,
+        velocityY: Math.abs(velocityY) < 0.012 ? (velocityY < 0 ? -0.018 : 0.018) : velocityY,
+        halfWidth,
+        halfHeight,
+        collisionGlowUntil: 0,
+        isColliding: false,
+      }
+    }
+
+    const syncBodiesForCurrentRound = (safeWidth: number, safeHeight: number) => {
+      const targets = blasterMotionTargetsRef.current
+      if (targets.length === 0) {
+        blasterBodiesRef.current.forEach((body) => {
+          body.element.classList.remove('motion-live', 'colliding')
+          body.element.style.transform = ''
+        })
+        blasterBodiesRef.current = []
+        return
+      }
+
+      const latestRound = blasterMotionRoundRef.current
+      const roundChanged = latestRound > 0 && latestRound !== syncedRound
+      const respawnIndex = roundChanged ? blasterRespawnTargetIndexRef.current : null
+      const previousBodiesByKey = new Map(blasterBodiesRef.current.map((body) => [body.key, body]))
+      const activeKeys = new Set<string>()
+      const nextBodies: BlasterAsteroidBody[] = []
+
+      targets.forEach((_target, index) => {
+        const key = blasterTargetDomKey(index)
+        const element = blasterTargetRefs.current[key]
+        if (!element) return
+        activeKeys.add(key)
+        const existingBody = previousBodiesByKey.get(key)
+        if (existingBody && respawnIndex !== index) {
+          existingBody.element = element
+          existingBody.halfWidth = Math.max(blasterAsteroidMinHalfWidthPx, element.offsetWidth / 2)
+          existingBody.halfHeight = Math.max(blasterAsteroidMinHalfHeightPx, element.offsetHeight / 2)
+          element.classList.add('motion-live')
+          nextBodies.push(existingBody)
+          return
+        }
+        nextBodies.push(createBodyForSlot(index, element, safeWidth, safeHeight, Boolean(roundChanged && respawnIndex === index)))
+      })
+
+      previousBodiesByKey.forEach((body, key) => {
+        if (activeKeys.has(key)) return
+        body.element.classList.remove('motion-live', 'colliding')
+        body.element.style.transform = ''
+      })
+
+      blasterBodiesRef.current = nextBodies
+      if (roundChanged) {
+        syncedRound = latestRound
+        blasterRespawnTargetIndexRef.current = null
+      }
+    }
+
+    updateFieldSize()
+    const resizeObserver = typeof ResizeObserver !== 'undefined' && blasterFieldRef.current
+      ? new ResizeObserver(updateFieldSize)
+      : null
+    if (resizeObserver && blasterFieldRef.current) {
+      resizeObserver.observe(blasterFieldRef.current)
+    }
+
+    const moveBodies = (timestamp: number) => {
+      if (stopped) return
+      const fieldElement = blasterFieldRef.current
+      if (!fieldElement) return
+
+      const elapsedMs = previousTimestamp > 0 ? Math.min(28, timestamp - previousTimestamp) : 16
+      previousTimestamp = timestamp
+      const safeWidth = Math.max(220, fieldWidth || fieldElement.clientWidth)
+      const safeHeight = Math.max(260, fieldHeight || fieldElement.clientHeight)
+      syncBodiesForCurrentRound(safeWidth, safeHeight)
+      const bodies = blasterBodiesRef.current
+      const activeDisruption = blasterDisruptionRef.current
+      const motionMultiplier = activeDisruption?.key === 'speedtrap' ? 2.45 : 1
+
+      bodies.forEach((body) => {
+        body.x += body.velocityX * elapsedMs * motionMultiplier
+        body.y += body.velocityY * elapsedMs * motionMultiplier
+        const wallInset = getBlasterWallInset(safeWidth, safeHeight)
+        const minX = wallInset + body.halfWidth
+        const maxX = Math.max(minX, safeWidth - wallInset - body.halfWidth)
+        const minY = wallInset + body.halfHeight
+        const maxY = Math.max(minY, safeHeight - wallInset - body.halfHeight)
+
+        if (body.x < minX) {
+          body.x = minX
+          body.velocityX = Math.abs(body.velocityX)
+        } else if (body.x > maxX) {
+          body.x = maxX
+          body.velocityX = -Math.abs(body.velocityX)
+        }
+
+        if (body.y < minY) {
+          body.y = minY
+          body.velocityY = Math.abs(body.velocityY)
+        } else if (body.y > maxY) {
+          body.y = maxY
+          body.velocityY = -Math.abs(body.velocityY)
+        }
+        clampVelocity(body)
+      })
+
+      for (let pass = 0; pass < blasterAsteroidSeparationPasses; pass += 1) {
+        for (let leftIndex = 0; leftIndex < bodies.length; leftIndex += 1) {
+          for (let rightIndex = leftIndex + 1; rightIndex < bodies.length; rightIndex += 1) {
+            pushBodiesApart(bodies[leftIndex], bodies[rightIndex], safeWidth, safeHeight, timestamp)
+          }
+        }
+      }
+
+      bodies.forEach((body) => {
+        clampBodyToField(body, safeWidth, safeHeight)
+        body.element.style.transform = `translate3d(${body.x - body.halfWidth}px, ${body.y - body.halfHeight}px, 0)`
+        const shouldCollideGlow = body.collisionGlowUntil > timestamp
+        if (body.isColliding !== shouldCollideGlow) {
+          body.isColliding = shouldCollideGlow
+          body.element.classList.toggle('colliding', shouldCollideGlow)
+        }
+      })
+
+      blasterAnimationFrameRef.current = window.requestAnimationFrame(moveBodies)
+    }
+
+    blasterAnimationFrameRef.current = window.requestAnimationFrame(moveBodies)
+
+    return () => {
+      stopped = true
+      resizeObserver?.disconnect()
+      resetBlasterMotion()
+    }
+  }, [
+    blasterMotionGameType,
+    blasterMotionRoomId,
+    blasterMotionRoomStatus,
+    canStartRound,
+  ])
 
   const myRoundHud = useMemo(() => {
     if (!room) return 1
@@ -2983,7 +4525,17 @@ export function OneVsOnePanel(props: {
 
   return (
     <div className="onevone-wrap">
-      {!inRoom ? (
+      {isJoiningRoom ? (
+        <div className="card onevone-card onevone-joining-card">
+          <h2>Joining 1v1 Room…</h2>
+          <p className="muted">Loading the invite room now. You should be moved into the lobby as soon as it syncs.</p>
+          <div className="actions-row">
+            <button className="primary" type="button" onClick={() => void refreshRoomSnapshot()}>
+              Retry Join
+            </button>
+          </div>
+        </div>
+      ) : !inRoom ? (
         <>
           <h2>1v1 Multiplayer</h2>
           <div className="onevone-lobby-layout">
@@ -3013,6 +4565,13 @@ export function OneVsOnePanel(props: {
                     >
                       Quiz
 	                    </button>
+                    <button
+                      type="button"
+                      className={duelStatsMode === 'blaster' ? 'seg active compact-seg' : 'seg compact-seg'}
+                      onClick={() => setDuelStatsMode('blaster')}
+                    >
+                      Blaster
+                    </button>
 	                  </div>
 	                </div>
 
@@ -3147,7 +4706,7 @@ export function OneVsOnePanel(props: {
                   <button
                     className="secondary onevone-invite-cta"
                     type="button"
-                    onClick={openInviteModal}
+                    onClick={() => openInviteModal()}
                     disabled={loading || !supabase}
                   >
                     <span>Invite a Friend</span>
@@ -3198,7 +4757,7 @@ export function OneVsOnePanel(props: {
                         <div>
                           <strong>{playerDisplay}</strong>
                           <p className="muted tiny">
-                            {statusLabel} • {item.game_type === 'quiz' ? 'Quiz' : 'Matching'} • {item.category.toUpperCase()} • {item.rounds} questions
+                            {statusLabel} • {duelGameTypeLabels[item.game_type]} • {item.category.toUpperCase()} • {formatDuelRoomRuleLabel(item)}
                           </p>
                         </div>
                         <div className="onevone-public-actions">
@@ -3240,26 +4799,21 @@ export function OneVsOnePanel(props: {
             <h3>Create Room</h3>
             <label className="game-control">
               Game Mode
-              <div className="segmented">
-                <button
-                  type="button"
-                  className={selectedGameType === 'quiz' ? 'seg active' : 'seg'}
-                  onClick={() => {
-                    setSelectedGameType('quiz')
-                  }}
-                >
-                  1v1 Quiz
-                </button>
-                <button
-                  type="button"
-                  className={selectedGameType === 'matching' ? 'seg active' : 'seg'}
-                  onClick={() => {
-                    setSelectedGameType('matching')
-                    if (selectedCategory === 'scenarios') setSelectedCategory('all')
-                  }}
-                >
-                  1v1 Matching
-                </button>
+              <div className="segmented onevone-mode-segmented">
+                {duelGameTypeOptions.map((option) => (
+                  <button
+                    key={`duel-mode-${option.value}`}
+                    type="button"
+                    className={selectedGameType === option.value ? 'seg active' : 'seg'}
+                    onClick={() => {
+                      setSelectedGameType(option.value)
+                      if (option.value !== 'quiz' && selectedCategory === 'scenarios') setSelectedCategory('all')
+                    }}
+                  >
+                    <span>{option.label}</span>
+                    <small>{option.subtitle}</small>
+                  </button>
+                ))}
               </div>
             </label>
             <label className="game-control">
@@ -3277,7 +4831,7 @@ export function OneVsOnePanel(props: {
               Category
               <div className="segmented">
                 {duelCategoryOptions
-                  .filter((option) => !(selectedGameType === 'matching' && option.quizOnly))
+                  .filter((option) => !(selectedGameType !== 'quiz' && option.quizOnly))
                   .map((option) => (
                     <button
                       key={`duel-category-${option.value}`}
@@ -3307,6 +4861,82 @@ export function OneVsOnePanel(props: {
                 </div>
               </label>
             ) : null}
+            {selectedGameType === 'blaster' ? (
+              <>
+                <label className="game-control">
+                  Win Condition
+                  <div className="segmented">
+                    {duelBlasterDurationOptions.map((seconds) => (
+                      <button
+                        key={`duel-blaster-duration-${seconds}`}
+                        type="button"
+                        className={selectedBlasterMode === 'timed' && selectedBlasterDurationSeconds === seconds ? 'seg active' : 'seg'}
+                        onClick={() => {
+                          setSelectedBlasterMode('timed')
+                          setSelectedBlasterDurationSeconds(seconds)
+                        }}
+                      >
+                        {seconds}s
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={selectedBlasterMode === 'death' ? 'seg active' : 'seg'}
+                      onClick={() => setSelectedBlasterMode('death')}
+                    >
+                      To the Death
+                    </button>
+                  </div>
+                  <small className="muted">Timed matches end on the clock or by rope KO. To the Death removes the clock and ends by rope KO.</small>
+                </label>
+                <label className="game-control onevone-powerup-toggle">
+                  <span>
+                    Enable Power-Ups
+                    <small>{selectedBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Correct power shots tug harder and build streak pressure.'}</small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={selectedPowerupsEnabled}
+                    onChange={(event) => setSelectedPowerupsEnabled(event.target.checked)}
+                  />
+                </label>
+                <div className="game-control onevone-overtime-control">
+                  <label className="onevone-powerup-toggle">
+                    <span>
+                      Enable Overtime
+                      <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={selectedBlasterOvertimeEnabled}
+                      onChange={(event) => setSelectedBlasterOvertimeEnabled(event.target.checked)}
+                    />
+                  </label>
+                  <div className={selectedBlasterOvertimeEnabled ? 'onevone-overtime-slider' : 'onevone-overtime-slider disabled'}>
+                    <div className="onevone-overtime-slider-head">
+                      <span className="muted tiny">Shrink rope after</span>
+                      <strong>{selectedBlasterOvertimeAfterSeconds}s</strong>
+                    </div>
+                    <input
+                      className="modern-range"
+                      type="range"
+                      min={0}
+                      max={duelBlasterOvertimeOptions.length - 1}
+                      step={1}
+                      value={Math.max(0, duelBlasterOvertimeOptions.indexOf(selectedBlasterOvertimeAfterSeconds as (typeof duelBlasterOvertimeOptions)[number]))}
+                      disabled={!selectedBlasterOvertimeEnabled}
+                      onChange={(event) => {
+                        const nextIndex = Number(event.target.value)
+                        setSelectedBlasterOvertimeAfterSeconds(duelBlasterOvertimeOptions[nextIndex] || duelBlasterDefaultOvertimeAfterSeconds)
+                      }}
+                    />
+                    <div className="onevone-overtime-marks" aria-hidden>
+                      {duelBlasterOvertimeOptions.map((seconds) => <span key={`create-overtime-${seconds}`}>{seconds}s</span>)}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
             <div className="actions-row">
               <button className="secondary cancel-button" type="button" onClick={() => setShowCreateRoomModal(false)} disabled={loading}>
                 Cancel
@@ -3319,7 +4949,7 @@ export function OneVsOnePanel(props: {
         </div>
       ) : null}
 
-      {!inRoom && showInviteModal ? (
+      {showInviteModal ? (
         <div
           className="profile-modal-overlay game-setup-overlay"
           onClick={() => setShowInviteModal(false)}
@@ -3350,8 +4980,13 @@ export function OneVsOnePanel(props: {
                             <strong>{user.username}</strong>
                             <span className="muted tiny">
                               Invite: {inviteGameLabel} • {inviteCategoryLabel}
-                              {inviteGameType === 'quiz' ? ` • ${inviteQuizRounds} questions` : ''}
-                            </span>
+                              {inviteGameType === 'quiz' ? ` • ${inviteQuizRounds} rounds` : ''}
+	                              {inviteGameType === 'blaster'
+	                                ? ` • ${inviteBlasterMode === 'death' ? 'To the Death' : `${inviteBlasterDurationSeconds}s`}`
+	                                : ''}
+	                              {inviteGameType === 'blaster' && invitePowerupsEnabled ? ' • Power-ups' : ''}
+	                              {inviteGameType === 'blaster' ? ` • OT ${inviteBlasterOvertimeEnabled ? `${inviteBlasterOvertimeAfterSeconds}s` : 'Off'}` : ''}
+	                            </span>
                           </div>
                         </div>
                         <button
@@ -3375,31 +5010,28 @@ export function OneVsOnePanel(props: {
                 </p>
                 <label className="game-control">
                   Game Mode
-                  <div className="segmented">
-                    <button
-                      type="button"
-                      className={inviteGameType === 'quiz' ? 'seg active' : 'seg'}
-                      onClick={() => setInviteGameType('quiz')}
-                    >
-                      1v1 Quiz
-                    </button>
-                    <button
-                      type="button"
-                      className={inviteGameType === 'matching' ? 'seg active' : 'seg'}
-                      onClick={() => {
-                        setInviteGameType('matching')
-                        if (inviteCategory === 'scenarios') setInviteCategory('all')
-                      }}
-                    >
-                      1v1 Matching
-                    </button>
+                  <div className="segmented onevone-mode-segmented">
+                    {duelGameTypeOptions.map((option) => (
+                      <button
+                        key={`invite-mode-${option.value}`}
+                        type="button"
+                        className={inviteGameType === option.value ? 'seg active' : 'seg'}
+                        onClick={() => {
+                          setInviteGameType(option.value)
+                          if (option.value !== 'quiz' && inviteCategory === 'scenarios') setInviteCategory('all')
+                        }}
+                      >
+                        <span>{option.label}</span>
+                        <small>{option.subtitle}</small>
+                      </button>
+                    ))}
                   </div>
                 </label>
                 <label className="game-control">
                   Category
                   <div className="segmented">
                     {duelCategoryOptions
-                      .filter((option) => !(inviteGameType === 'matching' && option.quizOnly))
+                      .filter((option) => !(inviteGameType !== 'quiz' && option.quizOnly))
                       .map((option) => (
                         <button
                           key={`invite-category-${option.value}`}
@@ -3429,6 +5061,82 @@ export function OneVsOnePanel(props: {
                     </div>
                   </label>
                 ) : null}
+                {inviteGameType === 'blaster' ? (
+                  <>
+                    <label className="game-control">
+                      Win Condition
+                      <div className="segmented">
+                        {duelBlasterDurationOptions.map((seconds) => (
+                          <button
+                            key={`invite-blaster-duration-${seconds}`}
+                            type="button"
+                            className={inviteBlasterMode === 'timed' && inviteBlasterDurationSeconds === seconds ? 'seg active' : 'seg'}
+                            onClick={() => {
+                              setInviteBlasterMode('timed')
+                              setInviteBlasterDurationSeconds(seconds)
+                            }}
+                          >
+                            {seconds}s
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className={inviteBlasterMode === 'death' ? 'seg active' : 'seg'}
+                          onClick={() => setInviteBlasterMode('death')}
+                        >
+                          To the Death
+                        </button>
+                      </div>
+                      <small className="muted">Default is 30 seconds. Rope KO can still end either mode early.</small>
+                    </label>
+                    <label className="game-control onevone-powerup-toggle">
+                      <span>
+                        Enable Power-Ups
+                        <small>{inviteBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Power shots make the tug-of-war swing harder.'}</small>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={invitePowerupsEnabled}
+                        onChange={(event) => setInvitePowerupsEnabled(event.target.checked)}
+                      />
+                    </label>
+                    <div className="game-control onevone-overtime-control">
+                      <label className="onevone-powerup-toggle">
+                        <span>
+                          Enable Overtime
+                          <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={inviteBlasterOvertimeEnabled}
+                          onChange={(event) => setInviteBlasterOvertimeEnabled(event.target.checked)}
+                        />
+                      </label>
+                      <div className={inviteBlasterOvertimeEnabled ? 'onevone-overtime-slider' : 'onevone-overtime-slider disabled'}>
+                        <div className="onevone-overtime-slider-head">
+                          <span className="muted tiny">Shrink rope after</span>
+                          <strong>{inviteBlasterOvertimeAfterSeconds}s</strong>
+                        </div>
+                        <input
+                          className="modern-range"
+                          type="range"
+                          min={0}
+                          max={duelBlasterOvertimeOptions.length - 1}
+                          step={1}
+                          value={Math.max(0, duelBlasterOvertimeOptions.indexOf(inviteBlasterOvertimeAfterSeconds as (typeof duelBlasterOvertimeOptions)[number]))}
+                          disabled={!inviteBlasterOvertimeEnabled}
+                          onChange={(event) => {
+                            const nextIndex = Number(event.target.value)
+                            setInviteBlasterOvertimeAfterSeconds(duelBlasterOvertimeOptions[nextIndex] || duelBlasterDefaultOvertimeAfterSeconds)
+                          }}
+                        />
+                        <div className="onevone-overtime-marks" aria-hidden>
+                          {duelBlasterOvertimeOptions.map((seconds) => <span key={`invite-overtime-${seconds}`}>{seconds}s</span>)}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
               </div>
             </div>
 
@@ -3445,7 +5153,7 @@ export function OneVsOnePanel(props: {
         <>
           {room.status !== 'completed' && room.status !== 'waiting' ? (
             <>
-              <h2>{roomDisplayName} · {room.game_type === 'quiz' ? '1v1 Quiz' : '1v1 Matching'}</h2>
+              <h2>{roomDisplayName} · 1v1 {duelGameTypeLabels[room.game_type]}</h2>
               {activityLog.length > 0 ? (
                 <div className="card onevone-card onevone-activity-card">
                   <h3>Room Activity</h3>
@@ -3465,8 +5173,8 @@ export function OneVsOnePanel(props: {
           {room.status === 'waiting' ? (
             <div className="onevone-waiting-room">
               <div className="onevone-waiting-title">
-                <h2>{room.game_type === 'quiz' ? '1v1 Quiz' : '1v1 Matching'}</h2>
-                <p className="muted">{room.rounds} rounds · {room.category.toUpperCase()}</p>
+                <h2>1v1 {duelGameTypeLabels[room.game_type]}</h2>
+                <p className="muted">{formatDuelRoomRuleLabel(room)} · {room.category.toUpperCase()}</p>
               </div>
 
               <div className="onevone-waiting-players">
@@ -3857,6 +5565,183 @@ export function OneVsOnePanel(props: {
             </div>
           ) : null}
 
+          {room.status === 'in_progress' && room.game_type === 'blaster' ? (
+            <div className="blaster-session-overlay onevone-blaster-overlay">
+              <div className="blaster-session-shell onevone-blaster-shell">
+                {isSpectator && (
+                  <div className="onevone-spectator-banner">
+                    <span>👁️ You are spectating</span>
+                    <span className="muted tiny">{players[0] ? usernameByUserId[players[0].user_id] || 'Player 1' : 'Player 1'} vs {players[1] ? usernameByUserId[players[1].user_id] || 'Player 2' : 'Player 2'}</span>
+                  </div>
+                )}
+                <div className="onevone-blaster-topbar">
+                  <button className="secondary blaster-exit-button onevone-leave-button" onClick={() => void confirmLeaveMatch()}>
+                    {isSpectator ? 'Stop Spectating' : 'Leave Match'}
+                  </button>
+                  <div className="onevone-blaster-title">
+	                    <span className="muted tiny">Rope Blaster</span>
+	                    <strong>
+	                      {formatBlasterRuleLabel(room.settings)}
+	                      {blasterSuddenDeathActive ? ' · Overtime' : ''}
+	                      {blasterPowerupsEnabled ? ' · Power-ups' : ''}
+                    </strong>
+	                    {ropeBlasterWorkerUrl ? (
+	                      <span className={`onevone-cloud-latency onevone-cloud-latency-${blasterCloudStatus}`}>
+	                        <span className="onevone-cloud-dot" />
+	                        Ping
+	                        {blasterCloudStatus === 'connected' && blasterCloudLatencyMs !== null ? ` · ${blasterCloudLatencyMs}ms` : ` · ${blasterCloudStatus}`}
+	                      </span>
+                    ) : null}
+                  </div>
+                  <div className="onevone-blaster-clock">
+                    <small className="muted">{blasterClockLabel}</small>
+                    <strong>{blasterClockValue}</strong>
+                    <span className="onevone-blaster-timer-track" aria-hidden>
+                      <span style={{ width: `${blasterMatchProgressPercent}%` }} />
+                    </span>
+                  </div>
+                </div>
+
+                <div className={`onevone-tug-panel ${tugStateClass}`}>
+	                  {blasterSuddenDeathActive ? (
+	                    <div className="onevone-sudden-death-banner" aria-live="polite">
+	                      <strong>⚠️ Overtime</strong>
+	                      <span>Short rope: push the bomb into either glowing KO gate.</span>
+                    </div>
+                  ) : null}
+                  <div className="onevone-tug-names">
+                    <span><small>You</small>{myDisplayName}</span>
+                    <strong>{scoreGap === 0 ? 'Even' : scoreGap > 0 ? `+${scoreGap}` : `${scoreGap}`}</strong>
+                    <span><small>Opponent</small>{opponentDisplayName}</span>
+                  </div>
+                  <div className="onevone-tug-track" style={tugTrackStyle} aria-label="Tug of war score pressure">
+                    <span className="onevone-tug-zone onevone-tug-zone-self">Your side</span>
+                    <span className="onevone-tug-zone onevone-tug-zone-opponent">Opponent</span>
+                    {blasterSuddenDeathActive ? (
+                      <>
+                        <span className="onevone-tug-short-window" aria-hidden />
+                        <span className="onevone-tug-short-gate onevone-tug-short-gate-self" aria-hidden>KO</span>
+                        <span className="onevone-tug-short-gate onevone-tug-short-gate-opponent" aria-hidden>KO</span>
+                      </>
+                    ) : null}
+                    <span className="onevone-tug-midline" />
+                    <span className="onevone-tug-rope" style={tugRopeStyle} />
+                    <span className="onevone-tug-handle onevone-tug-bomb" style={tugHandleStyle} aria-hidden>
+                      <span className="onevone-bomb-core" />
+                      <span className="onevone-bomb-fuse"><i /></span>
+                    </span>
+                  </div>
+                  <div className="onevone-tug-scores">
+                    <span>{myPlayer?.score || 0} pts</span>
+                    <span>{blasterSuddenDeathActive ? 'Sudden Rope' : 'Rope'} {blasterRopeRemainingPercent}%</span>
+                    <span>{opponentPlayer?.score || 0} pts</span>
+                  </div>
+                </div>
+
+                {countdownActive ? (
+                  <div className="onevone-countdown">
+                    <small className="muted">
+                      {syncingBeforeCountdown ? 'Syncing with opponent' : 'Starting together'}
+                    </small>
+                    {syncingBeforeCountdown ? (
+                      <strong className="onevone-syncing-dots">•••</strong>
+                    ) : (
+                      <strong>{countdownRemaining}</strong>
+                    )}
+                    <p className="muted tiny">
+                      {syncingBeforeCountdown ? 'Locking the shared start time…' : 'Blaster duel starts in…'}
+                    </p>
+                  </div>
+                ) : null}
+
+                {canStartRound && isBlasterRound(currentRound) ? (
+                  <div className="onevone-blaster-arena">
+	                    <div className="onevone-blaster-prompt">
+	                      <p className="muted tiny">Blast the correct code section</p>
+	                      <h3>{currentRound.prompt}</h3>
+	                      {blasterPowerup ? (
+	                        <strong className={`onevone-powerup-pill onevone-powerup-${blasterPowerup.key}`}>
+	                          {blasterPowerup.icon} {blasterPowerup.label} · {blasterPowerup.description}
+                        </strong>
+                      ) : null}
+                    </div>
+                    <div
+                      ref={blasterFieldRef}
+                      className={[
+                        'onevone-blaster-field',
+                        blasterPowerup ? 'onevone-blaster-field-powered' : '',
+                        blasterDisruption ? `onevone-blaster-field-disrupted onevone-blaster-field-disruption-${blasterDisruption.key}` : '',
+                      ].filter(Boolean).join(' ')}
+                    >
+                      <div className="blaster-starfield" aria-hidden>
+                        <span></span><span></span><span></span><span></span>
+                      </div>
+                      {blasterDisruption ? (
+                        <div className={`onevone-blaster-disruption onevone-blaster-disruption-${blasterDisruption.key}`} aria-hidden>
+	                          <strong>{blasterDisruption.icon} {blasterDisruption.label}</strong>
+	                          {blasterDisruption.key === 'paperwork' ? (
+	                            <span className="onevone-paperwork-storm">
+	                              {BLASTER_PAPERWORK_STORM_LABELS.map((label, paperworkIndex) => (
+	                                <i key={`${label}-${paperworkIndex}`}>{label}</i>
+	                              ))}
+	                            </span>
+	                          ) : null}
+	                        </div>
+                      ) : null}
+                      {blasterRoundTargets.map((target, index) => {
+                        const selected = blasterChoice === index && blasterChoiceRound === currentRound.round
+                        const correct = normalizeBlasterTarget(target) === normalizeBlasterTarget(blasterRoundCorrectCode)
+                        const k9Hinted = blasterPowerup?.key === 'k9' && correct && !blasterLocked
+                        const radarHinted = blasterPowerup?.key === 'radar' && correct && !blasterLocked
+                        const targetKey = blasterTargetDomKey(index)
+                        const targetDisplay = blasterDisruption?.key === 'clone'
+                          ? blasterDisruption.cloneText || target
+                          : target
+                        return isSpectator ? (
+                          <div
+                            key={`spectate-blaster-target-${index}`}
+                            ref={(node) => {
+                              blasterTargetRefs.current[targetKey] = node
+                            }}
+                            className={`onevone-blaster-target spectating${k9Hinted ? ' hinted' : ''}${radarHinted ? ' scanned' : ''}${blasterDisruption?.key === 'clone' ? ' cloned' : ''}`}
+                            style={blasterTargetStyle(room.id, index)}
+                          >
+                            <span>{targetDisplay}</span>
+                          </div>
+                        ) : (
+                          <button
+                            key={`duel-blaster-target-${index}`}
+                            ref={(node) => {
+                              blasterTargetRefs.current[targetKey] = node
+                            }}
+                            type="button"
+                            className={`onevone-blaster-target${selected ? ' selected' : ''}${selected && correct ? ' correct' : ''}${selected && !correct ? ' wrong' : ''}${k9Hinted ? ' hinted' : ''}${radarHinted ? ' scanned' : ''}${blasterDisruption?.key === 'clone' ? ' cloned' : ''}`}
+                            style={blasterTargetStyle(room.id, index)}
+                            onClick={(event) => submitBlasterAnswer(index, event)}
+                            disabled={blasterLocked || !roundIsInitialized}
+                            aria-label={`Blast ${targetDisplay}`}
+                          >
+                            <span>{targetDisplay}</span>
+                          </button>
+                        )
+                      })}
+                      {blasterShotBursts.map((burst) => (
+                        <span
+                          key={burst.id}
+                          className={`onevone-blaster-shot-burst onevone-blaster-shot-burst-${burst.tone}`}
+                          style={{ left: burst.x, top: burst.y }}
+                          aria-hidden
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="muted">{countdownActive ? 'Countdown in progress…' : 'Waiting for round sync...'}</p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
           {room.status === 'completed' ? (
             <div className="onevone-result-overlay">
               <div className="card onevone-card onevone-result-shell">
@@ -3887,6 +5772,11 @@ export function OneVsOnePanel(props: {
                       : `Winner: ${usernameByUserId[room.winner_user_id] || opponentDisplayName}`
                     : 'Result: Draw'}
                 </div>
+                {room.game_type === 'blaster' && myResultRow && opponentResultRow ? (
+                  <p className="muted tiny onevone-tiebreak-note">
+                    Code Blaster finish: <strong>{blasterResultRule}</strong> • {formatBlasterRuleLabel(room.settings)} • Final pressure gap {Math.abs(finalBlasterScoreGap)} / {finalBlasterRopeLimit}
+                  </p>
+                ) : null}
                 {!isSpectator && sessionXpReward ? (
                   <div className="onevone-result-xp-reward">
                     {sessionXpReward}
@@ -3899,19 +5789,18 @@ export function OneVsOnePanel(props: {
                 ) : null}
 
                 {!isSpectator && (
-                <div className="onevone-rematch-panel">
-                  <div className="onevone-rematch-head">
-                    <p className="muted tiny">Rematch</p>
-                    <p className="muted tiny">{rematchReadyCount}/2 agreed</p>
+                <div className="onevone-new-game-panel">
+                  <div className="onevone-new-game-head">
+                    <p className="muted tiny">Next Match</p>
+                    <strong>Start a new game</strong>
                   </div>
-                  <p className="muted tiny">{rematchStatusText}</p>
+                  <p className="muted tiny">Open the invite screen, choose anyone online, and create a fresh 1v1 room.</p>
                   <div className="actions-row">
                     <button
-                      className={`${myRematchRequested ? 'secondary cancel-button ready' : 'primary'}`}
-                      onClick={() => void toggleRematchVote()}
-                      disabled={rematchLoading}
+                      className="primary"
+                      onClick={() => openInviteModal(room)}
                     >
-                      {rematchLoading ? 'Starting...' : myRematchRequested ? 'Cancel' : 'Rematch'}
+                      Start New Game
                     </button>
                   </div>
                 </div>
@@ -4102,6 +5991,10 @@ export function OneVsOnePanel(props: {
               <article className="leader-profile-stat">
                 <p className="leader-profile-label">Quiz W-L</p>
                 <strong>{selectedDuelProfile.quiz.wins}-{selectedDuelProfile.quiz.losses}</strong>
+              </article>
+              <article className="leader-profile-stat">
+                <p className="leader-profile-label">Blaster W-L</p>
+                <strong>{selectedDuelProfile.blaster.wins}-{selectedDuelProfile.blaster.losses}</strong>
               </article>
             </div>
 

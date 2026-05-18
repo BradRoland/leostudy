@@ -17,7 +17,7 @@ type PendingDuelInvite = {
   senderLevel: number
   senderHaloClass: string
   senderProfileDecorationKey: string
-  gameType: 'quiz' | 'matching'
+  gameType: 'quiz' | 'matching' | 'blaster'
   category: 'all' | 'pc' | 'vc' | 'hs' | 'scenarios'
   rounds: number
   expiresAt: string
@@ -94,7 +94,8 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
       const value = row as Record<string, unknown>
       const gameTypeRaw = String(value.game_type || 'quiz')
       const categoryRaw = String(value.category || 'all')
-      const gameType: PendingDuelInvite['gameType'] = gameTypeRaw === 'matching' ? 'matching' : 'quiz'
+      const gameType: PendingDuelInvite['gameType'] =
+        gameTypeRaw === 'blaster' ? 'blaster' : gameTypeRaw === 'matching' ? 'matching' : 'quiz'
       const category: PendingDuelInvite['category'] = (
         categoryRaw === 'pc' || categoryRaw === 'vc' || categoryRaw === 'hs' || categoryRaw === 'scenarios'
           ? categoryRaw
@@ -301,7 +302,7 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
                 <div className="duel-invite-copy">
                   <strong>{invite.senderUsername} invited you to 1v1</strong>
                   <span className="muted tiny">
-                    {invite.gameType === 'quiz' ? 'Quiz' : 'Matching'} • {toCategoryLabel(invite.category)}
+                    {invite.gameType === 'blaster' ? 'Code Blaster' : invite.gameType === 'quiz' ? 'Quiz' : 'Matching'} • {toCategoryLabel(invite.category)}
                     {invite.gameType === 'quiz' ? ` • ${invite.rounds} questions` : ''}
                   </span>
                 </div>
