@@ -527,12 +527,28 @@ function getBlasterRoundCorrectCode(round: BlasterRoundPayload) {
   return String(round.correctCode || round.targets[round.correctIndex] || '').trim()
 }
 
+function uniqueBlasterTargets(targets: string[]) {
+  const seenTargets = new Set<string>()
+  return targets.filter((target) => {
+    const normalized = normalizeBlasterTarget(target)
+    if (!normalized || seenTargets.has(normalized)) return false
+    seenTargets.add(normalized)
+    return true
+  })
+}
+
+function randomBlasterItem<T>(items: T[]) {
+  if (items.length === 0) return null
+  return items[Math.floor(Math.random() * items.length)] ?? null
+}
+
 function buildBlasterVisibleTargetsForRound(
   previousTargets: string[],
   nextRound: BlasterRoundPayload,
   replacementIndex: number | null,
 ) {
   const nextRoundTargets = nextRound.targets.map((target) => String(target)).filter((target) => target.trim().length > 0)
+  const nextRoundCandidateTargets = uniqueBlasterTargets(nextRoundTargets)
   if (previousTargets.length === 0 || previousTargets.length !== nextRoundTargets.length) {
     return nextRoundTargets
   }
@@ -543,26 +559,44 @@ function buildBlasterVisibleTargetsForRound(
     : 0
   const correctCode = getBlasterRoundCorrectCode(nextRound)
   const normalizedCorrect = normalizeBlasterTarget(correctCode)
-  const usedWithoutReplacement = new Set(
+  const targetIndexes = nextTargets.map((_target, index) => index)
+  const stableIndexes = targetIndexes.filter((index) => index !== safeReplacementIndex)
+  const existingCorrectIndex = stableIndexes.find((index) => normalizeBlasterTarget(nextTargets[index] || '') === normalizedCorrect) ?? -1
+  const correctSlotIndex = existingCorrectIndex >= 0
+    ? existingCorrectIndex
+    : randomBlasterItem(targetIndexes) ?? safeReplacementIndex
+
+  if (correctCode && existingCorrectIndex < 0) {
+    nextTargets[correctSlotIndex] = correctCode
+  }
+
+  const usedByStableSlots = new Set(
     nextTargets
       .filter((_target, index) => index !== safeReplacementIndex)
       .map((target) => normalizeBlasterTarget(target)),
   )
-  const replacement = correctCode && !usedWithoutReplacement.has(normalizedCorrect)
+  const replacementCandidates = nextRoundCandidateTargets.filter((target) => {
+    const normalized = normalizeBlasterTarget(target)
+    if (usedByStableSlots.has(normalized)) return false
+    if (correctCode && correctSlotIndex !== safeReplacementIndex && normalized === normalizedCorrect) return false
+    return true
+  })
+  const replacement = correctSlotIndex === safeReplacementIndex && correctCode
     ? correctCode
-    : nextRoundTargets.find((target) => !usedWithoutReplacement.has(normalizeBlasterTarget(target)))
-      || correctCode
+    : randomBlasterItem(replacementCandidates)
+      || randomBlasterItem(nextRoundCandidateTargets.filter((target) => normalizeBlasterTarget(target) !== normalizedCorrect))
       || nextTargets[safeReplacementIndex]
       || nextRoundTargets[0]
+      || correctCode
       || ''
 
   nextTargets[safeReplacementIndex] = replacement
   if (correctCode && !nextTargets.some((target) => normalizeBlasterTarget(target) === normalizedCorrect)) {
-    nextTargets[safeReplacementIndex] = correctCode
+    nextTargets[randomBlasterItem(targetIndexes) ?? safeReplacementIndex] = correctCode
   }
 
   const usedTargets = new Set<string>()
-  return nextTargets.map((target, index) => {
+  const resolvedTargets = nextTargets.map((target, index) => {
     const normalized = normalizeBlasterTarget(target)
     if (target && !usedTargets.has(normalized)) {
       usedTargets.add(normalized)
@@ -575,6 +609,12 @@ function buildBlasterVisibleTargetsForRound(
     usedTargets.add(normalizeBlasterTarget(fallback))
     return fallback
   })
+
+  if (correctCode && !resolvedTargets.some((target) => normalizeBlasterTarget(target) === normalizedCorrect)) {
+    resolvedTargets[randomBlasterItem(targetIndexes) ?? safeReplacementIndex] = correctCode
+  }
+
+  return resolvedTargets
 }
 
 function blasterTargetStyle(seedInput: string, index: number): CSSProperties {
