@@ -595,6 +595,12 @@ body {
   display: none;
 }
 
+.app-shell:has(.onevone-blaster-overlay) .mobile-bottom-nav,
+.app-shell:has(.onevone-blaster-overlay) .mobile-quick-strip {
+  display: none !important;
+  pointer-events: none !important;
+}
+
 .mobile-quick-chip {
   flex: 0 0 auto;
   min-height: 34px;
@@ -15264,10 +15270,11 @@ textarea:focus-visible,
 }
 
 .onevone-blaster-arena {
+  --onevone-blaster-prompt-height: clamp(72px, 9svh, 96px);
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: var(--onevone-blaster-prompt-height) minmax(0, 1fr);
   gap: 6px;
   height: 100%;
   min-height: 0;
@@ -15278,21 +15285,36 @@ textarea:focus-visible,
   display: grid;
   gap: 2px;
   justify-items: center;
+  align-content: center;
+  height: var(--onevone-blaster-prompt-height);
+  min-height: var(--onevone-blaster-prompt-height);
+  max-height: var(--onevone-blaster-prompt-height);
+  overflow: hidden;
   border-radius: 18px;
   padding: 6px 12px;
   text-align: center;
 }
 
 .onevone-blaster-prompt h3 {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
   margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: clamp(0.98rem, 1.55vw, 1.36rem);
   line-height: 1.08;
 }
 
 .onevone-blaster-prompt > p,
-.onevone-blaster-prompt > span {
+.onevone-blaster-prompt > span,
+.onevone-blaster-prompt > strong {
+  max-width: 100%;
+  overflow: hidden;
   font-size: 0.72rem;
   line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .onevone-powerup-pill {
@@ -16320,7 +16342,8 @@ textarea:focus-visible,
   }
 
   .onevone-blaster-arena {
-    grid-template-rows: auto minmax(0, 1fr);
+    --onevone-blaster-prompt-height: 72px;
+    grid-template-rows: var(--onevone-blaster-prompt-height) minmax(0, 1fr);
   }
 
   .onevone-blaster-topbar {
@@ -16482,6 +16505,9 @@ textarea:focus-visible,
 
   .onevone-blaster-prompt {
     gap: 1px;
+    height: var(--onevone-blaster-prompt-height);
+    min-height: var(--onevone-blaster-prompt-height);
+    max-height: var(--onevone-blaster-prompt-height);
     padding: 5px 8px;
     border-radius: 12px;
   }

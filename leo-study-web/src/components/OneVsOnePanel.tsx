@@ -5973,7 +5973,7 @@ export function OneVsOnePanel(props: {
                 <div className="onevone-blaster-arena onevone-bot-arena">
                   <div className="onevone-blaster-prompt">
                     <p className="muted tiny">Bot round {botMatch.userRound}/{botMatch.rounds} · Blast the correct code section</p>
-                    <h3>{botCurrentRound.prompt}</h3>
+                    <h3 title={botCurrentRound.prompt}>{botCurrentRound.prompt}</h3>
                     {botPowerup ? (
                       <strong className={`onevone-powerup-pill onevone-powerup-${botPowerup.key}`}>
                         {botPowerup.icon} {botPowerup.label} · {botPowerup.description}
@@ -7555,7 +7555,7 @@ export function OneVsOnePanel(props: {
                   <div className="onevone-blaster-arena">
 	                    <div className="onevone-blaster-prompt">
 	                      <p className="muted tiny">Blast the correct code section</p>
-	                      <h3>{currentRound.prompt}</h3>
+	                      <h3 title={currentRound.prompt}>{currentRound.prompt}</h3>
 	                      {blasterPowerup ? (
 	                        <strong className={`onevone-powerup-pill onevone-powerup-${blasterPowerup.key}`}>
 	                          {blasterPowerup.icon} {blasterPowerup.label} · {blasterPowerup.description}
