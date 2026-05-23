@@ -1449,7 +1449,7 @@ function resolveBotDifficulty(input: DuelBotDifficulty, skill: DuelBotSkillSnaps
 
 function duelBotDifficultyConfig(difficulty: DuelBotResolvedDifficulty, scoreGap: number, userHotStreak = 0) {
   const base = {
-    easy: { minDelay: 3300, maxDelay: 5400, accuracy: 0.56, points: 106 },
+    easy: { minDelay: 2400, maxDelay: 4300, accuracy: 0.56, points: 106 },
     medium: { minDelay: 2600, maxDelay: 4300, accuracy: 0.66, points: 118 },
     hard: { minDelay: 1450, maxDelay: 2850, accuracy: 0.81, points: 134 },
     'very-hard': { minDelay: 850, maxDelay: 1750, accuracy: 0.91, points: 152 },
@@ -1472,6 +1472,12 @@ function duelBotDifficultyConfig(difficulty: DuelBotResolvedDifficulty, scoreGap
     catchupActive,
     catchupStrength,
   }
+}
+
+function duelBotOpeningDelayMultiplier(difficulty: DuelBotResolvedDifficulty, botRound: number, botTotalMs: number) {
+  if (difficulty !== 'easy') return 1
+  if (botRound !== 1 || botTotalMs > 0) return 1
+  return 0.32
 }
 
 function duelBotModeDelayMultiplier(gameType: DuelGameType, difficulty: DuelBotResolvedDifficulty) {
@@ -4013,7 +4019,8 @@ export function OneVsOnePanel(props: {
     const userHotStreak = botMatch.gameType === 'blaster' ? blasterStreak : botMatch.userStreak
     const config = duelBotDifficultyConfig(botMatch.resolvedDifficulty, scoreGap, userHotStreak)
     const modeDelayMultiplier = duelBotModeDelayMultiplier(botMatch.gameType, botMatch.resolvedDifficulty)
-    const delay = (config.minDelay + Math.random() * Math.max(0, config.maxDelay - config.minDelay)) * modeDelayMultiplier
+    const openingDelayMultiplier = duelBotOpeningDelayMultiplier(botMatch.resolvedDifficulty, botMatch.botRound, botMatch.botTotalMs)
+    const delay = (config.minDelay + Math.random() * Math.max(0, config.maxDelay - config.minDelay)) * modeDelayMultiplier * openingDelayMultiplier
     botAnswerTimerRef.current = window.setTimeout(() => {
       const activeMatch = botMatchRef.current
       if (!activeMatch || activeMatch.status !== 'in_progress') return
@@ -4511,6 +4518,34 @@ export function OneVsOnePanel(props: {
     window.addEventListener('keydown', handleQuizKeyDown)
     return () => window.removeEventListener('keydown', handleQuizKeyDown)
   }, [room, currentRound, canStartRound, quizLocked, submitQuizAnswer])
+
+  // Keyboard shortcuts for bot 1v1 quiz answers.
+  useEffect(() => {
+    if (!botMatch || botMatch.status !== 'in_progress' || botMatch.gameType !== 'quiz') return
+    if (quizLocked) return
+    const currentBotRound = botMatch.questionSet[botMatch.userRound - 1]
+    if (!isQuizRound(currentBotRound)) return
+
+    const handleBotQuizKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) return
+
+      const keyNumber = Number.parseInt(event.key, 10)
+      const codeNumber = event.code.startsWith('Digit') || event.code.startsWith('Numpad')
+        ? Number.parseInt(event.code.replace(/\D/g, ''), 10)
+        : Number.NaN
+      const choiceNumber = Number.isFinite(keyNumber) ? keyNumber : codeNumber
+      if (!Number.isInteger(choiceNumber)) return
+      const choiceIndex = choiceNumber - 1
+      if (choiceIndex < 0 || choiceIndex >= currentBotRound.choices.length) return
+
+      event.preventDefault()
+      submitBotQuizAnswer(choiceIndex)
+    }
+
+    window.addEventListener('keydown', handleBotQuizKeyDown)
+    return () => window.removeEventListener('keydown', handleBotQuizKeyDown)
+  }, [botMatch, quizLocked, submitBotQuizAnswer])
 
   useEffect(() => {
     if (!room || !myPlayer || room.status !== 'in_progress' || room.game_type !== 'quiz') return
