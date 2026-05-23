@@ -15271,10 +15271,11 @@ textarea:focus-visible,
 
 .onevone-blaster-arena {
   --onevone-blaster-prompt-height: clamp(72px, 9svh, 96px);
+  --onevone-blaster-powerup-height: 34px;
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-rows: var(--onevone-blaster-prompt-height) minmax(0, 1fr);
+  grid-template-rows: var(--onevone-blaster-prompt-height) var(--onevone-blaster-powerup-height) minmax(0, 1fr);
   gap: 6px;
   height: 100%;
   min-height: 0;
@@ -15317,7 +15318,24 @@ textarea:focus-visible,
   white-space: nowrap;
 }
 
+.onevone-powerup-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--onevone-blaster-powerup-height);
+  min-height: var(--onevone-blaster-powerup-height);
+  max-height: var(--onevone-blaster-powerup-height);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.onevone-powerup-status-row:not(.active) {
+  visibility: hidden;
+}
+
 .onevone-powerup-pill {
+  max-width: min(100%, 620px);
+  overflow: hidden;
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(250, 204, 21, 0.24), rgba(96, 165, 250, 0.22));
   padding: 4px 10px;
@@ -15325,6 +15343,8 @@ textarea:focus-visible,
   font-size: 0.78rem;
   line-height: 1.05;
   box-shadow: 0 0 22px rgba(250, 204, 21, 0.16);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .onevone-powerup-coffee {
@@ -16343,7 +16363,8 @@ textarea:focus-visible,
 
   .onevone-blaster-arena {
     --onevone-blaster-prompt-height: 72px;
-    grid-template-rows: var(--onevone-blaster-prompt-height) minmax(0, 1fr);
+    --onevone-blaster-powerup-height: 28px;
+    grid-template-rows: var(--onevone-blaster-prompt-height) var(--onevone-blaster-powerup-height) minmax(0, 1fr);
   }
 
   .onevone-blaster-topbar {
