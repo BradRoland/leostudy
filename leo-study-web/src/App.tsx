@@ -20,10 +20,10 @@ type ScoreGameName = 'Matching' | 'Speed Test' | 'Code Blaster'
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 type DisplayMode = 'dark' | 'light'
 type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home' | 'leaderboards' | 'chat'
-type HomeActionTarget = 'study' | 'games-matching' | 'games-speed' | 'games-blaster' | 'games-duel-blaster' | 'scenarios'
+type HomeActionTarget = 'study' | 'games-matching' | 'games-speed' | 'games-blaster' | 'games-duel-blaster' | 'games-duel-bot' | 'scenarios'
 type HomeDurationFilter = 15 | 30 | 60
 type DuelLeaderboardMode = 'all' | 'matching' | 'quiz' | 'blaster'
-type DuelInvitePreset = 'rope-blaster'
+type DuelInvitePreset = 'rope-blaster' | 'bot-practice'
 type DuelLevelStats = {
   wins: number
   losses: number
@@ -363,6 +363,8 @@ type UserProfile = {
   isOwner: boolean
   createdAt: string
 }
+
+type AuthUserMetadata = Record<string, unknown>
 
 type BugSeverity = 'low' | 'medium' | 'high' | 'urgent'
 type BugStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
@@ -884,6 +886,10 @@ const gameHighScoreSeed = {
 const avatarBucket = (import.meta.env.VITE_SUPABASE_AVATAR_BUCKET || 'avatars').trim()
 const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.svg`
 const defaultAvatarPngUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.png`
+const pendingProfileSetupKey = 'pending_profile_setup'
+const pendingProfileUsernameKey = 'pending_profile_username'
+const pendingProfileEmailKey = 'pending_profile_email'
+const profileUsernameCachePrefix = 'leo_profile_username_'
 
 const codeSetLabel: Record<CodeSet, string> = {
   penal: 'Penal',
@@ -949,9 +955,54 @@ const homeEncouragementQuotes = [
   'If you can answer under pressure, you can perform under pressure.',
   'Mastery is repetition with feedback. Stay with the process.',
 ]
-type ReleaseNoteVisual = 'blaster' | 'latency' | 'powerups' | 'flow' | 'gameUi' | 'mobile' | 'xp' | 'validation'
+type ReleaseNoteVisual = 'bot' | 'profile' | 'scrollLock' | 'gameUi' | 'blaster' | 'latency' | 'powerups' | 'flow' | 'mobile' | 'xp' | 'validation'
 
-const releaseNotesV060: Array<{ title: string; visual: ReleaseNoteVisual; items: string[] }> = [
+const releaseNotesV061: Array<{ title: string; visual: ReleaseNoteVisual; items: string[] }> = [
+  {
+    title: '1v1 Versus Bot Practice',
+    visual: 'bot',
+    items: [
+      'Added private bot matches for Quiz, Matching, and Code Blaster so users can practice without waiting for another player.',
+      'Added Adaptive, Random, Easy, Medium, Hard, and Very Hard bot difficulty choices with separate bot stats and streak tracking.',
+      'Added a polished bot match builder with match summary pills, adaptive scout details, and a cleaner start flow.',
+    ],
+  },
+  {
+    title: 'Home Screen Bot CTA',
+    visual: 'bot',
+    items: [
+      'Replaced the Try 1v1 Rope Blaster banner with a Try 1v1 vs a Bot practice banner.',
+      'The home banner now opens the 1v1 bot setup directly so users can start a private practice match faster.',
+      'Refreshed the banner artwork, action text, and supporting copy around bot practice instead of friend invites.',
+    ],
+  },
+  {
+    title: 'Profile and Safari Session Fixes',
+    visual: 'profile',
+    items: [
+      'Fixed profile labels after email sign-in so the app shows the username instead of falling back to a generic label.',
+      'Improved auth restore behavior so refreshing profile/settings pages is less likely to kick users back out.',
+      'Added safer browser storage fallback for Safari and tunnel sessions where localStorage can be unavailable or inconsistent.',
+    ],
+  },
+  {
+    title: 'Locked Modal Scrolling',
+    visual: 'scrollLock',
+    items: [
+      'Locked the page behind the invite screen, bot setup, create-room modal, power-up glossary, Matching setup, and Speed Test setup.',
+      'Added overscroll containment so wheel and touch scrolling stay inside the active setup panel.',
+      'Verified the modal scroll lock on the narrow in-app browser viewport after the fix.',
+    ],
+  },
+  {
+    title: 'Full Games Smoke Pass',
+    visual: 'validation',
+    items: [
+      'Smoke tested Matching, Speed Test, Code Blaster, 1v1 room creation, invite setup, and all three bot modes.',
+      'Confirmed Matching and Speed Test still launch correctly after adding setup scroll locks.',
+      'Ran build, lint, diff checks, and a fresh browser-console pass before publishing this update.',
+    ],
+  },
   {
     title: '1v1 Rope Blaster (v0.60)',
     visual: 'blaster',
@@ -3331,6 +3382,63 @@ function mapProfileRow(row: Record<string, unknown>, userId: string): UserProfil
   }
 }
 
+function profileNameFromMetadata(metadata: AuthUserMetadata): string {
+  return String(metadata.username || '').trim()
+}
+
+function emptyCurrentUserProfile(userId: string): UserProfile {
+  return {
+    userId,
+    username: '',
+    avatarPath: '',
+    avatarUrl: defaultAvatarUrl,
+    supporterTier: 'free',
+    isOwner: false,
+    createdAt: '',
+  }
+}
+
+function readPendingProfileUsername(email: string): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    const pendingEmail = window.localStorage.getItem(pendingProfileEmailKey) || ''
+    if (pendingEmail && pendingEmail !== email.trim().toLowerCase()) return ''
+    return (window.localStorage.getItem(pendingProfileUsernameKey) || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+function clearPendingProfileUsername() {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(pendingProfileUsernameKey)
+    window.localStorage.removeItem(pendingProfileEmailKey)
+  } catch {
+    // Ignore storage cleanup failures; auth storage has its own fallback.
+  }
+}
+
+function readCachedProfileUsername(userId: string): string {
+  if (typeof window === 'undefined' || !userId) return ''
+  try {
+    return (window.localStorage.getItem(`${profileUsernameCachePrefix}${userId}`) || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+function writeCachedProfileUsername(userId: string, username: string) {
+  if (typeof window === 'undefined' || !userId) return
+  const normalized = username.trim()
+  if (!normalized) return
+  try {
+    window.localStorage.setItem(`${profileUsernameCachePrefix}${userId}`, normalized)
+  } catch {
+    // The app can still use in-memory profile state when browser storage is unavailable.
+  }
+}
+
 function rowToBugReport(row: Record<string, unknown>): BugReport | null {
   const id = String(row.id || '').trim()
   const reporterUserId = String(row.reporter_user_id || '').trim()
@@ -4390,6 +4498,7 @@ function App() {
 
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
+  const [currentUserMetadata, setCurrentUserMetadata] = useState<AuthUserMetadata>({})
   const [authSessionVersion, setAuthSessionVersion] = useState(0)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileHydrated, setProfileHydrated] = useState(false)
@@ -4608,6 +4717,7 @@ function App() {
   const [speedDeck, setSpeedDeck] = useState<QuizQuestion[]>([])
   const [speedSessionQuestions, setSpeedSessionQuestions] = useState<QuizQuestion[]>([])
   const [showSpeedSetupModal, setShowSpeedSetupModal] = useState(false)
+  const lockGameSetupPageScroll = showMatchSetupModal || showSpeedSetupModal
   const [speedFeedback, setSpeedFeedback] = useState('')
   const [blasterRemaining, setBlasterRemaining] = useState(30)
   const [blasterRunning, setBlasterRunning] = useState(false)
@@ -4630,6 +4740,53 @@ function App() {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(taskbarCollapseStorageKey, JSON.stringify(taskbarCollapsedGroups))
   }, [taskbarCollapsedGroups])
+
+  useEffect(() => {
+    if (!lockGameSetupPageScroll || typeof window === 'undefined' || typeof document === 'undefined') return
+
+    const html = document.documentElement
+    const body = document.body
+    const scrollY = window.scrollY || html.scrollTop || 0
+    const scrollbarGap = Math.max(0, window.innerWidth - html.clientWidth)
+    const previousHtmlOverflow = html.style.overflow
+    const previousHtmlOverscrollBehavior = html.style.overscrollBehavior
+    const previousBodyOverflow = body.style.overflow
+    const previousBodyOverscrollBehavior = body.style.overscrollBehavior
+    const previousBodyPosition = body.style.position
+    const previousBodyTop = body.style.top
+    const previousBodyLeft = body.style.left
+    const previousBodyRight = body.style.right
+    const previousBodyWidth = body.style.width
+    const previousBodyPaddingRight = body.style.paddingRight
+
+    html.style.overflow = 'hidden'
+    html.style.overscrollBehavior = 'none'
+    body.style.overflow = 'hidden'
+    body.style.overscrollBehavior = 'none'
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.left = '0'
+    body.style.right = '0'
+    body.style.width = '100%'
+    if (scrollbarGap > 0) {
+      body.style.paddingRight = `${scrollbarGap}px`
+    }
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow
+      html.style.overscrollBehavior = previousHtmlOverscrollBehavior
+      body.style.overflow = previousBodyOverflow
+      body.style.overscrollBehavior = previousBodyOverscrollBehavior
+      body.style.position = previousBodyPosition
+      body.style.top = previousBodyTop
+      body.style.left = previousBodyLeft
+      body.style.right = previousBodyRight
+      body.style.width = previousBodyWidth
+      body.style.paddingRight = previousBodyPaddingRight
+      window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' })
+    }
+  }, [lockGameSetupPageScroll])
+
   const [speedAnswerLocked, setSpeedAnswerLocked] = useState(false)
   const [scenarioTrainingSection, setScenarioTrainingSection] = useState<ScenarioTrainingSection>('tmas1')
   const [scenarioDeck, setScenarioDeck] = useState<ScenarioQuestion[]>([])
@@ -5261,10 +5418,14 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const pendingSetup = window.localStorage.getItem('pending_profile_setup') === '1'
+    const pendingSetup = window.localStorage.getItem(pendingProfileSetupKey) === '1'
+    const pendingUsername = window.localStorage.getItem(pendingProfileUsernameKey) || ''
     if (pendingSetup) {
       setForceProfileSetup(true)
-      window.localStorage.removeItem('pending_profile_setup')
+      window.localStorage.removeItem(pendingProfileSetupKey)
+    }
+    if (pendingUsername.trim()) {
+      setProfileUsername(pendingUsername.trim())
     }
   }, [])
 
@@ -6241,6 +6402,7 @@ function App() {
     let mounted = true
     let readyFallbackTimer: number | null = null
     let waitingForRedirectSession = hasAuthRedirectParams()
+    let restoreSettled = false
     type CurrentSession = Awaited<ReturnType<typeof client.auth.getSession>>['data']['session']
 
     const clearReadyFallback = () => {
@@ -6252,6 +6414,12 @@ function App() {
 
     const markAuthReady = () => {
       if (mounted) setAuthReady(true)
+    }
+
+    const settleAuthRestore = () => {
+      restoreSettled = true
+      clearReadyFallback()
+      markAuthReady()
     }
 
     const finishRedirectWait = () => {
@@ -6267,6 +6435,7 @@ function App() {
         setCurrentUserId(session.user.id)
         setCurrentUserEmail(session.user.email || '')
         setCurrentUserProvider(String(session.user.app_metadata?.provider || 'email'))
+        setCurrentUserMetadata((session.user.user_metadata || {}) as AuthUserMetadata)
         setAuthSessionVersion((version) => version + 1)
         return
       }
@@ -6276,6 +6445,7 @@ function App() {
       setCurrentUserId('')
       setCurrentUserEmail('')
       setCurrentUserProvider('email')
+      setCurrentUserMetadata({})
       setProfile(null)
       setProfileHydrated(false)
       setForceProfileSetup(false)
@@ -6304,15 +6474,9 @@ function App() {
         !session?.user &&
         event !== 'SIGNED_OUT'
       applySession(session, !shouldHoldEmptyRedirectSession)
-      if (session?.user || event === 'SIGNED_OUT') {
-        clearReadyFallback()
+      if (session?.user || event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !shouldHoldEmptyRedirectSession)) {
         finishRedirectWait()
-        markAuthReady()
-        return
-      }
-      if (event === 'INITIAL_SESSION' && session?.user && !waitingForRedirectSession) {
-        clearReadyFallback()
-        markAuthReady()
+        settleAuthRestore()
       }
     })
 
@@ -6340,30 +6504,27 @@ function App() {
         const detectedSession = await waitForCurrentSession(4, 250)
         if (detectedSession?.user) {
           applySession(detectedSession)
-          clearReadyFallback()
-          markAuthReady()
+          settleAuthRestore()
           return
         }
 
         const { data, error } = await client.auth.exchangeCodeForSession(redirectCode)
         if (!error && data.session?.user) {
           applySession(data.session)
-          clearReadyFallback()
-          markAuthReady()
+          settleAuthRestore()
           return
         }
 
         const recoveredSession = await waitForCurrentSession(8, 500)
         if (recoveredSession?.user) {
           applySession(recoveredSession)
-          clearReadyFallback()
-          markAuthReady()
+          settleAuthRestore()
           return
         }
 
         setAuthError(error?.message || 'Could not finish Google sign-in. Please try again.')
         finishRedirectWait()
-        markAuthReady()
+        settleAuthRestore()
         return
       }
 
@@ -6371,8 +6532,7 @@ function App() {
       const shouldHoldEmptyRedirectSession = waitingForRedirectSession && !session?.user
       applySession(session, !shouldHoldEmptyRedirectSession)
       if (session?.user || !shouldHoldEmptyRedirectSession) {
-        clearReadyFallback()
-        markAuthReady()
+        settleAuthRestore()
       }
     }
 
@@ -6380,23 +6540,28 @@ function App() {
       .catch((error) => {
         console.warn('[auth] session restore failed:', error)
         if (!waitingForRedirectSession) {
-          markAuthReady()
+          settleAuthRestore()
         }
       })
 
     readyFallbackTimer = window.setTimeout(async () => {
+      if (restoreSettled) return
       try {
         const {
           data: { session },
         } = await client.auth.getSession()
-        applySession(session)
+        if (session?.user) {
+          applySession(session)
+        }
       } catch (error) {
         console.warn('[auth] session fallback failed:', error)
       } finally {
-        finishRedirectWait()
-        markAuthReady()
+        if (!restoreSettled) {
+          finishRedirectWait()
+          settleAuthRestore()
+        }
       }
-    }, waitingForRedirectSession ? 12000 : 2500)
+    }, waitingForRedirectSession ? 12000 : 10000)
 
     return () => {
       mounted = false
@@ -6438,6 +6603,7 @@ function App() {
         setCurrentUserId('')
         setCurrentUserEmail('')
         setCurrentUserProvider('email')
+        setCurrentUserMetadata({})
         setProfile(null)
         lastPersistedAppStateRef.current = {
           performance: null,
@@ -6457,21 +6623,76 @@ function App() {
         .maybeSingle()
 
       if (isStaleHydration()) return
+      let effectiveProfileRow = profileRow as Record<string, unknown> | null
+      const pendingProfileName = readPendingProfileUsername(currentUserEmail)
+      const metadataProfileName = profileNameFromMetadata(currentUserMetadata)
+      const cachedProfileName = readCachedProfileUsername(currentUserId)
+      const seededProfileName = pendingProfileName || metadataProfileName
+      const displayNameSeed = seededProfileName || cachedProfileName
+      const saveSeededProfileName = async (sourceRow: Record<string, unknown> | null) => {
+        if (!seededProfileName) return null
+        const sourceTier = String(sourceRow?.supporter_tier || '')
+        const supporterTier = ['free', 'tier2', 'tier5', 'tier10'].includes(sourceTier) ? sourceTier : 'free'
+        const { data: savedProfileRow, error: seedProfileError } = await client
+          .from('profiles')
+          .upsert(
+            {
+              user_id: currentUserId,
+              username: seededProfileName,
+              avatar_path: String(sourceRow?.avatar_path || ''),
+              supporter_tier: supporterTier,
+              bio: String(sourceRow?.bio || ''),
+              agency: normalizeAgency(sourceRow?.agency || defaultAgency, agencyOptions),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id' },
+          )
+          .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')
+          .single()
+
+        if (seedProfileError) {
+          console.warn('[profiles] seeded username save failed:', seedProfileError.message)
+          return null
+        }
+        clearPendingProfileUsername()
+        return savedProfileRow as Record<string, unknown>
+      }
+
       if (profileLookupError) {
         console.warn('[profiles] current user lookup failed:', profileLookupError.message)
         setAuthError('Signed in, but your profile could not be loaded. Please refresh or try signing in again.')
-        setProfile(null)
-        setProfileUsername('')
+        setProfile((previous) => previous || emptyCurrentUserProfile(currentUserId))
+        setProfileUsername((previous) => previous.trim() || cachedProfileName)
         setForceProfileSetup(false)
       } else if (profileRow) {
-        const mapped = mapProfileRow(profileRow as Record<string, unknown>, currentUserId)
+        let mapped = mapProfileRow(profileRow as Record<string, unknown>, currentUserId)
+        if (!mapped.username) {
+          const seededProfileRow = await saveSeededProfileName(effectiveProfileRow)
+          if (isStaleHydration()) return
+          if (seededProfileRow) {
+            effectiveProfileRow = seededProfileRow
+            mapped = mapProfileRow(seededProfileRow, currentUserId)
+          }
+        }
         setProfile(mapped)
-        setProfileUsername(mapped.username)
-        setForceProfileSetup(false)
+        setProfileUsername(mapped.username || displayNameSeed)
+        writeCachedProfileUsername(currentUserId, mapped.username)
+        setForceProfileSetup(!mapped.username)
       } else {
-        setProfile({ userId: currentUserId, username: '', avatarPath: '', avatarUrl: defaultAvatarUrl, supporterTier: 'free', isOwner: false, createdAt: '' })
-        setProfileUsername('')
-        setForceProfileSetup(true)
+        const seededProfileRow = await saveSeededProfileName(null)
+        if (isStaleHydration()) return
+        if (seededProfileRow) {
+          effectiveProfileRow = seededProfileRow
+          const mapped = mapProfileRow(seededProfileRow, currentUserId)
+          setProfile(mapped)
+          setProfileUsername(mapped.username)
+          writeCachedProfileUsername(currentUserId, mapped.username)
+          setForceProfileSetup(false)
+        } else {
+          setProfile(emptyCurrentUserProfile(currentUserId))
+          setProfileUsername(displayNameSeed)
+          setForceProfileSetup(true)
+        }
       }
       setProfileHydrated(true)
 
@@ -6496,8 +6717,8 @@ function App() {
       setPerformance(nextState.performance)
       setHighScores(nextState.highScores)
       setBestStreak(nextState.bestStreak)
-      const profileBio = String(profileRow?.bio || '')
-      const profileAgency = String(profileRow?.agency || '')
+      const profileBio = String(effectiveProfileRow?.bio || '')
+      const profileAgency = String(effectiveProfileRow?.agency || '')
       const hydratedProfileDetails: ProfileDetails = {
         bio: profileBio || nextState.profileDetails.bio,
         agency: profileAgency || nextState.profileDetails.agency,
@@ -6566,7 +6787,7 @@ function App() {
       setAuthError('Signed in, but your account data could not be loaded. Please refresh or try signing in again.')
       setProfileHydrated(true)
     })
-  }, [authSessionVersion, currentUserId, navigate])
+  }, [agencyOptions, authSessionVersion, currentUserEmail, currentUserId, currentUserMetadata, navigate])
 
   useEffect(() => {
     if (!supabase || !stateHydrated || !currentUserId) return
@@ -6656,7 +6877,10 @@ function App() {
           const row = payload.new as Record<string, unknown>
           const mapped = mapProfileRow(row, currentUserId)
           setProfile(mapped)
-          if (mapped.username) setProfileUsername(mapped.username)
+          if (mapped.username) {
+            setProfileUsername(mapped.username)
+            writeCachedProfileUsername(currentUserId, mapped.username)
+          }
           setProfileDetails((previous) => ({
             bio: String(row.bio || ''),
             agency: String(row.agency || ''),
@@ -6714,6 +6938,10 @@ function App() {
       if (!profileRow) return
       const mapped = mapProfileRow(profileRow as Record<string, unknown>, currentUserId)
       setProfile(mapped)
+      if (mapped.username) {
+        setProfileUsername(mapped.username)
+        writeCachedProfileUsername(currentUserId, mapped.username)
+      }
     }, 20000)
 
     return () => clearInterval(timer)
@@ -9286,7 +9514,8 @@ function App() {
     setAuthLoading(true)
     setAuthError('')
     setAuthSuccess('')
-    window.localStorage.removeItem('pending_profile_setup')
+    window.localStorage.removeItem(pendingProfileSetupKey)
+    setProfileUsername(readPendingProfileUsername(normalizedEmail))
     setForceProfileSetup(false)
     setProfile(null)
     setProfileHydrated(false)
@@ -9308,6 +9537,7 @@ function App() {
       setCurrentUserId(data.user.id)
       setCurrentUserEmail(data.user.email || '')
       setCurrentUserProvider(String(data.user.app_metadata?.provider || 'email'))
+      setCurrentUserMetadata((data.user.user_metadata || {}) as AuthUserMetadata)
       setAuthSessionVersion((version) => version + 1)
     }
 
@@ -9324,6 +9554,7 @@ function App() {
   const submitSignUp = async () => {
     if (!supabase) return
     const normalizedEmail = authEmail.trim().toLowerCase()
+    const normalizedUsername = profileUsername.trim()
     if (authPassword !== authPasswordConfirm) {
       setAuthError('Passwords do not match.')
       return
@@ -9332,14 +9563,24 @@ function App() {
       setAuthError('Enter an email address.')
       return
     }
+    if (!normalizedUsername) {
+      setAuthError('Enter a username.')
+      return
+    }
     setAuthLoading(true)
     setAuthError('')
     setAuthSuccess('')
-    window.localStorage.removeItem('pending_profile_setup')
+    window.localStorage.removeItem(pendingProfileSetupKey)
 
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password: authPassword,
+      options: {
+        data: {
+          username: normalizedUsername,
+          display_name: normalizedUsername,
+        },
+      },
     })
 
     if (error) {
@@ -9360,10 +9601,16 @@ function App() {
       return
     }
 
-    window.localStorage.setItem('pending_profile_setup', '1')
+    window.localStorage.setItem(pendingProfileSetupKey, '1')
+    window.localStorage.setItem(pendingProfileUsernameKey, normalizedUsername)
+    window.localStorage.setItem(pendingProfileEmailKey, normalizedEmail)
     window.localStorage.setItem('pending_dev_notice', '1')
     setForceProfileSetup(true)
     setAuthEmail(normalizedEmail)
+    setProfileUsername(normalizedUsername)
+    if (data.user) {
+      setCurrentUserMetadata((data.user.user_metadata || {}) as AuthUserMetadata)
+    }
     setAuthSuccess('Account created. You can sign in now.')
     setAuthPassword('')
     setAuthPasswordConfirm('')
@@ -9378,7 +9625,8 @@ function App() {
     if (!supabase) return
     setAuthLoading(true)
     setAuthError('')
-    window.localStorage.removeItem('pending_profile_setup')
+    window.localStorage.removeItem(pendingProfileSetupKey)
+    clearPendingProfileUsername()
     if (isSignUpPage) {
       window.localStorage.setItem('pending_dev_notice', '1')
     }
@@ -9484,7 +9732,9 @@ function App() {
     const mapped = mapProfileRow(savedProfileRow as Record<string, unknown>, currentUserId)
     setProfile(mapped)
     setProfileUsername(mapped.username)
+    writeCachedProfileUsername(currentUserId, mapped.username)
     setForceProfileSetup(false)
+    clearPendingProfileUsername()
 
     const pendingDevNotice = window.localStorage.getItem('pending_dev_notice') === '1'
     window.localStorage.removeItem('pending_dev_notice')
@@ -9614,8 +9864,10 @@ function App() {
     setCurrentUserId('')
     setCurrentUserEmail('')
     setCurrentUserProvider('email')
+    setCurrentUserMetadata({})
     setProfile(null)
     setForceProfileSetup(false)
+    clearPendingProfileUsername()
     setAuthEmail('')
     setAuthPassword('')
     setAuthPasswordConfirm('')
@@ -10406,6 +10658,10 @@ function App() {
     if (!profileRow) return
     const mapped = mapProfileRow(profileRow as Record<string, unknown>, currentUserId)
     setProfile(mapped)
+    if (mapped.username) {
+      setProfileUsername(mapped.username)
+      writeCachedProfileUsername(currentUserId, mapped.username)
+    }
   }
 
   const toggleDisplayMode = async () => {
@@ -10445,7 +10701,8 @@ function App() {
   const selectedTheme = getThemePreset(canUseThemes ? profileDetails.themeId : appThemePresets[0].id)
   const isUiLightMode = profileDetails.displayMode === 'light'
   const activeProfileTier: SupporterTier = profile?.supporterTier || 'free'
-  const activeProfileName = profile?.username || (profileHydrated ? 'Officer' : 'Loading profile…')
+  const profileDisplayName = profile?.username || profileUsername.trim()
+  const activeProfileName = profileDisplayName || (profileHydrated ? 'Profile' : 'Loading profile…')
   const pageTitle = isProfilePage
     ? 'Settings'
     : isStatsPage
@@ -12361,6 +12618,12 @@ function App() {
       navigate('/games/duel')
       return
     }
+    if (target === 'games-duel-bot') {
+      setActiveTab('games')
+      setDuelInvitePreset('bot-practice')
+      navigate('/games/duel')
+      return
+    }
     setActiveTab('scenarios')
     navigate('/scenarios')
   }
@@ -12503,6 +12766,17 @@ function App() {
               <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" />
             </label>
             <label>
+              Username
+              <input
+                value={profileUsername}
+                onChange={(event) => {
+                  setProfileUsername(event.target.value)
+                  if (authError.toLowerCase().includes('username')) setAuthError('')
+                }}
+                autoComplete="username"
+              />
+            </label>
+            <label>
               Password
               <div className="password-row">
                 <input
@@ -12560,7 +12834,7 @@ function App() {
               </div>
             </label>
             {authPasswordConfirm.length > 0 && authPassword !== authPasswordConfirm ? <p className="bad">Passwords do not match.</p> : null}
-            <button type="submit" className="primary" disabled={authLoading || authPassword.length === 0 || authPassword !== authPasswordConfirm}>
+            <button type="submit" className="primary" disabled={authLoading || profileUsername.trim().length < 1 || authPassword.length === 0 || authPassword !== authPasswordConfirm}>
               Create Account
             </button>
             <button type="button" className="secondary" onClick={submitGoogle} disabled={authLoading}>
@@ -12821,12 +13095,12 @@ function App() {
               <div className="taskbar-profile-wrap" ref={profileMenuRef}>
                 <button className="taskbar-profile" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="Open profile menu">
                   <span className={`avatar-decoration-wrap taskbar-profile-avatar-wrap level-halo-frame ${currentUserLevelProfile.haloClass}`}>
-                    <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="taskbar-profile-image" onError={handleAvatarImageError} />
+                    <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={activeProfileName} className="taskbar-profile-image" onError={handleAvatarImageError} />
                     {renderAvatarDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
                   </span>
                   <span className="taskbar-profile-info">
                     <span className={`taskbar-profile-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
-                      {profile.username || 'Profile'}
+                      {profileDisplayName || 'Profile'}
                     </span>
                     <span className="taskbar-profile-tier">{tierLabel[activeProfileTier]} • Lv {currentUserLevelProfile.level}</span>
                     <span className="taskbar-xp-meta">
@@ -12900,10 +13174,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 0.60"
+                    aria-label="Open what's new for version 0.61"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v0.60
+                    What's New · v0.61
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -12970,19 +13244,24 @@ function App() {
                 </button>
               ) : null}
               <button
-                className="home-blaster-cta"
+                className="home-blaster-cta home-bot-cta"
                 type="button"
-                onClick={() => handleHomeAction('games-duel-blaster', { forceAllTime: true })}
+                onClick={() => handleHomeAction('games-duel-bot', { forceAllTime: true })}
               >
                 <span className="home-blaster-cta-icon">
-                  <AppIcon name="blaster" />
+                  <AppIcon name="duel" />
                 </span>
                 <span className="home-blaster-cta-copy">
-                  <span className="home-blaster-cta-kicker">New Game Mode</span>
-                  <strong>Try 1v1 Rope Blaster</strong>
-                  <span>Invite a friend, push the lit bomb across the rope, and win by time or rope KO.</span>
+                  <span className="home-blaster-cta-kicker">Private Practice</span>
+                  <strong>Try 1v1 vs a Bot</strong>
+                  <span>Launch Quiz, Matching, or Code Blaster practice with adaptive bot pressure and no waiting room.</span>
+                  <span className="home-bot-cta-pills" aria-hidden>
+                    <span>Adaptive</span>
+                    <span>Quiz</span>
+                    <span>Blaster</span>
+                  </span>
                 </span>
-                <span className="home-blaster-cta-action">Invite</span>
+                <span className="home-blaster-cta-action">Practice</span>
               </button>
               <div className="home-actions">
                 <button className="primary" onClick={() => { setActiveTab('study'); navigate('/study') }}>
@@ -13704,7 +13983,7 @@ function App() {
             <div className="card chat-page-card">
               <GlobalChatWidget
                 currentUserId={currentUserId}
-                currentUsername={profileUsername}
+                currentUsername={profileDisplayName || 'You'}
                 userAgency={profileDetails?.agency}
                 isOwner={isOwner}
                 leaderboardFirstSpotCounts={{
@@ -15202,7 +15481,7 @@ function App() {
             {isGamesDuelPage ? (
               <OneVsOnePanel
                 currentUserId={currentUserId}
-                currentUsername={profile?.username || currentUserEmail || 'You'}
+                currentUsername={profileDisplayName || 'You'}
                 isOwner={isOwner}
                 externalJoinRoomId={duelInviteJoinRoomId}
                 onExternalJoinHandled={() => setDuelInviteJoinRoomId(null)}
@@ -16868,15 +17147,15 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v0.60</h3>
+                <h3>What’s New · v0.61</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV060.map((group) => (
-                <article key={`v060-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV061.map((group) => (
+                <article key={`v061-note-${group.title}`} className="home-whats-new-card">
                   <div className={`home-whats-new-visual home-whats-new-visual-${group.visual}`} aria-hidden>
                     <span className="home-whats-new-visual-screen" />
                     <span className="home-whats-new-visual-main" />
@@ -17399,7 +17678,7 @@ function App() {
       {authReady && currentUserId && !isChatPage ? (
         <GlobalChatWidget
           currentUserId={currentUserId}
-          currentUsername={profileUsername}
+          currentUsername={profileDisplayName || 'You'}
           userAgency={profileDetails?.agency}
           isOwner={isOwner}
           leaderboardFirstSpotCounts={{

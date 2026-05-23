@@ -15,6 +15,10 @@
   z-index: auto;
 }
 
+body:has(.profile-modal-overlay) .global-chat-widget:not(.global-chat-widget-full) {
+  display: none;
+}
+
 /* Hide floating toggle on mobile - chat is in tab bar */
 @media (max-width: 768px) {
   .global-chat-widget .global-chat-toggle {

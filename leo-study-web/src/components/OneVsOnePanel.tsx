@@ -1,5 +1,6 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type RealtimeChannel } from '@supabase/supabase-js'
+import { loadLocalContentBundle, type ContentBankItem } from '../content'
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
@@ -102,7 +103,7 @@ type BlasterRoundPayload = {
 
 type BlasterShotBurst = {
   id: string
-  tone: 'good' | 'bad' | 'power'
+  tone: 'good' | 'bad' | 'power' | 'spectator'
   x: number
   y: number
 }
@@ -122,6 +123,8 @@ type BlasterScoreBroadcastPayload = {
   powerup_key?: DuelBlasterPowerupKey | null
   powerup_effect?: DuelBlasterDisruptionKey | null
   disguise_code?: string | null
+  target_index?: number | null
+  target_label?: string | null
 }
 
 type BlasterPowerupEffectPayload = {
@@ -161,6 +164,8 @@ type RopeBlasterCloudState = {
     powerupKey?: DuelBlasterPowerupKey | string | null
     powerupEffect?: DuelBlasterDisruptionKey | string | null
     disguiseCode?: string | null
+    targetIndex?: number | null
+    targetLabel?: string | null
   } | null
 }
 
@@ -235,6 +240,67 @@ type ReadyRpcState = {
 
 type DuelStatsMode = 'all' | DuelGameType
 const duelStatsModes: DuelStatsMode[] = ['all', 'matching', 'quiz', 'blaster']
+
+type DuelBotDifficulty = 'adaptive' | 'random' | 'easy' | 'medium' | 'hard' | 'very-hard'
+type DuelBotResolvedDifficulty = Exclude<DuelBotDifficulty, 'adaptive' | 'random'>
+type DuelBotMatchStatus = 'in_progress' | 'completed'
+type DuelBotWinner = 'user' | 'bot' | 'draw'
+
+type DuelBotStats = {
+  version: number
+  wins: number
+  losses: number
+  matches_played: number
+  current_win_streak: number
+  best_win_streak: number
+  best_score: number
+  best_difficulty: DuelBotResolvedDifficulty | ''
+  wins_by_difficulty: Record<DuelBotResolvedDifficulty, number>
+  updated_at: string
+}
+
+type DuelBotSkillSnapshot = {
+  studySeconds: number
+  blasterWins: number
+  duelWins: number
+  masteredCodes: number
+  weakCategory: DuelCategory
+  weakCodes: string[]
+}
+
+type DuelBotRoundPayload = QuizRoundPayload | MatchingRoundPayload | BlasterRoundPayload
+
+type DuelBotMatch = {
+  id: string
+  status: DuelBotMatchStatus
+  gameType: DuelGameType
+  difficulty: DuelBotDifficulty
+  resolvedDifficulty: DuelBotResolvedDifficulty
+  category: DuelCategory
+  mode: DuelBlasterMode
+  durationSeconds: number
+  powerupsEnabled: boolean
+  overtimeEnabled: boolean
+  overtimeAfterSeconds: number
+  rounds: number
+  questionSet: DuelBotRoundPayload[]
+  userRound: number
+  botRound: number
+  userScore: number
+  botScore: number
+  userTotalMs: number
+  botTotalMs: number
+  userFastestMs: number
+  botFastestMs: number
+  startedAt: number
+  completedAt?: number
+  winner: DuelBotWinner | null
+  botName: string
+  coachingNote: string
+  userStreak: number
+  botStreak: number
+  lastBotCorrect?: boolean
+}
 
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
 
@@ -391,6 +457,35 @@ const duelGameTypeOptions: Array<{ value: DuelGameType; label: string; subtitle:
   { value: 'matching', label: '1v1 Matching', subtitle: 'Pair codes and definitions' },
   { value: 'blaster', label: 'Rope Blaster', subtitle: 'Timed code blasts or rope KO' },
 ]
+const duelBotDifficultyOptions: Array<{ value: DuelBotDifficulty; label: string; subtitle: string }> = [
+  { value: 'adaptive', label: 'Adaptive', subtitle: 'Targets your weak codes' },
+  { value: 'random', label: 'Random', subtitle: 'Surprise bot skill' },
+  { value: 'easy', label: 'Easy', subtitle: 'Warm-up pressure' },
+  { value: 'medium', label: 'Medium', subtitle: 'Solid academy pace' },
+  { value: 'hard', label: 'Hard', subtitle: 'Fast and accurate' },
+  { value: 'very-hard', label: 'Very Hard', subtitle: 'Boss pressure' },
+]
+const duelBotResolvedDifficultyLabels: Record<DuelBotResolvedDifficulty, string> = {
+  easy: 'Easy',
+  medium: 'Medium',
+  hard: 'Hard',
+  'very-hard': 'Very Hard',
+}
+const duelBotDifficultyRank: Record<DuelBotResolvedDifficulty, number> = {
+  easy: 1,
+  medium: 2,
+  hard: 3,
+  'very-hard': 4,
+}
+const duelBotNames: Record<DuelBotResolvedDifficulty, string[]> = {
+  easy: ['Cadet Luna', 'Bot Rookie', 'Officer Sprout'],
+  medium: ['Officer Byte', 'Cadet Radar', 'Unit 12'],
+  hard: ['Sgt. Vector', 'Code Coach', 'Officer Tempo'],
+  'very-hard': ['Lt. Overwatch', 'The Evaluator', 'Code Phantom'],
+}
+const duelBotStatsVersion = 1
+const duelBotCatchupStreakThreshold = 3
+const duelBotCatchupLeadThreshold = 100
 const duelCategoryOptions: Array<{ value: DuelCategory; label: string; quizOnly?: boolean }> = [
   { value: 'all', label: 'ALL' },
   { value: 'pc', label: 'PC' },
@@ -665,6 +760,21 @@ function duelBlasterPowerupForRound(round: number, powerupsEnabled: boolean, mod
   if (round % 3 === 0) return { key: 'radio', label: 'Radio Boost', points: 140, icon: '📻', description: 'Your streak bonus counts double.' }
   return null
 }
+
+const duelBlasterPowerupGlossary: Array<DuelBlasterPowerup & { timing: string }> = [
+  { key: 'radio', label: 'Radio Boost', points: 140, icon: '📻', description: 'Your streak bonus counts double when you hit the correct asteroid.', timing: 'Common streak booster' },
+  { key: 'coffee', label: 'Coffee Rush', points: 145, icon: '☕️', description: 'Timed mode bonus for answering in 4 seconds or less.', timing: 'Timed mode only' },
+  { key: 'donut', label: 'Donut Armor', points: 165, icon: '🍩', description: 'A miss keeps your streak alive instead of resetting it.', timing: 'Timed mode only' },
+  { key: 'code3', label: 'Code 3 Surge', points: 230, icon: '🚨', description: 'A huge correct blast yanks the rope hard.', timing: 'High-impact rounds' },
+  { key: 'k9', label: 'K-9 Sniff', points: 150, icon: '🐕', description: 'A paw-glow hint points toward the best target.', timing: 'Timed mode only' },
+  { key: 'backup', label: 'Backup Unit', points: 170, icon: '🚔', description: 'Correct answers get an extra shove on the rope.', timing: 'Timed mode only' },
+  { key: 'vest', label: 'Ballistic Vest', points: 135, icon: '🦺', description: 'Wrong clicks hurt less so one miss does not end the fight.', timing: 'Defense round' },
+  { key: 'evidence', label: 'Evidence Bag', points: 150, icon: '🧾', description: 'A chain bonus rewards sustained accuracy.', timing: 'Timed mode only' },
+  { key: 'clone', label: 'Clone Jammer', points: 160, icon: '🌀', description: 'The opponent briefly sees cloned code labels, forcing them to slow down.', timing: 'Disruption round' },
+  { key: 'paperwork', label: 'Paperwork Storm', points: 150, icon: '📄', description: 'Fake reports flood the opponent screen and block visibility.', timing: 'Disruption round' },
+  { key: 'radar', label: 'Spotlight Sweep', points: 145, icon: '🔦', description: 'A scanner glow marks the right asteroid.', timing: 'Hint round' },
+  { key: 'spikes', label: 'Pursuit Panic', points: 175, icon: '🚓', description: 'Opponent asteroids surge to Code 3 speed and become harder to click.', timing: 'Disruption round' },
+]
 
 function duelBlasterDisruptionForPowerup(powerup: DuelBlasterPowerup | null): DuelBlasterDisruptionKey | null {
   if (!powerup) return null
@@ -988,6 +1098,443 @@ function writeDuelLeaderboardCache(
   }
 }
 
+function emptyDuelBotStats(): DuelBotStats {
+  return {
+    version: duelBotStatsVersion,
+    wins: 0,
+    losses: 0,
+    matches_played: 0,
+    current_win_streak: 0,
+    best_win_streak: 0,
+    best_score: 0,
+    best_difficulty: '',
+    wins_by_difficulty: {
+      easy: 0,
+      medium: 0,
+      hard: 0,
+      'very-hard': 0,
+    },
+    updated_at: '',
+  }
+}
+
+function duelBotStatsCacheKey(userId: string) {
+  return `leo-study:duel-bot-stats:v${duelBotStatsVersion}:${userId}`
+}
+
+function sanitizeDuelBotStats(input: unknown): DuelBotStats {
+  const fallback = emptyDuelBotStats()
+  if (!input || typeof input !== 'object') return fallback
+  const row = input as Record<string, unknown>
+  const winsByDifficultyRaw = row.wins_by_difficulty && typeof row.wins_by_difficulty === 'object'
+    ? row.wins_by_difficulty as Partial<Record<DuelBotResolvedDifficulty, unknown>>
+    : {}
+  const bestDifficulty = String(row.best_difficulty || '') as DuelBotResolvedDifficulty | ''
+  return {
+    version: duelBotStatsVersion,
+    wins: Math.max(0, Math.floor(Number(row.wins || 0))),
+    losses: Math.max(0, Math.floor(Number(row.losses || 0))),
+    matches_played: Math.max(0, Math.floor(Number(row.matches_played || 0))),
+    current_win_streak: Math.max(0, Math.floor(Number(row.current_win_streak || 0))),
+    best_win_streak: Math.max(0, Math.floor(Number(row.best_win_streak || 0))),
+    best_score: Math.max(0, Math.floor(Number(row.best_score || 0))),
+    best_difficulty: bestDifficulty && duelBotDifficultyRank[bestDifficulty] ? bestDifficulty : '',
+    wins_by_difficulty: {
+      easy: Math.max(0, Math.floor(Number(winsByDifficultyRaw.easy || 0))),
+      medium: Math.max(0, Math.floor(Number(winsByDifficultyRaw.medium || 0))),
+      hard: Math.max(0, Math.floor(Number(winsByDifficultyRaw.hard || 0))),
+      'very-hard': Math.max(0, Math.floor(Number(winsByDifficultyRaw['very-hard'] || 0))),
+    },
+    updated_at: typeof row.updated_at === 'string' ? row.updated_at : '',
+  }
+}
+
+function readDuelBotStats(userId: string) {
+  if (typeof window === 'undefined' || !userId.trim()) return emptyDuelBotStats()
+  try {
+    const raw = window.localStorage.getItem(duelBotStatsCacheKey(userId))
+    return raw ? sanitizeDuelBotStats(JSON.parse(raw)) : emptyDuelBotStats()
+  } catch {
+    return emptyDuelBotStats()
+  }
+}
+
+function writeDuelBotStats(userId: string, stats: DuelBotStats) {
+  if (typeof window === 'undefined' || !userId.trim()) return
+  try {
+    window.localStorage.setItem(duelBotStatsCacheKey(userId), JSON.stringify(stats))
+  } catch {
+    // ignore storage write failures
+  }
+}
+
+function shuffleRandom<T>(items: T[]) {
+  const copy = [...items]
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1))
+    ;[copy[index], copy[swap]] = [copy[swap], copy[index]]
+  }
+  return copy
+}
+
+function contentCategoryToDuelCategory(item: ContentBankItem): DuelCategory {
+  if (item.category === 'pc') return 'pc'
+  if (item.category === 'vc') return 'vc'
+  if (item.category === 'hs') return 'hs'
+  return 'all'
+}
+
+function duelCategoryLabel(category: DuelCategory) {
+  if (category === 'pc') return 'Penal Codes'
+  if (category === 'vc') return 'Vehicle Codes'
+  if (category === 'hs') return 'HS Codes'
+  if (category === 'scenarios') return 'Scenarios'
+  return 'All Codes'
+}
+
+function codeItemSection(item: ContentBankItem) {
+  return String(item.codeSection || item.answer || '').trim()
+}
+
+function codeItemDefinition(item: ContentBankItem) {
+  return String(item.title || item.explanation || item.question || '').trim()
+}
+
+function uniqueBotStrings(items: string[]) {
+  const seen = new Set<string>()
+  const results: string[] = []
+  items.forEach((item) => {
+    const value = String(item || '').trim()
+    const key = value.toLowerCase()
+    if (!value || seen.has(key)) return
+    seen.add(key)
+    results.push(value)
+  })
+  return results
+}
+
+function getBotCodeItems(category: DuelCategory, minimumItems = 6) {
+  const bundle = loadLocalContentBundle()
+  const codeItems = bundle.codeItems
+    .filter((item) => codeItemSection(item) && codeItemDefinition(item))
+    .filter((item) => category === 'all' || category === 'scenarios' || contentCategoryToDuelCategory(item) === category)
+  const fallbackItems = bundle.codeItems.filter((item) => codeItemSection(item) && codeItemDefinition(item))
+  return codeItems.length >= minimumItems ? codeItems : fallbackItems
+}
+
+function prioritizeBotCodeItems(items: ContentBankItem[], priorityCodes: string[] = []) {
+  const prioritySet = new Set(priorityCodes.map(normalizeBlasterTarget).filter(Boolean))
+  if (prioritySet.size === 0) return shuffleRandom(items)
+  const priorityItems = shuffleRandom(items.filter((item) => prioritySet.has(normalizeBlasterTarget(codeItemSection(item)))))
+  const nonPriorityItems = shuffleRandom(items.filter((item) => !prioritySet.has(normalizeBlasterTarget(codeItemSection(item)))))
+  return [...priorityItems, ...nonPriorityItems]
+}
+
+function pickBotDistractors(
+  correctItem: ContentBankItem,
+  pool: ContentBankItem[],
+  count: number,
+  mode: 'definition' | 'section',
+) {
+  const correctValue = mode === 'definition' ? codeItemDefinition(correctItem) : codeItemSection(correctItem)
+  const normalizedCorrect = mode === 'definition'
+    ? correctValue.toLowerCase()
+    : normalizeBlasterTarget(correctValue)
+  const sameCategory = shuffleRandom(pool.filter((item) => {
+    if (item.id === correctItem.id) return false
+    if (contentCategoryToDuelCategory(item) !== contentCategoryToDuelCategory(correctItem)) return false
+    const candidate = mode === 'definition' ? codeItemDefinition(item) : codeItemSection(item)
+    return (mode === 'definition' ? candidate.toLowerCase() : normalizeBlasterTarget(candidate)) !== normalizedCorrect
+  }))
+  const anyCategory = shuffleRandom(pool.filter((item) => {
+    if (item.id === correctItem.id) return false
+    const candidate = mode === 'definition' ? codeItemDefinition(item) : codeItemSection(item)
+    return (mode === 'definition' ? candidate.toLowerCase() : normalizeBlasterTarget(candidate)) !== normalizedCorrect
+  }))
+  return uniqueBotStrings([...sameCategory, ...anyCategory].map((item) => mode === 'definition' ? codeItemDefinition(item) : codeItemSection(item))).slice(0, count)
+}
+
+function buildBotQuizRounds(category: DuelCategory, roundCount = 10, priorityCodes: string[] = []) {
+  const usableItems = getBotCodeItems(category, 4)
+  const shuffledItems = prioritizeBotCodeItems(usableItems, priorityCodes)
+  const rounds: QuizRoundPayload[] = []
+
+  for (let index = 0; index < Math.min(roundCount, shuffledItems.length); index += 1) {
+    const item = shuffledItems[index]
+    const correctCode = codeItemSection(item)
+    const correctDefinition = codeItemDefinition(item)
+    if (!correctCode || !correctDefinition) continue
+    const asksForDefinition = index % 2 === 0
+    const correctAnswer = asksForDefinition ? correctDefinition : correctCode
+    const distractors = pickBotDistractors(item, usableItems, 5, asksForDefinition ? 'definition' : 'section')
+    const choices = shuffleRandom(uniqueBotStrings([correctAnswer, ...distractors]).slice(0, 4))
+    const correctIndex = choices.findIndex((choice) => choice.toLowerCase() === correctAnswer.toLowerCase())
+    if (choices.length < 2 || correctIndex < 0) continue
+    rounds.push({
+      round: rounds.length + 1,
+      prompt: asksForDefinition
+        ? `What best matches ${correctCode}?`
+        : `Which section number matches: ${correctDefinition}?`,
+      choices,
+      correctIndex,
+      explanation: item.explanation || `${correctCode}: ${correctDefinition}.`,
+      sourceLabel: item.category.toUpperCase(),
+    })
+  }
+
+  return rounds
+}
+
+function buildBotMatchingRounds(category: DuelCategory, roundCount = 5, priorityCodes: string[] = []) {
+  const usableItems = getBotCodeItems(category, 3)
+  const shuffledItems = prioritizeBotCodeItems(usableItems, priorityCodes)
+  const rounds: MatchingRoundPayload[] = []
+  let itemIndex = 0
+
+  for (let roundIndex = 0; roundIndex < roundCount; roundIndex += 1) {
+    const selectedItems: ContentBankItem[] = []
+    const usedSections = new Set<string>()
+    while (selectedItems.length < 3 && itemIndex < shuffledItems.length) {
+      const item = shuffledItems[itemIndex]
+      itemIndex += 1
+      const section = codeItemSection(item)
+      const definition = codeItemDefinition(item)
+      const sectionKey = normalizeBlasterTarget(section)
+      if (!section || !definition || usedSections.has(sectionKey)) continue
+      usedSections.add(sectionKey)
+      selectedItems.push(item)
+    }
+    if (selectedItems.length < 3) break
+    rounds.push({
+      round: rounds.length + 1,
+      pairs: selectedItems.map((item, pairIndex) => ({
+        pairId: `bot-match-${rounds.length + 1}-${pairIndex}-${item.id}`,
+        left: codeItemSection(item),
+        right: codeItemDefinition(item),
+      })),
+    })
+  }
+
+  return rounds
+}
+
+function buildMatchingCardsForRound(round: MatchingRoundPayload, seed: string) {
+  const cards = round.pairs.flatMap((pair) => ([
+    {
+      id: `${pair.pairId}-code`,
+      pairId: pair.pairId,
+      text: pair.left,
+      kind: 'code' as const,
+    },
+    {
+      id: `${pair.pairId}-definition`,
+      pairId: pair.pairId,
+      text: pair.right,
+      kind: 'definition' as const,
+    },
+  ]))
+  return seededShuffle(cards, seed)
+}
+
+function buildBotBlasterRounds(category: DuelCategory, roundCount = duelBlasterRoundCap, priorityCodes: string[] = []) {
+  const usableItems = getBotCodeItems(category, 6)
+  const shuffledItems = prioritizeBotCodeItems(usableItems, priorityCodes)
+  const distractorPool = shuffleRandom(usableItems.map(codeItemSection).filter(Boolean))
+  const rounds: BlasterRoundPayload[] = []
+
+  for (let index = 0; index < Math.min(roundCount, shuffledItems.length); index += 1) {
+    const item = shuffledItems[index]
+    const correctCode = codeItemSection(item)
+    if (!correctCode) continue
+    const distractors = distractorPool.filter((target) => normalizeBlasterTarget(target) !== normalizeBlasterTarget(correctCode))
+    const targets = shuffleRandom(uniqueBlasterTargets([correctCode, ...distractors]).slice(0, 6))
+    const resolvedTargets = targets.length >= 2 ? targets : [correctCode, ...distractors.slice(0, 5)]
+    const correctIndex = Math.max(0, resolvedTargets.findIndex((target) => normalizeBlasterTarget(target) === normalizeBlasterTarget(correctCode)))
+    rounds.push({
+      round: rounds.length + 1,
+      prompt: item.title || item.question.replace(/^Which section number matches:\s*/i, '').replace(/\?$/, ''),
+      targets: resolvedTargets,
+      correctIndex,
+      correctCode,
+      explanation: item.explanation,
+      sourceLabel: item.category.toUpperCase(),
+    })
+  }
+
+  return rounds
+}
+
+function parseDuelBotSkillSnapshot(input: unknown, fallbackStats: DuelStatsLeaderboardEntry | null): DuelBotSkillSnapshot {
+  const row = input && typeof input === 'object' ? input as Record<string, unknown> : {}
+  const profileDetails = row.profile_details && typeof row.profile_details === 'object'
+    ? row.profile_details as Record<string, unknown>
+    : {}
+  const stats = profileDetails.stats && typeof profileDetails.stats === 'object'
+    ? profileDetails.stats as Record<string, unknown>
+    : {}
+  const studyModeCounts = stats.studyModeCounts && typeof stats.studyModeCounts === 'object'
+    ? stats.studyModeCounts as Record<string, unknown>
+    : {}
+  const algorithmSnapshot = profileDetails.algorithmSnapshot && typeof profileDetails.algorithmSnapshot === 'object'
+    ? profileDetails.algorithmSnapshot as Record<string, unknown>
+    : {}
+  const categoryNeed: Record<'pc' | 'vc' | 'hs', number> = { pc: 0, vc: 0, hs: 0 }
+  const weakCodes: Array<{ section: string; need: number }> = []
+  Object.values(algorithmSnapshot).forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return
+    const snapshot = entry as Record<string, unknown>
+    const codeSet = String(snapshot.codeSet || '').toLowerCase()
+    const attempts = Math.max(0, Number(snapshot.attempts || 0))
+    const needScore = Math.max(0, Number(snapshot.needScore || 0))
+    const status = String(snapshot.status || '')
+    const bucket = codeSet === 'penal' || codeSet === 'pc'
+      ? 'pc'
+      : codeSet === 'vehicle' || codeSet === 'vc'
+        ? 'vc'
+        : codeSet === 'hs'
+          ? 'hs'
+          : null
+    if (!bucket) return
+    categoryNeed[bucket] += needScore + (status === 'Needs Work' ? 1.5 : 0) + (attempts === 0 ? 0.2 : 0)
+    const section = String(snapshot.sectionNumber || '').trim()
+    if (section) {
+      weakCodes.push({
+        section,
+        need: needScore + (status === 'Needs Work' ? 2 : 0) + (attempts > 0 && Number(snapshot.accuracy || 0) < 0.7 ? 1 : 0),
+      })
+    }
+  })
+  const studyBuckets: Array<'pc' | 'hs' | 'vc'> = ['pc', 'hs', 'vc']
+  const leastStudied = [...studyBuckets].sort((left, right) => Number(studyModeCounts[left] || 0) - Number(studyModeCounts[right] || 0))[0]
+  const weakCategory = Object.values(categoryNeed).some((value) => value > 0)
+    ? (Object.entries(categoryNeed).sort((left, right) => right[1] - left[1])[0]?.[0] as DuelCategory) || 'all'
+    : leastStudied === 'pc'
+      ? 'pc'
+      : leastStudied === 'vc'
+        ? 'vc'
+        : leastStudied === 'hs'
+          ? 'hs'
+          : 'all'
+
+  return {
+    studySeconds: Math.max(0, Math.floor(Number(stats.studySeconds || 0))),
+    blasterWins: Math.max(0, Math.floor(Number(fallbackStats?.wins || 0))),
+    duelWins: Math.max(0, Math.floor(Number(fallbackStats?.wins || 0))),
+    masteredCodes: Math.max(0, Math.floor(Number(stats.lifetimeMasteredCodes || 0))),
+    weakCategory,
+    weakCodes: weakCodes
+      .sort((left, right) => right.need - left.need)
+      .map((entry) => entry.section)
+      .filter((section, index, all) => all.findIndex((candidate) => normalizeBlasterTarget(candidate) === normalizeBlasterTarget(section)) === index)
+      .slice(0, 18),
+  }
+}
+
+function resolveBotDifficulty(input: DuelBotDifficulty, skill: DuelBotSkillSnapshot): DuelBotResolvedDifficulty {
+  if (input === 'easy' || input === 'medium' || input === 'hard' || input === 'very-hard') return input
+  if (input === 'random') {
+    const roll = Math.random()
+    if (roll < 0.22) return 'easy'
+    if (roll < 0.58) return 'medium'
+    if (roll < 0.88) return 'hard'
+    return 'very-hard'
+  }
+  const studyHours = skill.studySeconds / 3600
+  const score = studyHours * 0.7 + skill.duelWins * 1.25 + skill.blasterWins * 1.35 + skill.masteredCodes * 0.18
+  if (score >= 38) return 'very-hard'
+  if (score >= 18) return 'hard'
+  if (score >= 6) return 'medium'
+  return 'easy'
+}
+
+function duelBotDifficultyConfig(difficulty: DuelBotResolvedDifficulty, scoreGap: number, userHotStreak = 0) {
+  const base = {
+    easy: { minDelay: 4100, maxDelay: 6500, accuracy: 0.45, points: 95 },
+    medium: { minDelay: 2600, maxDelay: 4300, accuracy: 0.66, points: 118 },
+    hard: { minDelay: 1450, maxDelay: 2850, accuracy: 0.81, points: 134 },
+    'very-hard': { minDelay: 850, maxDelay: 1750, accuracy: 0.91, points: 152 },
+  }[difficulty]
+  const mercyAccuracyDrop = difficulty === 'very-hard'
+    ? scoreGap < -540 ? 0.06 : scoreGap < -340 ? 0.035 : 0
+    : scoreGap < -420 ? 0.12 : scoreGap < -260 ? 0.07 : 0
+  const pressureAccuracyBoost = scoreGap > 260 && difficulty !== 'easy' ? 0.04 : 0
+  const hotStreakTier = Math.max(0, Math.floor((userHotStreak - duelBotCatchupStreakThreshold) / 2) + 1)
+  const catchupActive = userHotStreak >= duelBotCatchupStreakThreshold && scoreGap >= duelBotCatchupLeadThreshold
+  const catchupStrength = catchupActive ? Math.min(4, hotStreakTier) : 0
+  const delayMultiplier = catchupStrength > 0 ? Math.max(0.38, 0.66 - catchupStrength * 0.075) : 1
+  const accuracyCap = difficulty === 'very-hard' ? 0.97 : difficulty === 'hard' ? 0.95 : 0.92
+  return {
+    ...base,
+    minDelay: Math.round(base.minDelay * delayMultiplier),
+    maxDelay: Math.round(base.maxDelay * delayMultiplier),
+    accuracy: Math.max(0.32, Math.min(accuracyCap, base.accuracy - mercyAccuracyDrop + pressureAccuracyBoost + catchupStrength * 0.06)),
+    points: base.points + catchupStrength * 24,
+    catchupActive,
+    catchupStrength,
+  }
+}
+
+function duelBotModeDelayMultiplier(gameType: DuelGameType, difficulty: DuelBotResolvedDifficulty) {
+  if (gameType === 'quiz') {
+    if (difficulty === 'very-hard') return 0.82
+    if (difficulty === 'hard') return 0.96
+    if (difficulty === 'medium') return 1.05
+    return 1.18
+  }
+  if (gameType === 'matching') {
+    if (difficulty === 'very-hard') return 1.05
+    if (difficulty === 'hard') return 1.2
+    if (difficulty === 'medium') return 1.35
+    return 1.55
+  }
+  return 1
+}
+
+function calculateDuelQuizPoints(correct: boolean, nextStreak: number, elapsedMs: number) {
+  const speedBonus = correct ? Math.max(0, Math.min(40, Math.round((9000 - elapsedMs) / 300))) : 0
+  const streakBonus = correct ? Math.min(70, nextStreak * 10) : 0
+  return correct ? 100 + speedBonus + streakBonus : -15
+}
+
+function calculateDuelMatchingBotPoints(correct: boolean, nextStreak: number, elapsedMs: number, roundProgressPoints = 90) {
+  if (!correct) return -15
+  const speedBonus = Math.max(0, Math.min(60, Math.round((22_000 - elapsedMs) / 400)))
+  const streakBonus = Math.min(75, nextStreak * 12)
+  return Math.max(20, roundProgressPoints + 25 + speedBonus + streakBonus)
+}
+
+function calculateDuelBlasterPointDetails(
+  correct: boolean,
+  nextStreak: number,
+  elapsedMs: number,
+  powerup: DuelBlasterPowerup | null,
+  mode: DuelBlasterMode,
+) {
+  let streakBonus = correct ? Math.min(80, Math.floor(nextStreak / 3) * 20) : 0
+  if (correct && powerup?.key === 'radio') streakBonus *= 2
+  const quickDrawBonus = correct && powerup?.key === 'coffee' && mode === 'timed' && elapsedMs <= 4000 ? 75 : 0
+  const backupBonus = correct && powerup?.key === 'backup' ? 65 : 0
+  const evidenceBonus = correct && powerup?.key === 'evidence' ? Math.min(90, Math.max(30, Math.floor(nextStreak / 2) * 30)) : 0
+  const missPenalty = powerup?.key === 'vest' ? 35 : duelBlasterMissPenalty
+  const points = correct
+    ? (powerup?.points || 120) + streakBonus + quickDrawBonus + backupBonus + evidenceBonus
+    : -missPenalty
+  return {
+    points,
+    streakBonus,
+    quickDrawBonus,
+    backupBonus,
+    evidenceBonus,
+    missPenalty,
+  }
+}
+
+function botDifficultyDisplay(difficulty: DuelBotDifficulty, resolved: DuelBotResolvedDifficulty) {
+  if (difficulty === 'adaptive') return `Adaptive · ${duelBotResolvedDifficultyLabels[resolved]}`
+  if (difficulty === 'random') return `Random · ${duelBotResolvedDifficultyLabels[resolved]}`
+  return duelBotResolvedDifficultyLabels[resolved]
+}
+
 function isQuizRound(value: unknown): value is QuizRoundPayload {
   if (!value || typeof value !== 'object') return false
   const row = value as Partial<QuizRoundPayload>
@@ -1134,7 +1681,7 @@ export function OneVsOnePanel(props: {
   isOwner?: boolean
   externalJoinRoomId?: string | null
   onExternalJoinHandled?: () => void
-  invitePreset?: 'rope-blaster' | null
+  invitePreset?: 'rope-blaster' | 'bot-practice' | null
   onInvitePresetHandled?: () => void
   onStudyActivity?: () => void
   onDuelPerformanceReward?: (result: {
@@ -1170,6 +1717,7 @@ export function OneVsOnePanel(props: {
   const [selectedBlasterOvertimeAfterSeconds, setSelectedBlasterOvertimeAfterSeconds] = useState(duelBlasterDefaultOvertimeAfterSeconds)
   const [isPublicRoom, setIsPublicRoom] = useState(true)
   const [showInviteModal, setShowInviteModal] = useState(false)
+  const [showBotSetupModal, setShowBotSetupModal] = useState(false)
   const [inviteGameType, setInviteGameType] = useState<DuelGameType>('quiz')
   const [inviteCategory, setInviteCategory] = useState<DuelCategory>('all')
   const [inviteQuizRounds, setInviteQuizRounds] = useState(10)
@@ -1181,11 +1729,18 @@ export function OneVsOnePanel(props: {
   const [onlineInviteUsers, setOnlineInviteUsers] = useState<OnlineInviteUser[]>([])
   const [onlineInviteLoading, setOnlineInviteLoading] = useState(false)
   const [inviteSendingUserId, setInviteSendingUserId] = useState<string | null>(null)
+  const [showPowerupGlossary, setShowPowerupGlossary] = useState(false)
+  const [botDifficulty, setBotDifficulty] = useState<DuelBotDifficulty>('adaptive')
+  const [botStarting, setBotStarting] = useState(false)
+  const [botMatch, setBotMatch] = useState<DuelBotMatch | null>(null)
+  const [botStats, setBotStats] = useState<DuelBotStats>(() => readDuelBotStats(currentUserId))
+  const [botSkillSnapshot, setBotSkillSnapshot] = useState<DuelBotSkillSnapshot>(() => parseDuelBotSkillSnapshot(null, null))
 
   const [publicRooms, setPublicRooms] = useState<LobbyRoomItem[]>([])
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [roomId, setRoomId] = useState<string | null>(null)
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false)
+  const lockGameSetupPageScroll = showInviteModal || showBotSetupModal || showCreateRoomModal || showPowerupGlossary
   const [activityLog, setActivityLog] = useState<DuelRoomActivity[]>([])
   const [selectedQuizRounds, setSelectedQuizRounds] = useState(10)
   const [duelStatsMode, setDuelStatsMode] = useState<DuelStatsMode>('all')
@@ -1275,6 +1830,9 @@ export function OneVsOnePanel(props: {
   const blasterVisibleTargetsRef = useRef<string[]>([])
   const blasterVisibleRoundKeyRef = useRef('')
   const blasterPendingReplacementIndexRef = useRef<number | null>(null)
+  const botAnswerTimerRef = useRef<number | null>(null)
+  const botMatchRef = useRef<DuelBotMatch | null>(null)
+  const recordedBotMatchIdsRef = useRef<Set<string>>(new Set())
 
   const isSignedIn = currentUserId.trim().length > 0
   const markStudyActivity = useCallback(() => {
@@ -1313,6 +1871,60 @@ export function OneVsOnePanel(props: {
     myDuelStatsRef.current = myDuelStats
   }, [myDuelStats])
 
+  useEffect(() => {
+    setBotStats(readDuelBotStats(currentUserId))
+  }, [currentUserId])
+
+  useEffect(() => {
+    botMatchRef.current = botMatch
+  }, [botMatch])
+
+  useEffect(() => {
+    if (!lockGameSetupPageScroll || typeof window === 'undefined' || typeof document === 'undefined') return
+
+    const html = document.documentElement
+    const body = document.body
+    const scrollY = window.scrollY || html.scrollTop || 0
+    const scrollbarGap = Math.max(0, window.innerWidth - html.clientWidth)
+    const previousHtmlOverflow = html.style.overflow
+    const previousHtmlOverscrollBehavior = html.style.overscrollBehavior
+    const previousBodyOverflow = body.style.overflow
+    const previousBodyOverscrollBehavior = body.style.overscrollBehavior
+    const previousBodyPosition = body.style.position
+    const previousBodyTop = body.style.top
+    const previousBodyLeft = body.style.left
+    const previousBodyRight = body.style.right
+    const previousBodyWidth = body.style.width
+    const previousBodyPaddingRight = body.style.paddingRight
+
+    html.style.overflow = 'hidden'
+    html.style.overscrollBehavior = 'none'
+    body.style.overflow = 'hidden'
+    body.style.overscrollBehavior = 'none'
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.left = '0'
+    body.style.right = '0'
+    body.style.width = '100%'
+    if (scrollbarGap > 0) {
+      body.style.paddingRight = `${scrollbarGap}px`
+    }
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow
+      html.style.overscrollBehavior = previousHtmlOverscrollBehavior
+      body.style.overflow = previousBodyOverflow
+      body.style.overscrollBehavior = previousBodyOverscrollBehavior
+      body.style.position = previousBodyPosition
+      body.style.top = previousBodyTop
+      body.style.left = previousBodyLeft
+      body.style.right = previousBodyRight
+      body.style.width = previousBodyWidth
+      body.style.paddingRight = previousBodyPaddingRight
+      window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' })
+    }
+  }, [lockGameSetupPageScroll])
+
   useEffect(() => () => {
     if (blasterTugPulseTimerRef.current !== null) {
       window.clearTimeout(blasterTugPulseTimerRef.current)
@@ -1323,6 +1935,10 @@ export function OneVsOnePanel(props: {
       blasterAnimationFrameRef.current = null
     }
     blasterBodiesRef.current = []
+    if (botAnswerTimerRef.current !== null) {
+      window.clearTimeout(botAnswerTimerRef.current)
+      botAnswerTimerRef.current = null
+    }
   }, [])
 
   useEffect(() => {
@@ -1734,6 +2350,23 @@ export function OneVsOnePanel(props: {
     })
   }, [currentUserId, duelStatsMode, isSignedIn])
 
+  const loadBotSkillSnapshot = useCallback(async () => {
+    if (!supabase || !isSignedIn || !currentUserId) {
+      const fallback = parseDuelBotSkillSnapshot(null, myDuelStatsRef.current)
+      setBotSkillSnapshot(fallback)
+      return fallback
+    }
+
+    const { data } = await supabase
+      .from('app_state')
+      .select('profile_details')
+      .eq('user_id', currentUserId)
+      .maybeSingle()
+    const snapshot = parseDuelBotSkillSnapshot(data, myDuelStatsRef.current)
+    setBotSkillSnapshot(snapshot)
+    return snapshot
+  }, [currentUserId, isSignedIn])
+
   const loadWaitingChatMessages = useCallback(async (targetRoomId: string) => {
     if (!supabase || !isSignedIn) return
     const cleanRoomId = targetRoomId.trim()
@@ -2034,6 +2667,29 @@ export function OneVsOnePanel(props: {
     }
   }, [])
 
+  const triggerBlasterShotBurstAtElement = useCallback((element: HTMLElement | null | undefined, tone: BlasterShotBurst['tone']) => {
+    const targetBounds = element?.getBoundingClientRect()
+    if (!targetBounds) return
+    const burstId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+    const nextBurst: BlasterShotBurst = {
+      id: burstId,
+      tone,
+      x: targetBounds.left + targetBounds.width / 2,
+      y: targetBounds.top + targetBounds.height / 2,
+    }
+
+    setBlasterShotBursts((previous) => [...previous.slice(-5), nextBurst])
+    window.setTimeout(() => {
+      setBlasterShotBursts((previous) => previous.filter((burst) => burst.id !== burstId))
+    }, 820)
+  }, [])
+
+  const triggerBlasterShotBurst = useCallback((event: MouseEvent<HTMLButtonElement>, tone: BlasterShotBurst['tone']) => {
+    triggerBlasterShotBurstAtElement(event.currentTarget, tone)
+  }, [triggerBlasterShotBurstAtElement])
+
   const applyBlasterScoreBroadcast = useCallback((payloadLike: unknown) => {
     const payload = payloadLike && typeof payloadLike === 'object'
       ? payloadLike as Partial<BlasterScoreBroadcastPayload>
@@ -2095,11 +2751,19 @@ export function OneVsOnePanel(props: {
       }, 360)
     }
 
+    const targetIndex = Number(payload.target_index)
+    if (Number.isFinite(targetIndex)) {
+      triggerBlasterShotBurstAtElement(
+        blasterTargetRefs.current[blasterTargetDomKey(Math.max(0, Math.floor(targetIndex)))],
+        payload.correct ? 'spectator' : 'bad',
+      )
+    }
+
     const powerupEffect = typeof payload.powerup_effect === 'string' ? payload.powerup_effect as DuelBlasterDisruptionKey : null
     if (payload.correct && powerupEffect) {
       triggerBlasterDisruption(powerupEffect, typeof payload.disguise_code === 'string' ? payload.disguise_code : null)
     }
-  }, [currentUserId, roomId, triggerBlasterDisruption])
+  }, [currentUserId, roomId, triggerBlasterDisruption, triggerBlasterShotBurstAtElement])
 
   const applyBlasterPowerupEffectBroadcast = useCallback((payloadLike: unknown) => {
     const payload = payloadLike && typeof payloadLike === 'object'
@@ -2161,6 +2825,13 @@ export function OneVsOnePanel(props: {
         setBlasterTugPulse('')
         blasterTugPulseTimerRef.current = null
       }, 260)
+      const targetIndex = Number(lastEvent.targetIndex)
+      if (Number.isFinite(targetIndex)) {
+        triggerBlasterShotBurstAtElement(
+          blasterTargetRefs.current[blasterTargetDomKey(Math.max(0, Math.floor(targetIndex)))],
+          delta > 0 ? 'spectator' : 'bad',
+        )
+      }
     }
 
     if (
@@ -2176,7 +2847,7 @@ export function OneVsOnePanel(props: {
         void refreshRoomSnapshot()
       }, 80)
     }
-  }, [currentUserId, refreshRoomSnapshot, triggerBlasterDisruption])
+  }, [currentUserId, refreshRoomSnapshot, triggerBlasterDisruption, triggerBlasterShotBurstAtElement])
 
   const sendRopeBlasterCloudMessage = useCallback((payload: Record<string, unknown>) => {
     const socket = ropeBlasterSocketRef.current
@@ -2201,6 +2872,8 @@ export function OneVsOnePanel(props: {
       powerupKey: payload.powerup_key,
       powerupEffect: payload.powerup_effect,
       disguiseCode: payload.disguise_code,
+      targetIndex: payload.target_index,
+      targetLabel: payload.target_label,
     })
   }, [sendRopeBlasterCloudMessage])
 
@@ -2244,6 +2917,11 @@ export function OneVsOnePanel(props: {
   }, [isSignedIn, loadOnlineInviteUsers, showInviteModal])
 
   useEffect(() => {
+    if (!isSignedIn || !showBotSetupModal) return
+    void loadBotSkillSnapshot()
+  }, [isSignedIn, loadBotSkillSnapshot, showBotSetupModal])
+
+  useEffect(() => {
     if (inviteGameType !== 'quiz' && inviteCategory === 'scenarios') {
       setInviteCategory('all')
     }
@@ -2278,6 +2956,23 @@ export function OneVsOnePanel(props: {
     void loadOnlineInviteUsers()
     onInvitePresetHandled?.()
   }, [invitePreset, isSignedIn, loadOnlineInviteUsers, onInvitePresetHandled])
+
+  useEffect(() => {
+    if (invitePreset !== 'bot-practice') return
+    if (!isSignedIn) return
+    setSelectedGameType('quiz')
+    setSelectedCategory('all')
+    setInviteGameType('quiz')
+    setInviteCategory('all')
+    setInviteQuizRounds(10)
+    setBotDifficulty('adaptive')
+    setShowInviteModal(false)
+    setShowBotSetupModal(true)
+    setError('')
+    setNotice('')
+    void loadBotSkillSnapshot()
+    onInvitePresetHandled?.()
+  }, [invitePreset, isSignedIn, loadBotSkillSnapshot, onInvitePresetHandled])
 
   useEffect(() => {
     if (!roomId || !isSignedIn) return
@@ -2822,24 +3517,6 @@ export function OneVsOnePanel(props: {
     triggerAutoForfeit,
   ])
 
-  const triggerBlasterShotBurst = useCallback((event: MouseEvent<HTMLButtonElement>, tone: BlasterShotBurst['tone']) => {
-    const targetBounds = event.currentTarget.getBoundingClientRect()
-    const burstId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
-    const nextBurst: BlasterShotBurst = {
-      id: burstId,
-      tone,
-      x: targetBounds.left + targetBounds.width / 2,
-      y: targetBounds.top + targetBounds.height / 2,
-    }
-
-    setBlasterShotBursts((previous) => [...previous.slice(-5), nextBurst])
-    window.setTimeout(() => {
-      setBlasterShotBursts((previous) => previous.filter((burst) => burst.id !== burstId))
-    }, 820)
-  }, [])
-
   const triggerBlasterTugPulse = useCallback((tone: 'pull' | 'miss') => {
     if (blasterTugPulseTimerRef.current !== null) {
       window.clearTimeout(blasterTugPulseTimerRef.current)
@@ -2961,6 +3638,8 @@ export function OneVsOnePanel(props: {
         powerup_key: powerup?.key || null,
         powerup_effect: powerupEffect,
         disguise_code: selectedTarget || correctCode,
+        target_index: targetIndex,
+        target_label: selectedTarget || correctCode,
       })
     }
 
@@ -2988,6 +3667,413 @@ export function OneVsOnePanel(props: {
     triggerBlasterShotBurst,
     triggerBlasterTugPulse,
   ])
+
+  const recordBotMatchResult = useCallback((completedMatch: DuelBotMatch) => {
+    if (!currentUserId || recordedBotMatchIdsRef.current.has(completedMatch.id)) return
+    recordedBotMatchIdsRef.current.add(completedMatch.id)
+    const won = completedMatch.winner === 'user'
+    const lost = completedMatch.winner === 'bot'
+    const nextDifficulty = completedMatch.resolvedDifficulty
+    setBotStats((previousStats) => {
+      const previous = sanitizeDuelBotStats(previousStats)
+      const nextStreak = won ? previous.current_win_streak + 1 : 0
+      const nextBestDifficulty = won && (
+        !previous.best_difficulty ||
+        duelBotDifficultyRank[nextDifficulty] > duelBotDifficultyRank[previous.best_difficulty]
+      )
+        ? nextDifficulty
+        : previous.best_difficulty
+      const nextStats: DuelBotStats = {
+        ...previous,
+        version: duelBotStatsVersion,
+        wins: previous.wins + (won ? 1 : 0),
+        losses: previous.losses + (lost ? 1 : 0),
+        matches_played: previous.matches_played + 1,
+        current_win_streak: nextStreak,
+        best_win_streak: Math.max(previous.best_win_streak, nextStreak),
+        best_score: Math.max(previous.best_score, completedMatch.userScore),
+        best_difficulty: nextBestDifficulty,
+        wins_by_difficulty: {
+          ...previous.wins_by_difficulty,
+          [nextDifficulty]: previous.wins_by_difficulty[nextDifficulty] + (won ? 1 : 0),
+        },
+        updated_at: new Date().toISOString(),
+      }
+      writeDuelBotStats(currentUserId, nextStats)
+      return nextStats
+    })
+  }, [currentUserId])
+
+  const finishBotMatch = useCallback((winnerOverride?: DuelBotWinner) => {
+    const activeMatch = botMatchRef.current
+    if (!activeMatch || activeMatch.status !== 'in_progress') return
+    if (botAnswerTimerRef.current !== null) {
+      window.clearTimeout(botAnswerTimerRef.current)
+      botAnswerTimerRef.current = null
+    }
+    const winner = winnerOverride || (
+      activeMatch.userScore > activeMatch.botScore
+        ? 'user'
+        : activeMatch.botScore > activeMatch.userScore
+          ? 'bot'
+          : 'draw'
+    )
+    const completedMatch: DuelBotMatch = {
+      ...activeMatch,
+      status: 'completed',
+      winner,
+      completedAt: Date.now(),
+    }
+    botMatchRef.current = completedMatch
+    setBotMatch(completedMatch)
+    recordBotMatchResult(completedMatch)
+    setNotice(winner === 'user' ? 'Bot match complete. You beat the bot.' : winner === 'bot' ? 'Bot match complete. Run it back when ready.' : 'Bot match complete. Draw.')
+  }, [recordBotMatchResult])
+
+  const startBotMatch = useCallback(async () => {
+    setBotStarting(true)
+    setError('')
+    setNotice('')
+    const skillSnapshot = await loadBotSkillSnapshot()
+    const resolvedDifficulty = resolveBotDifficulty(botDifficulty, skillSnapshot)
+    const gameType = inviteGameType
+    const category = botDifficulty === 'adaptive' && inviteCategory === 'all'
+      ? skillSnapshot.weakCategory
+      : inviteCategory === 'scenarios' && gameType !== 'quiz'
+        ? 'all'
+        : inviteCategory
+    const priorityCodes = botDifficulty === 'adaptive' ? skillSnapshot.weakCodes : []
+    const questionSet: DuelBotRoundPayload[] = gameType === 'blaster'
+      ? buildBotBlasterRounds(category, duelBlasterRoundCap, priorityCodes)
+      : gameType === 'matching'
+        ? buildBotMatchingRounds(category, 5, priorityCodes)
+        : buildBotQuizRounds(category, inviteQuizRounds, priorityCodes)
+    setBotStarting(false)
+    const minimumRounds = gameType === 'matching' ? 1 : gameType === 'blaster' ? 6 : 3
+    if (questionSet.length < minimumRounds) {
+      setError('Not enough code questions are loaded for a bot match yet.')
+      return
+    }
+    const botNames = duelBotNames[resolvedDifficulty]
+    const botName = botNames[Math.floor(Math.random() * botNames.length)] || 'Code Bot'
+    const startedAt = Date.now()
+    const botRoomId = `bot-${startedAt}-${Math.random().toString(16).slice(2)}`
+    const coachingNote = botDifficulty === 'adaptive'
+      ? `Adaptive picked ${duelCategoryLabel(category)} and front-loaded weaker code sections from your study history.`
+      : botDifficulty === 'random'
+        ? `Random rolled ${duelBotResolvedDifficultyLabels[resolvedDifficulty]}.`
+        : `${duelBotResolvedDifficultyLabels[resolvedDifficulty]} bot pressure selected.`
+    const nextMatch: DuelBotMatch = {
+      id: botRoomId,
+      status: 'in_progress',
+      gameType,
+      difficulty: botDifficulty,
+      resolvedDifficulty,
+      category,
+      mode: inviteBlasterMode,
+      durationSeconds: inviteBlasterDurationSeconds,
+      powerupsEnabled: invitePowerupsEnabled,
+      overtimeEnabled: inviteBlasterOvertimeEnabled,
+      overtimeAfterSeconds: inviteBlasterOvertimeAfterSeconds,
+      rounds: questionSet.length,
+      questionSet,
+      userRound: 1,
+      botRound: 1,
+      userScore: 0,
+      botScore: 0,
+      userTotalMs: 0,
+      botTotalMs: 0,
+      userFastestMs: 0,
+      botFastestMs: 0,
+      startedAt,
+      winner: null,
+      botName,
+      coachingNote,
+      userStreak: 0,
+      botStreak: 0,
+    }
+    botMatchRef.current = nextMatch
+    setBotMatch(nextMatch)
+    setShowInviteModal(false)
+    setShowBotSetupModal(false)
+    setBlasterStreak(0)
+    setBlasterLocked(false)
+    setBlasterChoice(null)
+    setBlasterChoiceRound(null)
+    setBlasterShotBursts([])
+    setBlasterTugPulse('')
+    setQuizChoice(null)
+    setQuizLocked(false)
+    setSelectedMatchingCards([])
+    setWrongMatchingCardIds([])
+    setMatchedPairIds([])
+    setMatchingMistakes(0)
+    setMatchingRoundPoints(0)
+    setMatchingSubmitted(false)
+    const firstRound = questionSet[0]
+    if (isBlasterRound(firstRound)) {
+      blasterMotionRoundRef.current = firstRound.round
+      blasterVisibleRoundKeyRef.current = `${botRoomId}:${firstRound.round}`
+      blasterVisibleTargetsRef.current = firstRound.targets
+      blasterMotionTargetsRef.current = firstRound.targets
+      setBlasterVisibleTargets(firstRound.targets)
+    } else {
+      blasterVisibleTargetsRef.current = []
+      blasterMotionTargetsRef.current = []
+      setBlasterVisibleTargets([])
+    }
+    if (isMatchingRound(firstRound)) {
+      setMatchingCards(buildMatchingCardsForRound(firstRound, `${botRoomId}-${firstRound.round}`))
+    } else {
+      setMatchingCards([])
+    }
+    setRoundStartedAt(startedAt)
+    roundStartedAtRef.current = startedAt
+    markStudyActivity()
+  }, [
+    botDifficulty,
+    inviteBlasterDurationSeconds,
+    inviteBlasterMode,
+    inviteBlasterOvertimeAfterSeconds,
+    inviteBlasterOvertimeEnabled,
+    inviteCategory,
+    inviteGameType,
+    invitePowerupsEnabled,
+    inviteQuizRounds,
+    loadBotSkillSnapshot,
+    markStudyActivity,
+  ])
+
+  const submitBotBlasterAnswer = useCallback((targetIndex: number, event?: MouseEvent<HTMLButtonElement>) => {
+    const activeMatch = botMatchRef.current
+    if (!activeMatch || activeMatch.status !== 'in_progress' || blasterLocked) return
+    const currentBotRound = activeMatch.questionSet[activeMatch.userRound - 1]
+    if (!isBlasterRound(currentBotRound)) return
+    const selectedTarget = blasterVisibleTargetsRef.current[targetIndex] || currentBotRound.targets[targetIndex] || ''
+    const correctCode = getBlasterRoundCorrectCode(currentBotRound)
+    const correct = normalizeBlasterTarget(selectedTarget) === normalizeBlasterTarget(correctCode)
+    const elapsedMs = Math.max(0, Date.now() - (roundStartedAtRef.current || activeMatch.startedAt))
+    const powerup = duelBlasterPowerupForRound(currentBotRound.round, activeMatch.powerupsEnabled, activeMatch.mode)
+    const powerupEffect = correct ? duelBlasterDisruptionForPowerup(powerup) : null
+    const nextStreak = correct ? blasterStreak + 1 : powerup?.key === 'donut' || powerup?.key === 'vest' ? blasterStreak : 0
+    const pointDetails = calculateDuelBlasterPointDetails(correct, nextStreak, elapsedMs, powerup, activeMatch.mode)
+    const { points } = pointDetails
+    const nextRoundNumber = Math.min(activeMatch.rounds + 1, activeMatch.userRound + 1)
+    const nextScore = activeMatch.userScore + points
+    const nextTotalMs = activeMatch.userTotalMs + elapsedMs
+    const nextFastest = elapsedMs > 0 && (activeMatch.userFastestMs <= 0 || elapsedMs < activeMatch.userFastestMs)
+      ? elapsedMs
+      : activeMatch.userFastestMs
+
+    markStudyActivity()
+    if (event) triggerBlasterShotBurst(event, correct ? (powerup ? 'power' : 'good') : 'bad')
+    triggerBlasterTugPulse(correct ? 'pull' : 'miss')
+    if (correct && powerupEffect) triggerBlasterDisruption(powerupEffect, selectedTarget || correctCode)
+    setBlasterChoice(targetIndex)
+    setBlasterChoiceRound(currentBotRound.round)
+    setBlasterLocked(true)
+    setBlasterStreak(nextStreak)
+    blasterRespawnTargetIndexRef.current = targetIndex
+
+    const nextMatch: DuelBotMatch = {
+      ...activeMatch,
+      userScore: nextScore,
+      userRound: nextRoundNumber,
+      userTotalMs: nextTotalMs,
+      userFastestMs: nextFastest,
+      userStreak: nextStreak,
+    }
+    botMatchRef.current = nextMatch
+    setBotMatch(nextMatch)
+
+    const nextRound = nextMatch.questionSet[nextRoundNumber - 1]
+    if (isBlasterRound(nextRound)) {
+      const previousVisibleTargets = blasterVisibleTargetsRef.current.length > 0
+        ? blasterVisibleTargetsRef.current
+        : currentBotRound.targets.map((target) => String(target))
+      const nextVisibleTargets = buildBlasterVisibleTargetsForRound(previousVisibleTargets, nextRound, targetIndex)
+      blasterVisibleTargetsRef.current = nextVisibleTargets
+      blasterMotionTargetsRef.current = nextVisibleTargets
+      blasterMotionRoundRef.current = nextRound.round
+      blasterVisibleRoundKeyRef.current = `${nextMatch.id}:${nextRound.round}`
+      setBlasterVisibleTargets(nextVisibleTargets)
+      const nextStartedAt = Date.now()
+      roundStartedAtRef.current = nextStartedAt
+      setRoundStartedAt(nextStartedAt)
+    }
+
+    window.setTimeout(() => {
+      setBlasterChoice(null)
+      setBlasterChoiceRound(null)
+      setBlasterLocked(false)
+    }, correct ? 260 : 420)
+  }, [
+    blasterLocked,
+    blasterStreak,
+    markStudyActivity,
+    triggerBlasterDisruption,
+    triggerBlasterShotBurst,
+    triggerBlasterTugPulse,
+  ])
+
+  const submitBotQuizAnswer = useCallback((choiceIndex: number) => {
+    const activeMatch = botMatchRef.current
+    if (!activeMatch || activeMatch.status !== 'in_progress' || activeMatch.gameType !== 'quiz' || quizLocked) return
+    const currentBotRound = activeMatch.questionSet[activeMatch.userRound - 1]
+    if (!isQuizRound(currentBotRound)) return
+    const startedAt = roundStartedAtRef.current || activeMatch.startedAt
+    const elapsedMs = Math.max(0, Date.now() - startedAt)
+    const correct = choiceIndex === currentBotRound.correctIndex
+    const nextStreak = correct ? activeMatch.userStreak + 1 : 0
+    const points = calculateDuelQuizPoints(correct, nextStreak, elapsedMs)
+    const nextRoundNumber = Math.min(activeMatch.rounds + 1, activeMatch.userRound + 1)
+    const nextScore = activeMatch.userScore + points
+    const nextFastest = elapsedMs > 0 && (activeMatch.userFastestMs <= 0 || elapsedMs < activeMatch.userFastestMs)
+      ? elapsedMs
+      : activeMatch.userFastestMs
+
+    markStudyActivity()
+    setQuizChoice(choiceIndex)
+    setQuizLocked(true)
+
+    window.setTimeout(() => {
+      const latestMatch = botMatchRef.current
+      if (!latestMatch || latestMatch.status !== 'in_progress' || latestMatch.gameType !== 'quiz') return
+      if (latestMatch.userRound !== activeMatch.userRound) return
+      const nextMatch: DuelBotMatch = {
+        ...latestMatch,
+        userScore: nextScore,
+        userRound: nextRoundNumber,
+        userTotalMs: latestMatch.userTotalMs + elapsedMs,
+        userFastestMs: nextFastest,
+        userStreak: nextStreak,
+      }
+      botMatchRef.current = nextMatch
+      setBotMatch(nextMatch)
+      setQuizChoice(null)
+      setQuizLocked(false)
+      roundStartedAtRef.current = Date.now()
+      setRoundStartedAt(roundStartedAtRef.current)
+    }, correct ? 360 : 620)
+  }, [markStudyActivity, quizLocked])
+
+  const handleBotMatchingCardClick = useCallback((cardId: string) => {
+    const activeMatch = botMatchRef.current
+    if (!activeMatch || activeMatch.status !== 'in_progress' || activeMatch.gameType !== 'matching' || matchingSubmitted) return
+    if (selectedMatchingCards.length >= 2) return
+    const card = matchingCards.find((item) => item.id === cardId)
+    if (!card || matchedPairIds.includes(card.pairId) || selectedMatchingCards.includes(cardId)) return
+    markStudyActivity()
+    setSelectedMatchingCards((previous) => {
+      if (previous.includes(cardId) || previous.length >= 2) return previous
+      return [...previous, cardId]
+    })
+  }, [markStudyActivity, matchedPairIds, matchingCards, matchingSubmitted, selectedMatchingCards])
+
+  useEffect(() => {
+    if (!botMatch || botMatch.status !== 'in_progress') return
+    setHudNow(Date.now())
+    const timer = window.setInterval(() => setHudNow(Date.now()), 250)
+    return () => window.clearInterval(timer)
+  }, [botMatch])
+
+  useEffect(() => {
+    if (!botMatch || botMatch.status !== 'in_progress') return
+    if (botMatch.gameType === 'blaster') {
+      const baseLimit = duelBlasterDefaultRopeLimit
+      const elapsedMs = Math.max(0, hudNow - botMatch.startedAt)
+      const suddenDeathActive = botMatch.overtimeEnabled && elapsedMs >= botMatch.overtimeAfterSeconds * 1000
+      const effectiveLimit = suddenDeathActive ? getBlasterSuddenDeathRopeLimit(baseLimit) : baseLimit
+      const scoreGap = botMatch.userScore - botMatch.botScore
+      if (Math.abs(scoreGap) >= effectiveLimit) {
+        finishBotMatch(scoreGap > 0 ? 'user' : 'bot')
+        return
+      }
+      if (botMatch.mode === 'timed' && elapsedMs >= botMatch.durationSeconds * 1000) {
+        finishBotMatch()
+        return
+      }
+    }
+    if (botMatch.userRound > botMatch.rounds && botMatch.botRound > botMatch.rounds) {
+      finishBotMatch()
+    }
+  }, [botMatch, finishBotMatch, hudNow])
+
+  useEffect(() => {
+    if (!botMatch || botMatch.status !== 'in_progress') return
+    if (botAnswerTimerRef.current !== null) {
+      window.clearTimeout(botAnswerTimerRef.current)
+      botAnswerTimerRef.current = null
+    }
+    if (botMatch.botRound > botMatch.rounds) return
+    const currentBotRound = botMatch.questionSet[botMatch.botRound - 1]
+    if (!currentBotRound) return
+
+    const scoreGap = botMatch.userScore - botMatch.botScore
+    const userHotStreak = botMatch.gameType === 'blaster' ? blasterStreak : botMatch.userStreak
+    const config = duelBotDifficultyConfig(botMatch.resolvedDifficulty, scoreGap, userHotStreak)
+    const modeDelayMultiplier = duelBotModeDelayMultiplier(botMatch.gameType, botMatch.resolvedDifficulty)
+    const delay = (config.minDelay + Math.random() * Math.max(0, config.maxDelay - config.minDelay)) * modeDelayMultiplier
+    botAnswerTimerRef.current = window.setTimeout(() => {
+      const activeMatch = botMatchRef.current
+      if (!activeMatch || activeMatch.status !== 'in_progress') return
+      const activeRound = activeMatch.questionSet[activeMatch.botRound - 1]
+      if (!activeRound) return
+      const activeScoreGap = activeMatch.userScore - activeMatch.botScore
+      const activeUserHotStreak = activeMatch.gameType === 'blaster' ? blasterStreak : activeMatch.userStreak
+      const activeConfig = duelBotDifficultyConfig(activeMatch.resolvedDifficulty, activeScoreGap, activeUserHotStreak)
+      const correct = Math.random() < activeConfig.accuracy
+      const elapsedMs = Math.max(0, Math.round(delay))
+      let nextBotStreak = correct ? activeMatch.botStreak + 1 : 0
+      let points = 0
+      let powerupEffect: DuelBlasterDisruptionKey | null = null
+      if (activeMatch.gameType === 'blaster' && isBlasterRound(activeRound)) {
+        const powerup = duelBlasterPowerupForRound(activeRound.round, activeMatch.powerupsEnabled, activeMatch.mode)
+        powerupEffect = correct ? duelBlasterDisruptionForPowerup(powerup) : null
+        nextBotStreak = correct ? activeMatch.botStreak + 1 : powerup?.key === 'donut' || powerup?.key === 'vest' ? activeMatch.botStreak : 0
+        points = calculateDuelBlasterPointDetails(correct, nextBotStreak, elapsedMs, powerup, activeMatch.mode).points
+      } else if (activeMatch.gameType === 'matching') {
+        points = calculateDuelMatchingBotPoints(correct, nextBotStreak, elapsedMs)
+      } else {
+        points = calculateDuelQuizPoints(correct, nextBotStreak, elapsedMs)
+      }
+      const nextBotRound = Math.min(activeMatch.rounds + 1, activeMatch.botRound + 1)
+      const nextBotScore = activeMatch.botScore + points
+      const nextBotTotalMs = activeMatch.botTotalMs + elapsedMs
+      const nextBotFastestMs = elapsedMs > 0 && (activeMatch.botFastestMs <= 0 || elapsedMs < activeMatch.botFastestMs)
+        ? elapsedMs
+        : activeMatch.botFastestMs
+      const nextMatch: DuelBotMatch = {
+        ...activeMatch,
+        botScore: nextBotScore,
+        botRound: nextBotRound,
+        botTotalMs: nextBotTotalMs,
+        botFastestMs: nextBotFastestMs,
+        botStreak: nextBotStreak,
+        lastBotCorrect: correct,
+      }
+      botMatchRef.current = nextMatch
+      setBotMatch(nextMatch)
+      if (activeMatch.gameType === 'blaster' && isBlasterRound(activeRound)) {
+        const targetIndex = correct
+          ? activeRound.targets.findIndex((target) => normalizeBlasterTarget(target) === normalizeBlasterTarget(getBlasterRoundCorrectCode(activeRound)))
+          : Math.max(0, activeRound.targets.findIndex((target) => normalizeBlasterTarget(target) !== normalizeBlasterTarget(getBlasterRoundCorrectCode(activeRound))))
+        triggerBlasterShotBurstAtElement(
+          blasterTargetRefs.current[blasterTargetDomKey(Math.max(0, targetIndex))],
+          correct ? 'spectator' : 'bad',
+        )
+        triggerBlasterTugPulse(correct ? 'miss' : 'pull')
+        if (correct && powerupEffect) triggerBlasterDisruption(powerupEffect, getBlasterRoundCorrectCode(activeRound))
+      }
+    }, delay)
+
+    return () => {
+      if (botAnswerTimerRef.current !== null) {
+        window.clearTimeout(botAnswerTimerRef.current)
+        botAnswerTimerRef.current = null
+      }
+    }
+  }, [blasterStreak, botMatch, triggerBlasterDisruption, triggerBlasterShotBurstAtElement, triggerBlasterTugPulse])
 
   useEffect(() => {
     if (!room || !myPlayer || !canStartRound) return
@@ -3157,8 +4243,8 @@ export function OneVsOnePanel(props: {
     setNotice('Room created. Waiting for opponent.')
   }
 
-  const openInviteModal = (sourceRoom?: DuelRoomRow | null) => {
-    const sourceGameType = sourceRoom?.game_type || selectedGameType
+  const openInviteModal = (sourceRoom?: DuelRoomRow | null, presetGameType?: DuelGameType) => {
+    const sourceGameType = presetGameType || sourceRoom?.game_type || selectedGameType
     const sourceCategory = sourceRoom?.category || selectedCategory
     const sourceSettings = sourceRoom?.settings || null
     setInviteGameType(sourceGameType)
@@ -3169,10 +4255,28 @@ export function OneVsOnePanel(props: {
     setInviteBlasterDurationSeconds(sourceGameType === 'blaster' ? getBlasterDurationSeconds(sourceSettings) : selectedBlasterDurationSeconds)
     setInviteBlasterOvertimeEnabled(sourceGameType === 'blaster' ? getBlasterOvertimeEnabled(sourceSettings) : selectedBlasterOvertimeEnabled)
     setInviteBlasterOvertimeAfterSeconds(sourceGameType === 'blaster' ? getBlasterOvertimeAfterSeconds(sourceSettings) : selectedBlasterOvertimeAfterSeconds)
+    setShowBotSetupModal(false)
     setShowInviteModal(true)
     setError('')
     setNotice('')
     void loadOnlineInviteUsers()
+  }
+
+  const openBotSetupModal = (presetGameType?: DuelGameType) => {
+    const sourceGameType = presetGameType || selectedGameType
+    setInviteGameType(sourceGameType)
+    setInviteCategory(sourceGameType !== 'quiz' && selectedCategory === 'scenarios' ? 'all' : selectedCategory)
+    setInviteQuizRounds(selectedQuizRounds)
+    setInvitePowerupsEnabled(selectedPowerupsEnabled)
+    setInviteBlasterMode(selectedBlasterMode)
+    setInviteBlasterDurationSeconds(selectedBlasterDurationSeconds)
+    setInviteBlasterOvertimeEnabled(selectedBlasterOvertimeEnabled)
+    setInviteBlasterOvertimeAfterSeconds(selectedBlasterOvertimeAfterSeconds)
+    setShowInviteModal(false)
+    setShowBotSetupModal(true)
+    setError('')
+    setNotice('')
+    void loadBotSkillSnapshot()
   }
 
   const broadcastInviteCreated = useCallback(async (payload: {
@@ -3551,6 +4655,53 @@ export function OneVsOnePanel(props: {
     })
   }, [applyOptimisticRoundAdvance, currentRound, initializedRoundKey, matchedPairIds.length, matchingRoundPoints, matchingSubmitted, room, roundStartedAt, submitRound])
 
+  useEffect(() => {
+    if (!botMatch || botMatch.status !== 'in_progress' || botMatch.gameType !== 'matching') return
+    const currentBotRound = botMatch.questionSet[botMatch.userRound - 1]
+    if (!isMatchingRound(currentBotRound) || matchingSubmitted) return
+    if (matchedPairIds.length !== currentBotRound.pairs.length) return
+
+    setMatchingSubmitted(true)
+    const elapsedMs = Math.max(0, Date.now() - (roundStartedAtRef.current || botMatch.startedAt))
+    const nextStreak = botMatch.userStreak + 1
+    const roundPoints = calculateDuelMatchingBotPoints(true, nextStreak, elapsedMs, matchingRoundPoints)
+    const nextRoundNumber = Math.min(botMatch.rounds + 1, botMatch.userRound + 1)
+    const activeMatch = botMatchRef.current && botMatchRef.current.id === botMatch.id
+      ? botMatchRef.current
+      : botMatch
+    const nextFastest = elapsedMs > 0 && (activeMatch.userFastestMs <= 0 || elapsedMs < activeMatch.userFastestMs)
+      ? elapsedMs
+      : activeMatch.userFastestMs
+    const nextMatch: DuelBotMatch = {
+      ...activeMatch,
+      userScore: activeMatch.userScore + roundPoints,
+      userRound: nextRoundNumber,
+      userTotalMs: activeMatch.userTotalMs + elapsedMs,
+      userFastestMs: nextFastest,
+      userStreak: nextStreak,
+    }
+    botMatchRef.current = nextMatch
+    setBotMatch(nextMatch)
+
+    window.setTimeout(() => {
+      const latestMatch = botMatchRef.current
+      const nextRound = latestMatch?.questionSet[nextRoundNumber - 1]
+      setSelectedMatchingCards([])
+      setWrongMatchingCardIds([])
+      setMatchedPairIds([])
+      setMatchingMistakes(0)
+      setMatchingRoundPoints(0)
+      setMatchingSubmitted(false)
+      if (latestMatch?.status === 'in_progress' && isMatchingRound(nextRound)) {
+        setMatchingCards(buildMatchingCardsForRound(nextRound, `${latestMatch.id}-${nextRound.round}`))
+        roundStartedAtRef.current = Date.now()
+        setRoundStartedAt(roundStartedAtRef.current)
+      } else {
+        setMatchingCards([])
+      }
+    }, 420)
+  }, [botMatch, matchedPairIds.length, matchingRoundPoints, matchingSubmitted])
+
   const leaveRoom = useCallback(() => {
     initializedRoundKeyRef.current = ''
     autoForfeitRoundKeyRef.current = ''
@@ -3586,6 +4737,29 @@ export function OneVsOnePanel(props: {
     previousRoomStatusRef.current = null
     activityBootstrappedRef.current = false
     setError('')
+    setNotice('')
+  }, [])
+
+  const exitBotMatch = useCallback(() => {
+    if (botAnswerTimerRef.current !== null) {
+      window.clearTimeout(botAnswerTimerRef.current)
+      botAnswerTimerRef.current = null
+    }
+    botMatchRef.current = null
+    setBotMatch(null)
+    initializedRoundKeyRef.current = ''
+    roundStartedAtRef.current = 0
+    setRoundStartedAt(0)
+    setBlasterChoice(null)
+    setBlasterChoiceRound(null)
+    setBlasterLocked(false)
+    setBlasterStreak(0)
+    setBlasterShotBursts([])
+    setBlasterTugPulse('')
+    setBlasterVisibleTargets([])
+    blasterVisibleTargetsRef.current = []
+    blasterMotionTargetsRef.current = []
+    blasterMotionRoundRef.current = 0
     setNotice('')
   }, [])
 
@@ -3708,6 +4882,21 @@ export function OneVsOnePanel(props: {
         : inviteCategory === 'hs'
           ? 'HS'
           : 'Scenarios'
+  const botSetupDifficultyOption = duelBotDifficultyOptions.find((option) => option.value === botDifficulty) || duelBotDifficultyOptions[0]
+  const botSetupRuleLabel = inviteGameType === 'quiz'
+    ? `${inviteQuizRounds} questions`
+    : inviteGameType === 'matching'
+      ? '3 pair sets'
+      : inviteBlasterMode === 'death'
+        ? 'To the Death'
+        : `${inviteBlasterDurationSeconds}s timer`
+  const botSetupAssistLabel = inviteGameType === 'blaster'
+    ? `${invitePowerupsEnabled ? 'Power-ups on' : 'Power-ups off'} | Overtime ${inviteBlasterOvertimeEnabled ? `${inviteBlasterOvertimeAfterSeconds}s` : 'off'}`
+    : inviteGameType === 'matching'
+      ? 'Fast pair rounds'
+      : 'Code recall rounds'
+  const botSetupFocusCodes = botSkillSnapshot.weakCodes.slice(0, 3)
+  const botSetupFocusLabel = botSetupFocusCodes.length > 0 ? botSetupFocusCodes.join(', ') : 'Balanced rotation'
   const inRoom = Boolean(room && roomId && room.id === roomId)
   const isJoiningRoom = Boolean(roomId && !inRoom)
   // const waitingPlayersCount = players.length
@@ -3818,9 +5007,75 @@ export function OneVsOnePanel(props: {
     : blasterSuddenDeathActive
       ? `${blasterMatchRemainingSeconds}s left`
       : `${blasterMatchRemainingSeconds}s`
-  const blasterMotionRoomId = room?.id || ''
-  const blasterMotionRoomStatus = room?.status || null
-  const blasterMotionGameType = room?.game_type || null
+  const botMatchInProgress = botMatch?.status === 'in_progress'
+  const botCurrentRound = botMatchInProgress ? botMatch.questionSet[botMatch.userRound - 1] : null
+  const botGameLabel = botMatch ? duelGameTypeLabels[botMatch.gameType] : 'Bot Match'
+  const botRoundTargets = botMatchInProgress && isBlasterRound(botCurrentRound)
+    ? blasterVisibleTargets.length > 0
+      ? blasterVisibleTargets
+      : botCurrentRound.targets.map((target) => String(target))
+    : []
+  const botRoundCorrectCode = botMatchInProgress && isBlasterRound(botCurrentRound) ? getBlasterRoundCorrectCode(botCurrentRound) : ''
+  const botMatchElapsedMs = botMatch ? Math.max(0, hudNow - botMatch.startedAt) : 0
+  const botSuddenDeathActive = Boolean(
+    botMatchInProgress
+    && botMatch.gameType === 'blaster'
+    && botMatch.overtimeEnabled
+    && botMatchElapsedMs >= botMatch.overtimeAfterSeconds * 1000,
+  )
+  const botEffectiveRopeLimit = botSuddenDeathActive ? getBlasterSuddenDeathRopeLimit(duelBlasterDefaultRopeLimit) : duelBlasterDefaultRopeLimit
+  const botScoreGap = botMatch ? botMatch.userScore - botMatch.botScore : 0
+  const botTugPercent = Math.max(2, Math.min(98, 50 + (botScoreGap / botEffectiveRopeLimit) * 50))
+  const botTugVisualWidthPercent = botSuddenDeathActive ? 54 : 100
+  const botTugVisualStartPercent = botSuddenDeathActive ? (100 - botTugVisualWidthPercent) / 2 : 0
+  const botTugVisualPercent = botSuddenDeathActive
+    ? botTugVisualStartPercent + (botTugPercent / 100) * botTugVisualWidthPercent
+    : botTugPercent
+  const botTugTrackStyle = botSuddenDeathActive
+    ? ({
+        '--short-rope-left': `${botTugVisualStartPercent}%`,
+        '--short-rope-width': `${botTugVisualWidthPercent}%`,
+      } as CSSProperties)
+    : undefined
+  const botTugRopeStyle: CSSProperties = botSuddenDeathActive
+    ? {
+        left: `${botTugVisualStartPercent}%`,
+        width: `${Math.max(0, botTugVisualPercent - botTugVisualStartPercent)}%`,
+      }
+    : { width: `${botTugPercent}%` }
+  const botTugHandleStyle: CSSProperties = { left: `${botTugVisualPercent}%` }
+  const botRopeRemainingPercent = Math.max(0, Math.round(100 - (Math.abs(botScoreGap) / botEffectiveRopeLimit) * 100))
+  const botRemainingMs = botMatch && botMatch.gameType === 'blaster' && botMatch.mode === 'timed'
+    ? Math.max(0, botMatch.startedAt + botMatch.durationSeconds * 1000 - hudNow)
+    : 0
+  const botRemainingSeconds = botRemainingMs > 0 ? Math.ceil(botRemainingMs / 1000) : 0
+  const botProgressPercent = botMatch
+    ? botMatch.gameType === 'blaster' && botMatch.mode === 'timed'
+      ? Math.max(0, Math.min(100, (botRemainingMs / Math.max(1, botMatch.durationSeconds * 1000)) * 100))
+      : botMatch.gameType === 'blaster'
+        ? 100
+        : Math.max(0, Math.min(100, ((botMatch.userRound - 1) / Math.max(1, botMatch.rounds)) * 100))
+    : 100
+  const botPowerup = botMatchInProgress && isBlasterRound(botCurrentRound)
+    ? duelBlasterPowerupForRound(botCurrentRound.round, botMatch.powerupsEnabled, botMatch.mode)
+    : null
+  const botCatchupConfig = botMatchInProgress && botMatch
+    ? duelBotDifficultyConfig(botMatch.resolvedDifficulty, botScoreGap, botMatch.gameType === 'blaster' ? blasterStreak : botMatch.userStreak)
+    : null
+  const botCatchupActive = Boolean(botCatchupConfig?.catchupActive)
+  const botTugBaseClass = blasterTugPulse
+    ? `onevone-tug-${blasterTugPulse}`
+    : botScoreGap > 0
+      ? 'onevone-tug-leading'
+      : botScoreGap < 0
+        ? 'onevone-tug-trailing'
+        : 'onevone-tug-even'
+  const botTugStateClass = `${botTugBaseClass}${botSuddenDeathActive ? ' onevone-tug-sudden-death' : ''}${botCatchupActive ? ' onevone-bot-catchup-active' : ''}`
+  const blasterBotMotionActive = Boolean(botMatchInProgress && botMatch?.gameType === 'blaster')
+  const blasterMotionRoomId = blasterBotMotionActive ? botMatch?.id || '' : room?.id || ''
+  const blasterMotionRoomStatus = botMatchInProgress ? 'in_progress' : room?.status || null
+  const blasterMotionGameType = blasterBotMotionActive ? 'blaster' : room?.game_type || null
+  const blasterMotionCanStart = blasterBotMotionActive || canStartRound
 
   useEffect(() => {
     if (!room || room.status !== 'in_progress' || room.game_type !== 'blaster') return
@@ -3987,7 +5242,7 @@ export function OneVsOnePanel(props: {
     resetBlasterMotion()
 
     if (!blasterMotionRoomId || blasterMotionRoomStatus !== 'in_progress' || blasterMotionGameType !== 'blaster') return
-    if (!canStartRound) return
+    if (!blasterMotionCanStart) return
     if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     let stopped = false
@@ -4266,7 +5521,7 @@ export function OneVsOnePanel(props: {
     blasterMotionGameType,
     blasterMotionRoomId,
     blasterMotionRoomStatus,
-    canStartRound,
+    blasterMotionCanStart,
   ])
 
   const myRoundHud = useMemo(() => {
@@ -4576,6 +5831,276 @@ export function OneVsOnePanel(props: {
             </button>
           </div>
         </div>
+      ) : botMatch ? (
+        botMatchInProgress ? (
+          <div className="blaster-session-overlay onevone-blaster-overlay onevone-bot-overlay">
+            <div className="blaster-session-shell onevone-blaster-shell">
+              <div className="onevone-blaster-topbar">
+                <button className="secondary blaster-exit-button onevone-leave-button" onClick={exitBotMatch}>
+                  Leave Bot Match
+                </button>
+                <div className="onevone-blaster-title">
+                  <span className="muted tiny">1v1 vs Bot · {botGameLabel}</span>
+                  <strong>{botDifficultyDisplay(botMatch.difficulty, botMatch.resolvedDifficulty)} · {duelCategoryLabel(botMatch.category)}{botMatch.gameType === 'blaster' && botMatch.powerupsEnabled ? ' · Power-ups' : ''}</strong>
+                  <span className="onevone-bot-note">{botMatch.coachingNote}</span>
+                </div>
+                <div className="onevone-blaster-clock">
+                  <small className="muted">{botMatch.gameType === 'blaster' ? (botSuddenDeathActive ? 'Overtime' : botMatch.mode === 'death' ? 'Win Condition' : 'Match Timer') : 'Progress'}</small>
+                  <strong>{botMatch.gameType === 'blaster' ? (botMatch.mode === 'death' ? botSuddenDeathActive ? 'Rope Shrunk' : 'To the Death' : `${botRemainingSeconds}s`) : `${Math.min(botMatch.userRound, botMatch.rounds)}/${botMatch.rounds}`}</strong>
+                  <span className="onevone-blaster-timer-track" aria-hidden>
+                    <span style={{ width: `${botProgressPercent}%` }} />
+                  </span>
+                </div>
+              </div>
+
+              {botMatch.gameType === 'blaster' ? (
+                <div className={`onevone-tug-panel ${botTugStateClass}`}>
+                  {botCatchupActive ? (
+                    <div className="onevone-bot-catchup-pill" aria-live="polite">
+                      <strong>🤖 Bot adapting</strong>
+                      <span>Your hot streak triggered a quick catch-up burst.</span>
+                    </div>
+                  ) : null}
+                  {botSuddenDeathActive ? (
+                    <div className="onevone-sudden-death-banner" aria-live="polite">
+                      <strong>⚠️ Overtime</strong>
+                      <span>Short rope: one strong streak can end it.</span>
+                    </div>
+                  ) : null}
+                  <div className="onevone-tug-names">
+                    <span><small>You</small>{myDisplayName}</span>
+                    <strong>{botScoreGap === 0 ? 'Even' : botScoreGap > 0 ? `+${botScoreGap}` : `${botScoreGap}`}</strong>
+                    <span><small>Bot</small>{botMatch.botName}</span>
+                  </div>
+                  <div className="onevone-tug-track" style={botTugTrackStyle} aria-label="Bot tug of war score pressure">
+                    <span className="onevone-tug-zone onevone-tug-zone-self">Your side</span>
+                    <span className="onevone-tug-zone onevone-tug-zone-opponent">Bot side</span>
+                    {botSuddenDeathActive ? (
+                      <>
+                        <span className="onevone-tug-short-window" aria-hidden />
+                        <span className="onevone-tug-short-gate onevone-tug-short-gate-self" aria-hidden>KO</span>
+                        <span className="onevone-tug-short-gate onevone-tug-short-gate-opponent" aria-hidden>KO</span>
+                      </>
+                    ) : null}
+                    <span className="onevone-tug-midline" />
+                    <span className="onevone-tug-rope" style={botTugRopeStyle} />
+                    <span className="onevone-tug-handle onevone-tug-bomb" style={botTugHandleStyle} aria-hidden>
+                      <span className="onevone-bomb-core" />
+                      <span className="onevone-bomb-fuse"><i /></span>
+                    </span>
+                  </div>
+                  <div className="onevone-tug-scores">
+                    <span>{botMatch.userScore} pts</span>
+                    <span>{botSuddenDeathActive ? 'Sudden Rope' : 'Rope'} {botRopeRemainingPercent}%</span>
+                    <span>{botMatch.botScore} pts</span>
+                  </div>
+                </div>
+              ) : (
+                <div className={`onevone-bot-duel-panel${botCatchupActive ? ' onevone-bot-catchup-active' : ''}`}>
+                  {botCatchupActive ? (
+                    <div className="onevone-bot-catchup-pill" aria-live="polite">
+                      <strong>🤖 Bot adapting</strong>
+                      <span>Your hot streak made the bot speed up for a short catch-up burst.</span>
+                    </div>
+                  ) : null}
+                  <div className="onevone-bot-score-row">
+                    <article>
+                      <small>You</small>
+                      <strong>{botMatch.userScore} pts</strong>
+                      <span>Round {Math.min(botMatch.userRound, botMatch.rounds)}/{botMatch.rounds}</span>
+                    </article>
+                    <div className="onevone-bot-versus">VS</div>
+                    <article>
+                      <small>{botMatch.botName}</small>
+                      <strong>{botMatch.botScore} pts</strong>
+                      <span>Round {Math.min(botMatch.botRound, botMatch.rounds)}/{botMatch.rounds}</span>
+                    </article>
+                  </div>
+                  <div className="onevone-bot-progress-bars" aria-hidden>
+                    <span style={{ width: `${Math.max(0, Math.min(100, ((botMatch.userRound - 1) / Math.max(1, botMatch.rounds)) * 100))}%` }} />
+                    <span style={{ width: `${Math.max(0, Math.min(100, ((botMatch.botRound - 1) / Math.max(1, botMatch.rounds)) * 100))}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {isQuizRound(botCurrentRound) ? (
+                <div className="card quiz-card speed-session-card onevone-quiz-card onevone-bot-quiz-card">
+                  <p className="muted tiny">Bot round {botMatch.userRound}/{botMatch.rounds} · Beat {botMatch.botName}</p>
+                  <h3>{botCurrentRound.prompt}</h3>
+                  {botCurrentRound.sourceLabel ? <p className="muted tiny">{botCurrentRound.sourceLabel}</p> : null}
+                  <div className="choices">
+                    {botCurrentRound.choices.map((choice, index) => {
+                      const selected = quizChoice === index
+                      const correct = index === botCurrentRound.correctIndex
+                      return (
+                        <button
+                          key={`bot-quiz-choice-${botCurrentRound.round}-${index}`}
+                          className={`choice${selected ? ' active' : ''}${selected && correct ? ' correct' : ''}${selected && !correct ? ' wrong' : ''}`}
+                          onClick={() => submitBotQuizAnswer(index)}
+                          disabled={quizLocked}
+                        >
+                          <span className="choice-key">{index + 1}</span> {choice}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : isMatchingRound(botCurrentRound) ? (
+                <div className="onevone-round onevone-match-round onevone-bot-match-round">
+                  <p className="muted tiny">Bot set {botMatch.userRound}/{botMatch.rounds} · Match all 3 pairs before {botMatch.botName}</p>
+                  <div className="match-grid match-grid-session">
+                    {matchingCards.map((card) => {
+                      const selected = selectedMatchingCards.includes(card.id)
+                      const matched = matchedPairIds.includes(card.pairId)
+                      const wrong = wrongMatchingCardIds.includes(card.id)
+                      return (
+                        <button
+                          key={`bot-match-card-${botCurrentRound.round}-${card.id}`}
+                          className={`match-card${selected ? ' match-selected' : ''}${matched ? ' match-done' : ''}${wrong ? ' match-wrong' : ''}`}
+                          disabled={matchingSubmitted || matched || (!selected && selectedMatchingCards.length >= 2)}
+                          onClick={() => handleBotMatchingCardClick(card.id)}
+                        >
+                          <strong className={card.kind === 'code' ? 'match-card-code' : 'match-card-definition'}>
+                            {card.text}
+                          </strong>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p className="muted tiny onevone-match-status">{matchingStatusText}</p>
+                </div>
+              ) : isBlasterRound(botCurrentRound) ? (
+                <div className="onevone-blaster-arena onevone-bot-arena">
+                  <div className="onevone-blaster-prompt">
+                    <p className="muted tiny">Bot round {botMatch.userRound}/{botMatch.rounds} · Blast the correct code section</p>
+                    <h3>{botCurrentRound.prompt}</h3>
+                    {botPowerup ? (
+                      <strong className={`onevone-powerup-pill onevone-powerup-${botPowerup.key}`}>
+                        {botPowerup.icon} {botPowerup.label} · {botPowerup.description}
+                      </strong>
+                    ) : null}
+                  </div>
+                  <div
+                    ref={blasterFieldRef}
+                    className={[
+                      'onevone-blaster-field',
+                      botPowerup ? 'onevone-blaster-field-powered' : '',
+                      blasterDisruption ? `onevone-blaster-field-disrupted onevone-blaster-field-disruption-${blasterDisruption.key}` : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    <div className="blaster-starfield" aria-hidden>
+                      <span></span><span></span><span></span><span></span>
+                    </div>
+                    {blasterDisruption ? (
+                      <div className={`onevone-blaster-disruption onevone-blaster-disruption-${blasterDisruption.key}`} aria-hidden>
+                        <strong>{blasterDisruption.icon} {blasterDisruption.label}</strong>
+                        {blasterDisruption.key === 'paperwork' ? (
+                          <span className="onevone-paperwork-storm">
+                            {BLASTER_PAPERWORK_STORM_LABELS.map((label, paperworkIndex) => (
+                              <i key={`bot-${label}-${paperworkIndex}`}>{label}</i>
+                            ))}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {botRoundTargets.map((target, index) => {
+                      const selected = blasterChoice === index && blasterChoiceRound === botCurrentRound.round
+                      const correct = normalizeBlasterTarget(target) === normalizeBlasterTarget(botRoundCorrectCode)
+                      const targetKey = blasterTargetDomKey(index)
+                      const targetDisplay = blasterDisruption?.key === 'clone'
+                        ? blasterDisruption.cloneText || target
+                        : target
+                      return (
+                        <button
+                          key={`bot-blaster-target-${index}`}
+                          ref={(node) => {
+                            blasterTargetRefs.current[targetKey] = node
+                          }}
+                          type="button"
+                          className={`onevone-blaster-target${selected ? ' selected' : ''}${selected && correct ? ' correct' : ''}${selected && !correct ? ' wrong' : ''}${blasterDisruption?.key === 'clone' ? ' cloned' : ''}`}
+                          style={blasterTargetStyle(botMatch.id, index)}
+                          onClick={(event) => submitBotBlasterAnswer(index, event)}
+                          disabled={blasterLocked}
+                          aria-label={`Blast ${targetDisplay}`}
+                        >
+                          <span>{targetDisplay}</span>
+                        </button>
+                      )
+                    })}
+                    {blasterShotBursts.map((burst) => (
+                      <span
+                        key={burst.id}
+                        className={`onevone-blaster-shot-burst onevone-blaster-shot-burst-${burst.tone}`}
+                        style={{ left: burst.x, top: burst.y }}
+                        aria-hidden
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="muted">Loading bot round…</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="onevone-result-overlay onevone-bot-result-overlay">
+            <div className="card onevone-card onevone-result-shell onevone-bot-result-shell">
+              <p className="muted tiny">1v1 vs Bot · {botGameLabel}</p>
+              <h3>{botMatch.winner === 'user' ? 'You beat the bot.' : botMatch.winner === 'bot' ? 'Bot wins this one.' : 'Draw.'}</h3>
+              <div className={botMatch.winner === 'user' ? 'onevone-winner-banner good' : 'onevone-winner-banner'}>
+                {botMatch.winner === 'user'
+                  ? `Winner: ${myDisplayName}`
+                  : botMatch.winner === 'bot'
+                    ? `Winner: ${botMatch.botName}`
+                    : 'Result: Draw'}
+              </div>
+              <div className="onevone-result-summary onevone-bot-result-summary">
+                <article className="onevone-result-summary-chip">
+                  <span className="muted tiny">Your Score</span>
+                  <strong>{botMatch.userScore} pts</strong>
+                </article>
+                <article className="onevone-result-summary-chip">
+                  <span className="muted tiny">Bot Score</span>
+                  <strong>{botMatch.botScore} pts</strong>
+                </article>
+                <article className="onevone-result-summary-chip">
+                  <span className="muted tiny">Difficulty</span>
+                  <strong>{botDifficultyDisplay(botMatch.difficulty, botMatch.resolvedDifficulty)}</strong>
+                </article>
+              </div>
+              <div className="onevone-new-game-panel">
+                <div className="onevone-new-game-head">
+                  <p className="muted tiny">Bot stats do not affect real 1v1 streaks</p>
+                  <strong>1v1 vs Bots Board</strong>
+                </div>
+                <div className="onevone-my-summary-grid onevone-bot-summary-grid">
+                  <span>Bot wins: <strong>{botStats.wins}</strong></span>
+                  <span>Bot losses: <strong>{botStats.losses}</strong></span>
+                  <span>Bot streak: <strong>{botStats.current_win_streak}</strong></span>
+                  <span>Best score: <strong>{botStats.best_score}</strong></span>
+                </div>
+              </div>
+              <div className="actions-row">
+                <button className="primary" type="button" onClick={() => {
+                  const lastBotGameType = botMatch.gameType
+                  exitBotMatch()
+                  openBotSetupModal(lastBotGameType)
+                }}>
+                  Start New Bot Match
+                </button>
+                <button className="secondary" type="button" onClick={() => {
+                  exitBotMatch()
+                  openInviteModal()
+                }}>
+                  Invite a Friend
+                </button>
+                <button className="secondary" type="button" onClick={exitBotMatch}>
+                  Exit
+                </button>
+              </div>
+            </div>
+          </div>
+        )
       ) : !inRoom ? (
         <>
           <h2>1v1 Multiplayer</h2>
@@ -4725,6 +6250,16 @@ export function OneVsOnePanel(props: {
                     </div>
                   </div>
                 ) : null}
+                <div className="onevone-my-summary onevone-bot-board">
+                  <p className="muted tiny">1v1 Versus Bots</p>
+                  <div className="onevone-my-summary-grid">
+                    <span>Wins: <strong>{botStats.wins}</strong></span>
+                    <span>Matches: <strong>{botStats.matches_played}</strong></span>
+                    <span>Bot streak: <strong>{botStats.current_win_streak}</strong></span>
+                    <span>Best bot: <strong>{botStats.best_difficulty ? duelBotResolvedDifficultyLabels[botStats.best_difficulty] : '—'}</strong></span>
+                  </div>
+                  <small className="muted tiny">Separate from real 1v1 stats and streaks.</small>
+                </div>
               </div>
             </aside>
 
@@ -4752,6 +6287,14 @@ export function OneVsOnePanel(props: {
                   >
                     <span>Invite a Friend</span>
                     <small>Send a direct 1v1 invite to someone online now.</small>
+                  </button>
+                  <button
+                    className="secondary onevone-invite-cta onevone-bot-cta"
+                    type="button"
+                    onClick={() => openBotSetupModal()}
+                  >
+                    <span>1v1 Versus Bot</span>
+                    <small>Practice Quiz, Matching, or Rope Blaster with adaptive bots.</small>
                   </button>
                   <div className="onevone-join-block">
                     <p className="muted tiny">Join Private Room</p>
@@ -4927,9 +6470,12 @@ export function OneVsOnePanel(props: {
                     >
                       To the Death
                     </button>
-                  </div>
-                  <small className="muted">Timed matches end on the clock or by rope KO. To the Death removes the clock and ends by rope KO.</small>
-                </label>
+	                  </div>
+	                  <small className="muted">Timed matches end on the clock or by rope KO. To the Death removes the clock and ends by rope KO.</small>
+                    <button className="secondary onevone-glossary-button" type="button" onClick={() => setShowPowerupGlossary(true)}>
+                      View Power-Up Glossary
+                    </button>
+	                </label>
                 <label className={`game-control onevone-powerup-toggle ${selectedPowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
                   <span>
                     Enable Power-Ups
@@ -4994,13 +6540,304 @@ export function OneVsOnePanel(props: {
                 Create Room
               </button>
             </div>
+	          </div>
+	        </div>
+	      ) : null}
+
+      {showPowerupGlossary ? (
+        <div
+          className="profile-modal-overlay game-setup-overlay onevone-powerup-glossary-overlay"
+          onClick={() => setShowPowerupGlossary(false)}
+        >
+          <div className="card game-settings-modal onevone-powerup-glossary-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="onevone-glossary-head">
+              <div>
+                <p className="onevone-glossary-kicker">Rope Blaster</p>
+                <h3>Power-Up Glossary</h3>
+                <span>Know what each boost does before the match starts.</span>
+              </div>
+              <button className="secondary onevone-glossary-close" type="button" onClick={() => setShowPowerupGlossary(false)}>
+                Close
+              </button>
+            </div>
+            <div className="onevone-powerup-glossary-grid">
+              {duelBlasterPowerupGlossary.map((powerup) => (
+                <article key={`powerup-glossary-${powerup.key}`} className={`onevone-powerup-glossary-card onevone-powerup-${powerup.key}`}>
+                  <span className="onevone-powerup-glossary-icon" aria-hidden>
+                    <span>{powerup.icon}</span>
+                  </span>
+                  <div className="onevone-powerup-glossary-copy">
+                    <div className="onevone-powerup-glossary-title">
+                      <strong>{powerup.label}</strong>
+                      <small>{powerup.timing}</small>
+                    </div>
+                    <p>{powerup.description}</p>
+                    <span className="onevone-powerup-glossary-points">{powerup.points} base tug pressure</span>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}
 
-      {showInviteModal ? (
+      {showBotSetupModal ? (
         <div
-          className="profile-modal-overlay game-setup-overlay"
+          className="profile-modal-overlay game-setup-overlay onevone-bot-setup-overlay"
+          onClick={() => setShowBotSetupModal(false)}
+        >
+          <div className="card game-settings-modal onevone-bot-setup-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="onevone-bot-setup-head">
+              <div className="onevone-bot-title-lockup">
+                <p className="muted tiny">Bot match setup</p>
+                <h3>1v1 Versus Bot</h3>
+                <div className="onevone-bot-header-pills" aria-label="Current bot match settings">
+                  <span>{duelGameTypeLabels[inviteGameType]}</span>
+                  <span>{botSetupDifficultyOption.label}</span>
+                  <span>{botSetupRuleLabel}</span>
+                </div>
+              </div>
+              <button className="secondary onevone-bot-close-button" type="button" onClick={() => setShowBotSetupModal(false)} disabled={botStarting} aria-label="Close bot match setup">
+                Close
+              </button>
+            </div>
+            <div className="onevone-bot-setup-body">
+              <section className="onevone-bot-lab onevone-bot-command-panel">
+                <div className="onevone-bot-lab-head">
+                  <span className="onevone-bot-icon" aria-hidden>🤖</span>
+                  <div>
+                    <strong>Bot Training Room</strong>
+                    <p className="muted tiny">Tune the bot pressure, then build a quick private match around the codes you want to sharpen.</p>
+                  </div>
+                </div>
+                <div className="onevone-bot-difficulty-grid" aria-label="Bot difficulty">
+                  {duelBotDifficultyOptions.map((option) => (
+                    <button
+                      key={`bot-modal-difficulty-${option.value}`}
+                      type="button"
+                      className={botDifficulty === option.value ? 'onevone-bot-difficulty active' : 'onevone-bot-difficulty'}
+                      onClick={() => setBotDifficulty(option.value)}
+                    >
+                      <strong>{option.label}</strong>
+                      <small>{option.subtitle}</small>
+                    </button>
+                  ))}
+                </div>
+                <div className="onevone-bot-scouting">
+                  <span>Adaptive scout</span>
+                  <strong>{duelCategoryLabel(botSkillSnapshot.weakCategory)}</strong>
+                  <div className="onevone-bot-scout-metrics" aria-label="Bot practice profile">
+                    <span>
+                      <small>Study</small>
+                      <strong>{Math.round(botSkillSnapshot.studySeconds / 60)}m</strong>
+                    </span>
+                    <span>
+                      <small>Wins</small>
+                      <strong>{botSkillSnapshot.blasterWins}</strong>
+                    </span>
+                    <span>
+                      <small>Mastered</small>
+                      <strong>{botSkillSnapshot.masteredCodes}</strong>
+                    </span>
+                  </div>
+                  <small>
+                    Focus: {botSetupFocusLabel}
+                  </small>
+                </div>
+              </section>
+
+              <section className="onevone-bot-builder-panel">
+                <div className="onevone-bot-builder-head">
+                  <div>
+                    <p className="muted tiny">Match builder</p>
+                    <strong>{duelGameTypeLabels[inviteGameType]} practice</strong>
+                  </div>
+                  <span>{duelCategoryLabel(inviteCategory)}</span>
+                </div>
+                <div className="onevone-bot-summary-strip" aria-label="Bot match summary">
+                  <span>
+                    <small>Mode</small>
+                    <strong>{duelGameTypeLabels[inviteGameType]}</strong>
+                  </span>
+                  <span>
+                    <small>Rules</small>
+                    <strong>{botSetupRuleLabel}</strong>
+                  </span>
+                  <span>
+                    <small>Assist</small>
+                    <strong>{botSetupAssistLabel}</strong>
+                  </span>
+                </div>
+                <div className="onevone-invite-settings onevone-bot-settings">
+                  <label className="game-control">
+                    Game Mode
+                    <div className="segmented onevone-mode-segmented">
+                      {duelGameTypeOptions.map((option) => (
+                        <button
+                          key={`bot-mode-${option.value}`}
+                          type="button"
+                          className={inviteGameType === option.value ? 'seg active' : 'seg'}
+                          onClick={() => {
+                            setInviteGameType(option.value)
+                            if (option.value !== 'quiz' && inviteCategory === 'scenarios') setInviteCategory('all')
+                          }}
+                        >
+                          <span>{option.label}</span>
+                          <small>{option.subtitle}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+                  <label className="game-control">
+                    Category
+                    <div className="segmented">
+                      {duelCategoryOptions
+                        .filter((option) => !(inviteGameType !== 'quiz' && option.quizOnly))
+                        .map((option) => (
+                          <button
+                            key={`bot-category-${option.value}`}
+                            type="button"
+                            className={inviteCategory === option.value ? 'seg active' : 'seg'}
+                            onClick={() => setInviteCategory(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                    </div>
+                  </label>
+                  {inviteGameType === 'quiz' ? (
+                    <label className="game-control">
+                      Questions
+                      <div className="segmented">
+                        {duelQuizRoundOptions.map((count) => (
+                          <button
+                            key={`bot-rounds-${count}`}
+                            type="button"
+                            className={inviteQuizRounds === count ? 'seg active' : 'seg'}
+                            onClick={() => setInviteQuizRounds(count)}
+                          >
+                            {count}
+                          </button>
+                        ))}
+                      </div>
+                    </label>
+                  ) : null}
+                  {inviteGameType === 'blaster' ? (
+                    <>
+                      <label className="game-control">
+                        Win Condition
+                        <div className="segmented onevone-win-condition-segmented">
+                          {duelBlasterDurationOptions.map((seconds) => (
+                            <button
+                              key={`bot-blaster-duration-${seconds}`}
+                              type="button"
+                              className={inviteBlasterMode === 'timed' && inviteBlasterDurationSeconds === seconds ? 'seg active' : 'seg'}
+                              onClick={() => {
+                                setInviteBlasterMode('timed')
+                                setInviteBlasterDurationSeconds(seconds)
+                              }}
+                            >
+                              {seconds}s
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            className={inviteBlasterMode === 'death' ? 'seg active' : 'seg'}
+                            onClick={() => setInviteBlasterMode('death')}
+                          >
+                            To the Death
+                          </button>
+                        </div>
+                        <small className="muted">Default is 30 seconds. Rope KO can still end either mode early.</small>
+                        <button className="secondary onevone-glossary-button" type="button" onClick={() => setShowPowerupGlossary(true)}>
+                          View Power-Up Glossary
+                        </button>
+                      </label>
+                      <label className={`game-control onevone-powerup-toggle ${invitePowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
+                        <span>
+                          Enable Power-Ups
+                          <small>{inviteBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Power shots make the tug-of-war swing harder.'}</small>
+                        </span>
+                        <span className="onevone-toggle-action">
+                          <input
+                            type="checkbox"
+                            checked={invitePowerupsEnabled}
+                            onChange={(event) => setInvitePowerupsEnabled(event.target.checked)}
+                            aria-label="Enable power-ups"
+                          />
+                          <strong className="onevone-toggle-state">{invitePowerupsEnabled ? 'ON ✓' : 'OFF'}</strong>
+                        </span>
+                      </label>
+                      <div className="game-control onevone-overtime-control">
+                        <label className={`onevone-powerup-toggle ${inviteBlasterOvertimeEnabled ? 'is-enabled' : 'is-disabled'}`}>
+                          <span>
+                            Enable Overtime
+                            <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
+                          </span>
+                          <span className="onevone-toggle-action">
+                            <input
+                              type="checkbox"
+                              checked={inviteBlasterOvertimeEnabled}
+                              onChange={(event) => setInviteBlasterOvertimeEnabled(event.target.checked)}
+                              aria-label="Enable overtime"
+                            />
+                            <strong className="onevone-toggle-state">{inviteBlasterOvertimeEnabled ? 'ON ✓' : 'OFF'}</strong>
+                          </span>
+                        </label>
+                        <div className={inviteBlasterOvertimeEnabled ? 'onevone-overtime-slider' : 'onevone-overtime-slider disabled'}>
+                          <div className="onevone-overtime-slider-head">
+                            <span className="muted tiny">Shrink rope after</span>
+                            <strong>{inviteBlasterOvertimeAfterSeconds}s</strong>
+                          </div>
+                          <input
+                            className="modern-range"
+                            type="range"
+                            min={0}
+                            max={duelBlasterOvertimeOptions.length - 1}
+                            step={1}
+                            value={Math.max(0, duelBlasterOvertimeOptions.indexOf(inviteBlasterOvertimeAfterSeconds as (typeof duelBlasterOvertimeOptions)[number]))}
+                            disabled={!inviteBlasterOvertimeEnabled}
+                            onChange={(event) => {
+                              const nextIndex = Number(event.target.value)
+                              setInviteBlasterOvertimeAfterSeconds(duelBlasterOvertimeOptions[nextIndex] || duelBlasterDefaultOvertimeAfterSeconds)
+                            }}
+                          />
+                          <div className="onevone-overtime-marks" aria-hidden>
+                            {duelBlasterOvertimeOptions.map((seconds) => <span key={`bot-overtime-${seconds}`}>{seconds}s</span>)}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              </section>
+            </div>
+            <div className="actions-row onevone-bot-setup-actions">
+              <div className="onevone-bot-start-summary">
+                <strong>{duelGameTypeLabels[inviteGameType]} vs Bot</strong>
+                <span>{duelCategoryLabel(inviteCategory)} | {botSetupRuleLabel} | {botSetupAssistLabel}</span>
+              </div>
+              <div className="onevone-bot-action-buttons">
+                <button className="secondary" type="button" onClick={() => setShowBotSetupModal(false)} disabled={botStarting}>
+                  Cancel
+                </button>
+                <button
+                  className="primary onevone-bot-start"
+                  type="button"
+                  onClick={() => void startBotMatch()}
+                  disabled={botStarting}
+                >
+                  {botStarting ? 'Building bot match…' : `Start ${duelGameTypeLabels[inviteGameType]} vs Bot`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+	      {showInviteModal ? (
+	        <div
+	          className="profile-modal-overlay game-setup-overlay"
           onClick={() => setShowInviteModal(false)}
         >
           <div className="card game-settings-modal onevone-invite-modal" onClick={(event) => event.stopPropagation()}>
@@ -5135,9 +6972,12 @@ export function OneVsOnePanel(props: {
                         >
                           To the Death
                         </button>
-                      </div>
-                      <small className="muted">Default is 30 seconds. Rope KO can still end either mode early.</small>
-                    </label>
+	                      </div>
+	                      <small className="muted">Default is 30 seconds. Rope KO can still end either mode early.</small>
+                        <button className="secondary onevone-glossary-button" type="button" onClick={() => setShowPowerupGlossary(true)}>
+                          View Power-Up Glossary
+                        </button>
+	                    </label>
                     <label className={`game-control onevone-powerup-toggle ${invitePowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
                       <span>
                         Enable Power-Ups

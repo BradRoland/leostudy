@@ -11,14 +11,18 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
 const browserStorage = (() => {
   if (typeof window === 'undefined') return undefined
-  try {
-    const testKey = '__leo_study_storage_test__'
-    window.localStorage.setItem(testKey, '1')
-    window.localStorage.removeItem(testKey)
-    return window.localStorage
-  } catch {
-    return undefined
+  const candidates = [window.localStorage, window.sessionStorage]
+  for (const storage of candidates) {
+    try {
+      const testKey = '__leo_study_storage_test__'
+      storage.setItem(testKey, '1')
+      storage.removeItem(testKey)
+      return storage
+    } catch {
+      // Try the next browser-backed storage option.
+    }
   }
+  return undefined
 })()
 
 export const supabase = isSupabaseConfigured

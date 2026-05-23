@@ -1194,6 +1194,50 @@ body {
   border-color: color-mix(in srgb, var(--accent) 64%, var(--border));
 }
 
+.home-bot-cta {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background:
+    radial-gradient(circle at 11% 18%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--panel-strong) 92%, transparent), color-mix(in srgb, #0f766e 18%, var(--panel) 82%));
+}
+
+.home-bot-cta:hover {
+  border-color: color-mix(in srgb, #38bdf8 48%, var(--accent));
+}
+
+.home-bot-cta .home-blaster-cta-icon {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 28%, var(--panel)), color-mix(in srgb, #38bdf8 18%, var(--panel-strong)));
+  color: color-mix(in srgb, var(--text) 92%, #fff);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, #38bdf8 30%, transparent),
+    0 10px 24px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.home-bot-cta .home-blaster-cta-action {
+  background: linear-gradient(180deg, color-mix(in srgb, #38bdf8 28%, var(--accent)), color-mix(in srgb, var(--accent) 88%, black 12%));
+}
+
+.home-bot-cta-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.home-bot-cta-pills span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: color-mix(in srgb, var(--panel-soft) 76%, transparent);
+  color: color-mix(in srgb, var(--text) 84%, #fff);
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
 .home-blaster-cta-icon {
   width: 46px;
   height: 46px;
@@ -1620,6 +1664,156 @@ body {
   right: 20px;
   top: 18px;
 }
+
+.home-whats-new-visual-bot::before {
+  left: 22px;
+  right: 22px;
+  top: 50%;
+  height: 52px;
+  border-radius: 18px;
+  border: 1px solid rgba(125, 211, 252, 0.26);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.34), rgba(20, 184, 166, 0.24));
+  transform: translateY(-50%);
+}
+
+.home-whats-new-visual-bot .home-whats-new-visual-main {
+  width: 66px;
+  height: 56px;
+  border-radius: 20px 20px 18px 18px;
+  background:
+    radial-gradient(circle at 34% 38%, #93c5fd 0 6px, transparent 7px),
+    radial-gradient(circle at 66% 38%, #93c5fd 0 6px, transparent 7px),
+    linear-gradient(145deg, rgba(226, 232, 240, 0.96), rgba(125, 211, 252, 0.9));
+  border: 1px solid rgba(226, 232, 240, 0.62);
+  box-shadow: 0 18px 28px rgba(15, 23, 42, 0.22);
+}
+
+.home-whats-new-visual-bot .home-whats-new-visual-main::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  width: 2px;
+  height: 13px;
+  background: rgba(226, 232, 240, 0.78);
+}
+
+.home-whats-new-visual-bot .home-whats-new-visual-main::after {
+  content: 'BOT';
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  color: #0f172a;
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.home-whats-new-visual-bot .home-whats-new-visual-chip {
+  width: 78px;
+  height: 26px;
+  background: rgba(37, 99, 235, 0.58);
+}
+
+.home-whats-new-visual-bot .home-whats-new-visual-chip-a::after,
+.home-whats-new-visual-bot .home-whats-new-visual-chip-b::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #eff6ff;
+  font-size: 0.66rem;
+  font-weight: 950;
+}
+
+.home-whats-new-visual-bot .home-whats-new-visual-chip-a::after { content: 'ADAPT'; }
+.home-whats-new-visual-bot .home-whats-new-visual-chip-b::after { content: '1v1'; }
+
+.home-whats-new-visual-profile .home-whats-new-visual-main {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  border: 8px solid rgba(96, 165, 250, 0.58);
+  background:
+    radial-gradient(circle at 50% 36%, rgba(226, 232, 240, 0.96) 0 17px, transparent 18px),
+    radial-gradient(circle at 50% 88%, rgba(226, 232, 240, 0.88) 0 31px, transparent 32px),
+    linear-gradient(145deg, rgba(14, 165, 233, 0.48), rgba(37, 99, 235, 0.34));
+  box-shadow: 0 0 28px rgba(59, 130, 246, 0.28);
+}
+
+.home-whats-new-visual-profile .home-whats-new-visual-chip {
+  width: 92px;
+  height: 26px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.home-whats-new-visual-profile .home-whats-new-visual-chip-a::after,
+.home-whats-new-visual-profile .home-whats-new-visual-chip-b::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #dbeafe;
+  font-size: 0.62rem;
+  font-weight: 950;
+}
+
+.home-whats-new-visual-profile .home-whats-new-visual-chip-a::after { content: 'NAME'; }
+.home-whats-new-visual-profile .home-whats-new-visual-chip-b::after { content: 'SAFARI'; }
+
+.home-whats-new-visual-scrollLock .home-whats-new-visual-main {
+  width: 80px;
+  height: 72px;
+  border-radius: 18px;
+  border: 2px solid rgba(226, 232, 240, 0.62);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.62)),
+    repeating-linear-gradient(180deg, rgba(226, 232, 240, 0.16) 0 8px, transparent 8px 16px);
+  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.24);
+}
+
+.home-whats-new-visual-scrollLock .home-whats-new-visual-main::before {
+  content: '';
+  position: absolute;
+  left: 23px;
+  top: -18px;
+  width: 34px;
+  height: 28px;
+  border-radius: 16px 16px 0 0;
+  border: 7px solid rgba(226, 232, 240, 0.78);
+  border-bottom: 0;
+}
+
+.home-whats-new-visual-scrollLock .home-whats-new-visual-main::after {
+  content: 'LOCK';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #f8fafc;
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+.home-whats-new-visual-scrollLock .home-whats-new-visual-chip {
+  width: 84px;
+  height: 24px;
+  background: rgba(20, 184, 166, 0.28);
+}
+
+.home-whats-new-visual-scrollLock .home-whats-new-visual-chip-a::after,
+.home-whats-new-visual-scrollLock .home-whats-new-visual-chip-b::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #ccfbf1;
+  font-size: 0.62rem;
+  font-weight: 950;
+}
+
+.home-whats-new-visual-scrollLock .home-whats-new-visual-chip-a::after { content: 'MODAL'; }
+.home-whats-new-visual-scrollLock .home-whats-new-visual-chip-b::after { content: 'TOUCH'; }
 
 .home-whats-new-visual-blaster::before {
   left: 13%;
@@ -4408,6 +4602,7 @@ button:active:not(:disabled):not(.study-session-flashcard) {
   align-items: flex-start;
   justify-items: center;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-top: max(12px, env(safe-area-inset-top));
   padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
@@ -10028,6 +10223,18 @@ button.study-session-top-action-start:active:not(:disabled) {
   line-height: 1.35;
 }
 
+.onevone-bot-cta {
+  border-color: color-mix(in srgb, var(--accent) 56%, var(--border));
+  background:
+    radial-gradient(circle at 16% 12%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 40%),
+    color-mix(in srgb, var(--panel-soft) 86%, transparent);
+  box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.04), 0 12px 28px rgba(0, 0, 0, 0.14);
+}
+
+.onevone-bot-board {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+}
+
 .onevone-join-block {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -10085,6 +10292,216 @@ button.study-session-top-action-start:active:not(:disabled) {
   gap: 12px;
 }
 
+.onevone-bot-setup-overlay {
+  z-index: 48;
+}
+
+.onevone-bot-setup-modal {
+  width: min(1040px, calc(100vw - 24px));
+  max-height: calc(100svh - max(18px, env(safe-area-inset-top)) - max(18px, env(safe-area-inset-bottom)));
+  overflow: hidden;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 38%),
+    radial-gradient(circle at 95% 12%, color-mix(in srgb, #38bdf8 13%, transparent), transparent 34%),
+    linear-gradient(145deg, color-mix(in srgb, var(--panel) 96%, rgba(15, 23, 42, 0.9)), color-mix(in srgb, var(--panel-strong) 86%, rgba(15, 23, 42, 0.94)));
+}
+
+.onevone-bot-setup-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.onevone-bot-setup-head h3,
+.onevone-bot-setup-head p {
+  margin: 0;
+}
+
+.onevone-bot-setup-head h3 {
+  font-size: clamp(1.55rem, 3vw, 2.35rem);
+  line-height: 1;
+}
+
+.onevone-bot-title-lockup {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.onevone-bot-header-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.onevone-bot-header-pills span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: color-mix(in srgb, var(--panel-soft) 78%, transparent);
+  color: color-mix(in srgb, var(--text) 86%, #fff);
+  font-size: 0.75rem;
+  font-weight: 850;
+}
+
+.onevone-bot-close-button {
+  min-height: 40px;
+  padding-inline: 14px;
+}
+
+.onevone-bot-setup-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.82fr) minmax(360px, 1.18fr);
+  align-items: start;
+  gap: 14px;
+  padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.onevone-bot-command-panel {
+  position: relative;
+  overflow: hidden;
+  align-self: start;
+}
+
+.onevone-bot-command-panel::after {
+  content: '';
+  position: absolute;
+  inset: auto 18px -34px;
+  height: 76px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  filter: blur(30px);
+  pointer-events: none;
+}
+
+.onevone-bot-builder-panel {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 18px;
+  padding: 12px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--panel-strong) 84%, transparent), color-mix(in srgb, var(--panel-soft) 68%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.onevone-bot-builder-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.onevone-bot-builder-head p {
+  margin: 0 0 2px;
+}
+
+.onevone-bot-builder-head strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.onevone-bot-builder-head > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-soft));
+  color: color-mix(in srgb, var(--accent) 82%, #fff 12%);
+  font-size: 0.75rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.onevone-bot-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.onevone-bot-summary-strip > span {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 14px;
+  padding: 8px 9px;
+  background: color-mix(in srgb, var(--panel) 76%, transparent);
+  display: grid;
+  gap: 2px;
+}
+
+.onevone-bot-summary-strip small {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.onevone-bot-summary-strip strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.onevone-bot-settings {
+  overflow: visible;
+  padding-right: 0;
+}
+
+.onevone-bot-setup-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
+  align-items: center;
+  gap: 12px;
+  margin-top: 0;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.onevone-bot-start-summary {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.onevone-bot-start-summary strong {
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.onevone-bot-start-summary span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.onevone-bot-action-buttons {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.62fr) minmax(0, 1.38fr);
+  gap: 10px;
+}
+
 .onevone-invite-modal-body {
   min-height: 0;
   overflow: hidden;
@@ -10112,8 +10529,216 @@ button.study-session-top-action-start:active:not(:disabled) {
   align-content: start;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding-right: 2px;
   -webkit-overflow-scrolling: touch;
+}
+
+.onevone-bot-lab {
+  display: grid;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-radius: 18px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 42%),
+    linear-gradient(145deg, color-mix(in srgb, var(--panel-strong) 86%, transparent), color-mix(in srgb, var(--panel-soft) 70%, transparent));
+  box-shadow:
+    inset 0 0 24px rgba(255, 255, 255, 0.04),
+    0 18px 42px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.onevone-bot-lab-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.onevone-bot-lab-head strong {
+  display: block;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.onevone-bot-lab-head p {
+  margin: 2px 0 0;
+}
+
+.onevone-bot-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
+  display: inline-grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 46%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.onevone-bot-difficulty-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.onevone-bot-difficulty {
+  position: relative;
+  min-height: 68px;
+  overflow: hidden;
+  border-radius: 15px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--panel) 78%, transparent), color-mix(in srgb, var(--panel-soft) 64%, transparent));
+  color: var(--text);
+  text-align: left;
+  padding: 10px 11px;
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.onevone-bot-difficulty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-left: 4px solid color-mix(in srgb, var(--accent) 86%, #fff 10%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.onevone-bot-difficulty:hover,
+.onevone-bot-difficulty.active {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 78%, #fff 10%);
+  background: color-mix(in srgb, var(--accent) 26%, var(--panel-soft));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.onevone-bot-difficulty.active::before {
+  opacity: 1;
+}
+
+.onevone-bot-difficulty strong,
+.onevone-bot-difficulty small {
+  position: relative;
+  z-index: 1;
+}
+
+.onevone-bot-difficulty small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.onevone-bot-scouting {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  border-radius: 15px;
+  padding: 10px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--panel-soft) 78%, transparent), color-mix(in srgb, var(--panel) 66%, transparent));
+}
+
+.onevone-bot-scouting span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.onevone-bot-scouting > strong {
+  justify-self: end;
+  color: color-mix(in srgb, var(--accent) 82%, #fff 12%);
+}
+
+.onevone-bot-scout-metrics {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.onevone-bot-scout-metrics > span {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 13px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  display: grid;
+  gap: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.onevone-bot-scout-metrics small {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.onevone-bot-scout-metrics strong {
+  justify-self: start;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.onevone-bot-scouting > small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+.onevone-bot-start,
+.onevone-glossary-button {
+  width: 100%;
+}
+
+.onevone-glossary-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  background:
+    radial-gradient(circle at 14% 18%, rgba(255, 255, 255, 0.16), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 36%, var(--panel-soft)), color-mix(in srgb, #38bdf8 18%, var(--panel)));
+  color: color-mix(in srgb, var(--text) 92%, #fff);
+  font-weight: 900;
+  box-shadow:
+    0 12px 26px color-mix(in srgb, var(--accent) 16%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.onevone-glossary-button::before {
+  content: '⚡';
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.onevone-glossary-button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 82%, #fff);
+  box-shadow:
+    0 16px 34px color-mix(in srgb, var(--accent) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .onevone-online-list-head {
@@ -10135,6 +10760,7 @@ button.study-session-top-action-start:active:not(:disabled) {
   max-height: none;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding-right: 2px;
   -webkit-overflow-scrolling: touch;
 }
@@ -11970,7 +12596,8 @@ button:disabled {
     width: 100%;
   }
 
-  .onevone-invite-modal {
+  .onevone-invite-modal,
+  .onevone-bot-setup-modal {
     width: min(100%, calc(100vw - 16px));
     max-height: calc(100svh - max(10px, env(safe-area-inset-top)) - max(10px, env(safe-area-inset-bottom)));
   }
@@ -11979,6 +12606,20 @@ button:disabled {
     grid-template-columns: 1fr;
     overflow-y: auto;
     align-content: start;
+  }
+
+  .onevone-bot-setup-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+    align-content: start;
+  }
+
+  .onevone-bot-setup-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .onevone-bot-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .onevone-online-list-wrap {
@@ -13602,6 +14243,198 @@ textarea:focus-visible,
     0 8px 18px rgba(0, 0, 0, 0.24);
 }
 
+.onevone-powerup-glossary-modal {
+  width: min(920px, calc(100vw - 24px));
+  max-height: calc(100svh - 28px);
+  overflow: auto;
+  border-radius: 28px;
+}
+
+.onevone-powerup-glossary-overlay {
+  z-index: 130;
+  align-items: center;
+  padding-top: max(16px, env(safe-area-inset-top));
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 48%),
+    rgba(5, 10, 22, 0.72);
+  backdrop-filter: blur(9px);
+  isolation: isolate;
+}
+
+.onevone-powerup-glossary-overlay .onevone-powerup-glossary-modal {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+  background:
+    radial-gradient(circle at 16% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 42%),
+    radial-gradient(circle at 100% 8%, rgba(56, 189, 248, 0.14), transparent 36%),
+    color-mix(in srgb, var(--panel) 94%, rgba(7, 13, 28, 0.96));
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.48),
+    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.onevone-glossary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+}
+
+.onevone-glossary-head h3,
+.onevone-glossary-head p,
+.onevone-glossary-head span {
+  margin: 0;
+}
+
+.onevone-glossary-head h3 {
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  line-height: 0.98;
+}
+
+.onevone-glossary-head span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.onevone-glossary-kicker {
+  width: fit-content;
+  margin-bottom: 7px !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: color-mix(in srgb, var(--accent) 82%, #fff);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.onevone-glossary-close {
+  min-width: 86px;
+}
+
+.onevone-powerup-glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 265px), 1fr));
+  gap: 12px;
+}
+
+.onevone-powerup-glossary-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 36%, var(--border));
+  border-radius: 20px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.12), transparent 42%),
+    linear-gradient(145deg, color-mix(in srgb, var(--panel-soft) 88%, transparent), color-mix(in srgb, var(--panel) 74%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.onevone-powerup-glossary-card::after {
+  content: '';
+  position: absolute;
+  inset: auto -32px -48px 38%;
+  height: 92px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  filter: blur(24px);
+  pointer-events: none;
+}
+
+.onevone-powerup-glossary-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 70%, #fff 8%);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.onevone-powerup-glossary-icon {
+  position: relative;
+  z-index: 1;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  place-items: center;
+  padding: 0;
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.34), transparent 34%),
+    color-mix(in srgb, var(--accent) 20%, rgba(255, 255, 255, 0.1));
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, rgba(255, 255, 255, 0.16));
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.onevone-powerup-glossary-icon span {
+  display: block;
+  width: 1em;
+  height: 1em;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 1.68rem;
+  line-height: 1;
+  text-align: center;
+  transform: translateY(-0.5px);
+  filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.28));
+}
+
+.onevone-powerup-glossary-copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.onevone-powerup-glossary-title {
+  display: grid;
+  gap: 3px;
+}
+
+.onevone-powerup-glossary-card strong,
+.onevone-powerup-glossary-card small,
+.onevone-powerup-glossary-card span {
+  display: block;
+}
+
+.onevone-powerup-glossary-card small {
+  color: color-mix(in srgb, var(--accent) 82%, #fff 12%);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.onevone-powerup-glossary-card p {
+  margin: 8px 0 10px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.onevone-powerup-glossary-points {
+  width: fit-content;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: color-mix(in srgb, var(--text) 90%, #fff);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .onevone-blaster-shell {
   display: grid;
   grid-template-rows: auto minmax(44px, auto) minmax(0, 1fr);
@@ -13613,6 +14446,216 @@ textarea:focus-visible,
   max-height: calc(100svh - clamp(16px, 3vw, 48px) - var(--global-banner-offset, 0px));
   box-sizing: border-box;
   overflow: hidden;
+}
+
+.onevone-bot-overlay .onevone-blaster-shell {
+  border-color: color-mix(in srgb, var(--accent) 52%, rgba(147, 197, 253, 0.28));
+  background:
+    radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 38%),
+    linear-gradient(135deg, rgba(14, 24, 52, 0.96), rgba(8, 15, 36, 0.98));
+}
+
+.onevone-bot-note {
+  display: inline-flex;
+  justify-content: center;
+  max-width: min(100%, 620px);
+  color: color-mix(in srgb, var(--text-muted) 88%, #fff 8%);
+  font-size: clamp(0.6rem, 1vw, 0.74rem);
+  line-height: 1.2;
+}
+
+.onevone-bot-arena .onevone-blaster-prompt {
+  border-color: color-mix(in srgb, var(--accent) 34%, rgba(255, 255, 255, 0.14));
+}
+
+.onevone-bot-duel-panel {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, rgba(255, 255, 255, 0.14));
+  border-radius: 18px;
+  padding: 10px;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 42%),
+    rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.onevone-bot-score-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.onevone-bot-score-row article {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border-radius: 14px;
+  padding: 9px 12px;
+  background: rgba(15, 23, 42, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.onevone-bot-score-row article:last-child {
+  text-align: right;
+}
+
+.onevone-bot-score-row small,
+.onevone-bot-score-row span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.onevone-bot-score-row strong {
+  color: var(--text);
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
+  line-height: 1;
+}
+
+.onevone-bot-versus {
+  align-self: center;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: color-mix(in srgb, var(--accent) 24%, rgba(15, 23, 42, 0.7));
+  color: color-mix(in srgb, var(--accent) 74%, #fff);
+  font-size: 0.76rem;
+  font-weight: 950;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.onevone-bot-progress-bars {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.onevone-bot-progress-bars::before,
+.onevone-bot-progress-bars::after {
+  content: '';
+  grid-row: 1;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.onevone-bot-progress-bars::before {
+  grid-column: 1;
+}
+
+.onevone-bot-progress-bars::after {
+  grid-column: 2;
+}
+
+.onevone-bot-progress-bars span {
+  grid-row: 1;
+  z-index: 1;
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 76%, #60a5fa), #4ade80);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 30%, transparent);
+  transition: width 0.28s ease;
+}
+
+.onevone-bot-progress-bars span:first-child {
+  grid-column: 1;
+}
+
+.onevone-bot-progress-bars span:last-child {
+  grid-column: 2;
+  justify-self: end;
+  background: linear-gradient(90deg, #fb7185, #facc15);
+}
+
+.onevone-bot-quiz-card,
+.onevone-bot-match-round {
+  min-height: 0;
+  overflow: auto;
+}
+
+.onevone-bot-match-round {
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, rgba(255, 255, 255, 0.12));
+  border-radius: 22px;
+  padding: clamp(12px, 2vw, 18px);
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 44%),
+    rgba(255, 255, 255, 0.07);
+}
+
+.onevone-bot-match-round > .muted {
+  text-align: center;
+  font-weight: 850;
+  margin-bottom: 10px;
+}
+
+.onevone-bot-catchup-active {
+  border-color: rgba(56, 189, 248, 0.52);
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.12),
+    0 0 26px rgba(56, 189, 248, 0.18),
+    inset 0 0 24px rgba(56, 189, 248, 0.08);
+}
+
+.onevone-bot-catchup-active .onevone-tug-handle {
+  filter:
+    drop-shadow(0 0 16px rgba(56, 189, 248, 0.36))
+    drop-shadow(0 14px 16px rgba(0, 0, 0, 0.36));
+}
+
+.onevone-bot-catchup-pill {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  gap: 4px 8px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.28), rgba(99, 102, 241, 0.18), rgba(14, 165, 233, 0.28)),
+    rgba(8, 15, 36, 0.62);
+  color: #e0f2fe;
+  font-size: clamp(0.66rem, 1vw, 0.76rem);
+  line-height: 1.15;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  animation: onevone-bot-catchup-pop 0.36s cubic-bezier(.2, 1.3, .28, 1);
+}
+
+.onevone-bot-catchup-pill span {
+  color: rgba(224, 242, 254, 0.8);
+  font-weight: 800;
+}
+
+@keyframes onevone-bot-catchup-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.onevone-bot-result-overlay {
+  align-items: center;
+}
+
+.onevone-bot-result-shell {
+  width: min(720px, calc(100vw - 28px));
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 42%),
+    color-mix(in srgb, var(--panel) 88%, rgba(15, 23, 42, 0.9));
+}
+
+.onevone-bot-result-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.onevone-bot-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .onevone-blaster-topbar,
@@ -14720,6 +15763,11 @@ textarea:focus-visible,
   box-shadow: 0 0 0 14px rgba(248, 113, 113, 0.14), 0 0 34px rgba(248, 113, 113, 0.76);
 }
 
+.onevone-blaster-shot-burst-spectator {
+  background: radial-gradient(circle, #fff 0 12%, #bae6fd 13% 32%, #38bdf8 33% 56%, transparent 60%);
+  box-shadow: 0 0 0 14px rgba(56, 189, 248, 0.16), 0 0 36px rgba(96, 165, 250, 0.8);
+}
+
 @keyframes onevone-blaster-shot-pop {
   0% { opacity: 1; transform: translate(-50%, -50%) scale(0.6); filter: blur(0); }
   42% { opacity: 1; transform: translate(-50%, -50%) scale(3.2) rotate(18deg); filter: blur(0.2px); }
@@ -15111,6 +16159,8 @@ textarea:focus-visible,
   .onevone-hud-grid,
   .onevone-compare-grid,
   .onevone-result-summary,
+  .onevone-bot-result-summary,
+  .onevone-bot-summary-grid,
   .tier-upgrade-grid,
   .theme-grid {
     display: grid !important;
@@ -15711,7 +16761,8 @@ textarea:focus-visible,
     max-height: min(34svh, 260px) !important;
   }
 
-  .onevone-invite-modal {
+  .onevone-invite-modal,
+  .onevone-bot-setup-modal {
     width: calc(100vw - 12px) !important;
     max-width: none !important;
     height: auto !important;
@@ -15725,14 +16776,44 @@ textarea:focus-visible,
     -webkit-overflow-scrolling: touch;
   }
 
-  .onevone-invite-modal > h3 {
+  .onevone-bot-setup-modal {
+    overflow: hidden !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+  }
+
+  .onevone-invite-modal > h3,
+  .onevone-bot-setup-head h3 {
     margin: 0;
     padding: 2px 2px 6px;
     font-size: clamp(1.25rem, 7vw, 1.8rem);
     line-height: 1;
   }
 
+  .onevone-bot-setup-head {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .onevone-bot-close-button {
+    justify-self: end;
+    width: auto !important;
+    min-height: 38px !important;
+    padding: 7px 12px !important;
+  }
+
+  .onevone-bot-header-pills {
+    gap: 5px !important;
+  }
+
+  .onevone-bot-header-pills span {
+    min-height: 26px;
+    padding: 3px 8px;
+    font-size: 0.7rem;
+  }
+
   .onevone-invite-modal-body,
+  .onevone-bot-setup-body,
   .onevone-invite-settings,
   .onevone-online-list-wrap {
     display: grid !important;
@@ -15746,6 +16827,31 @@ textarea:focus-visible,
     overflow-y: visible !important;
     overflow-x: hidden !important;
     padding: 0 !important;
+  }
+
+  .onevone-bot-setup-body {
+    grid-template-rows: none !important;
+    grid-auto-rows: max-content !important;
+    gap: 10px !important;
+    align-content: start !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0 !important;
+  }
+
+  .onevone-bot-command-panel,
+  .onevone-bot-builder-panel {
+    border-radius: 16px !important;
+    padding: 10px !important;
+  }
+
+  .onevone-bot-builder-head {
+    align-items: flex-start;
+  }
+
+  .onevone-bot-summary-strip,
+  .onevone-bot-scout-metrics {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   .onevone-invite-settings {
@@ -15836,17 +16942,20 @@ textarea:focus-visible,
     border-radius: 13px !important;
   }
 
-  .onevone-invite-modal .game-control {
+  .onevone-invite-modal .game-control,
+  .onevone-bot-setup-modal .game-control {
     gap: 8px !important;
     border-radius: 15px !important;
     padding: 10px !important;
   }
 
-  .onevone-invite-modal .game-control > small {
+  .onevone-invite-modal .game-control > small,
+  .onevone-bot-setup-modal .game-control > small {
     line-height: 1.25;
   }
 
-  .onevone-invite-modal .segmented {
+  .onevone-invite-modal .segmented,
+  .onevone-bot-setup-modal .segmented {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 7px !important;
@@ -15854,22 +16963,26 @@ textarea:focus-visible,
     padding: 5px !important;
   }
 
-  .onevone-invite-modal .onevone-mode-segmented {
+  .onevone-invite-modal .onevone-mode-segmented,
+  .onevone-bot-setup-modal .onevone-mode-segmented {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
-  .onevone-invite-modal .onevone-mode-segmented .seg {
+  .onevone-invite-modal .onevone-mode-segmented .seg,
+  .onevone-bot-setup-modal .onevone-mode-segmented .seg {
     justify-items: center;
     min-height: 52px !important;
     text-align: center;
   }
 
-  .onevone-invite-modal .onevone-mode-segmented .seg small {
+  .onevone-invite-modal .onevone-mode-segmented .seg small,
+  .onevone-bot-setup-modal .onevone-mode-segmented .seg small {
     font-size: 0.72rem;
     line-height: 1.16;
   }
 
-  .onevone-invite-modal .seg {
+  .onevone-invite-modal .seg,
+  .onevone-bot-setup-modal .seg {
     min-width: 0 !important;
     min-height: 44px !important;
     padding: 8px 9px !important;
@@ -15877,7 +16990,8 @@ textarea:focus-visible,
     white-space: normal !important;
   }
 
-  .onevone-invite-modal .onevone-powerup-toggle {
+  .onevone-invite-modal .onevone-powerup-toggle,
+  .onevone-bot-setup-modal .onevone-powerup-toggle {
     grid-template-columns: minmax(0, 1fr) !important;
     min-height: auto !important;
     gap: 10px !important;
@@ -15885,22 +16999,38 @@ textarea:focus-visible,
     border-radius: 15px !important;
   }
 
-  .onevone-invite-modal .onevone-toggle-action {
+  .onevone-invite-modal .onevone-toggle-action,
+  .onevone-bot-setup-modal .onevone-toggle-action {
     width: 100%;
     min-width: 0;
     justify-content: space-between;
   }
 
-  .onevone-invite-modal .onevone-overtime-control {
+  .onevone-invite-modal .onevone-overtime-control,
+  .onevone-bot-setup-modal .onevone-overtime-control {
     gap: 9px !important;
   }
 
-  .onevone-invite-modal .onevone-overtime-slider {
+  .onevone-invite-modal .onevone-overtime-slider,
+  .onevone-bot-setup-modal .onevone-overtime-slider {
     padding: 10px !important;
     border-radius: 14px !important;
   }
 
-  .onevone-invite-modal .actions-row {
+  .onevone-invite-modal .onevone-bot-difficulty-grid,
+  .onevone-bot-setup-modal .onevone-bot-difficulty-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .onevone-invite-modal .onevone-bot-difficulty,
+  .onevone-bot-setup-modal .onevone-bot-difficulty {
+    min-height: 52px;
+    padding: 9px 10px;
+  }
+
+  .onevone-invite-modal .actions-row,
+  .onevone-bot-setup-modal .actions-row {
+    grid-template-columns: minmax(0, 1fr) !important;
     position: sticky;
     bottom: 0;
     z-index: 5;
@@ -15911,8 +17041,21 @@ textarea:focus-visible,
       color-mix(in srgb, var(--card-bg) 94%, transparent);
   }
 
+  .onevone-bot-setup-modal .actions-row {
+    position: static;
+    margin: 0 !important;
+    padding: 10px 0 0 !important;
+    background: transparent;
+  }
+
+  .onevone-bot-action-buttons {
+    grid-template-columns: minmax(92px, 0.7fr) minmax(0, 1.3fr) !important;
+  }
+
   .app-shell:has(.onevone-invite-modal) .mobile-bottom-nav,
-  .app-shell:has(.onevone-invite-modal) .mobile-quick-strip {
+  .app-shell:has(.onevone-invite-modal) .mobile-quick-strip,
+  .app-shell:has(.onevone-bot-setup-modal) .mobile-bottom-nav,
+  .app-shell:has(.onevone-bot-setup-modal) .mobile-quick-strip {
     display: none !important;
     pointer-events: none !important;
   }
