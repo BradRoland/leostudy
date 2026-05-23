@@ -460,7 +460,7 @@ const duelGameTypeOptions: Array<{ value: DuelGameType; label: string; subtitle:
 const duelBotDifficultyOptions: Array<{ value: DuelBotDifficulty; label: string; subtitle: string }> = [
   { value: 'adaptive', label: 'Adaptive', subtitle: 'Targets your weak codes' },
   { value: 'random', label: 'Random', subtitle: 'Surprise bot skill' },
-  { value: 'easy', label: 'Easy', subtitle: 'Warm-up pressure' },
+  { value: 'easy', label: 'Easy', subtitle: 'Light challenge' },
   { value: 'medium', label: 'Medium', subtitle: 'Solid academy pace' },
   { value: 'hard', label: 'Hard', subtitle: 'Fast and accurate' },
   { value: 'very-hard', label: 'Very Hard', subtitle: 'Boss pressure' },
@@ -1449,7 +1449,7 @@ function resolveBotDifficulty(input: DuelBotDifficulty, skill: DuelBotSkillSnaps
 
 function duelBotDifficultyConfig(difficulty: DuelBotResolvedDifficulty, scoreGap: number, userHotStreak = 0) {
   const base = {
-    easy: { minDelay: 4100, maxDelay: 6500, accuracy: 0.45, points: 95 },
+    easy: { minDelay: 3300, maxDelay: 5400, accuracy: 0.56, points: 106 },
     medium: { minDelay: 2600, maxDelay: 4300, accuracy: 0.66, points: 118 },
     hard: { minDelay: 1450, maxDelay: 2850, accuracy: 0.81, points: 134 },
     'very-hard': { minDelay: 850, maxDelay: 1750, accuracy: 0.91, points: 152 },
@@ -1457,7 +1457,7 @@ function duelBotDifficultyConfig(difficulty: DuelBotResolvedDifficulty, scoreGap
   const mercyAccuracyDrop = difficulty === 'very-hard'
     ? scoreGap < -540 ? 0.06 : scoreGap < -340 ? 0.035 : 0
     : scoreGap < -420 ? 0.12 : scoreGap < -260 ? 0.07 : 0
-  const pressureAccuracyBoost = scoreGap > 260 && difficulty !== 'easy' ? 0.04 : 0
+  const pressureAccuracyBoost = scoreGap > 260 ? (difficulty === 'easy' ? 0.025 : 0.04) : 0
   const hotStreakTier = Math.max(0, Math.floor((userHotStreak - duelBotCatchupStreakThreshold) / 2) + 1)
   const catchupActive = userHotStreak >= duelBotCatchupStreakThreshold && scoreGap >= duelBotCatchupLeadThreshold
   const catchupStrength = catchupActive ? Math.min(4, hotStreakTier) : 0
