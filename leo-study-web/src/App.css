@@ -17927,3 +17927,143 @@ textarea:focus-visible,
     font-size: clamp(0.68rem, 3vw, 0.84rem) !important;
   }
 }
+
+.onevone-lobby-settings-strip {
+  width: min(100%, 520px);
+  margin: 14px auto 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.onevone-lobby-settings-strip span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-soft) 78%, transparent);
+  text-align: left;
+}
+
+.onevone-lobby-settings-strip small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.onevone-lobby-settings-strip strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+}
+
+.onevone-change-mode-button {
+  min-width: 132px;
+  min-height: 52px;
+  align-self: stretch;
+  white-space: nowrap;
+}
+
+.onevone-change-mode-modal {
+  width: min(680px, 100%);
+  max-height: min(86dvh, 780px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.onevone-change-mode-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.onevone-change-mode-head h3,
+.onevone-change-mode-head p {
+  margin: 0;
+}
+
+.onevone-change-mode-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.onevone-change-mode-summary span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-soft) 82%, transparent);
+  padding: 10px;
+}
+
+.onevone-change-mode-summary small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.onevone-change-mode-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+
+.onevone-change-mode-note {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--warning, #fbbf24) 28%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warning, #fbbf24) 10%, transparent);
+  padding: 9px 10px;
+}
+
+.onevone-change-mode-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--card-bg);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
+@media (max-width: 720px) {
+  .onevone-lobby-settings-strip,
+  .onevone-change-mode-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .onevone-change-mode-button {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .onevone-lobby-settings-strip,
+  .onevone-change-mode-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .onevone-change-mode-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .onevone-change-mode-modal {
+    max-height: 92dvh;
+  }
+}

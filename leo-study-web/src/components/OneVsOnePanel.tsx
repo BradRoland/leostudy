@@ -1746,7 +1746,17 @@ export function OneVsOnePanel(props: {
   const [joinCodeInput, setJoinCodeInput] = useState('')
   const [roomId, setRoomId] = useState<string | null>(null)
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false)
-  const lockGameSetupPageScroll = showInviteModal || showBotSetupModal || showCreateRoomModal || showPowerupGlossary
+  const [showChangeModeModal, setShowChangeModeModal] = useState(false)
+  const [lobbyEditGameType, setLobbyEditGameType] = useState<DuelGameType>('quiz')
+  const [lobbyEditCategory, setLobbyEditCategory] = useState<DuelCategory>('all')
+  const [lobbyEditQuizRounds, setLobbyEditQuizRounds] = useState(10)
+  const [lobbyEditPowerupsEnabled, setLobbyEditPowerupsEnabled] = useState(duelBlasterDefaultPowerupsEnabled)
+  const [lobbyEditBlasterMode, setLobbyEditBlasterMode] = useState<DuelBlasterMode>('timed')
+  const [lobbyEditBlasterDurationSeconds, setLobbyEditBlasterDurationSeconds] = useState(duelBlasterDefaultDurationSeconds)
+  const [lobbyEditBlasterOvertimeEnabled, setLobbyEditBlasterOvertimeEnabled] = useState(duelBlasterDefaultOvertimeEnabled)
+  const [lobbyEditBlasterOvertimeAfterSeconds, setLobbyEditBlasterOvertimeAfterSeconds] = useState(duelBlasterDefaultOvertimeAfterSeconds)
+  const [lobbySettingsSaving, setLobbySettingsSaving] = useState(false)
+  const lockGameSetupPageScroll = showInviteModal || showBotSetupModal || showCreateRoomModal || showChangeModeModal || showPowerupGlossary
   const [activityLog, setActivityLog] = useState<DuelRoomActivity[]>([])
   const [selectedQuizRounds, setSelectedQuizRounds] = useState(10)
   const [duelStatsMode, setDuelStatsMode] = useState<DuelStatsMode>('all')
@@ -2938,6 +2948,19 @@ export function OneVsOnePanel(props: {
       setSelectedCategory('all')
     }
   }, [selectedCategory, selectedGameType])
+
+  useEffect(() => {
+    if (lobbyEditGameType !== 'quiz' && lobbyEditCategory === 'scenarios') {
+      setLobbyEditCategory('all')
+    }
+  }, [lobbyEditCategory, lobbyEditGameType])
+
+  useEffect(() => {
+    if (!showChangeModeModal) return
+    if (!room || room.status !== 'waiting' || room.host_user_id !== currentUserId) {
+      setShowChangeModeModal(false)
+    }
+  }, [currentUserId, room, showChangeModeModal])
 
   useEffect(() => {
     if (invitePreset !== 'rope-blaster') return
@@ -4250,6 +4273,133 @@ export function OneVsOnePanel(props: {
     setNotice('Room created. Waiting for opponent.')
   }
 
+  const syncLobbySettingsDraftFromRoom = useCallback((sourceRoom: DuelRoomRow) => {
+    const sourceSettings = sourceRoom.settings || {}
+    setLobbyEditGameType(sourceRoom.game_type)
+    setLobbyEditCategory(sourceRoom.game_type !== 'quiz' && sourceRoom.category === 'scenarios' ? 'all' : sourceRoom.category)
+    setLobbyEditQuizRounds(sourceRoom.game_type === 'quiz' ? sourceRoom.rounds || selectedQuizRounds : selectedQuizRounds)
+    setLobbyEditPowerupsEnabled(sourceRoom.game_type === 'blaster' ? Boolean(sourceSettings.powerups_enabled ?? selectedPowerupsEnabled) : selectedPowerupsEnabled)
+    setLobbyEditBlasterMode(sourceRoom.game_type === 'blaster' ? getBlasterMode(sourceSettings) : selectedBlasterMode)
+    setLobbyEditBlasterDurationSeconds(sourceRoom.game_type === 'blaster' ? getBlasterDurationSeconds(sourceSettings) : selectedBlasterDurationSeconds)
+    setLobbyEditBlasterOvertimeEnabled(sourceRoom.game_type === 'blaster' ? getBlasterOvertimeEnabled(sourceSettings) : selectedBlasterOvertimeEnabled)
+    setLobbyEditBlasterOvertimeAfterSeconds(sourceRoom.game_type === 'blaster' ? getBlasterOvertimeAfterSeconds(sourceSettings) : selectedBlasterOvertimeAfterSeconds)
+  }, [
+    selectedBlasterDurationSeconds,
+    selectedBlasterMode,
+    selectedBlasterOvertimeAfterSeconds,
+    selectedBlasterOvertimeEnabled,
+    selectedPowerupsEnabled,
+    selectedQuizRounds,
+  ])
+
+  const openChangeModeModal = () => {
+    if (!room || room.status !== 'waiting') {
+      setError('Game settings can only be changed before the match starts.')
+      return
+    }
+    if (room.host_user_id !== currentUserId) {
+      setError('Only the host can change the lobby mode.')
+      return
+    }
+    syncLobbySettingsDraftFromRoom(room)
+    setError('')
+    setNotice('')
+    setShowChangeModeModal(true)
+  }
+
+  const saveLobbySettings = async () => {
+    if (!supabase || !room || !roomId) return
+    if (room.status !== 'waiting') {
+      setError('Game settings can only be changed before the match starts.')
+      setShowChangeModeModal(false)
+      return
+    }
+    if (room.host_user_id !== currentUserId) {
+      setError('Only the host can change the lobby mode.')
+      setShowChangeModeModal(false)
+      return
+    }
+
+    const nextCategory = lobbyEditGameType !== 'quiz' && lobbyEditCategory === 'scenarios' ? 'all' : lobbyEditCategory
+    const nextRounds = lobbyEditGameType === 'matching'
+      ? 5
+      : lobbyEditGameType === 'blaster'
+        ? duelBlasterRoundCap
+        : lobbyEditQuizRounds
+    const nextSettings: Record<string, unknown> = {
+      powerups_enabled: lobbyEditGameType === 'blaster' ? lobbyEditPowerupsEnabled : false,
+      blaster_duration_seconds: lobbyEditGameType === 'blaster' ? lobbyEditBlasterDurationSeconds : duelBlasterDefaultDurationSeconds,
+      blaster_win_condition: lobbyEditGameType === 'blaster' && lobbyEditBlasterMode === 'death' ? 'death' : 'timed',
+      blaster_rope_limit: duelBlasterDefaultRopeLimit,
+      blaster_overtime_enabled: lobbyEditGameType === 'blaster' ? lobbyEditBlasterOvertimeEnabled : duelBlasterDefaultOvertimeEnabled,
+      blaster_overtime_after_seconds: lobbyEditGameType === 'blaster' ? lobbyEditBlasterOvertimeAfterSeconds : duelBlasterDefaultOvertimeAfterSeconds,
+    }
+
+    setLobbySettingsSaving(true)
+    setError('')
+    setNotice('')
+    let rpcErrorMessage = ''
+    try {
+      const { error: rpcError } = await supabase.rpc('update_1v1_lobby_settings', {
+        p_room_id: roomId,
+        p_game_type: lobbyEditGameType,
+        p_category: nextCategory,
+        p_rounds: nextRounds,
+        p_powerups_enabled: lobbyEditGameType === 'blaster' ? lobbyEditPowerupsEnabled : false,
+        p_blaster_duration_seconds: lobbyEditGameType === 'blaster'
+          ? lobbyEditBlasterDurationSeconds
+          : duelBlasterDefaultDurationSeconds,
+        p_blaster_sudden_death: lobbyEditGameType === 'blaster' && lobbyEditBlasterMode === 'death',
+        p_blaster_rope_limit: duelBlasterDefaultRopeLimit,
+        p_blaster_overtime_enabled: lobbyEditGameType === 'blaster' ? lobbyEditBlasterOvertimeEnabled : duelBlasterDefaultOvertimeEnabled,
+        p_blaster_overtime_after_seconds: lobbyEditGameType === 'blaster' ? lobbyEditBlasterOvertimeAfterSeconds : duelBlasterDefaultOvertimeAfterSeconds,
+      })
+      rpcErrorMessage = rpcError?.message || ''
+    } catch (err) {
+      rpcErrorMessage = err instanceof Error ? err.message : 'Could not update lobby settings.'
+    } finally {
+      setLobbySettingsSaving(false)
+    }
+    if (rpcErrorMessage) {
+      setError(rpcErrorMessage || 'Could not update lobby settings.')
+      return
+    }
+
+    setSelectedGameType(lobbyEditGameType)
+    setSelectedCategory(nextCategory)
+    setSelectedQuizRounds(lobbyEditQuizRounds)
+    setSelectedPowerupsEnabled(lobbyEditPowerupsEnabled)
+    setSelectedBlasterMode(lobbyEditBlasterMode)
+    setSelectedBlasterDurationSeconds(lobbyEditBlasterDurationSeconds)
+    setSelectedBlasterOvertimeEnabled(lobbyEditBlasterOvertimeEnabled)
+    setSelectedBlasterOvertimeAfterSeconds(lobbyEditBlasterOvertimeAfterSeconds)
+    setRoom((previous) => previous && previous.id === roomId
+      ? {
+        ...previous,
+        game_type: lobbyEditGameType,
+        category: nextCategory,
+        rounds: nextRounds,
+        settings: nextSettings,
+        current_round: 1,
+        started_at: null,
+        winner_user_id: null,
+      }
+      : previous)
+    setPlayers((previous) => previous.map((player) => ({
+      ...player,
+      is_ready: false,
+      score: 0,
+      total_time_ms: 0,
+      fastest_round_ms: 0,
+      current_round: 1,
+      finished_at: null,
+    })))
+    setShowChangeModeModal(false)
+    setNotice('Lobby settings updated. Both players need to ready up again.')
+    await refreshRoomSnapshot()
+    window.setTimeout(() => void refreshRoomSnapshot(), 400)
+  }
+
   const openInviteModal = (sourceRoom?: DuelRoomRow | null, presetGameType?: DuelGameType) => {
     const sourceGameType = presetGameType || sourceRoom?.game_type || selectedGameType
     const sourceCategory = sourceRoom?.category || selectedCategory
@@ -4906,6 +5056,23 @@ export function OneVsOnePanel(props: {
   const opponentResultRow = useMemo(() => roomPlayerRowsSorted.find((entry) => entry.user_id !== currentUserId) || null, [currentUserId, roomPlayerRowsSorted])
 
   const lobbyReadyCount = players.filter((player) => player.is_ready).length
+  const lobbyPlayerCount = players.length
+  const isRoomHost = Boolean(room && room.host_user_id === currentUserId)
+  const canHostChangeLobbyMode = Boolean(room && room.status === 'waiting' && isRoomHost)
+  const roomRuleLabel = room ? formatDuelRoomRuleLabel(room) : ''
+  const roomCategoryLabel = room ? duelCategoryLabel(room.category) : ''
+  const lobbyEditRuleLabel = lobbyEditGameType === 'quiz'
+    ? `${lobbyEditQuizRounds} questions`
+    : lobbyEditGameType === 'matching'
+      ? '3 pair sets'
+      : lobbyEditBlasterMode === 'death'
+        ? 'To the Death'
+        : `${lobbyEditBlasterDurationSeconds}s timer`
+  const lobbyEditAssistLabel = lobbyEditGameType === 'blaster'
+    ? `${lobbyEditPowerupsEnabled ? 'Power-ups on' : 'Power-ups off'} | Overtime ${lobbyEditBlasterOvertimeEnabled ? `${lobbyEditBlasterOvertimeAfterSeconds}s` : 'off'}`
+    : lobbyEditGameType === 'matching'
+      ? 'Fast pair rounds'
+      : 'Code recall rounds'
   const waitingChatSendDisabled = waitingChatSending || !waitingChatInput.trim() || !room || room.status !== 'waiting'
   const inviteGameLabel = duelGameTypeLabels[inviteGameType]
   const inviteCategoryLabel = inviteCategory === 'all'
@@ -6581,6 +6748,207 @@ export function OneVsOnePanel(props: {
 	        </div>
 	      ) : null}
 
+      {inRoom && room && showChangeModeModal ? (
+        <div
+          className="profile-modal-overlay game-setup-overlay onevone-change-mode-overlay"
+          onClick={() => {
+            if (!lobbySettingsSaving) setShowChangeModeModal(false)
+          }}
+        >
+          <div className="card game-settings-modal onevone-change-mode-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="onevone-change-mode-head">
+              <div>
+                <p className="muted tiny">Host controls</p>
+                <h3>Change Mode</h3>
+              </div>
+              <button
+                className="secondary onevone-change-mode-close"
+                type="button"
+                onClick={() => setShowChangeModeModal(false)}
+                disabled={lobbySettingsSaving}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="onevone-change-mode-summary" aria-label="Lobby setting preview">
+              <span>
+                <small>Mode</small>
+                <strong>{duelGameTypeLabels[lobbyEditGameType]}</strong>
+              </span>
+              <span>
+                <small>Category</small>
+                <strong>{duelCategoryLabel(lobbyEditCategory)}</strong>
+              </span>
+              <span>
+                <small>Rules</small>
+                <strong>{lobbyEditRuleLabel}</strong>
+              </span>
+              <span>
+                <small>Extras</small>
+                <strong>{lobbyEditAssistLabel}</strong>
+              </span>
+            </div>
+
+            <label className="game-control">
+              Game Mode
+              <div className="segmented onevone-mode-segmented">
+                {duelGameTypeOptions.map((option) => (
+                  <button
+                    key={`lobby-mode-${option.value}`}
+                    type="button"
+                    className={lobbyEditGameType === option.value ? 'seg active' : 'seg'}
+                    onClick={() => {
+                      setLobbyEditGameType(option.value)
+                      if (option.value !== 'quiz' && lobbyEditCategory === 'scenarios') setLobbyEditCategory('all')
+                    }}
+                  >
+                    <span>{option.label}</span>
+                    <small>{option.subtitle}</small>
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label className="game-control">
+              Category
+              <div className="segmented">
+                {duelCategoryOptions
+                  .filter((option) => !(lobbyEditGameType !== 'quiz' && option.quizOnly))
+                  .map((option) => (
+                    <button
+                      key={`lobby-category-${option.value}`}
+                      type="button"
+                      className={lobbyEditCategory === option.value ? 'seg active' : 'seg'}
+                      onClick={() => setLobbyEditCategory(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+              </div>
+            </label>
+            {lobbyEditGameType === 'quiz' ? (
+              <label className="game-control">
+                Questions
+                <div className="segmented">
+                  {duelQuizRoundOptions.map((count) => (
+                    <button
+                      key={`lobby-rounds-${count}`}
+                      type="button"
+                      className={lobbyEditQuizRounds === count ? 'seg active' : 'seg'}
+                      onClick={() => setLobbyEditQuizRounds(count)}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </div>
+              </label>
+            ) : null}
+            {lobbyEditGameType === 'blaster' ? (
+              <>
+                <label className="game-control">
+                  Win Condition
+                  <div className="segmented onevone-win-condition-segmented">
+                    {duelBlasterDurationOptions.map((seconds) => (
+                      <button
+                        key={`lobby-blaster-duration-${seconds}`}
+                        type="button"
+                        className={lobbyEditBlasterMode === 'timed' && lobbyEditBlasterDurationSeconds === seconds ? 'seg active' : 'seg'}
+                        onClick={() => {
+                          setLobbyEditBlasterMode('timed')
+                          setLobbyEditBlasterDurationSeconds(seconds)
+                        }}
+                      >
+                        {seconds}s
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={lobbyEditBlasterMode === 'death' ? 'seg active' : 'seg'}
+                      onClick={() => setLobbyEditBlasterMode('death')}
+                    >
+                      To the Death
+                    </button>
+                  </div>
+                  <small className="muted">Timed matches end on the clock or by rope KO. To the Death removes the clock and ends by rope KO.</small>
+                  <button className="secondary onevone-glossary-button" type="button" onClick={() => setShowPowerupGlossary(true)}>
+                    View Power-Up Glossary
+                  </button>
+                </label>
+                <label className={`game-control onevone-powerup-toggle ${lobbyEditPowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
+                  <span>
+                    Enable Power-Ups
+                    <small>{lobbyEditBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Correct power shots tug harder and build streak pressure.'}</small>
+                  </span>
+                  <span className="onevone-toggle-action">
+                    <input
+                      type="checkbox"
+                      checked={lobbyEditPowerupsEnabled}
+                      onChange={(event) => setLobbyEditPowerupsEnabled(event.target.checked)}
+                      aria-label="Enable power-ups"
+                    />
+                    <strong className="onevone-toggle-state">{lobbyEditPowerupsEnabled ? 'ON ✓' : 'OFF'}</strong>
+                  </span>
+                </label>
+                <div className="game-control onevone-overtime-control">
+                  <label className={`onevone-powerup-toggle ${lobbyEditBlasterOvertimeEnabled ? 'is-enabled' : 'is-disabled'}`}>
+                    <span>
+                      Enable Overtime
+                      <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
+                    </span>
+                    <span className="onevone-toggle-action">
+                      <input
+                        type="checkbox"
+                        checked={lobbyEditBlasterOvertimeEnabled}
+                        onChange={(event) => setLobbyEditBlasterOvertimeEnabled(event.target.checked)}
+                        aria-label="Enable overtime"
+                      />
+                      <strong className="onevone-toggle-state">{lobbyEditBlasterOvertimeEnabled ? 'ON ✓' : 'OFF'}</strong>
+                    </span>
+                  </label>
+                  <div className={lobbyEditBlasterOvertimeEnabled ? 'onevone-overtime-slider' : 'onevone-overtime-slider disabled'}>
+                    <div className="onevone-overtime-slider-head">
+                      <span className="muted tiny">Shrink rope after</span>
+                      <strong>{lobbyEditBlasterOvertimeAfterSeconds}s</strong>
+                    </div>
+                    <input
+                      className="modern-range"
+                      type="range"
+                      min={0}
+                      max={duelBlasterOvertimeOptions.length - 1}
+                      step={1}
+                      value={Math.max(0, duelBlasterOvertimeOptions.indexOf(lobbyEditBlasterOvertimeAfterSeconds as (typeof duelBlasterOvertimeOptions)[number]))}
+                      disabled={!lobbyEditBlasterOvertimeEnabled}
+                      onChange={(event) => {
+                        const nextIndex = Number(event.target.value)
+                        setLobbyEditBlasterOvertimeAfterSeconds(duelBlasterOvertimeOptions[nextIndex] || duelBlasterDefaultOvertimeAfterSeconds)
+                      }}
+                    />
+                    <div className="onevone-overtime-marks" aria-hidden>
+                      {duelBlasterOvertimeOptions.map((seconds) => <span key={`lobby-overtime-${seconds}`}>{seconds}s</span>)}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            <p className="muted tiny onevone-change-mode-note">Saving changes resets both ready checks so the match starts with the new settings.</p>
+            <div className="actions-row onevone-change-mode-actions">
+              <button
+                className="secondary cancel-button"
+                type="button"
+                onClick={() => setShowChangeModeModal(false)}
+                disabled={lobbySettingsSaving}
+              >
+                Cancel
+              </button>
+              <button className="primary" type="button" onClick={() => void saveLobbySettings()} disabled={lobbySettingsSaving || !supabase}>
+                {lobbySettingsSaving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showPowerupGlossary ? (
         <div
           className="profile-modal-overlay game-setup-overlay onevone-powerup-glossary-overlay"
@@ -7108,7 +7476,26 @@ export function OneVsOnePanel(props: {
             <div className="onevone-waiting-room">
               <div className="onevone-waiting-title">
                 <h2>1v1 {duelGameTypeLabels[room.game_type]}</h2>
-                <p className="muted">{formatDuelRoomRuleLabel(room)} · {room.category.toUpperCase()}</p>
+                <p className="muted">{roomRuleLabel} · {roomCategoryLabel}</p>
+                <div className="onevone-lobby-settings-strip" aria-label="Current lobby settings">
+                  <span>
+                    <small>Players</small>
+                    <strong>{lobbyPlayerCount}/2</strong>
+                  </span>
+                  <span>
+                    <small>Mode</small>
+                    <strong>{duelGameTypeLabels[room.game_type]}</strong>
+                  </span>
+                  <span>
+                    <small>Rules</small>
+                    <strong>{roomRuleLabel}</strong>
+                  </span>
+                  {canHostChangeLobbyMode ? (
+                    <button className="secondary onevone-change-mode-button" type="button" onClick={openChangeModeModal}>
+                      Change Mode
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="onevone-waiting-players">
