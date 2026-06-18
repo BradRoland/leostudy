@@ -8,6 +8,11 @@ export type Connect4Move = {
   row: number
 }
 
+export type Connect4Coordinate = {
+  row: number
+  column: number
+}
+
 export type Connect4State = {
   board: Connect4Cell[][]
   currentTurn: Connect4Player
@@ -101,6 +106,40 @@ function hasConnect4Win(board: Connect4Cell[][], row: number, column: number, pl
     + countDirection(board, row, column, -rowStep, -columnStep, player)
     >= 4
   ))
+}
+
+export function findConnect4WinningCells(board: Connect4Cell[][], player: Connect4Player | null): Connect4Coordinate[] {
+  if (!player) return []
+  const normalizedBoard = cloneBoard(board)
+  const directions = [
+    [0, 1],
+    [1, 0],
+    [1, 1],
+    [-1, 1],
+  ] as const
+
+  for (let row = 0; row < connect4Rows; row += 1) {
+    for (let column = 0; column < connect4Columns; column += 1) {
+      if (normalizedBoard[row][column] !== player) continue
+      for (const [rowStep, columnStep] of directions) {
+        const cells = Array.from({ length: 4 }, (_unused, index) => ({
+          row: row + rowStep * index,
+          column: column + columnStep * index,
+        }))
+        if (cells.every((cell) => (
+          cell.row >= 0
+          && cell.row < connect4Rows
+          && cell.column >= 0
+          && cell.column < connect4Columns
+          && normalizedBoard[cell.row][cell.column] === player
+        ))) {
+          return cells
+        }
+      }
+    }
+  }
+
+  return []
 }
 
 function boardIsFull(board: Connect4Cell[][]) {

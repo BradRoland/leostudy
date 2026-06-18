@@ -4,6 +4,7 @@ import {
   applyConnect4Move,
   chooseConnect4BotMove,
   createConnect4State,
+  findConnect4WinningCells,
   type Connect4State,
 } from './connect4.ts'
 
@@ -76,6 +77,12 @@ test('detects a horizontal win', () => {
   assert.equal(state.winner, 'P1')
   assert.equal(state.winnerUserId, player1)
   assert.equal(state.draw, false)
+  assert.deepEqual(findConnect4WinningCells(state.board, state.winner), [
+    { row: 5, column: 0 },
+    { row: 5, column: 1 },
+    { row: 5, column: 2 },
+    { row: 5, column: 3 },
+  ])
 })
 
 test('detects a vertical win', () => {
@@ -90,6 +97,12 @@ test('detects a diagonal down-right win', () => {
 
   assert.equal(state.status, 'completed')
   assert.equal(state.winner, 'P1')
+  assert.deepEqual(findConnect4WinningCells(state.board, state.winner), [
+    { row: 5, column: 0 },
+    { row: 4, column: 1 },
+    { row: 3, column: 2 },
+    { row: 2, column: 3 },
+  ])
 })
 
 test('detects a diagonal up-right win', () => {
