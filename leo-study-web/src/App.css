@@ -10339,7 +10339,7 @@ button.study-session-top-action-start:active:not(:disabled) {
 }
 
 .connect4-cell-dropping {
-  animation: connect4-disc-drop 0.42s cubic-bezier(0.18, 0.86, 0.24, 1.08) both;
+  animation: connect4-disc-drop 0.7s cubic-bezier(0.18, 0.86, 0.24, 1.08) both;
 }
 
 .connect4-cell-winning {
@@ -10352,8 +10352,8 @@ button.study-session-top-action-start:active:not(:disabled) {
 
 .connect4-cell-dropping.connect4-cell-winning {
   animation:
-    connect4-disc-drop 0.42s cubic-bezier(0.18, 0.86, 0.24, 1.08) both,
-    connect4-winning-disc-pop 0.72s ease 0.32s both;
+    connect4-disc-drop 0.7s cubic-bezier(0.18, 0.86, 0.24, 1.08) both,
+    connect4-winning-disc-pop 0.72s ease 0.56s both;
 }
 
 .connect4-win-line {
