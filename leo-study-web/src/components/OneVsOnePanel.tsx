@@ -1,11 +1,12 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type RealtimeChannel } from '@supabase/supabase-js'
 import { loadLocalContentBundle, type ContentBankItem } from '../content'
+import { applyConnect4Move, chooseConnect4BotMove, connect4Columns, connect4Rows, createConnect4State, normalizeConnect4State, type Connect4Cell, type Connect4Player, type Connect4State } from '../lib/connect4'
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
 
-type DuelGameType = 'quiz' | 'matching' | 'blaster'
+type DuelGameType = 'quiz' | 'matching' | 'blaster' | 'connect4'
 type DuelCategory = 'all' | 'pc' | 'vc' | 'hs' | 'scenarios'
 type DuelRoomStatus = 'waiting' | 'in_progress' | 'completed' | 'cancelled'
 type DuelBlasterMode = 'timed' | 'death'
@@ -238,7 +239,7 @@ type ReadyRpcState = {
   room_id?: string
 }
 
-type DuelStatsMode = 'all' | DuelGameType
+type DuelStatsMode = 'all' | Exclude<DuelGameType, 'connect4'>
 const duelStatsModes: DuelStatsMode[] = ['all', 'matching', 'quiz', 'blaster']
 
 type DuelBotDifficulty = 'adaptive' | 'random' | 'easy' | 'medium' | 'hard' | 'very-hard'
@@ -300,6 +301,18 @@ type DuelBotMatch = {
   userStreak: number
   botStreak: number
   lastBotCorrect?: boolean
+}
+
+type Connect4BotMatch = {
+  id: string
+  status: DuelBotMatchStatus
+  state: Connect4State
+  startedAt: number
+  completedAt?: number
+  winner: DuelBotWinner | null
+  botName: string
+  difficulty: DuelBotDifficulty
+  resolvedDifficulty: DuelBotResolvedDifficulty
 }
 
 type SupporterTier = 'free' | 'tier2' | 'tier5' | 'tier10'
@@ -451,11 +464,13 @@ const duelGameTypeLabels: Record<DuelGameType, string> = {
   quiz: 'Quiz',
   matching: 'Matching',
   blaster: 'Code Blaster',
+  connect4: 'Connect 4',
 }
 const duelGameTypeOptions: Array<{ value: DuelGameType; label: string; subtitle: string }> = [
   { value: 'quiz', label: '1v1 Quiz', subtitle: 'Classic question duel' },
   { value: 'matching', label: '1v1 Matching', subtitle: 'Pair codes and definitions' },
   { value: 'blaster', label: 'Rope Blaster', subtitle: 'Timed code blasts or rope KO' },
+  { value: 'connect4', label: 'Connect 4', subtitle: 'Drop discs and connect four' },
 ]
 const duelBotDifficultyOptions: Array<{ value: DuelBotDifficulty; label: string; subtitle: string }> = [
   { value: 'adaptive', label: 'Adaptive', subtitle: 'Targets your weak codes' },
@@ -878,6 +893,7 @@ function toRopeBlasterWebSocketUrl(baseUrl: string, roomId: string, userId: stri
 }
 
 function formatDuelRoomRuleLabel(room: Pick<LobbyRoomItem, 'game_type' | 'rounds' | 'settings'>) {
+  if (room.game_type === 'connect4') return 'Classic 7x6'
   return room.game_type === 'blaster' ? formatBlasterRuleLabel(room.settings) : `${room.rounds} rounds`
 }
 
@@ -1562,6 +1578,17 @@ function isBlasterRound(value: unknown): value is BlasterRoundPayload {
     && typeof row.correctIndex === 'number'
 }
 
+function connect4CellClass(cell: Connect4Cell) {
+  if (cell === 'P1') return 'connect4-cell connect4-cell-p1'
+  if (cell === 'P2') return 'connect4-cell connect4-cell-p2'
+  return 'connect4-cell connect4-cell-empty'
+}
+
+function connect4CellLabel(cell: Connect4Cell, rowIndex: number, columnIndex: number) {
+  const token = cell === 'P1' ? 'Player 1 disc' : cell === 'P2' ? 'Player 2 disc' : 'Empty'
+  return `${token}, row ${rowIndex + 1}, column ${columnIndex + 1}`
+}
+
 function parseReadyRpcState(value: unknown): ReadyRpcState {
   if (typeof value === 'string') {
     const rawStatus = value.trim()
@@ -1691,9 +1718,10 @@ export function OneVsOnePanel(props: {
   onInvitePresetHandled?: () => void
   onStudyActivity?: () => void
   onActiveMatchChange?: (active: boolean) => void
+  connect4Enabled?: boolean
   onDuelPerformanceReward?: (result: {
     roomId: string
-    gameType: DuelGameType
+    gameType: Exclude<DuelGameType, 'connect4'>
     rounds: number
     score: number
     opponentScore: number
@@ -1712,10 +1740,15 @@ export function OneVsOnePanel(props: {
     onInvitePresetHandled,
     onStudyActivity,
     onActiveMatchChange,
+    connect4Enabled = true,
     onDuelPerformanceReward,
     sessionXpReward,
   } = props
 
+  const availableDuelGameTypeOptions = useMemo(
+    () => duelGameTypeOptions.filter((option) => option.value !== 'connect4' || connect4Enabled),
+    [connect4Enabled],
+  )
   const [selectedGameType, setSelectedGameType] = useState<DuelGameType>('quiz')
   const [selectedCategory, setSelectedCategory] = useState<DuelCategory>('all')
   const [selectedPowerupsEnabled, setSelectedPowerupsEnabled] = useState(duelBlasterDefaultPowerupsEnabled)
@@ -1741,6 +1774,7 @@ export function OneVsOnePanel(props: {
   const [botDifficulty, setBotDifficulty] = useState<DuelBotDifficulty>('adaptive')
   const [botStarting, setBotStarting] = useState(false)
   const [botMatch, setBotMatch] = useState<DuelBotMatch | null>(null)
+  const [connect4BotMatch, setConnect4BotMatch] = useState<Connect4BotMatch | null>(null)
   const [botStats, setBotStats] = useState<DuelBotStats>(() => readDuelBotStats(currentUserId))
   const [botSkillSnapshot, setBotSkillSnapshot] = useState<DuelBotSkillSnapshot>(() => parseDuelBotSkillSnapshot(null, null))
 
@@ -2002,7 +2036,7 @@ export function OneVsOnePanel(props: {
           score: Number(p.score || 0)
         }))
       }
-    }).filter((row) => row.id)
+    }).filter((row) => row.id && (connect4Enabled || row.game_type !== 'connect4'))
     setPublicRooms(mapped)
 
     // Build host map from player data
@@ -2014,7 +2048,7 @@ export function OneVsOnePanel(props: {
       }
     })
     setPublicRoomHostNames(hostMap)
-  }, [isSignedIn])
+  }, [connect4Enabled, isSignedIn])
 
   const loadOnlineInviteUsers = useCallback(async () => {
     if (!supabase || !isSignedIn) return
@@ -2946,6 +2980,13 @@ export function OneVsOnePanel(props: {
   }, [inviteCategory, inviteGameType])
 
   useEffect(() => {
+    if (connect4Enabled) return
+    if (selectedGameType === 'connect4') setSelectedGameType('quiz')
+    if (inviteGameType === 'connect4') setInviteGameType('quiz')
+    if (lobbyEditGameType === 'connect4') setLobbyEditGameType('quiz')
+  }, [connect4Enabled, inviteGameType, lobbyEditGameType, selectedGameType])
+
+  useEffect(() => {
     if (selectedGameType !== 'quiz' && selectedCategory === 'scenarios') {
       setSelectedCategory('all')
     }
@@ -3140,7 +3181,18 @@ export function OneVsOnePanel(props: {
 
   const myPlayer = useMemo(() => players.find((player) => player.user_id === currentUserId) || null, [players, currentUserId])
   const opponentPlayer = useMemo(() => players.find((player) => player.user_id !== currentUserId) || null, [players, currentUserId])
+  const connect4PlayerOne = useMemo(() => players.find((player) => player.slot_no === 1) || null, [players])
+  const connect4PlayerTwo = useMemo(() => players.find((player) => player.slot_no === 2) || null, [players])
   const isSpectator = useMemo(() => !myPlayer && players.length > 0 && room?.status === 'in_progress', [myPlayer, players, room])
+  const connect4State = useMemo(() => {
+    const rawState = room?.settings?.connect4
+    return normalizeConnect4State(
+      rawState && typeof rawState === 'object'
+        ? (rawState as Partial<Connect4State>)
+        : createConnect4State(),
+    )
+  }, [room?.settings])
+  const myConnect4Token: Connect4Player | null = myPlayer?.slot_no === 1 ? 'P1' : myPlayer?.slot_no === 2 ? 'P2' : null
 
   // Poll for updates when spectating (since realtime may not work due to RLS)
   useEffect(() => {
@@ -3228,6 +3280,18 @@ export function OneVsOnePanel(props: {
     return Math.ceil(Math.min(serverStartRemainingMs, countdownSeconds * 1000) / 1000)
   }, [serverStartRemainingMs])
   const countdownActive = serverStartRemainingMs > 0
+  const connect4IsMyTurn = Boolean(
+    room?.game_type === 'connect4'
+      && room.status === 'in_progress'
+      && connect4State.status === 'active'
+      && myConnect4Token === connect4State.currentTurn
+      && !countdownActive,
+  )
+  const connect4WinnerName = connect4State.winner === 'P1'
+    ? getPlayerName(connect4PlayerOne?.user_id || '', 'Player 1')
+    : connect4State.winner === 'P2'
+      ? getPlayerName(connect4PlayerTwo?.user_id || '', 'Player 2')
+      : ''
   const syncingBeforeCountdown = serverStartRemainingMs > countdownSeconds * 1000
   const currentRoomStatus = room?.status
   const myPlayerFinishedMatch = Boolean(
@@ -3431,6 +3495,108 @@ export function OneVsOnePanel(props: {
 
     await roundSubmitQueueRef.current
   }, [currentUserId, refreshRoomSnapshot, room?.game_type, room?.rounds, room?.status, roomId])
+
+  const submitConnect4Move = useCallback(async (column: number) => {
+    if (!supabase || !roomId || !room || room.game_type !== 'connect4') return
+    if (!connect4Enabled) {
+      setError('Connect 4 is disabled.')
+      return
+    }
+    if (!connect4IsMyTurn || isSpectator) return
+
+    setError('')
+    const { data, error: rpcError } = await supabase.rpc('submit_connect4_move', {
+      p_room_id: roomId,
+      p_column: column,
+    })
+    if (rpcError) {
+      setError(rpcError.message || 'Could not drop disc.')
+      void refreshRoomSnapshot()
+      return
+    }
+
+    const payload = data && typeof data === 'object'
+      ? (data as Record<string, unknown>)
+      : null
+    const nextConnect4 = payload?.connect4 && typeof payload.connect4 === 'object'
+      ? normalizeConnect4State(payload.connect4 as Partial<Connect4State>)
+      : null
+    if (nextConnect4) {
+      const nextStatus = String(payload?.status || '').trim()
+      const nextWinnerUserId = typeof payload?.winner_user_id === 'string' ? payload.winner_user_id : ''
+      setRoom((previous) => {
+        if (!previous || previous.id !== roomId) return previous
+        return {
+          ...previous,
+          status: ['waiting', 'in_progress', 'completed', 'cancelled'].includes(nextStatus)
+            ? nextStatus as DuelRoomStatus
+            : previous.status,
+          winner_user_id: nextWinnerUserId || previous.winner_user_id,
+          current_round: Math.max(previous.current_round, nextConnect4.moveHistory.length),
+          settings: {
+            ...previous.settings,
+            connect4: nextConnect4,
+          },
+        }
+      })
+    }
+    markStudyActivity()
+    void refreshRoomSnapshot()
+  }, [connect4Enabled, connect4IsMyTurn, isSpectator, markStudyActivity, refreshRoomSnapshot, room, roomId])
+
+  const submitConnect4BotMove = useCallback((column: number) => {
+    if (!connect4BotMatch || connect4BotMatch.status !== 'in_progress') return
+    if (connect4BotMatch.state.currentTurn !== 'P1' || connect4BotMatch.state.status !== 'active') return
+    const playersForBot = { player1UserId: currentUserId, player2UserId: 'connect4-bot' }
+    let userState: Connect4State
+    try {
+      userState = applyConnect4Move(connect4BotMatch.state, column, currentUserId, playersForBot).state
+    } catch (moveError) {
+      setError(moveError instanceof Error ? moveError.message : 'Could not drop disc.')
+      return
+    }
+
+    const completeUserMatch = userState.status === 'completed'
+    setConnect4BotMatch((previous) => {
+      if (!previous || previous.id !== connect4BotMatch.id) return previous
+      return {
+        ...previous,
+        state: userState,
+        status: completeUserMatch ? 'completed' : previous.status,
+        completedAt: completeUserMatch ? Date.now() : previous.completedAt,
+        winner: userState.winner === 'P1' ? 'user' : userState.winner === 'P2' ? 'bot' : userState.draw ? 'draw' : previous.winner,
+      }
+    })
+    markStudyActivity()
+    if (completeUserMatch) return
+
+    if (botAnswerTimerRef.current !== null) {
+      window.clearTimeout(botAnswerTimerRef.current)
+      botAnswerTimerRef.current = null
+    }
+    botAnswerTimerRef.current = window.setTimeout(() => {
+      const botColumn = chooseConnect4BotMove(userState, 'P2')
+      if (botColumn < 0) return
+      try {
+        const botState = applyConnect4Move(userState, botColumn, 'connect4-bot', playersForBot).state
+        setConnect4BotMatch((previous) => {
+          if (!previous || previous.id !== connect4BotMatch.id) return previous
+          const completeBotMatch = botState.status === 'completed'
+          return {
+            ...previous,
+            state: botState,
+            status: completeBotMatch ? 'completed' : previous.status,
+            completedAt: completeBotMatch ? Date.now() : previous.completedAt,
+            winner: botState.winner === 'P1' ? 'user' : botState.winner === 'P2' ? 'bot' : botState.draw ? 'draw' : previous.winner,
+          }
+        })
+      } catch (moveError) {
+        setError(moveError instanceof Error ? moveError.message : 'Bot could not move.')
+      } finally {
+        botAnswerTimerRef.current = null
+      }
+    }, 420)
+  }, [connect4BotMatch, currentUserId, markStudyActivity])
 
   const triggerAutoForfeit = useCallback(async (roundKey: string, reason: 'question' | 'matching' | 'blaster' = 'question') => {
     if (!supabase || !roomId || !roundKey || !room || !myPlayer) return
@@ -3768,6 +3934,30 @@ export function OneVsOnePanel(props: {
     const skillSnapshot = await loadBotSkillSnapshot()
     const resolvedDifficulty = resolveBotDifficulty(botDifficulty, skillSnapshot)
     const gameType = inviteGameType
+    const botNames = duelBotNames[resolvedDifficulty]
+    const botName = botNames[Math.floor(Math.random() * botNames.length)] || 'Code Bot'
+    const startedAt = Date.now()
+    if (gameType === 'connect4') {
+      const nextMatch: Connect4BotMatch = {
+        id: `connect4-bot-${startedAt}-${Math.random().toString(16).slice(2)}`,
+        status: 'in_progress',
+        state: createConnect4State(),
+        startedAt,
+        winner: null,
+        botName,
+        difficulty: botDifficulty,
+        resolvedDifficulty,
+      }
+      setBotStarting(false)
+      setBotMatch(null)
+      botMatchRef.current = null
+      setConnect4BotMatch(nextMatch)
+      setShowInviteModal(false)
+      setShowBotSetupModal(false)
+      setNotice('')
+      markStudyActivity()
+      return
+    }
     const category = botDifficulty === 'adaptive' && inviteCategory === 'all'
       ? skillSnapshot.weakCategory
       : inviteCategory === 'scenarios' && gameType !== 'quiz'
@@ -3785,9 +3975,6 @@ export function OneVsOnePanel(props: {
       setError('Not enough code questions are loaded for a bot match yet.')
       return
     }
-    const botNames = duelBotNames[resolvedDifficulty]
-    const botName = botNames[Math.floor(Math.random() * botNames.length)] || 'Code Bot'
-    const startedAt = Date.now()
     const botRoomId = `bot-${startedAt}-${Math.random().toString(16).slice(2)}`
     const coachingNote = botDifficulty === 'adaptive'
       ? `Adaptive picked ${duelCategoryLabel(category)} and front-loaded weaker code sections from your study history.`
@@ -4239,27 +4426,33 @@ export function OneVsOnePanel(props: {
 
   const createRoom = async () => {
     if (!supabase || !isSignedIn) return
+    if (selectedGameType === 'connect4' && !connect4Enabled) {
+      setError('Connect 4 is disabled.')
+      return
+    }
     setLoading(true)
     setError('')
     setNotice('')
     const { data, error: rpcError } = await supabase.rpc('create_1v1_room_v2', {
-      p_game_type: selectedGameType,
-      p_category: selectedCategory,
-      p_is_public: isPublicRoom,
-      p_rounds: selectedGameType === 'matching'
-        ? 5
-        : selectedGameType === 'blaster'
-          ? duelBlasterRoundCap
-          : selectedQuizRounds,
-      p_powerups_enabled: selectedGameType === 'blaster' ? selectedPowerupsEnabled : false,
-      p_blaster_duration_seconds: selectedGameType === 'blaster'
-        ? selectedBlasterDurationSeconds
-        : duelBlasterDefaultDurationSeconds,
-      p_blaster_sudden_death: selectedGameType === 'blaster' && selectedBlasterMode === 'death',
-      p_blaster_rope_limit: duelBlasterDefaultRopeLimit,
-      p_blaster_overtime_enabled: selectedGameType === 'blaster' ? selectedBlasterOvertimeEnabled : duelBlasterDefaultOvertimeEnabled,
-      p_blaster_overtime_after_seconds: selectedGameType === 'blaster' ? selectedBlasterOvertimeAfterSeconds : duelBlasterDefaultOvertimeAfterSeconds,
-    })
+        p_game_type: selectedGameType,
+        p_category: selectedGameType === 'connect4' ? 'all' : selectedCategory,
+        p_is_public: isPublicRoom,
+        p_rounds: selectedGameType === 'connect4'
+          ? 42
+          : selectedGameType === 'matching'
+          ? 5
+          : selectedGameType === 'blaster'
+            ? duelBlasterRoundCap
+            : selectedQuizRounds,
+        p_powerups_enabled: selectedGameType === 'blaster' ? selectedPowerupsEnabled : false,
+        p_blaster_duration_seconds: selectedGameType === 'blaster'
+          ? selectedBlasterDurationSeconds
+          : duelBlasterDefaultDurationSeconds,
+        p_blaster_sudden_death: selectedGameType === 'blaster' && selectedBlasterMode === 'death',
+        p_blaster_rope_limit: duelBlasterDefaultRopeLimit,
+        p_blaster_overtime_enabled: selectedGameType === 'blaster' ? selectedBlasterOvertimeEnabled : duelBlasterDefaultOvertimeEnabled,
+        p_blaster_overtime_after_seconds: selectedGameType === 'blaster' ? selectedBlasterOvertimeAfterSeconds : duelBlasterDefaultOvertimeAfterSeconds,
+      })
     setLoading(false)
     if (rpcError) {
       setError(rpcError.message || 'Could not create room.')
@@ -4322,8 +4515,16 @@ export function OneVsOnePanel(props: {
       return
     }
 
-    const nextCategory = lobbyEditGameType !== 'quiz' && lobbyEditCategory === 'scenarios' ? 'all' : lobbyEditCategory
-    const nextRounds = lobbyEditGameType === 'matching'
+    if (lobbyEditGameType === 'connect4' && !connect4Enabled) {
+      setError('Connect 4 is disabled.')
+      setShowChangeModeModal(false)
+      return
+    }
+
+    const nextCategory = lobbyEditGameType === 'connect4' || (lobbyEditGameType !== 'quiz' && lobbyEditCategory === 'scenarios') ? 'all' : lobbyEditCategory
+    const nextRounds = lobbyEditGameType === 'connect4'
+      ? 42
+      : lobbyEditGameType === 'matching'
       ? 5
       : lobbyEditGameType === 'blaster'
         ? duelBlasterRoundCap
@@ -4422,7 +4623,8 @@ export function OneVsOnePanel(props: {
   }
 
   const openBotSetupModal = (presetGameType?: DuelGameType) => {
-    const sourceGameType = presetGameType || selectedGameType
+    const requestedGameType = presetGameType || selectedGameType
+    const sourceGameType = requestedGameType
     setInviteGameType(sourceGameType)
     setInviteCategory(sourceGameType !== 'quiz' && selectedCategory === 'scenarios' ? 'all' : selectedCategory)
     setInviteQuizRounds(selectedQuizRounds)
@@ -4487,28 +4689,34 @@ export function OneVsOnePanel(props: {
 
   const sendInvite = async (targetUser: OnlineInviteUser) => {
     if (!supabase || !isSignedIn) return
+    if (inviteGameType === 'connect4' && !connect4Enabled) {
+      setError('Connect 4 is disabled.')
+      return
+    }
     setInviteSendingUserId(targetUser.user_id)
     setError('')
     setNotice('')
-    const inviteRounds = inviteGameType === 'matching'
+    const inviteRounds = inviteGameType === 'connect4'
+      ? 42
+      : inviteGameType === 'matching'
       ? 5
       : inviteGameType === 'blaster'
         ? duelBlasterRoundCap
         : inviteQuizRounds
     const { data, error: rpcError } = await supabase.rpc('create_1v1_invite_v2', {
-      p_target_user_id: targetUser.user_id,
-      p_game_type: inviteGameType,
-      p_category: inviteCategory,
-      p_rounds: inviteRounds,
-      p_powerups_enabled: inviteGameType === 'blaster' ? invitePowerupsEnabled : false,
-      p_blaster_duration_seconds: inviteGameType === 'blaster'
-        ? inviteBlasterDurationSeconds
-        : duelBlasterDefaultDurationSeconds,
-      p_blaster_sudden_death: inviteGameType === 'blaster' && inviteBlasterMode === 'death',
-      p_blaster_rope_limit: duelBlasterDefaultRopeLimit,
-      p_blaster_overtime_enabled: inviteGameType === 'blaster' ? inviteBlasterOvertimeEnabled : duelBlasterDefaultOvertimeEnabled,
-      p_blaster_overtime_after_seconds: inviteGameType === 'blaster' ? inviteBlasterOvertimeAfterSeconds : duelBlasterDefaultOvertimeAfterSeconds,
-    })
+        p_target_user_id: targetUser.user_id,
+        p_game_type: inviteGameType,
+        p_category: inviteGameType === 'connect4' ? 'all' : inviteCategory,
+        p_rounds: inviteRounds,
+        p_powerups_enabled: inviteGameType === 'blaster' ? invitePowerupsEnabled : false,
+        p_blaster_duration_seconds: inviteGameType === 'blaster'
+          ? inviteBlasterDurationSeconds
+          : duelBlasterDefaultDurationSeconds,
+        p_blaster_sudden_death: inviteGameType === 'blaster' && inviteBlasterMode === 'death',
+        p_blaster_rope_limit: duelBlasterDefaultRopeLimit,
+        p_blaster_overtime_enabled: inviteGameType === 'blaster' ? inviteBlasterOvertimeEnabled : duelBlasterDefaultOvertimeEnabled,
+        p_blaster_overtime_after_seconds: inviteGameType === 'blaster' ? inviteBlasterOvertimeAfterSeconds : duelBlasterDefaultOvertimeAfterSeconds,
+      })
     setInviteSendingUserId(null)
     if (rpcError) {
       setError(rpcError.message || 'Could not send invite.')
@@ -4934,6 +5142,7 @@ export function OneVsOnePanel(props: {
     }
     botMatchRef.current = null
     setBotMatch(null)
+    setConnect4BotMatch(null)
     initializedRoundKeyRef.current = ''
     roundStartedAtRef.current = 0
     setRoundStartedAt(0)
@@ -5063,15 +5272,19 @@ export function OneVsOnePanel(props: {
   const canHostChangeLobbyMode = Boolean(room && room.status === 'waiting' && isRoomHost)
   const roomRuleLabel = room ? formatDuelRoomRuleLabel(room) : ''
   const roomCategoryLabel = room ? duelCategoryLabel(room.category) : ''
-  const lobbyEditRuleLabel = lobbyEditGameType === 'quiz'
-    ? `${lobbyEditQuizRounds} questions`
-    : lobbyEditGameType === 'matching'
-      ? '3 pair sets'
-      : lobbyEditBlasterMode === 'death'
-        ? 'To the Death'
-        : `${lobbyEditBlasterDurationSeconds}s timer`
+  const lobbyEditRuleLabel = lobbyEditGameType === 'connect4'
+    ? 'Classic 7x6'
+    : lobbyEditGameType === 'quiz'
+      ? `${lobbyEditQuizRounds} questions`
+      : lobbyEditGameType === 'matching'
+        ? '3 pair sets'
+        : lobbyEditBlasterMode === 'death'
+          ? 'To the Death'
+          : `${lobbyEditBlasterDurationSeconds}s timer`
   const lobbyEditAssistLabel = lobbyEditGameType === 'blaster'
     ? `${lobbyEditPowerupsEnabled ? 'Power-ups on' : 'Power-ups off'} | Overtime ${lobbyEditBlasterOvertimeEnabled ? `${lobbyEditBlasterOvertimeAfterSeconds}s` : 'off'}`
+    : lobbyEditGameType === 'connect4'
+      ? 'Column-drop duel'
     : lobbyEditGameType === 'matching'
       ? 'Fast pair rounds'
       : 'Code recall rounds'
@@ -5087,15 +5300,19 @@ export function OneVsOnePanel(props: {
           ? 'HS'
           : 'Scenarios'
   const botSetupDifficultyOption = duelBotDifficultyOptions.find((option) => option.value === botDifficulty) || duelBotDifficultyOptions[0]
-  const botSetupRuleLabel = inviteGameType === 'quiz'
-    ? `${inviteQuizRounds} questions`
-    : inviteGameType === 'matching'
-      ? '3 pair sets'
-      : inviteBlasterMode === 'death'
-        ? 'To the Death'
-        : `${inviteBlasterDurationSeconds}s timer`
+  const botSetupRuleLabel = inviteGameType === 'connect4'
+    ? 'Classic 7x6'
+    : inviteGameType === 'quiz'
+      ? `${inviteQuizRounds} questions`
+      : inviteGameType === 'matching'
+        ? '3 pair sets'
+        : inviteBlasterMode === 'death'
+          ? 'To the Death'
+          : `${inviteBlasterDurationSeconds}s timer`
   const botSetupAssistLabel = inviteGameType === 'blaster'
     ? `${invitePowerupsEnabled ? 'Power-ups on' : 'Power-ups off'} | Overtime ${inviteBlasterOvertimeEnabled ? `${inviteBlasterOvertimeAfterSeconds}s` : 'off'}`
+    : inviteGameType === 'connect4'
+      ? 'Bot blocks and wins'
     : inviteGameType === 'matching'
       ? 'Fast pair rounds'
       : 'Code recall rounds'
@@ -5212,7 +5429,8 @@ export function OneVsOnePanel(props: {
       ? `${blasterMatchRemainingSeconds}s left`
       : `${blasterMatchRemainingSeconds}s`
   const botMatchInProgress = botMatch?.status === 'in_progress'
-  const duelMatchInProgress = Boolean(room?.status === 'in_progress' || botMatchInProgress)
+  const connect4BotMatchInProgress = connect4BotMatch?.status === 'in_progress'
+  const duelMatchInProgress = Boolean(room?.status === 'in_progress' || botMatchInProgress || connect4BotMatchInProgress)
   useEffect(() => {
     onActiveMatchChange?.(duelMatchInProgress)
   }, [duelMatchInProgress, onActiveMatchChange])
@@ -5933,7 +6151,7 @@ export function OneVsOnePanel(props: {
   const opponentFastestRoundMs = opponentResultRow ? playerByUserId.get(opponentResultRow.user_id)?.fastest_round_ms || 0 : 0
 
   useEffect(() => {
-    if (!room || room.status !== 'completed' || isSpectator || !myResultRow || !opponentResultRow) return
+    if (!room || room.status !== 'completed' || room.game_type === 'connect4' || isSpectator || !myResultRow || !opponentResultRow) return
     if (rewardedResultRoomIdsRef.current.has(room.id)) return
     rewardedResultRoomIdsRef.current.add(room.id)
     onDuelPerformanceReward?.({
@@ -6044,6 +6262,116 @@ export function OneVsOnePanel(props: {
             </button>
           </div>
         </div>
+      ) : connect4BotMatch ? (
+        connect4BotMatch.status === 'in_progress' ? (
+          <div className="connect4-session-overlay connect4-bot-overlay">
+            <div className="connect4-session-shell">
+              <div className="connect4-topbar">
+                <button className="secondary onevone-leave-button" onClick={exitBotMatch}>
+                  Leave Bot Match
+                </button>
+                <div className="connect4-title">
+                  <span className="muted tiny">1v1 vs Bot · Connect 4</span>
+                  <strong>{connect4BotMatch.state.currentTurn === 'P1' ? 'Your move' : `${connect4BotMatch.botName} is thinking`}</strong>
+                  <span className="onevone-bot-note">{botDifficultyDisplay(connect4BotMatch.difficulty, connect4BotMatch.resolvedDifficulty)} · Bot blocks and wins when it can.</span>
+                </div>
+                <div className="connect4-move-count">
+                  <small className="muted">Moves</small>
+                  <strong>{connect4BotMatch.state.moveHistory.length}/{connect4Rows * connect4Columns}</strong>
+                </div>
+              </div>
+
+              <div className="connect4-players" aria-label="Connect 4 bot players">
+                <div className={`connect4-player-chip ${connect4BotMatch.state.currentTurn === 'P1' ? 'active' : ''}`}>
+                  <span className="connect4-token connect4-token-p1" aria-hidden />
+                  <small>You</small>
+                  <strong>{myDisplayName}</strong>
+                </div>
+                <div className={`connect4-player-chip ${connect4BotMatch.state.currentTurn === 'P2' ? 'active' : ''}`}>
+                  <span className="connect4-token connect4-token-p2" aria-hidden />
+                  <small>Bot</small>
+                  <strong>{connect4BotMatch.botName}</strong>
+                </div>
+              </div>
+
+              <div className="connect4-board-wrap">
+                <div className="connect4-column-actions" aria-label="Drop a disc by column">
+                  {Array.from({ length: connect4Columns }, (_, columnIndex) => {
+                    const columnFull = connect4BotMatch.state.board[0]?.[columnIndex] !== null
+                    const waitingForBot = connect4BotMatch.state.currentTurn !== 'P1'
+                    return (
+                      <button
+                        key={`connect4-bot-drop-${columnIndex}`}
+                        type="button"
+                        className={`connect4-column-drop ${columnFull ? 'full' : ''}`}
+                        disabled={columnFull || waitingForBot || connect4BotMatch.state.status !== 'active'}
+                        onClick={() => submitConnect4BotMove(columnIndex)}
+                        aria-label={`Drop disc in column ${columnIndex + 1}`}
+                      >
+                        {columnIndex + 1}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="connect4-board" role="grid" aria-label="Connect 4 bot board">
+                  {connect4BotMatch.state.board.map((row, rowIndex) => (
+                    <div key={`connect4-bot-row-${rowIndex}`} className="connect4-row" role="row">
+                      {row.map((cell, columnIndex) => (
+                        <span
+                          key={`connect4-bot-cell-${rowIndex}-${columnIndex}`}
+                          className={connect4CellClass(cell)}
+                          role="gridcell"
+                          aria-label={connect4CellLabel(cell, rowIndex, columnIndex)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <p className="connect4-status muted" aria-live="polite">
+                {connect4BotMatch.state.currentTurn === 'P1'
+                  ? 'Choose a column to drop your disc.'
+                  : `${connect4BotMatch.botName} is choosing a column...`}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="onevone-result-overlay onevone-bot-result-overlay">
+            <div className="card onevone-card onevone-result-shell onevone-bot-result-shell">
+              <p className="muted tiny">1v1 vs Bot · Connect 4</p>
+              <h3>{connect4BotMatch.winner === 'user' ? 'You beat the bot.' : connect4BotMatch.winner === 'bot' ? 'Bot wins this one.' : 'Draw.'}</h3>
+              <div className={connect4BotMatch.winner === 'user' ? 'onevone-winner-banner good' : 'onevone-winner-banner'}>
+                {connect4BotMatch.winner === 'user'
+                  ? `Winner: ${myDisplayName}`
+                  : connect4BotMatch.winner === 'bot'
+                    ? `Winner: ${connect4BotMatch.botName}`
+                    : 'Result: Draw'}
+              </div>
+              <div className="onevone-result-summary onevone-bot-result-summary">
+                <article className="onevone-result-summary-chip">
+                  <span className="muted tiny">Moves</span>
+                  <strong>{connect4BotMatch.state.moveHistory.length}</strong>
+                </article>
+                <article className="onevone-result-summary-chip">
+                  <span className="muted tiny">Difficulty</span>
+                  <strong>{botDifficultyDisplay(connect4BotMatch.difficulty, connect4BotMatch.resolvedDifficulty)}</strong>
+                </article>
+              </div>
+              <div className="actions-row">
+                <button className="primary" type="button" onClick={() => {
+                  exitBotMatch()
+                  openBotSetupModal('connect4')
+                }}>
+                  Start New Connect 4 Bot Match
+                </button>
+                <button className="secondary" type="button" onClick={exitBotMatch}>
+                  Exit
+                </button>
+              </div>
+            </div>
+          </div>
+        )
       ) : botMatch ? (
         botMatchInProgress ? (
           <div className="blaster-session-overlay onevone-blaster-overlay onevone-bot-overlay">
@@ -6509,7 +6837,7 @@ export function OneVsOnePanel(props: {
                     onClick={() => openBotSetupModal()}
                   >
                     <span>1v1 Versus Bot</span>
-                    <small>Practice Quiz, Matching, or Rope Blaster with adaptive bots.</small>
+                    <small>Practice Quiz, Matching, Rope Blaster, or Connect 4 with adaptive bots.</small>
                   </button>
                   <div className="onevone-join-block">
                     <p className="muted tiny">Join Private Room</p>
@@ -6599,13 +6927,14 @@ export function OneVsOnePanel(props: {
             <label className="game-control">
               Game Mode
               <div className="segmented onevone-mode-segmented">
-                {duelGameTypeOptions.map((option) => (
+                {availableDuelGameTypeOptions.map((option) => (
                   <button
                     key={`duel-mode-${option.value}`}
                     type="button"
                     className={selectedGameType === option.value ? 'seg active' : 'seg'}
                     onClick={() => {
                       setSelectedGameType(option.value)
+                      if (option.value === 'connect4') setSelectedCategory('all')
                       if (option.value !== 'quiz' && selectedCategory === 'scenarios') setSelectedCategory('all')
                     }}
                   >
@@ -6630,7 +6959,7 @@ export function OneVsOnePanel(props: {
               Category
               <div className="segmented">
                 {duelCategoryOptions
-                  .filter((option) => !(selectedGameType !== 'quiz' && option.quizOnly))
+                  .filter((option) => selectedGameType === 'connect4' ? option.value === 'all' : !(selectedGameType !== 'quiz' && option.quizOnly))
                   .map((option) => (
                     <button
                       key={`duel-category-${option.value}`}
@@ -6804,15 +7133,16 @@ export function OneVsOnePanel(props: {
             <label className="game-control">
               Game Mode
               <div className="segmented onevone-mode-segmented">
-                {duelGameTypeOptions.map((option) => (
+                {availableDuelGameTypeOptions.map((option) => (
                   <button
                     key={`lobby-mode-${option.value}`}
                     type="button"
-                    className={lobbyEditGameType === option.value ? 'seg active' : 'seg'}
-                    onClick={() => {
-                      setLobbyEditGameType(option.value)
-                      if (option.value !== 'quiz' && lobbyEditCategory === 'scenarios') setLobbyEditCategory('all')
-                    }}
+                      className={lobbyEditGameType === option.value ? 'seg active' : 'seg'}
+                      onClick={() => {
+                        setLobbyEditGameType(option.value)
+                        if (option.value === 'connect4') setLobbyEditCategory('all')
+                        if (option.value !== 'quiz' && lobbyEditCategory === 'scenarios') setLobbyEditCategory('all')
+                      }}
                   >
                     <span>{option.label}</span>
                     <small>{option.subtitle}</small>
@@ -6824,7 +7154,7 @@ export function OneVsOnePanel(props: {
               Category
               <div className="segmented">
                 {duelCategoryOptions
-                  .filter((option) => !(lobbyEditGameType !== 'quiz' && option.quizOnly))
+                  .filter((option) => lobbyEditGameType === 'connect4' ? option.value === 'all' : !(lobbyEditGameType !== 'quiz' && option.quizOnly))
                   .map((option) => (
                     <button
                       key={`lobby-category-${option.value}`}
@@ -7088,13 +7418,14 @@ export function OneVsOnePanel(props: {
                   <label className="game-control">
                     Game Mode
                     <div className="segmented onevone-mode-segmented">
-                      {duelGameTypeOptions.map((option) => (
+                      {availableDuelGameTypeOptions.map((option) => (
                         <button
                           key={`bot-mode-${option.value}`}
                           type="button"
                           className={inviteGameType === option.value ? 'seg active' : 'seg'}
                           onClick={() => {
                             setInviteGameType(option.value)
+                            if (option.value === 'connect4') setInviteCategory('all')
                             if (option.value !== 'quiz' && inviteCategory === 'scenarios') setInviteCategory('all')
                           }}
                         >
@@ -7107,8 +7438,8 @@ export function OneVsOnePanel(props: {
                   <label className="game-control">
                     Category
                     <div className="segmented">
-                      {duelCategoryOptions
-                        .filter((option) => !(inviteGameType !== 'quiz' && option.quizOnly))
+                    {duelCategoryOptions
+                        .filter((option) => inviteGameType === 'connect4' ? option.value === 'all' : !(inviteGameType !== 'quiz' && option.quizOnly))
                         .map((option) => (
                           <button
                             key={`bot-category-${option.value}`}
@@ -7313,7 +7644,7 @@ export function OneVsOnePanel(props: {
                 <label className="game-control">
                   Game Mode
                   <div className="segmented onevone-mode-segmented">
-                    {duelGameTypeOptions.map((option) => (
+                    {availableDuelGameTypeOptions.map((option) => (
                       <button
                         key={`invite-mode-${option.value}`}
                         type="button"
@@ -7333,7 +7664,7 @@ export function OneVsOnePanel(props: {
                   Category
                   <div className="segmented">
                     {duelCategoryOptions
-                      .filter((option) => !(inviteGameType !== 'quiz' && option.quizOnly))
+                      .filter((option) => inviteGameType === 'connect4' ? option.value === 'all' : !(inviteGameType !== 'quiz' && option.quizOnly))
                       .map((option) => (
                         <button
                           key={`invite-category-${option.value}`}
@@ -8072,6 +8403,120 @@ export function OneVsOnePanel(props: {
                 ) : (
                   <p className="muted">{countdownActive ? 'Countdown in progress…' : 'Waiting for round sync...'}</p>
                 )}
+              </div>
+            </div>
+          ) : null}
+
+          {room.status === 'in_progress' && room.game_type === 'connect4' ? (
+            <div className="connect4-session-overlay">
+              <div className="connect4-session-shell">
+                <div className="connect4-topbar">
+                  <button className="secondary onevone-leave-button" onClick={() => void confirmLeaveMatch()}>
+                    {isSpectator ? 'Stop Spectating' : 'Leave Match'}
+                  </button>
+                  <div className="connect4-title">
+                    <span className="muted tiny">1v1 Connect 4</span>
+                    <strong>
+                      {connect4State.winner
+                        ? `${connect4WinnerName || 'Winner'} connects four`
+                        : connect4State.draw
+                          ? 'Board filled: draw'
+                          : countdownActive
+                            ? 'Starting together'
+                            : isSpectator
+                              ? `${connect4State.currentTurn === 'P1' ? getPlayerName(connect4PlayerOne?.user_id || '', 'Player 1') : getPlayerName(connect4PlayerTwo?.user_id || '', 'Player 2')} to move`
+                              : connect4IsMyTurn
+                                ? 'Your move'
+                                : 'Opponent to move'}
+                    </strong>
+                  </div>
+                  <div className="connect4-move-count">
+                    <small className="muted">Moves</small>
+                    <strong>{connect4State.moveHistory.length}/{connect4Rows * connect4Columns}</strong>
+                  </div>
+                </div>
+
+                {isSpectator ? (
+                  <div className="onevone-spectator-banner">
+                    <span>Watching</span>
+                    <span className="muted tiny">{getPlayerName(connect4PlayerOne?.user_id || '', 'Player 1')} vs {getPlayerName(connect4PlayerTwo?.user_id || '', 'Player 2')}</span>
+                  </div>
+                ) : null}
+
+                <div className="connect4-players" aria-label="Connect 4 players">
+                  <div className={`connect4-player-chip ${connect4State.currentTurn === 'P1' && connect4State.status === 'active' ? 'active' : ''}`}>
+                    <span className="connect4-token connect4-token-p1" aria-hidden />
+                    <small>Player 1</small>
+                    <strong>{getPlayerName(connect4PlayerOne?.user_id || '', 'Player 1')}</strong>
+                  </div>
+                  <div className={`connect4-player-chip ${connect4State.currentTurn === 'P2' && connect4State.status === 'active' ? 'active' : ''}`}>
+                    <span className="connect4-token connect4-token-p2" aria-hidden />
+                    <small>Player 2</small>
+                    <strong>{getPlayerName(connect4PlayerTwo?.user_id || '', 'Player 2')}</strong>
+                  </div>
+                </div>
+
+                {countdownActive ? (
+                  <div className="onevone-countdown">
+                    <small className="muted">
+                      {syncingBeforeCountdown ? 'Syncing with opponent' : 'Starting together'}
+                    </small>
+                    {syncingBeforeCountdown ? (
+                      <strong className="onevone-syncing-dots">•••</strong>
+                    ) : (
+                      <strong>{countdownRemaining}</strong>
+                    )}
+                    <p className="muted tiny">
+                      {syncingBeforeCountdown ? 'Locking the shared start time...' : 'Connect 4 starts in...'}
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="connect4-board-wrap">
+                  <div className="connect4-column-actions" aria-label="Drop a disc by column">
+                    {Array.from({ length: connect4Columns }, (_, columnIndex) => {
+                      const columnFull = connect4State.board[0]?.[columnIndex] !== null
+                      return (
+                        <button
+                          key={`connect4-drop-${columnIndex}`}
+                          type="button"
+                          className={`connect4-column-drop ${columnFull ? 'full' : ''}`}
+                          disabled={!connect4IsMyTurn || columnFull}
+                          onClick={() => void submitConnect4Move(columnIndex)}
+                          aria-label={`Drop disc in column ${columnIndex + 1}`}
+                        >
+                          {columnIndex + 1}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="connect4-board" role="grid" aria-label="Connect 4 board">
+                    {connect4State.board.map((row, rowIndex) => (
+                      <div key={`connect4-row-${rowIndex}`} className="connect4-row" role="row">
+                        {row.map((cell, columnIndex) => (
+                          <span
+                            key={`connect4-cell-${rowIndex}-${columnIndex}`}
+                            className={connect4CellClass(cell)}
+                            role="gridcell"
+                            aria-label={connect4CellLabel(cell, rowIndex, columnIndex)}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="connect4-status muted" aria-live="polite">
+                  {connect4State.winner
+                    ? `${connect4WinnerName || 'Winner'} won this match.`
+                    : connect4State.draw
+                      ? 'The board is full. This match is a draw.'
+                      : isSpectator
+                        ? 'Spectator view updates as each player drops a disc.'
+                        : connect4IsMyTurn
+                          ? 'Choose a column to drop your disc.'
+                          : 'Waiting for your opponent to choose a column.'}
+                </p>
               </div>
             </div>
           ) : null}

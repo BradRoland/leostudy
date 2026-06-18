@@ -597,7 +597,9 @@ body {
 }
 
 .app-shell:has(.onevone-blaster-overlay) .mobile-bottom-nav,
-.app-shell:has(.onevone-blaster-overlay) .mobile-quick-strip {
+.app-shell:has(.onevone-blaster-overlay) .mobile-quick-strip,
+.app-shell:has(.connect4-session-overlay) .mobile-bottom-nav,
+.app-shell:has(.connect4-session-overlay) .mobile-quick-strip {
   display: none !important;
   pointer-events: none !important;
 }
@@ -10124,6 +10126,398 @@ button.study-session-top-action-start:active:not(:disabled) {
   min-width: 84px;
 }
 
+.connect4-session-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: rgba(8, 13, 23, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(10px, env(safe-area-inset-top))
+    max(10px, env(safe-area-inset-right))
+    max(10px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  overflow: hidden;
+}
+
+.connect4-session-shell {
+  width: min(980px, 100%);
+  max-width: calc(100svw - max(20px, env(safe-area-inset-left) + env(safe-area-inset-right)));
+  max-height: calc(100svh - max(20px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  overflow: auto;
+  display: grid;
+  gap: clamp(8px, 1.5svh, 14px);
+  align-content: start;
+  color: var(--text);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
+}
+
+.connect4-topbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.connect4-title {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 3px;
+}
+
+.connect4-title strong {
+  font-size: clamp(1.2rem, 2.8vw, 2rem);
+  line-height: 1.05;
+}
+
+.connect4-move-count {
+  min-width: 92px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.connect4-players {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.connect4-player-chip {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 9px 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+}
+
+.connect4-player-chip.active {
+  border-color: rgba(98, 185, 255, 0.62);
+  background: rgba(98, 185, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(98, 185, 255, 0.18);
+}
+
+.connect4-player-chip small,
+.connect4-player-chip strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect4-player-chip small {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.connect4-player-chip strong {
+  grid-column: 2;
+}
+
+.connect4-token {
+  grid-row: 1 / span 2;
+  width: 22px;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  box-shadow: inset 0 3px 5px rgba(255, 255, 255, 0.34), inset 0 -4px 5px rgba(0, 0, 0, 0.3);
+}
+
+.connect4-token-p1 {
+  background: #f05b56;
+}
+
+.connect4-token-p2 {
+  background: #ffd24d;
+}
+
+.connect4-board-wrap {
+  width: min(720px, 100%, calc(100svw - 28px), 78svh);
+  justify-self: center;
+  display: grid;
+  gap: clamp(4px, 1svh, 8px);
+}
+
+.connect4-column-actions {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: clamp(4px, 1vw, 8px);
+}
+
+.connect4-column-drop {
+  min-width: 0;
+  min-height: clamp(30px, 5.5svh, 38px);
+  border-radius: 8px;
+  padding: 0;
+  font-weight: 800;
+  border: 1px solid rgba(126, 195, 255, 0.38);
+  background: rgba(64, 137, 214, 0.26);
+  color: #f7fbff;
+}
+
+.connect4-column-drop:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(255, 210, 77, 0.68);
+}
+
+.connect4-column-drop.full,
+.connect4-column-drop:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.connect4-board {
+  aspect-ratio: 7 / 6;
+  width: 100%;
+  border: 1px solid rgba(126, 195, 255, 0.36);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(16, 94, 170, 0.96), rgba(10, 63, 138, 0.96));
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.06), 0 18px 48px rgba(0, 0, 0, 0.28);
+  padding: clamp(8px, 1.5vw, 14px);
+  display: grid;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  gap: clamp(6px, 1.2vw, 10px);
+}
+
+.connect4-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: clamp(6px, 1.2vw, 10px);
+}
+
+.connect4-cell {
+  min-width: 0;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: rgba(5, 11, 21, 0.72);
+  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.48), 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.connect4-cell-p1 {
+  background: radial-gradient(circle at 34% 28%, #ffc0b8 0 11%, #f05b56 12% 62%, #9c2429 63% 100%);
+}
+
+.connect4-cell-p2 {
+  background: radial-gradient(circle at 34% 28%, #fff5b5 0 11%, #ffd24d 12% 62%, #a26a15 63% 100%);
+}
+
+.connect4-status {
+  margin: 0;
+  text-align: center;
+  font-weight: 650;
+}
+
+@media (max-width: 700px), (max-height: 620px) {
+  .connect4-session-overlay {
+    align-items: stretch;
+    padding:
+      max(6px, env(safe-area-inset-top))
+      max(6px, env(safe-area-inset-right))
+      max(6px, env(safe-area-inset-bottom))
+      max(6px, env(safe-area-inset-left));
+  }
+
+  .connect4-session-shell {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    gap: clamp(6px, 1.1svh, 10px);
+    align-content: center;
+    padding: 0;
+  }
+
+  .connect4-topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .connect4-topbar .onevone-leave-button {
+    grid-column: 1 / -1;
+    justify-self: start;
+    min-height: 34px;
+    padding: 7px 10px;
+  }
+
+  .connect4-title {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .connect4-title strong {
+    font-size: clamp(1.05rem, 5.2svw, 1.35rem);
+  }
+
+  .connect4-title .onevone-bot-note,
+  .connect4-title .tiny {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .connect4-move-count {
+    min-width: 72px;
+    padding: 6px 8px;
+  }
+
+  .connect4-players {
+    gap: 6px;
+  }
+
+  .connect4-player-chip {
+    min-height: 44px;
+    padding: 6px 7px;
+    column-gap: 6px;
+  }
+
+  .connect4-token {
+    width: clamp(16px, 4.8svw, 20px);
+  }
+
+  .connect4-player-chip small {
+    font-size: 0.68rem;
+  }
+
+  .connect4-player-chip strong {
+    font-size: 0.82rem;
+  }
+
+  .connect4-board-wrap {
+    width: min(100%, calc(100svw - 12px), 72svh);
+  }
+
+  .connect4-board {
+    border-radius: 10px;
+    padding: clamp(5px, 1.8svw, 8px);
+    gap: clamp(4px, 1.5svw, 7px);
+  }
+
+  .connect4-row {
+    gap: clamp(4px, 1.5svw, 7px);
+  }
+
+  .connect4-column-actions {
+    gap: clamp(3px, 1svw, 5px);
+  }
+
+  .connect4-column-drop {
+    min-height: clamp(28px, 5.2svh, 34px);
+    font-size: 0.84rem;
+  }
+
+  .connect4-status {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .connect4-board-wrap {
+    width: min(100%, calc(100svw - 10px), 68svh);
+  }
+
+  .connect4-session-shell {
+    gap: 6px;
+  }
+
+  .connect4-players {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .connect4-player-chip {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
+@media (max-height: 480px) and (min-width: 520px) {
+  .connect4-session-shell {
+    align-content: start;
+    gap: 5px;
+  }
+
+  .connect4-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .connect4-topbar .onevone-leave-button {
+    grid-column: auto;
+    min-height: 30px;
+    padding: 5px 9px;
+  }
+
+  .connect4-title {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .connect4-title strong {
+    font-size: clamp(1rem, 3svh, 1.2rem);
+  }
+
+  .connect4-title .onevone-bot-note {
+    display: none;
+  }
+
+  .connect4-title .tiny {
+    font-size: 0.68rem;
+  }
+
+  .connect4-move-count {
+    min-width: 66px;
+    padding: 5px 7px;
+  }
+
+  .connect4-move-count small {
+    display: none;
+  }
+
+  .connect4-players {
+    width: min(100%, 520px);
+    justify-self: center;
+  }
+
+  .connect4-player-chip {
+    min-height: 36px;
+    padding: 5px 7px;
+  }
+
+  .connect4-board-wrap {
+    width: min(100%, calc(100svw - 12px), 58svh);
+    gap: 3px;
+  }
+
+  .connect4-column-drop {
+    min-height: 25px;
+  }
+
+  .connect4-board {
+    padding: 4px;
+    gap: 3px;
+    border-radius: 9px;
+  }
+
+  .connect4-row {
+    gap: 3px;
+  }
+
+  .connect4-status {
+    font-size: 0.78rem;
+    line-height: 1.15;
+  }
+}
+
 .onevone-lobby-layout {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
@@ -12292,6 +12686,20 @@ button.study-session-top-action-start:active:not(:disabled) {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.settings-feature-toggle-card {
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-soft) 82%, transparent);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.settings-feature-toggle-card h4,
+.settings-feature-toggle-card p {
+  margin: 0;
 }
 
 .assisted-learning-inline {
@@ -16343,7 +16751,8 @@ textarea:focus-visible,
     padding: max(8px, env(safe-area-inset-top)) 8px calc(112px + env(safe-area-inset-bottom)) !important;
   }
 
-  .app-shell:has(.onevone-blaster-overlay) {
+  .app-shell:has(.onevone-blaster-overlay),
+  .app-shell:has(.connect4-session-overlay) {
     padding: max(4px, env(safe-area-inset-top)) 4px max(4px, env(safe-area-inset-bottom)) !important;
     overflow: hidden !important;
   }
@@ -16371,7 +16780,8 @@ textarea:focus-visible,
     padding-bottom: calc(122px + env(safe-area-inset-bottom)) !important;
   }
 
-  .app-shell:has(.onevone-blaster-overlay) .workspace-main {
+  .app-shell:has(.onevone-blaster-overlay) .workspace-main,
+  .app-shell:has(.connect4-session-overlay) .workspace-main {
     padding-bottom: max(4px, env(safe-area-inset-bottom)) !important;
     overflow: hidden !important;
   }
@@ -16852,7 +17262,9 @@ textarea:focus-visible,
   }
 
   .app-shell:has(.onevone-blaster-overlay) .mobile-bottom-nav,
-  .app-shell:has(.onevone-blaster-overlay) .mobile-quick-strip {
+  .app-shell:has(.onevone-blaster-overlay) .mobile-quick-strip,
+  .app-shell:has(.connect4-session-overlay) .mobile-bottom-nav,
+  .app-shell:has(.connect4-session-overlay) .mobile-quick-strip {
     display: none !important;
     pointer-events: none !important;
   }

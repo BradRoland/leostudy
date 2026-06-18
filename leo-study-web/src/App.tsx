@@ -4684,6 +4684,10 @@ function App() {
   const [ownerBannerSaving, setOwnerBannerSaving] = useState(false)
   const [ownerBannerError, setOwnerBannerError] = useState('')
   const [ownerBannerSuccess, setOwnerBannerSuccess] = useState('')
+  const [connect4Enabled, setConnect4Enabled] = useState(true)
+  const [connect4Saving, setConnect4Saving] = useState(false)
+  const [connect4Error, setConnect4Error] = useState('')
+  const [connect4Success, setConnect4Success] = useState('')
   const [bugReportPagePath, setBugReportPagePath] = useState('/home')
   const [bugReportSeverity, setBugReportSeverity] = useState<BugSeverity>('medium')
   const [bugReportSummary, setBugReportSummary] = useState('')
@@ -5283,6 +5287,44 @@ function App() {
     return true
   }
 
+  const saveConnect4Enabled = async (enabled: boolean) => {
+    if (!supabase || !isOwner) return false
+    const previousValue = connect4Enabled
+    setConnect4Enabled(enabled)
+    setConnect4Saving(true)
+    setConnect4Error('')
+    setConnect4Success('')
+    const { data, error } = await supabase
+      .from('app_settings')
+      .upsert(
+        {
+          id: agencySettingsId || appSettingsRowId,
+          connect4_enabled: enabled,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+      .select('id,connect4_enabled')
+      .single()
+
+    if (error) {
+      setConnect4Enabled(previousValue)
+      const message = String(error.message || 'Could not save Connect 4 setting.')
+      const migrationHint = message.toLowerCase().includes('connect4_') || message.toLowerCase().includes('app_settings')
+        ? ' Run /supabase/migrations/20260618110000_connect4_1v1.sql first.'
+        : ''
+      setConnect4Error(`${message}${migrationHint}`)
+      setConnect4Saving(false)
+      return false
+    }
+
+    setConnect4Enabled(Boolean((data as Record<string, unknown> | null)?.connect4_enabled))
+    setAgencySettingsId(String(data?.id || appSettingsRowId))
+    setConnect4Saving(false)
+    setConnect4Success(enabled ? 'Connect 4 enabled.' : 'Connect 4 disabled.')
+    return true
+  }
+
   const loadOwnerBugReports = useCallback(async () => {
     if (!supabase || !isOwner) {
       setOwnerBugReports([])
@@ -5474,12 +5516,13 @@ function App() {
       })
       setAppBannerSettings(nextBanner)
       setOwnerBannerDraft(nextBanner)
+      setConnect4Enabled(row?.connect4_enabled !== false)
     }
 
     const loadAppSettings = async () => {
       const { data, error } = await client
         .from('app_settings')
-        .select('id,agencies,banner_enabled,banner_level,banner_message,banner_scroll,banner_scroll_speed,banner_scroll_repeat')
+        .select('id,agencies,banner_enabled,banner_level,banner_message,banner_scroll,banner_scroll_speed,banner_scroll_repeat,connect4_enabled')
         .eq('id', appSettingsRowId)
         .maybeSingle()
       if (cancelled) return
@@ -15792,6 +15835,7 @@ function App() {
                 onActiveMatchChange={setDuelMatchActive}
                 onDuelPerformanceReward={awardDuelMilestoneXp}
                 sessionXpReward={renderSessionXpReward()}
+                connect4Enabled={connect4Enabled}
               />
             ) : null}
           </section>
@@ -17080,6 +17124,28 @@ function App() {
                   <div className="settings-section-card">
                     <h3>Global Site Banner</h3>
                     <p className="muted tiny">This banner appears at the top of the website for all users.</p>
+
+                    <div className="settings-feature-toggle-card">
+                      <div className="settings-inline-head">
+                        <div>
+                          <h4>Game Hub Features</h4>
+                          <p className="muted tiny">Owner-controlled game availability across lobby creation, invites, and public listings.</p>
+                        </div>
+                      </div>
+                      <label className="switch-row">
+                        <input
+                          type="checkbox"
+                          checked={connect4Enabled}
+                          disabled={connect4Saving}
+                          onChange={(event) => {
+                            void saveConnect4Enabled(event.target.checked)
+                          }}
+                        />
+                        Enable Connect 4
+                      </label>
+                      {connect4Error ? <p className="bad">{connect4Error}</p> : null}
+                      {connect4Success ? <p className="saved-pill">{connect4Success}</p> : null}
+                    </div>
 
                     <label className="switch-row">
                       <input
