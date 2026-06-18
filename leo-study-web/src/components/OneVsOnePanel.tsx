@@ -1721,12 +1721,13 @@ export function OneVsOnePanel(props: {
   connect4Enabled?: boolean
   onDuelPerformanceReward?: (result: {
     roomId: string
-    gameType: Exclude<DuelGameType, 'connect4'>
+    gameType: DuelGameType
     rounds: number
     score: number
     opponentScore: number
     won: boolean
     draw: boolean
+    moveCount?: number
   }) => void
   sessionXpReward?: ReactNode
 }) {
@@ -6151,19 +6152,39 @@ export function OneVsOnePanel(props: {
   const opponentFastestRoundMs = opponentResultRow ? playerByUserId.get(opponentResultRow.user_id)?.fastest_round_ms || 0 : 0
 
   useEffect(() => {
-    if (!room || room.status !== 'completed' || room.game_type === 'connect4' || isSpectator || !myResultRow || !opponentResultRow) return
+    if (!room || room.status !== 'completed' || isSpectator || !myResultRow || !opponentResultRow) return
     if (rewardedResultRoomIdsRef.current.has(room.id)) return
     rewardedResultRoomIdsRef.current.add(room.id)
+    const connect4MoveCount = room.game_type === 'connect4'
+      ? normalizeConnect4State(room.settings?.connect4 as Partial<Connect4State> | null | undefined).moveHistory.length
+      : undefined
     onDuelPerformanceReward?.({
       roomId: room.id,
       gameType: room.game_type,
-      rounds: room.rounds,
+      rounds: room.game_type === 'connect4' ? (connect4MoveCount || room.rounds) : room.rounds,
       score: myResultRow.score,
       opponentScore: opponentResultRow.score,
       won: room.winner_user_id === currentUserId,
       draw: !room.winner_user_id,
+      moveCount: connect4MoveCount,
     })
   }, [currentUserId, isSpectator, myResultRow, onDuelPerformanceReward, opponentResultRow, room])
+
+  useEffect(() => {
+    if (!connect4BotMatch || connect4BotMatch.status !== 'completed') return
+    if (rewardedResultRoomIdsRef.current.has(connect4BotMatch.id)) return
+    rewardedResultRoomIdsRef.current.add(connect4BotMatch.id)
+    onDuelPerformanceReward?.({
+      roomId: connect4BotMatch.id,
+      gameType: 'connect4',
+      rounds: connect4BotMatch.state.moveHistory.length,
+      score: connect4BotMatch.winner === 'user' ? 1 : 0,
+      opponentScore: connect4BotMatch.winner === 'bot' ? 1 : 0,
+      won: connect4BotMatch.winner === 'user',
+      draw: connect4BotMatch.winner === 'draw',
+      moveCount: connect4BotMatch.state.moveHistory.length,
+    })
+  }, [connect4BotMatch, onDuelPerformanceReward])
 
   useEffect(() => {
     if (!inRoom || !room) {
@@ -6358,6 +6379,11 @@ export function OneVsOnePanel(props: {
                   <strong>{botDifficultyDisplay(connect4BotMatch.difficulty, connect4BotMatch.resolvedDifficulty)}</strong>
                 </article>
               </div>
+              {sessionXpReward ? (
+                <div className="onevone-result-xp-reward">
+                  {sessionXpReward}
+                </div>
+              ) : null}
               <div className="actions-row">
                 <button className="primary" type="button" onClick={() => {
                   exitBotMatch()

@@ -22,7 +22,7 @@ type DisplayMode = 'dark' | 'light'
 type AppTab = 'library' | 'study' | 'games' | 'scenarios' | 'home' | 'leaderboards' | 'chat'
 type HomeActionTarget = 'study' | 'games-matching' | 'games-speed' | 'games-blaster' | 'games-duel-blaster' | 'games-duel-bot' | 'scenarios'
 type HomeDurationFilter = 15 | 30 | 60
-type DuelLeaderboardMode = 'all' | 'matching' | 'quiz' | 'blaster'
+type DuelLeaderboardMode = 'all' | 'matching' | 'quiz' | 'blaster' | 'connect4'
 type DuelInvitePreset = 'rope-blaster' | 'bot-practice'
 type DuelLevelStats = {
   wins: number
@@ -86,6 +86,10 @@ const duelWinnerBonusXpValue = 35
 const duelClutchBonusXpValue = 30
 const duelDominantBonusXpValue = 40
 const duelShutoutBonusXpValue = 75
+const connect4CompletionBonusXpValue = 45
+const connect4WinnerBonusXpValue = 65
+const connect4DrawBonusXpValue = 30
+const connect4DeepGameBonusXpValue = 25
 const achievementAwardLedgerLimit = 320
 const leaderboardRefreshThrottleMs = 5000
 const homeLeaderboardRefreshThrottleMs = 12000
@@ -475,6 +479,10 @@ type AchievementCounterKey =
   | 'duelClutchMatches'
   | 'duelDominantWins'
   | 'duelShutouts'
+  | 'connect4Completed'
+  | 'connect4Wins'
+  | 'connect4Draws'
+  | 'connect4DeepGames'
 
 type UserStats = {
   studySeconds: number
@@ -865,6 +873,7 @@ type DuelAchievementRewardInput = {
   opponentScore: number
   won: boolean
   draw: boolean
+  moveCount?: number
 }
 
 type AchievementRewardBuild = {
@@ -916,12 +925,13 @@ const codeSetLabel: Record<CodeSet, string> = {
 
 const homeLeaderboardRotationDurations: Array<15 | 30 | 60> = [15, 30, 60]
 const homeLeaderboardRotationCodeSets: CodeFilter[] = ['all', 'penal', 'hs', 'vehicle']
-const duelLeaderboardModeOrder: DuelLeaderboardMode[] = ['all', 'matching', 'quiz', 'blaster']
+const duelLeaderboardModeOrder: DuelLeaderboardMode[] = ['all', 'matching', 'quiz', 'blaster', 'connect4']
 const duelLeaderboardModeLabel: Record<DuelLeaderboardMode, string> = {
   all: 'All',
   matching: 'Matching',
   quiz: 'Quiz',
   blaster: 'Blaster',
+  connect4: 'Connect 4',
 }
 const homeLeaderboardRotationSteps = homeLeaderboardRotationDurations.flatMap((duration) =>
   homeLeaderboardRotationCodeSets.map((codeSet) => ({ duration, codeSet })),
@@ -1919,6 +1929,10 @@ const defaultUserStats: UserStats = {
     duelClutchMatches: 0,
     duelDominantWins: 0,
     duelShutouts: 0,
+    connect4Completed: 0,
+    connect4Wins: 0,
+    connect4Draws: 0,
+    connect4DeepGames: 0,
   },
   achievementAwardLedger: {},
 }
@@ -2159,6 +2173,13 @@ function emptyDuelLevelStats(): DuelLevelStats {
   return { wins: 0, losses: 0, currentWinStreak: 0 }
 }
 
+function emptyDuelStatsByMode(): Record<DuelLeaderboardMode, DuelLevelStats> {
+  return duelLeaderboardModeOrder.reduce<Record<DuelLeaderboardMode, DuelLevelStats>>((accumulator, mode) => {
+    accumulator[mode] = emptyDuelLevelStats()
+    return accumulator
+  }, {} as Record<DuelLeaderboardMode, DuelLevelStats>)
+}
+
 function sanitizeDuelLevelStats(value: unknown): DuelLevelStats {
   const row = value && typeof value === 'object' ? value as Record<string, unknown> : {}
   return {
@@ -2269,6 +2290,25 @@ function buildScoreAchievementReward(input: ScoreAchievementRewardInput): Achiev
 }
 
 function buildDuelAchievementReward(input: DuelAchievementRewardInput): AchievementRewardBuild | null {
+  if (input.gameType === 'connect4') {
+    const moveCount = Math.max(0, Math.floor(input.moveCount ?? input.rounds ?? 0))
+    const rewards: Array<{ label: string; xp: number; counter: AchievementCounterKey }> = [
+      { label: 'Connect 4 match completed', xp: connect4CompletionBonusXpValue, counter: 'connect4Completed' },
+    ]
+
+    if (input.won) {
+      rewards.push({ label: 'Connect 4 win bonus', xp: connect4WinnerBonusXpValue, counter: 'connect4Wins' })
+    } else if (input.draw) {
+      rewards.push({ label: 'Connect 4 draw grind', xp: connect4DrawBonusXpValue, counter: 'connect4Draws' })
+    }
+
+    if (moveCount >= 16) {
+      rewards.push({ label: 'Deep-board strategy', xp: connect4DeepGameBonusXpValue, counter: 'connect4DeepGames' })
+    }
+
+    return combineAchievementRewards('🔴🟡 Connect 4 XP Bonus', rewards)
+  }
+
   const rounds = Math.max(1, Math.floor(input.rounds || 1))
   const score = Math.max(0, Math.round(input.score || 0))
   const opponentScore = Math.max(0, Math.round(input.opponentScore || 0))
@@ -4752,12 +4792,14 @@ function App() {
     matching: [],
     quiz: [],
     blaster: [],
+    connect4: [],
   })
   const [homeDuelStreakLeadersByMode, setHomeDuelStreakLeadersByMode] = useState<Record<DuelLeaderboardMode, HomeLeaderboardEntry[]>>({
     all: [],
     matching: [],
     quiz: [],
     blaster: [],
+    connect4: [],
   })
   const [levelProfilesByUserId, setLevelProfilesByUserId] = useState<Record<string, UserLevelProfile>>({})
   const [currentUserDuelStats, setCurrentUserDuelStats] = useState<DuelLevelStats>(() => emptyDuelLevelStats())
@@ -6166,12 +6208,7 @@ function App() {
             const gameType = String((entry as Record<string, unknown>).game_type || 'all') as DuelLeaderboardMode
             if (!userId) return accumulator
             if (!duelLeaderboardModeOrder.includes(gameType)) return accumulator
-            const current = accumulator[userId] || {
-              all: { wins: 0, losses: 0, currentWinStreak: 0 },
-              matching: { wins: 0, losses: 0, currentWinStreak: 0 },
-              quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
-              blaster: { wins: 0, losses: 0, currentWinStreak: 0 },
-            }
+            const current = accumulator[userId] || emptyDuelStatsByMode()
             current[gameType] = {
               wins: Number(entry.wins || 0),
               losses: Number(entry.losses || 0),
@@ -6310,12 +6347,7 @@ function App() {
             const gameType = String((entry as Record<string, unknown>).game_type || 'all') as DuelLeaderboardMode
             if (!userId) return accumulator
             if (!duelLeaderboardModeOrder.includes(gameType)) return accumulator
-            const current = accumulator[userId] || {
-              all: { wins: 0, losses: 0, currentWinStreak: 0 },
-              matching: { wins: 0, losses: 0, currentWinStreak: 0 },
-              quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
-              blaster: { wins: 0, losses: 0, currentWinStreak: 0 },
-            }
+            const current = accumulator[userId] || emptyDuelStatsByMode()
             current[gameType] = {
               wins: Number(entry.wins || 0),
               losses: Number(entry.losses || 0),
@@ -6365,12 +6397,14 @@ function App() {
         matching: [],
         quiz: [],
         blaster: [],
+        connect4: [],
       }
       const duelStreakRowsByMode: Record<DuelLeaderboardMode, HomeLeaderboardEntry[]> = {
         all: [],
         matching: [],
         quiz: [],
         blaster: [],
+        connect4: [],
       }
       let ownerRotationMs: number | null = null
       for (const row of states) {
@@ -6402,12 +6436,7 @@ function App() {
         const studySeconds = details.studySeconds
         const studyDayStreak = details.studyDayStreak
         const mostStudiedMode = mostStudiedModeFromCounts(details.studyModeCounts)
-        const duelStatsByMode = duelStatsByUserId[userId] || {
-          all: { wins: 0, losses: 0, currentWinStreak: 0 },
-          matching: { wins: 0, losses: 0, currentWinStreak: 0 },
-          quiz: { wins: 0, losses: 0, currentWinStreak: 0 },
-          blaster: { wins: 0, losses: 0, currentWinStreak: 0 },
-        }
+        const duelStatsByMode = duelStatsByUserId[userId] || emptyDuelStatsByMode()
         const duelStats = duelStatsByMode.all
         const weeklyDepartmentKey = bestWeeklyDepartmentForLevels
           ? normalizeAgencyKey(bestWeeklyDepartmentForLevels.agency)
@@ -6567,6 +6596,9 @@ function App() {
         blaster: duelWinsRowsByMode.blaster
           .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
           .slice(0, 5),
+        connect4: duelWinsRowsByMode.connect4
+          .sort((left, right) => right.duelWins - left.duelWins || right.duelCurrentWinStreak - left.duelCurrentWinStreak || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
       })
       setHomeDuelStreakLeadersByMode({
         all: duelStreakRowsByMode.all
@@ -6579,6 +6611,9 @@ function App() {
           .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
           .slice(0, 5),
         blaster: duelStreakRowsByMode.blaster
+          .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
+          .slice(0, 5),
+        connect4: duelStreakRowsByMode.connect4
           .sort((left, right) => right.duelCurrentWinStreak - left.duelCurrentWinStreak || right.duelWins - left.duelWins || left.duelLosses - right.duelLosses)
           .slice(0, 5),
       })
@@ -16457,7 +16492,11 @@ function App() {
                         profileDetails.stats.achievementCounts.duelWinnerBonus +
                         profileDetails.stats.achievementCounts.duelClutchMatches +
                         profileDetails.stats.achievementCounts.duelDominantWins +
-                        profileDetails.stats.achievementCounts.duelShutouts
+                        profileDetails.stats.achievementCounts.duelShutouts +
+                        profileDetails.stats.achievementCounts.connect4Completed +
+                        profileDetails.stats.achievementCounts.connect4Wins +
+                        profileDetails.stats.achievementCounts.connect4Draws +
+                        profileDetails.stats.achievementCounts.connect4DeepGames
                       ).toLocaleString()}</strong>
                     </div>
                   </div>
