@@ -1579,13 +1579,17 @@ function isBlasterRound(value: unknown): value is BlasterRoundPayload {
     && typeof row.correctIndex === 'number'
 }
 
-function connect4CellClass(cell: Connect4Cell, isWinningCell = false) {
+function connect4CellClass(cell: Connect4Cell, isWinningCell = false, isLatestMove = false) {
   const baseClass = cell === 'P1'
     ? 'connect4-cell connect4-cell-p1'
     : cell === 'P2'
       ? 'connect4-cell connect4-cell-p2'
       : 'connect4-cell connect4-cell-empty'
-  return isWinningCell ? `${baseClass} connect4-cell-winning` : baseClass
+  return [
+    baseClass,
+    isLatestMove ? 'connect4-cell-dropping' : '',
+    isWinningCell ? 'connect4-cell-winning' : '',
+  ].filter(Boolean).join(' ')
 }
 
 function connect4CellLabel(cell: Connect4Cell, rowIndex: number, columnIndex: number) {
@@ -1595,6 +1599,11 @@ function connect4CellLabel(cell: Connect4Cell, rowIndex: number, columnIndex: nu
 
 function connect4WinningCellKey(rowIndex: number, columnIndex: number) {
   return `${rowIndex}:${columnIndex}`
+}
+
+function connect4DropCellStyle(isLatestMove: boolean, rowIndex: number): CSSProperties | undefined {
+  if (!isLatestMove) return undefined
+  return { '--connect4-drop-rows': rowIndex + 1 } as CSSProperties
 }
 
 function connect4WinLineStyle(cells: Connect4Coordinate[]): CSSProperties | undefined {
@@ -6425,6 +6434,7 @@ export function OneVsOnePanel(props: {
                 {(() => {
                   const winningCells = findConnect4WinningCells(connect4BotMatch.state.board, connect4BotMatch.state.winner)
                   const winningCellKeys = new Set(winningCells.map((cell) => connect4WinningCellKey(cell.row, cell.column)))
+                  const latestMove = connect4BotMatch.state.moveHistory.at(-1) || null
                   const winLineStyle = connect4WinLineStyle(winningCells)
                   return (
                     <div className="connect4-board" role="grid" aria-label="Connect 4 bot board">
@@ -6435,11 +6445,13 @@ export function OneVsOnePanel(props: {
                             const columnFull = connect4BotMatch.state.board[0]?.[columnIndex] !== null
                             const waitingForBot = connect4BotMatch.state.currentTurn !== 'P1'
                             const canDrop = !columnFull && !waitingForBot && connect4BotMatch.state.status === 'active'
+                            const isLatestMove = latestMove?.row === rowIndex && latestMove.column === columnIndex
                             return (
                               <button
                                 key={`connect4-bot-cell-${rowIndex}-${columnIndex}`}
                                 type="button"
-                                className={connect4CellClass(cell, winningCellKeys.has(connect4WinningCellKey(rowIndex, columnIndex)))}
+                                className={connect4CellClass(cell, winningCellKeys.has(connect4WinningCellKey(rowIndex, columnIndex)), isLatestMove)}
+                                style={connect4DropCellStyle(isLatestMove, rowIndex)}
                                 role="gridcell"
                                 disabled={!canDrop}
                                 onClick={() => submitConnect4BotMove(columnIndex)}
@@ -8627,6 +8639,7 @@ export function OneVsOnePanel(props: {
                   {(() => {
                     const winningCells = findConnect4WinningCells(connect4State.board, connect4State.winner)
                     const winningCellKeys = new Set(winningCells.map((cell) => connect4WinningCellKey(cell.row, cell.column)))
+                    const latestMove = connect4State.moveHistory.at(-1) || null
                     const winLineStyle = connect4WinLineStyle(winningCells)
                     return (
                       <div className="connect4-board" role="grid" aria-label="Connect 4 board">
@@ -8636,11 +8649,13 @@ export function OneVsOnePanel(props: {
                             {row.map((cell, columnIndex) => {
                               const columnFull = connect4State.board[0]?.[columnIndex] !== null
                               const canDrop = connect4IsMyTurn && !columnFull
+                              const isLatestMove = latestMove?.row === rowIndex && latestMove.column === columnIndex
                               return (
                                 <button
                                   key={`connect4-cell-${rowIndex}-${columnIndex}`}
                                   type="button"
-                                  className={connect4CellClass(cell, winningCellKeys.has(connect4WinningCellKey(rowIndex, columnIndex)))}
+                                  className={connect4CellClass(cell, winningCellKeys.has(connect4WinningCellKey(rowIndex, columnIndex)), isLatestMove)}
+                                  style={connect4DropCellStyle(isLatestMove, rowIndex)}
                                   role="gridcell"
                                   disabled={!canDrop}
                                   onClick={() => void submitConnect4Move(columnIndex)}

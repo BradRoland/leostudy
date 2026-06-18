@@ -10338,12 +10338,22 @@ button.study-session-top-action-start:active:not(:disabled) {
   background: radial-gradient(circle at 34% 28%, #fff5b5 0 11%, #ffd24d 12% 62%, #a26a15 63% 100%);
 }
 
+.connect4-cell-dropping {
+  animation: connect4-disc-drop 0.42s cubic-bezier(0.18, 0.86, 0.24, 1.08) both;
+}
+
 .connect4-cell-winning {
   animation: connect4-winning-disc-pop 0.72s ease both;
   box-shadow:
     inset 0 4px 8px rgba(0, 0, 0, 0.42),
     0 0 0 3px rgba(255, 255, 255, 0.46),
     0 0 26px rgba(255, 234, 128, 0.72);
+}
+
+.connect4-cell-dropping.connect4-cell-winning {
+  animation:
+    connect4-disc-drop 0.42s cubic-bezier(0.18, 0.86, 0.24, 1.08) both,
+    connect4-winning-disc-pop 0.72s ease 0.32s both;
 }
 
 .connect4-win-line {
@@ -10389,6 +10399,22 @@ button.study-session-top-action-start:active:not(:disabled) {
 
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes connect4-disc-drop {
+  0% {
+    transform: translateY(calc((var(--connect4-drop-rows, 6) * -112%) - 12px)) scale(0.94);
+    filter: brightness(1.12);
+  }
+
+  76% {
+    transform: translateY(3px) scale(1.02);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
   }
 }
 
