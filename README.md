@@ -95,10 +95,10 @@ Deploy the `leo-study-web/dist` output to Vercel or your own hardware. `leo-stud
 ## Required Web Environment Variables
 
 ```bash
-VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_URL=https://supabase.180.academy
 VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_OR_PUBLISHABLE_KEY
 VITE_CONTENT_SOURCE=local
-VITE_AUTH_REDIRECT_BASE_URL=http://localhost:5173
+VITE_AUTH_REDIRECT_BASE_URL=https://180.academy
 VITE_OWNER_EMAIL=owner@example.com
 VITE_SUPABASE_AVATAR_BUCKET=avatars
 ```
@@ -134,7 +134,7 @@ npm run build
 npm run preview -- --host 0.0.0.0 --port 4173
 ```
 
-Put Nginx, Caddy, or Cloudflare Tunnel in front of port `4173`, set `VITE_AUTH_REDIRECT_BASE_URL` to the public site origin, then add the public `/auth/callback` URL to Supabase Auth redirect URLs.
+Put Nginx, Caddy, or Cloudflare Tunnel in front of port `4173`, set `VITE_AUTH_REDIRECT_BASE_URL` to `https://180.academy`, then add `https://180.academy/auth/callback**` to Supabase Auth redirect URLs. In Google Cloud OAuth, use `https://supabase.180.academy/auth/v1/callback` as the authorized redirect URI.
 
 For the optional standalone Stripe webhook:
 

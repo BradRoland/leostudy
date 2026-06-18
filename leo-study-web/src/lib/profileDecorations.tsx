@@ -9,13 +9,15 @@ export function ProfileAvatarDecoration({ decoration }: { decoration: ProfileDec
       className={`avatar-decoration-layer has-generated-art ${decoration.cssClass} ${decoration.animated ? 'is-animated' : ''}`}
       aria-label={decoration.title}
     >
-      <img
-        src={assetPath}
-        alt=""
-        className="avatar-decoration-image"
-        loading="lazy"
-        decoding="async"
-      />
+      <span className="avatar-decoration-art" aria-hidden>
+        <img
+          src={assetPath}
+          alt=""
+          className="avatar-decoration-image"
+          loading="lazy"
+          decoding="async"
+        />
+      </span>
       <span className="avatar-decoration-particle one" />
       <span className="avatar-decoration-particle two" />
     </span>

@@ -69,6 +69,7 @@ type DeployRefreshNotice = {
   buildId: string
   secondsRemaining: number
   delayedForActivity: boolean
+  pausedForGame?: boolean
 }
 
 const studyTrackingTickMs = 5000
@@ -101,6 +102,12 @@ const deployRefreshInitialCheckDelayMs = 15000
 const deployRefreshPollMs = 60000
 const deployRefreshQuietReloadDelayMs = 8000
 const deployRefreshActiveReloadDelayMs = 45000
+const deployRefreshGameRetryMs = 5000
+const enableVercelTelemetry = String(
+  import.meta.env.VITE_ENABLE_VERCEL_TELEMETRY ||
+  import.meta.env.VITE_ENABLE_VERCEL_ANALYTICS ||
+  '',
+).toLowerCase() === 'true'
 const priorityTmas2ExamStartMs = Date.parse('2026-03-24T07:00:00-07:00')
 const priorityTmas3ExamStartMs = Date.parse('2026-05-18T13:00:00-07:00')
 
@@ -362,6 +369,16 @@ type UserProfile = {
   supporterTier: SupporterTier
   isOwner: boolean
   createdAt: string
+}
+
+type OnlineStudyUser = {
+  userId: string
+  username: string
+  avatarUrl: string
+  supporterTier: SupporterTier
+  lastActive: string
+  presence: PresenceStatus
+  isCurrentUser: boolean
 }
 
 type AuthUserMetadata = Record<string, unknown>
@@ -1148,6 +1165,8 @@ function normalizeRoutePath(path: string): string {
 }
 
 const authCallbackPath = '/auth/callback'
+const canonicalAuthRedirectBaseUrl = 'https://180.academy'
+const authCallbackNextPathKey = 'auth_callback_next_path'
 
 function getAuthRedirectBaseUrl() {
   const configured =
@@ -1155,7 +1174,11 @@ function getAuthRedirectBaseUrl() {
       ? import.meta.env.VITE_AUTH_REDIRECT_BASE_URL.trim()
       : ''
   if (configured) return configured.replace(/\/+$/, '')
-  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    const hostname = window.location.hostname.toLowerCase()
+    if (hostname === '180.academy' || hostname === 'prod.180.academy') return canonicalAuthRedirectBaseUrl
+    return window.location.origin
+  }
   return ''
 }
 
@@ -1164,14 +1187,27 @@ function buildAuthRedirectTo(nextPath = '/home') {
   if (!baseUrl) return undefined
   const redirectUrl = new URL(authCallbackPath, `${baseUrl}/`)
   const normalizedNextPath = normalizeRoutePath(nextPath)
-  if (normalizedNextPath && normalizedNextPath !== authCallbackPath) {
-    redirectUrl.searchParams.set('next', normalizedNextPath)
+  if (normalizedNextPath && normalizedNextPath !== authCallbackPath && typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(authCallbackNextPathKey, normalizedNextPath)
+    } catch {
+      // Storage can be unavailable in hardened browser modes.
+    }
   }
   return redirectUrl.toString()
 }
 
 function getAuthCallbackNextPath(search: string) {
-  const nextPath = new URLSearchParams(search).get('next') || '/home'
+  let storedNextPath = ''
+  if (typeof window !== 'undefined') {
+    try {
+      storedNextPath = window.localStorage.getItem(authCallbackNextPathKey) || ''
+      window.localStorage.removeItem(authCallbackNextPathKey)
+    } catch {
+      storedNextPath = ''
+    }
+  }
+  const nextPath = new URLSearchParams(search).get('next') || storedNextPath || '/home'
   const normalized = normalizeRoutePath(nextPath)
   if (normalized === authCallbackPath || normalized === '/signin' || normalized === '/signup') return '/home'
   return normalized.startsWith('/') ? normalized : '/home'
@@ -4391,6 +4427,13 @@ function App() {
   const [leaderboardViewFilter, setLeaderboardViewFilter] = useState<CodeFilter>('all')
   const [onlineUsersCount, setOnlineUsersCount] = useState(0)
   const [onlinePresenceByUserId, setOnlinePresenceByUserId] = useState<Record<string, PresenceStatus>>({})
+  const [onlineStudyUsers, setOnlineStudyUsers] = useState<OnlineStudyUser[]>([])
+  const [onlineStudyUsersLoading, setOnlineStudyUsersLoading] = useState(false)
+  const [onlineStudyUsersError, setOnlineStudyUsersError] = useState('')
+  const [onlineStudyPanelOpen, setOnlineStudyPanelOpen] = useState(false)
+  const onlineStudyPanelRef = useRef<HTMLDivElement | null>(null)
+  const onlineStudySidebarScrollTopRef = useRef(0)
+  const onlineStudyWindowScrollRef = useRef({ left: 0, top: 0 })
   const [studyFlashFilter, setStudyFlashFilter] = useState<CodeFilter>('all')
   const [studyTestFilter, setStudyTestFilter] = useState<CodeFilter>('all')
   const [studyTestWrongness, setStudyTestWrongness] = useState<StudyWrongness>('needs_work')
@@ -4438,63 +4481,188 @@ function App() {
   const [currentUserId, setCurrentUserId] = useState<string>('')
   const [clockNowMs, setClockNowMs] = useState<number>(() => Date.now())
   
-  // Track online users - update last_active and fetch active/away presence
-  useEffect(() => {
+  const loadOnlineStudyUsers = useCallback(async (options: { showLoading?: boolean } = {}) => {
     const client = supabase
     if (!client || !currentUserId) return
     const activeThresholdMs = 10 * 60 * 1000
 
-    const updateLastActive = async () => {
-      try {
-        await client.from('profiles').update({ last_active: new Date().toISOString() }).eq('user_id', currentUserId)
-      } catch { /* ignore */ }
-    }
+    if (options.showLoading) setOnlineStudyUsersLoading(true)
+    setOnlineStudyUsersError('')
 
-    const fetchOnlinePresence = async () => {
-      try {
-        const { data, error } = await client.rpc('list_online_1v1_users', { p_minutes_interval: 60 })
-        if (!error && Array.isArray(data)) {
-          const now = Date.now()
-          const presence: Record<string, PresenceStatus> = {}
-          for (const row of data) {
-            const value = row as Record<string, unknown>
-            const userId = String(value.user_id || '').trim()
-            if (!userId) continue
-            const parsedMs = Date.parse(String(value.last_active || ''))
-            if (!Number.isFinite(parsedMs)) continue
-            const elapsedMs = Math.max(0, now - parsedMs)
-            presence[userId] = elapsedMs <= activeThresholdMs ? 'active' : 'away'
+    try {
+      const { data, error } = await client.rpc('list_online_1v1_users', { p_minutes_interval: 60 })
+      if (error) {
+        console.warn('[presence] online user list failed:', error)
+        throw error
+      }
+      if (Array.isArray(data)) {
+        const now = Date.now()
+        const presence: Record<string, PresenceStatus> = {}
+        const users = data.map((row) => {
+          const value = row as Record<string, unknown>
+          const userId = String(value.user_id || '').trim()
+          const username = String(value.username || '').trim()
+          const avatarPath = String(value.avatar_path || '')
+          const lastActive = String(value.last_active || '')
+          const parsedMs = Date.parse(lastActive)
+          const elapsedMs = Number.isFinite(parsedMs) ? Math.max(0, now - parsedMs) : Number.POSITIVE_INFINITY
+          const userPresence: PresenceStatus = elapsedMs <= activeThresholdMs ? 'active' : 'away'
+          const supporterTier = (['free', 'tier2', 'tier5', 'tier10'].includes(String(value.supporter_tier))
+            ? String(value.supporter_tier)
+            : 'free') as SupporterTier
+
+          if (userId) presence[userId] = userPresence
+          return {
+            userId,
+            username: username || (userId ? `User ${userId.slice(0, 8)}` : 'User'),
+            avatarUrl: toPublicAvatarUrl(avatarPath) || defaultAvatarUrl,
+            supporterTier,
+            lastActive,
+            presence: userPresence,
+            isCurrentUser: userId === currentUserId,
           }
-          presence[currentUserId] = 'active'
-          setOnlinePresenceByUserId(presence)
-          setOnlineUsersCount(
-            Object.values(presence).filter((status) => status === 'active').length,
-          )
-          return
-        }
-      } catch {
-        // Ignore and try fallback count
-      }
+        }).filter((user): user is OnlineStudyUser => Boolean(user.userId))
 
-      setOnlinePresenceByUserId({ [currentUserId]: 'active' })
-      try {
-        const { data } = await client.rpc('get_online_users_count', { minutes_interval: 10 })
-        const fallbackCount = Number(data || 0)
-        setOnlineUsersCount(Number.isFinite(fallbackCount) ? fallbackCount : 0)
-      } catch {
-        setOnlineUsersCount(0)
+        if (!users.some((user) => user.userId === currentUserId)) {
+          users.unshift({
+            userId: currentUserId,
+            username: profileUsername.trim() || 'You',
+            avatarUrl: String(profileAvatarPreviewUrl || '').trim() || defaultAvatarUrl,
+            supporterTier: 'free',
+            lastActive: new Date().toISOString(),
+            presence: 'active',
+            isCurrentUser: true,
+          })
+        }
+
+        presence[currentUserId] = 'active'
+        const sortedUsers = users
+          .map((user) => user.userId === currentUserId ? { ...user, presence: 'active' as PresenceStatus, isCurrentUser: true } : user)
+          .sort((left, right) => {
+            if (left.presence !== right.presence) return left.presence === 'active' ? -1 : 1
+            const rightTime = Date.parse(right.lastActive)
+            const leftTime = Date.parse(left.lastActive)
+            return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0)
+          })
+
+        setOnlinePresenceByUserId(presence)
+        setOnlineStudyUsers(sortedUsers)
+        setOnlineUsersCount(sortedUsers.filter((user) => user.presence === 'active').length)
+        setOnlineStudyUsersLoading(false)
+        return
       }
+    } catch {
+      setOnlineStudyUsersError('Could not load online users.')
     }
 
-    updateLastActive()
+    setOnlinePresenceByUserId({ [currentUserId]: 'active' })
+    setOnlineStudyUsers([{
+      userId: currentUserId,
+      username: profileUsername.trim() || 'You',
+      avatarUrl: String(profileAvatarPreviewUrl || '').trim() || defaultAvatarUrl,
+      supporterTier: 'free',
+      lastActive: new Date().toISOString(),
+      presence: 'active',
+      isCurrentUser: true,
+    }])
+
+    try {
+      const { data } = await client.rpc('get_online_users_count', { minutes_interval: 10 })
+      const fallbackCount = Number(data || 0)
+      setOnlineUsersCount(Number.isFinite(fallbackCount) ? fallbackCount : 1)
+    } catch {
+      setOnlineUsersCount(1)
+    } finally {
+      setOnlineStudyUsersLoading(false)
+    }
+  }, [currentUserId, profileAvatarPreviewUrl, profileUsername])
+
+  const touchOnlineStudyActivity = useCallback(async () => {
+    const client = supabase
+    if (!client || !currentUserId) return
+    try {
+      await client.from('profiles').update({ last_active: new Date().toISOString() }).eq('user_id', currentUserId)
+    } catch { /* ignore */ }
+  }, [currentUserId])
+
+  // Track online users - update last_active and fetch active/away presence
+  useEffect(() => {
+    if (!supabase || !currentUserId) {
+      setOnlineUsersCount(0)
+      setOnlinePresenceByUserId({})
+      setOnlineStudyUsers([])
+      setOnlineStudyPanelOpen(false)
+      return
+    }
+
+    void touchOnlineStudyActivity()
     const interval = setInterval(() => {
-      updateLastActive()
-      fetchOnlinePresence()
+      void touchOnlineStudyActivity()
+      void loadOnlineStudyUsers()
     }, 30000)
-    fetchOnlinePresence()
+    void loadOnlineStudyUsers()
 
     return () => clearInterval(interval)
-  }, [currentUserId])
+  }, [currentUserId, loadOnlineStudyUsers, touchOnlineStudyActivity])
+
+  useEffect(() => {
+    if (!onlineStudyPanelOpen) return
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (onlineStudyPanelRef.current?.contains(target)) return
+      setOnlineStudyPanelOpen(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOnlineStudyPanelOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onlineStudyPanelOpen])
+
+  useEffect(() => {
+    if (!onlineStudyPanelOpen) return
+
+    const restoreSidebarScroll = () => {
+      const sidebar = onlineStudyPanelRef.current?.closest('.left-taskbar')
+      if (sidebar instanceof HTMLElement) {
+        sidebar.scrollTop = onlineStudySidebarScrollTopRef.current
+      }
+      window.scrollTo(onlineStudyWindowScrollRef.current.left, onlineStudyWindowScrollRef.current.top)
+    }
+    const frame = window.requestAnimationFrame(() => {
+      restoreSidebarScroll()
+      window.requestAnimationFrame(restoreSidebarScroll)
+    })
+    const timeouts = [60, 180, 420, 760, 1100].map((delay) => window.setTimeout(restoreSidebarScroll, delay))
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      timeouts.forEach((timeout) => window.clearTimeout(timeout))
+    }
+  }, [onlineStudyPanelOpen, onlineStudyUsers.length, onlineStudyUsersLoading])
+
+  const handleOnlineStudyPanelToggle = () => {
+    const nextOpen = !onlineStudyPanelOpen
+    const sidebar = onlineStudyPanelRef.current?.closest('.left-taskbar')
+    if (nextOpen && sidebar instanceof HTMLElement) {
+      onlineStudySidebarScrollTopRef.current = sidebar.scrollTop
+      onlineStudyWindowScrollRef.current = { left: window.scrollX, top: window.scrollY }
+    }
+    setOnlineStudyPanelOpen(nextOpen)
+    if (nextOpen) {
+      void touchOnlineStudyActivity()
+      void loadOnlineStudyUsers({ showLoading: true })
+    }
+  }
 
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
@@ -4626,6 +4794,7 @@ function App() {
   const deployRefreshTimerRef = useRef<number | null>(null)
   const deployRefreshCountdownRef = useRef<number | null>(null)
   const deployRefreshReloadingRef = useRef(false)
+  const deployRefreshGameActiveRef = useRef(false)
   const previousXpSnapshotRef = useRef<{ userId: string; totalXp: number; level: number; capturedAt: number } | null>(null)
   const lastXpEligibleActivityAtRef = useRef(0)
   const xpGainTimerRef = useRef<number | null>(null)
@@ -4796,6 +4965,7 @@ function App() {
   const [scenarioStreak, setScenarioStreak] = useState(0)
   const [duelInviteJoinRoomId, setDuelInviteJoinRoomId] = useState<string | null>(null)
   const [duelInvitePreset, setDuelInvitePreset] = useState<DuelInvitePreset | null>(null)
+  const [duelMatchActive, setDuelMatchActive] = useState(false)
   const homeMatchingRotationIndexRef = useRef(0)
   const homeSpeedRotationIndexRef = useRef(0)
   const homeBlasterRotationIndexRef = useRef(0)
@@ -6696,11 +6866,32 @@ function App() {
       }
       setProfileHydrated(true)
 
-      const { data: stateRow } = await client
-        .from('app_state')
-        .select('performance,high_scores,best_streak,profile_details,updated_at')
-        .eq('user_id', currentUserId)
-        .maybeSingle()
+      let stateRow: Record<string, unknown> | null = null
+      let stateLookupError: { message?: string } | null = null
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const { data, error } = await client
+          .from('app_state')
+          .select('performance,high_scores,best_streak,profile_details,updated_at')
+          .eq('user_id', currentUserId)
+          .maybeSingle()
+
+        if (isStaleHydration()) return
+        if (!error) {
+          stateRow = (data as Record<string, unknown> | null) || null
+          stateLookupError = null
+          break
+        }
+
+        stateLookupError = error
+        console.warn(`[app_state] load attempt ${attempt + 1} failed:`, error.message || error)
+        if (attempt < 3) {
+          await new Promise((resolve) => window.setTimeout(resolve, 350 * (attempt + 1)))
+        }
+      }
+
+      if (stateLookupError) {
+        throw new Error(stateLookupError.message || 'Could not load saved progress.')
+      }
 
       if (isStaleHydration()) return
       const nextState = sanitizeState(
@@ -10077,9 +10268,21 @@ function App() {
   const isSupportPage = currentPath === '/support'
   const isProfilePage = currentPath === '/profile'
   const isStatsPage = currentPath === '/stats'
+  const deployRefreshGameActive = Boolean(
+    (matchRunning && !matchDone) ||
+    (speedRunning && !speedDone) ||
+    (blasterRunning && !blasterDone) ||
+    duelMatchActive ||
+    (studyTestSessionOpen && !studyTestSessionDone) ||
+    studyPracticeSessionState.active,
+  )
   useEffect(() => {
     currentPathRef.current = currentPath
   }, [currentPath])
+
+  useEffect(() => {
+    deployRefreshGameActiveRef.current = deployRefreshGameActive
+  }, [deployRefreshGameActive])
 
   useEffect(() => {
     if (import.meta.env.DEV || typeof window === 'undefined') return
@@ -10100,6 +10303,13 @@ function App() {
 
     const reloadToLatest = () => {
       if (deployRefreshReloadingRef.current) return
+      if (deployRefreshGameActiveRef.current) {
+        setDeployRefreshNotice((previous) => previous
+          ? { ...previous, pausedForGame: true, secondsRemaining: 0 }
+          : previous)
+        deployRefreshTimerRef.current = window.setTimeout(reloadToLatest, deployRefreshGameRetryMs)
+        return
+      }
       deployRefreshReloadingRef.current = true
       window.location.reload()
     }
@@ -10115,10 +10325,12 @@ function App() {
       const reloadAt = Date.now() + delayMs
       const displayBuildId = nextBuildId.slice(0, 12)
       const updateNotice = () => {
+        const pausedForGame = deployRefreshGameActiveRef.current
         setDeployRefreshNotice({
           buildId: displayBuildId,
           delayedForActivity,
-          secondsRemaining: Math.max(1, Math.ceil((reloadAt - Date.now()) / 1000)),
+          pausedForGame,
+          secondsRemaining: pausedForGame ? 0 : Math.max(1, Math.ceil((reloadAt - Date.now()) / 1000)),
         })
       }
 
@@ -11219,13 +11431,15 @@ function App() {
         className={`avatar-decoration-layer has-generated-art ${decoration.cssClass} ${decoration.animated ? 'is-animated' : ''}`}
         aria-label={decoration.title}
       >
-        <img
-          src={decorationAssetPath}
-          alt=""
-          className="avatar-decoration-image"
-          loading="lazy"
-          decoding="async"
-        />
+        <span className="avatar-decoration-art" aria-hidden>
+          <img
+            src={decorationAssetPath}
+            alt=""
+            className="avatar-decoration-image"
+            loading="lazy"
+            decoding="async"
+          />
+        </span>
         <span className="avatar-decoration-particle one" />
         <span className="avatar-decoration-particle two" />
       </span>
@@ -11274,6 +11488,7 @@ function App() {
     const value = String(rawValue || '').trim()
     return value.length > 0 ? value : defaultAvatarUrl
   }
+  const activeOnlineStudyUsers = onlineStudyUsers.filter((user) => user.presence === 'active')
   const handleAvatarImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget
     const stage = image.dataset.fallbackApplied || '0'
@@ -12639,12 +12854,25 @@ function App() {
           <span className="deploy-refresh-copy">
             <strong>New update ready</strong>
             <span>
-              Refreshing in {deployRefreshNotice.secondsRemaining}s
-              {deployRefreshNotice.delayedForActivity ? ' after giving this session a moment' : ''}.
+              {deployRefreshNotice.pausedForGame || deployRefreshGameActive
+                ? 'Waiting until your current game or match is over.'
+                : (
+                  <>
+                    Refreshing in {deployRefreshNotice.secondsRemaining}s
+                    {deployRefreshNotice.delayedForActivity ? ' after giving this session a moment' : ''}.
+                  </>
+                )}
             </span>
           </span>
-          <button type="button" className="secondary deploy-refresh-button" onClick={() => window.location.reload()}>
-            Update now
+          <button
+            type="button"
+            className="secondary deploy-refresh-button"
+            onClick={() => {
+              if (!deployRefreshNotice.pausedForGame && !deployRefreshGameActive) window.location.reload()
+            }}
+            disabled={deployRefreshNotice.pausedForGame || deployRefreshGameActive}
+          >
+            {deployRefreshNotice.pausedForGame || deployRefreshGameActive ? 'Waiting' : 'Update now'}
           </button>
         </div>
       ) : null}
@@ -12669,7 +12897,18 @@ function App() {
         </div>
       ) : null}
 
-      {authReady && currentUserId ? (
+      {authReady && currentUserId && !stateHydrated ? (
+        <div className="onboarding-overlay">
+          <div className="onboarding-card">
+            <p className="eyebrow">Welcome back</p>
+            <h1>LEO Study</h1>
+            <p className="muted">Loading your progress...</p>
+            {authError ? <p className="bad">{authError}</p> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {authReady && currentUserId && stateHydrated ? (
         <DuelInviteBanner
           currentUserId={currentUserId}
           onJoinRoom={(nextRoomId) => {
@@ -12923,7 +13162,7 @@ function App() {
         </div>
       ) : null}
 
-      {authReady && currentUserId ? (
+      {authReady && currentUserId && stateHydrated ? (
         <>
         {appBannerSettings.enabled && appBannerSettings.message ? (
           <section
@@ -13085,10 +13324,72 @@ function App() {
               </div>
             </div>
 
-            <div className="home-online-indicator taskbar-online-indicator">
-              <span className="online-dot"></span>
-              <span className="online-count">{onlineUsersCount}</span>
-              <span className="online-label">studying now</span>
+            <div className="taskbar-online-wrap" ref={onlineStudyPanelRef}>
+              <button
+                type="button"
+                className={`home-online-indicator taskbar-online-indicator ${onlineStudyPanelOpen ? 'is-open' : ''}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={handleOnlineStudyPanelToggle}
+                aria-expanded={onlineStudyPanelOpen}
+                aria-controls="online-study-panel"
+                aria-haspopup="dialog"
+              >
+                <span className="online-dot"></span>
+                <span className="online-count">{onlineUsersCount}</span>
+                <span className="online-label">studying now</span>
+              </button>
+
+              {onlineStudyPanelOpen ? (
+                <div id="online-study-panel" className="online-study-popover" role="dialog" aria-label="Studying now">
+                  <div className="online-study-popover-head">
+                    <div>
+                      <p className="eyebrow">Who's studying</p>
+                      <h3>{onlineUsersCount} online</h3>
+                    </div>
+                    <button
+                      type="button"
+                      className="secondary online-study-refresh"
+                      onClick={() => {
+                        void touchOnlineStudyActivity()
+                        void loadOnlineStudyUsers({ showLoading: true })
+                      }}
+                      disabled={onlineStudyUsersLoading}
+                    >
+                      {onlineStudyUsersLoading ? 'Refreshing' : 'Refresh'}
+                    </button>
+                  </div>
+
+                  {onlineStudyUsersError ? <p className="bad online-study-error">{onlineStudyUsersError}</p> : null}
+
+                  <div className="online-study-list">
+                    {activeOnlineStudyUsers.length === 0 ? (
+                      <p className="muted tiny online-study-empty">
+                        {onlineStudyUsersLoading ? 'Loading online users...' : 'No one is actively studying right now.'}
+                      </p>
+                    ) : (
+                      activeOnlineStudyUsers.map((user) => (
+                        <article key={`online-study-${user.userId}`} className="online-study-row">
+                          <img
+                            src={avatarFor(user.avatarUrl)}
+                            alt={user.username}
+                            className="online-study-avatar"
+                            loading="lazy"
+                            decoding="async"
+                            onError={handleAvatarImageError}
+                          />
+                          <div className="online-study-copy">
+                            <strong className={displayNameClass(user.supporterTier, true)}>
+                              {user.username}{user.isCurrentUser ? ' (you)' : ''}
+                            </strong>
+                            <span>{user.isCurrentUser ? 'You are online' : 'Active now'}</span>
+                          </div>
+                          <span className="online-study-status">Live</span>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {profile ? (
@@ -15488,6 +15789,7 @@ function App() {
                 invitePreset={duelInvitePreset}
                 onInvitePresetHandled={() => setDuelInvitePreset(null)}
                 onStudyActivity={() => markStudyActivity('duel')}
+                onActiveMatchChange={setDuelMatchActive}
                 onDuelPerformanceReward={awardDuelMilestoneXp}
                 sessionXpReward={renderSessionXpReward()}
               />
@@ -16140,7 +16442,16 @@ function App() {
                             disabled={!unlocked}
                           >
                             <span className="profile-decoration-preview avatar-decoration-wrap">
-                              <span className="profile-decoration-preview-face" aria-hidden />
+                              <span className="profile-decoration-preview-face" aria-hidden>
+                                <img
+                                  src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)}
+                                  alt=""
+                                  className="profile-decoration-preview-avatar"
+                                  loading="lazy"
+                                  decoding="async"
+                                  onError={handleAvatarImageError}
+                                />
+                              </span>
                               {renderDecorationLayer(previewDecoration)}
                             </span>
                             <span className="profile-decoration-copy">
@@ -17675,7 +17986,7 @@ function App() {
         </>
       ) : null}
 
-      {authReady && currentUserId && !isChatPage ? (
+      {authReady && currentUserId && stateHydrated && !isChatPage ? (
         <GlobalChatWidget
           currentUserId={currentUserId}
           currentUsername={profileDisplayName || 'You'}
@@ -17689,8 +18000,12 @@ function App() {
           onOpenProfile={(userId) => void openLeaderboardStyleProfileByUserId(userId)}
         />
       ) : null}
-      <SpeedInsights />
-      <Analytics />
+      {enableVercelTelemetry ? (
+        <>
+          <SpeedInsights />
+          <Analytics />
+        </>
+      ) : null}
     </div>
   )
 }

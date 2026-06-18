@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="LEO Study">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="56" x2="904" y2="968" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#173f91" />
+      <stop offset="0.48" stop-color="#061b4f" />
+      <stop offset="1" stop-color="#020b25" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="36%" r="60%">
+      <stop offset="0" stop-color="#4f86ff" stop-opacity="0.55" />
+      <stop offset="0.56" stop-color="#17407f" stop-opacity="0.12" />
+      <stop offset="1" stop-color="#020817" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="gold" x1="274" y1="180" x2="750" y2="790" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff1a6" />
+      <stop offset="0.36" stop-color="#f6c94d" />
+      <stop offset="1" stop-color="#c98316" />
+    </linearGradient>
+    <linearGradient id="page" x1="180" y1="686" x2="844" y2="800" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#eaf4ff" />
+      <stop offset="0.52" stop-color="#ffffff" />
+      <stop offset="1" stop-color="#d7e8ff" />
+    </linearGradient>
+    <filter id="softShadow" x="-16%" y="-16%" width="132%" height="132%">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#000718" flood-opacity="0.42" />
+    </filter>
+    <filter id="letterShadow" x="-8%" y="-12%" width="116%" height="124%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000817" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)" />
+  <rect width="1024" height="1024" fill="url(#glow)" />
+  <path
+    d="M62 116C62 82 89 55 123 55h778c34 0 61 27 61 61v792c0 34-27 61-61 61H123c-34 0-61-27-61-61V116Z"
+    fill="none"
+    stroke="#6ba3ff"
+    stroke-opacity="0.3"
+    stroke-width="24"
+  />
+
+  <g filter="url(#softShadow)">
+    <path
+      d="M512 105 610 317 842 289 699 475 842 661 610 633 512 845 414 633 182 661 325 475 182 289 414 317 512 105Z"
+      fill="url(#gold)"
+    />
+    <circle cx="512" cy="105" r="44" fill="#fff0a1" />
+    <circle cx="842" cy="289" r="40" fill="#f9d75b" />
+    <circle cx="842" cy="661" r="40" fill="#d99622" />
+    <circle cx="512" cy="845" r="40" fill="#d99622" />
+    <circle cx="182" cy="661" r="40" fill="#d99622" />
+    <circle cx="182" cy="289" r="40" fill="#f9d75b" />
+  </g>
+
+  <g filter="url(#softShadow)">
+    <path d="M144 691c128 6 248 28 368 86 120-58 240-80 368-86v72c-126 6-246 30-368 88-122-58-242-82-368-88v-72Z" fill="#56a1ff" />
+    <path d="M166 653c124 4 234 24 346 78 112-54 222-74 346-78l47 65c-145 4-269 27-393 85-124-58-248-81-393-85l47-65Z" fill="url(#page)" />
+    <path d="M512 731c-112-54-222-74-346-78l-47 65c145 4 269 27 393 85V731Z" fill="#f8fbff" />
+    <path d="M512 731c112-54 222-74 346-78l47 65c-145 4-269 27-393 85V731Z" fill="#ecf5ff" />
+    <path d="M150 732c122 7 240 30 362 87 122-57 240-80 362-87" fill="none" stroke="#0d2e68" stroke-width="24" stroke-linecap="round" opacity="0.5" />
+    <path d="M512 728v104" stroke="#1b55a6" stroke-width="20" stroke-linecap="round" />
+  </g>
+
+  <text
+    x="512"
+    y="594"
+    text-anchor="middle"
+    font-family="Inter, Arial, Helvetica, sans-serif"
+    font-size="315"
+    font-weight="950"
+    letter-spacing="-10"
+    fill="#ffffff"
+    stroke="#071942"
+    stroke-width="28"
+    paint-order="stroke"
+    filter="url(#letterShadow)"
+  >LEO</text>
+
+  <path d="M140 886h744" stroke="#2f7de1" stroke-width="22" stroke-linecap="round" opacity="0.72" />
+</svg>

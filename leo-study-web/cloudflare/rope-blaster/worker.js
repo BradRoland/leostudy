@@ -120,6 +120,8 @@ export class RopeBlasterRoom {
       powerupKey: clean(msg.powerupKey),
       powerupEffect: clean(msg.powerupEffect),
       disguiseCode: cleanDisplay(msg.disguiseCode),
+      targetIndex: Number.isFinite(Number(msg.targetIndex)) ? Math.max(0, Math.min(12, Math.round(Number(msg.targetIndex)))) : null,
+      targetLabel: cleanDisplay(msg.targetLabel),
     }))
   }
 

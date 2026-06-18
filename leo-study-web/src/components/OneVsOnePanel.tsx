@@ -1690,6 +1690,7 @@ export function OneVsOnePanel(props: {
   invitePreset?: 'rope-blaster' | 'bot-practice' | null
   onInvitePresetHandled?: () => void
   onStudyActivity?: () => void
+  onActiveMatchChange?: (active: boolean) => void
   onDuelPerformanceReward?: (result: {
     roomId: string
     gameType: DuelGameType
@@ -1710,6 +1711,7 @@ export function OneVsOnePanel(props: {
     invitePreset = null,
     onInvitePresetHandled,
     onStudyActivity,
+    onActiveMatchChange,
     onDuelPerformanceReward,
     sessionXpReward,
   } = props
@@ -5210,6 +5212,15 @@ export function OneVsOnePanel(props: {
       ? `${blasterMatchRemainingSeconds}s left`
       : `${blasterMatchRemainingSeconds}s`
   const botMatchInProgress = botMatch?.status === 'in_progress'
+  const duelMatchInProgress = Boolean(room?.status === 'in_progress' || botMatchInProgress)
+  useEffect(() => {
+    onActiveMatchChange?.(duelMatchInProgress)
+  }, [duelMatchInProgress, onActiveMatchChange])
+
+  useEffect(() => () => {
+    onActiveMatchChange?.(false)
+  }, [onActiveMatchChange])
+
   const botCurrentRound = botMatchInProgress ? botMatch.questionSet[botMatch.userRound - 1] : null
   const botGameLabel = botMatch ? duelGameTypeLabels[botMatch.gameType] : 'Bot Match'
   const botRoundTargets = botMatchInProgress && isBlasterRound(botCurrentRound)
