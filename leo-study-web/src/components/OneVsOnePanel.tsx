@@ -454,6 +454,7 @@ const duelBlasterDefaultOvertimeAfterSeconds = 45
 const duelBlasterSuddenDeathRopeMultiplier = 0.45
 const duelBlasterSuddenDeathMinimumRopeLimit = 260
 const duelBlasterMissPenalty = 85
+const connect4WinAnimationHoldMs = 1400
 const defaultRopeBlasterWorkerUrl = 'https://leo-rope-blaster.brad-e22.workers.dev'
 const ropeBlasterWorkerUrl = String(
   import.meta.env.VITE_ROPE_BLASTER_WORKER_URL ||
@@ -1801,6 +1802,8 @@ export function OneVsOnePanel(props: {
   const [botStarting, setBotStarting] = useState(false)
   const [botMatch, setBotMatch] = useState<DuelBotMatch | null>(null)
   const [connect4BotMatch, setConnect4BotMatch] = useState<Connect4BotMatch | null>(null)
+  const [connect4BotResultReadyMatchId, setConnect4BotResultReadyMatchId] = useState<string | null>(null)
+  const [connect4RoomResultReadyRoomId, setConnect4RoomResultReadyRoomId] = useState<string | null>(null)
   const [botStats, setBotStats] = useState<DuelBotStats>(() => readDuelBotStats(currentUserId))
   const [botSkillSnapshot, setBotSkillSnapshot] = useState<DuelBotSkillSnapshot>(() => parseDuelBotSkillSnapshot(null, null))
 
@@ -3318,6 +3321,24 @@ export function OneVsOnePanel(props: {
     : connect4State.winner === 'P2'
       ? getPlayerName(connect4PlayerTwo?.user_id || '', 'Player 2')
       : ''
+  const connect4BotShowingBoard = Boolean(
+    connect4BotMatch
+      && (
+        connect4BotMatch.status === 'in_progress'
+        || connect4BotResultReadyMatchId !== connect4BotMatch.id
+      ),
+  )
+  const connect4RoomShowingBoard = Boolean(
+    room?.game_type === 'connect4'
+      && (
+        room.status === 'in_progress'
+        || (room.status === 'completed' && connect4RoomResultReadyRoomId !== room.id)
+      ),
+  )
+  const connect4RoomShowingResults = Boolean(
+    room?.status === 'completed'
+      && (room.game_type !== 'connect4' || connect4RoomResultReadyRoomId === room.id)
+  )
   const syncingBeforeCountdown = serverStartRemainingMs > countdownSeconds * 1000
   const currentRoomStatus = room?.status
   const myPlayerFinishedMatch = Boolean(
@@ -3326,6 +3347,38 @@ export function OneVsOnePanel(props: {
     && room.status === 'in_progress'
     && myPlayer.current_round > room.rounds,
   )
+
+  useEffect(() => {
+    if (!connect4BotMatch) {
+      setConnect4BotResultReadyMatchId(null)
+      return
+    }
+    if (connect4BotMatch.status !== 'completed') {
+      setConnect4BotResultReadyMatchId((previousMatchId) => (
+        previousMatchId === connect4BotMatch.id ? null : previousMatchId
+      ))
+      return
+    }
+
+    setConnect4BotResultReadyMatchId(null)
+    const timer = window.setTimeout(() => {
+      setConnect4BotResultReadyMatchId(connect4BotMatch.id)
+    }, connect4WinAnimationHoldMs)
+    return () => window.clearTimeout(timer)
+  }, [connect4BotMatch])
+
+  useEffect(() => {
+    if (room?.game_type !== 'connect4' || room.status !== 'completed') {
+      setConnect4RoomResultReadyRoomId(null)
+      return
+    }
+
+    setConnect4RoomResultReadyRoomId(null)
+    const timer = window.setTimeout(() => {
+      setConnect4RoomResultReadyRoomId(room.id)
+    }, connect4WinAnimationHoldMs)
+    return () => window.clearTimeout(timer)
+  }, [room?.game_type, room?.id, room?.status])
 
   useEffect(() => {
     if (!roomId || !isSignedIn) return
@@ -6309,7 +6362,7 @@ export function OneVsOnePanel(props: {
           </div>
         </div>
       ) : connect4BotMatch ? (
-        connect4BotMatch.status === 'in_progress' ? (
+        connect4BotShowingBoard ? (
           <div className="connect4-session-overlay connect4-bot-overlay">
             <div className="connect4-session-shell">
               <div className="connect4-topbar">
@@ -6318,7 +6371,17 @@ export function OneVsOnePanel(props: {
                 </button>
                 <div className="connect4-title">
                   <span className="muted tiny">1v1 vs Bot · Connect 4</span>
-                  <strong>{connect4BotMatch.state.currentTurn === 'P1' ? 'Your move' : `${connect4BotMatch.botName} is thinking`}</strong>
+                  <strong>
+                    {connect4BotMatch.state.winner === 'P1'
+                      ? 'You connected four'
+                      : connect4BotMatch.state.winner === 'P2'
+                        ? `${connect4BotMatch.botName} connected four`
+                        : connect4BotMatch.state.draw
+                          ? 'Board filled: draw'
+                          : connect4BotMatch.state.currentTurn === 'P1'
+                            ? 'Your move'
+                            : `${connect4BotMatch.botName} is thinking`}
+                  </strong>
                   <span className="onevone-bot-note">{botDifficultyDisplay(connect4BotMatch.difficulty, connect4BotMatch.resolvedDifficulty)} · Bot blocks and wins when it can.</span>
                 </div>
                 <div className="connect4-move-count">
@@ -6392,9 +6455,13 @@ export function OneVsOnePanel(props: {
               </div>
 
               <p className="connect4-status muted" aria-live="polite">
-                {connect4BotMatch.state.currentTurn === 'P1'
-                  ? 'Choose a column to drop your disc.'
-                  : `${connect4BotMatch.botName} is choosing a column...`}
+                {connect4BotMatch.state.winner
+                  ? 'Showing the winning connection...'
+                  : connect4BotMatch.state.draw
+                    ? 'Showing the final board...'
+                    : connect4BotMatch.state.currentTurn === 'P1'
+                      ? 'Choose a column to drop your disc.'
+                      : `${connect4BotMatch.botName} is choosing a column...`}
               </p>
             </div>
           </div>
@@ -8474,7 +8541,7 @@ export function OneVsOnePanel(props: {
             </div>
           ) : null}
 
-          {room.status === 'in_progress' && room.game_type === 'connect4' ? (
+          {connect4RoomShowingBoard ? (
             <div className="connect4-session-overlay">
               <div className="connect4-session-shell">
                 <div className="connect4-topbar">
@@ -8603,7 +8670,7 @@ export function OneVsOnePanel(props: {
             </div>
           ) : null}
 
-          {room.status === 'completed' ? (
+          {connect4RoomShowingResults ? (
             <div className="onevone-result-overlay">
               <div className="card onevone-card onevone-result-shell">
                 {isSpectator && (
