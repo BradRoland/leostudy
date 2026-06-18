@@ -455,6 +455,7 @@ const duelBlasterSuddenDeathRopeMultiplier = 0.45
 const duelBlasterSuddenDeathMinimumRopeLimit = 260
 const duelBlasterMissPenalty = 85
 const connect4WinAnimationHoldMs = 1400
+const duelStartSyncMaxFutureMs = 12_000
 const defaultRopeBlasterWorkerUrl = 'https://leo-rope-blaster.brad-e22.workers.dev'
 const ropeBlasterWorkerUrl = String(
   import.meta.env.VITE_ROPE_BLASTER_WORKER_URL ||
@@ -3311,7 +3312,17 @@ export function OneVsOnePanel(props: {
     if (!room || room.status !== 'in_progress') return 0
     const startedAtMs = room.started_at ? Date.parse(room.started_at) : NaN
     if (!Number.isFinite(startedAtMs)) return 0
-    return Math.max(0, startedAtMs - hudNow)
+    const remainingMs = startedAtMs - hudNow
+    if (remainingMs > duelStartSyncMaxFutureMs) {
+      console.warn('Ignoring stale 1v1 start sync timestamp', {
+        roomId: room.id,
+        gameType: room.game_type,
+        startedAt: room.started_at,
+        remainingMs,
+      })
+      return 0
+    }
+    return Math.max(0, remainingMs)
   }, [hudNow, room])
   const countdownRemaining = useMemo(() => {
     if (serverStartRemainingMs <= 0) return 0
@@ -4894,7 +4905,7 @@ export function OneVsOnePanel(props: {
     const nextRoomId = state.room_id || roomId
     const switchingRooms = Boolean(nextRoomId && nextRoomId !== roomId)
     if (state.status === 'in_progress' && roomId) {
-      const nextStartedAt = state.started_at || new Date(Date.now() + 4000).toISOString()
+      const nextStartedAt = state.started_at || new Date(Date.now() + 2000).toISOString()
       setRoom((previous) => previous && previous.id === roomId
         ? {
           ...previous,
