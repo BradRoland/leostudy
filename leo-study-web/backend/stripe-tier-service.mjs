@@ -17,6 +17,67 @@ function paymentLinkId(value) {
   return parts[parts.length - 1] || ''
 }
 
+export function createTierResolver({ priceToTier = new Map(), amountToTier = new Map(), paymentLinkToTier = new Map(), retrieveSession }) {
+  async function resolveTierFromSession(session) {
+    const metadataTier = String(session.metadata?.tier || '').toLowerCase()
+    if (metadataTier === 'tier2' || metadataTier === 'tier5' || metadataTier === 'tier10') {
+      return metadataTier
+    }
+
+    const plinkId = paymentLinkId(session.payment_link)
+    if (plinkId && paymentLinkToTier.has(plinkId)) {
+      return paymentLinkToTier.get(plinkId)
+    }
+
+    const detailed = await retrieveSession(session.id)
+    const lineItems = detailed.line_items?.data || []
+    for (const lineItem of lineItems) {
+      const priceId = typeof lineItem.price === 'string' ? lineItem.price : lineItem.price?.id
+      if (priceId && priceToTier.has(priceId)) {
+        return priceToTier.get(priceId)
+      }
+
+      const unitAmount = Number(lineItem.price?.unit_amount || 0)
+      if (unitAmount && amountToTier.has(unitAmount)) {
+        return amountToTier.get(unitAmount)
+      }
+
+      const itemAmount = Number(lineItem.amount_subtotal || 0)
+      if (itemAmount && amountToTier.has(itemAmount)) {
+        return amountToTier.get(itemAmount)
+      }
+
+      const label = String(lineItem.description || lineItem.price?.nickname || '').toLowerCase()
+      if (label.includes('tier 10') || label.includes('$10') || label.includes('10 supporter')) return 'tier10'
+      if (label.includes('tier 5') || label.includes('$5') || label.includes('5 supporter')) return 'tier5'
+      if (label.includes('tier 2') || label.includes('$2') || label.includes('2 supporter')) return 'tier2'
+    }
+
+    const amountCandidates = [Number(session.amount_subtotal || 0), Number(session.amount_total || 0)]
+    for (const amount of amountCandidates) {
+      if (amountToTier.has(amount)) {
+        return amountToTier.get(amount)
+      }
+    }
+
+    console.warn('stripe webhook: tier resolution failed', {
+      sessionId: session.id,
+      paymentLink: session.payment_link || null,
+      amountSubtotal: session.amount_subtotal || null,
+      amountTotal: session.amount_total || null,
+      lineItems: lineItems.map((lineItem) => ({
+        priceId: typeof lineItem.price === 'string' ? lineItem.price : lineItem.price?.id || null,
+        unitAmount: lineItem.price?.unit_amount || null,
+        amountSubtotal: lineItem.amount_subtotal || null,
+        description: lineItem.description || lineItem.price?.nickname || null,
+      })),
+    })
+    return null
+  }
+
+  return { resolveTierFromSession }
+}
+
 export function createStripeTierService() {
   const stripeSecretKey = requireEnv('STRIPE_SECRET_KEY')
   const supabaseUrl = requireEnv('SUPABASE_URL', process.env.VITE_SUPABASE_URL || '')
@@ -62,65 +123,21 @@ export function createStripeTierService() {
     return null
   }
 
-  async function resolveTierFromSession(session) {
-    const metadataTier = String(session.metadata?.tier || '').toLowerCase()
-    if (metadataTier === 'tier2' || metadataTier === 'tier5' || metadataTier === 'tier10') {
-      return metadataTier
+  async function verifySupabaseServiceAccess() {
+    const { error } = await supabase.from('profiles').select('user_id').limit(1)
+    if (error) {
+      throw new Error(`Supabase service-role access check failed: ${error.message}`)
     }
-
-    const plinkId = paymentLinkId(session.payment_link)
-    if (plinkId && paymentLinkToTier.has(plinkId)) {
-      return paymentLinkToTier.get(plinkId)
-    }
-
-    const detailed = await stripe.checkout.sessions.retrieve(session.id, {
-      expand: ['line_items.data.price'],
-    })
-
-    const lineItems = detailed.line_items?.data || []
-    for (const lineItem of lineItems) {
-      const priceId = typeof lineItem.price === 'string' ? lineItem.price : lineItem.price?.id
-      if (priceId && priceToTier.has(priceId)) {
-        return priceToTier.get(priceId)
-      }
-
-      const unitAmount = Number(lineItem.price?.unit_amount || 0)
-      if (unitAmount && amountToTier.has(unitAmount)) {
-        return amountToTier.get(unitAmount)
-      }
-
-      const itemAmount = Number(lineItem.amount_subtotal || 0)
-      if (itemAmount && amountToTier.has(itemAmount)) {
-        return amountToTier.get(itemAmount)
-      }
-
-      const label = String(lineItem.description || lineItem.price?.nickname || '').toLowerCase()
-      if (label.includes('tier 10') || label.includes('$10') || label.includes('10 supporter')) return 'tier10'
-      if (label.includes('tier 5') || label.includes('$5') || label.includes('5 supporter')) return 'tier5'
-      if (label.includes('tier 2') || label.includes('$2') || label.includes('2 supporter')) return 'tier2'
-    }
-
-    const amountCandidates = [Number(session.amount_subtotal || 0), Number(session.amount_total || 0)]
-    for (const amount of amountCandidates) {
-      if (amountToTier.has(amount)) {
-        return amountToTier.get(amount)
-      }
-    }
-
-    console.warn('stripe webhook: tier resolution failed', {
-      sessionId: session.id,
-      paymentLink: session.payment_link || null,
-      amountSubtotal: session.amount_subtotal || null,
-      amountTotal: session.amount_total || null,
-      lineItems: lineItems.map((lineItem) => ({
-        priceId: typeof lineItem.price === 'string' ? lineItem.price : lineItem.price?.id || null,
-        unitAmount: lineItem.price?.unit_amount || null,
-        amountSubtotal: lineItem.amount_subtotal || null,
-        description: lineItem.description || lineItem.price?.nickname || null,
-      })),
-    })
-    return null
   }
+
+  const { resolveTierFromSession } = createTierResolver({
+    priceToTier,
+    amountToTier,
+    paymentLinkToTier,
+    retrieveSession: (sessionId) => stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['line_items.data.price'],
+    }),
+  })
 
   async function applyTierToUser(targetUserId, tier) {
     const { error } = await supabase.from('profiles').upsert(
@@ -169,6 +186,7 @@ export function createStripeTierService() {
     stripe,
     supabase,
     findUserByEmail,
+    verifySupabaseServiceAccess,
     applyTierToUser,
     applyTierFromCheckoutSession,
   }

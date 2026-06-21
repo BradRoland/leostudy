@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
+    "start": "node backend/coolify-server.mjs",
+    "start:coolify": "node backend/coolify-server.mjs",
     "stripe:webhook": "node backend/stripe-webhook.mjs",
     "owner:bootstrap": "node backend/bootstrap-owner.mjs",
     "content:sync": "node backend/sync-content-items.mjs",
@@ -12,6 +14,7 @@
     "pm2:webhook:start": "pm2 start ecosystem.config.cjs --only leo-stripe-webhook",
     "pm2:webhook:restart": "pm2 restart leo-stripe-webhook",
     "pm2:webhook:logs": "pm2 logs leo-stripe-webhook",
+    "test": "node --test src/**/*.test.ts backend/*.test.mjs",
     "build": "node scripts/write-build-version.mjs && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

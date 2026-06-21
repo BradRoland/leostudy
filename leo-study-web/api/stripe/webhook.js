@@ -34,7 +34,8 @@ export default async function handler(req, res) {
       return
     }
 
-    const { stripe, applyTierFromCheckoutSession } = createStripeTierService()
+    const { stripe, applyTierFromCheckoutSession, verifySupabaseServiceAccess } = createStripeTierService()
+    await verifySupabaseServiceAccess()
 
     let event
     try {

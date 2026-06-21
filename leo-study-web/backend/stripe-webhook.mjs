@@ -11,7 +11,15 @@ if (!stripeWebhookSecret || !process.env.STRIPE_SECRET_KEY || !process.env.SUPAB
   process.exit(1)
 }
 
-const { stripe, findUserByEmail, applyTierToUser, applyTierFromCheckoutSession } = createStripeTierService()
+const { stripe, findUserByEmail, applyTierToUser, applyTierFromCheckoutSession, verifySupabaseServiceAccess } = createStripeTierService()
+
+try {
+  await verifySupabaseServiceAccess()
+} catch (error) {
+  console.error(error.message)
+  console.error('Check that SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY point to the same Supabase backend used by the website.')
+  process.exit(1)
+}
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/health') {

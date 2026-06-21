@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.vercel
+.playwright-cli
+.tmp-post-*
+logs
+*.log
+.env
+.env.*
+!.env.example
+coverage

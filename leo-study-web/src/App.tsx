@@ -12,6 +12,7 @@ import { DuelInviteBanner } from './components/DuelInviteBanner'
 import { GlobalChatWidget } from './components/GlobalChatWidget'
 import { StudyGuidePage } from './components/StudyGuidePage'
 import { StudyPracticeTestPage } from './components/StudyPracticeTestPage'
+import { buildSupportCheckoutUrl } from './lib/stripeSupport'
 import './components/GlobalChatWidget.css'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
@@ -10120,9 +10121,7 @@ function App() {
       setAuthError(`Missing checkout link for ${tierLabel[tier]}. Add it in .env.`)
       return
     }
-    const url = new URL(checkoutUrl)
-    if (currentUserEmail) url.searchParams.set('prefilled_email', currentUserEmail)
-    if (currentUserId) url.searchParams.set('client_reference_id', currentUserId)
+    const url = buildSupportCheckoutUrl({ checkoutUrl, currentUserEmail, currentUserId })
     window.location.href = url.toString()
   }
 

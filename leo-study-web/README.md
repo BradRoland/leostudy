@@ -258,9 +258,39 @@ Production health check:
 https://YOUR_DOMAIN/api/health
 ```
 
-## Deploy on Your Own Hardware
+## Deploy on Coolify or Your Own Hardware
 
-A simple hardware deployment uses Vite build output behind a reverse proxy.
+Coolify should use the included `Dockerfile`. It builds the Vite app and runs `backend/coolify-server.mjs`, which serves the SPA and handles Stripe webhooks in the same container.
+
+Required production settings:
+
+```text
+PORT=80
+SUPABASE_URL=https://supabase.180.academy
+SUPABASE_SERVICE_ROLE_KEY=...
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
+VITE_SUPABASE_URL=https://supabase.180.academy
+VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=...
+VITE_AUTH_REDIRECT_BASE_URL=https://180.academy
+VITE_STRIPE_LINK_TIER2=...
+VITE_STRIPE_LINK_TIER5=...
+VITE_STRIPE_LINK_TIER10=...
+```
+
+Production health check:
+
+```text
+https://YOUR_DOMAIN/health
+```
+
+Stripe webhook endpoint:
+
+```text
+https://YOUR_DOMAIN/api/stripe/webhook
+```
+
+A simple static-only hardware deployment can still use Vite build output behind a reverse proxy, but Stripe webhooks must be run separately in that shape.
 
 ```bash
 npm ci
@@ -274,7 +304,7 @@ Recommended production shape:
 2. Terminate HTTPS at the proxy/tunnel.
 3. Set the Supabase Auth Site URL to `https://180.academy` and add `https://180.academy/auth/callback**` to redirect URLs.
 4. In Google Cloud OAuth, set the authorized redirect URI to `https://supabase.180.academy/auth/v1/callback` and the authorized JavaScript origin to `https://180.academy`.
-5. Run the Stripe webhook process separately if using Stripe:
+5. Run the Stripe webhook process separately if using the static-only preview server:
 
 ```bash
 npm run pm2:webhook:start
