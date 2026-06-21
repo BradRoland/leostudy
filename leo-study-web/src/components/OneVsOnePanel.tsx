@@ -1,6 +1,7 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type RealtimeChannel } from '@supabase/supabase-js'
 import { loadLocalContentBundle, type ContentBankItem } from '../content'
+import { getDuelBlasterMotionSpeedBounds, normalizeDuelBlasterVelocity } from '../lib/blasterMotion'
 import { applyConnect4Move, chooseConnect4BotMove, connect4Columns, connect4Rows, createConnect4State, findConnect4WinningCells, normalizeConnect4State, type Connect4Cell, type Connect4Coordinate, type Connect4Player, type Connect4State } from '../lib/connect4'
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
@@ -618,8 +619,6 @@ const blasterTargetAnchors = [
 const blasterFieldWallInsetPx = 28
 const blasterAsteroidMinHalfWidthPx = 30
 const blasterAsteroidMinHalfHeightPx = 22
-const blasterAsteroidMinSpeed = 0.022
-const blasterAsteroidMaxSpeed = 0.048
 const blasterAsteroidCollisionGapPx = 12
 const blasterAsteroidSeparationPasses = 4
 
@@ -5773,13 +5772,16 @@ export function OneVsOnePanel(props: {
 
     if (!blasterMotionRoomId || blasterMotionRoomStatus !== 'in_progress' || blasterMotionGameType !== 'blaster') return
     if (!blasterMotionCanStart) return
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     let stopped = false
     let previousTimestamp = 0
     let syncedRound = blasterMotionRoundRef.current
     let fieldWidth = 0
     let fieldHeight = 0
+    const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const speedBounds = getDuelBlasterMotionSpeedBounds(reducedMotion)
+    const minVelocity = speedBounds.minPixelsPerSecond / 1000
+    const maxVelocity = speedBounds.maxPixelsPerSecond / 1000
 
     const updateFieldSize = () => {
       const fieldElement = blasterFieldRef.current
@@ -5789,21 +5791,9 @@ export function OneVsOnePanel(props: {
     }
 
     const clampVelocity = (body: BlasterAsteroidBody) => {
-      const speed = Math.hypot(body.velocityX, body.velocityY)
-      if (!Number.isFinite(speed) || speed <= 0) {
-        body.velocityX = blasterAsteroidMinSpeed
-        body.velocityY = blasterAsteroidMinSpeed * 0.65
-        return
-      }
-      if (speed < blasterAsteroidMinSpeed) {
-        const multiplier = blasterAsteroidMinSpeed / speed
-        body.velocityX *= multiplier
-        body.velocityY *= multiplier
-      } else if (speed > blasterAsteroidMaxSpeed) {
-        const multiplier = blasterAsteroidMaxSpeed / speed
-        body.velocityX *= multiplier
-        body.velocityY *= multiplier
-      }
+      const velocity = normalizeDuelBlasterVelocity(body.velocityX, body.velocityY, reducedMotion)
+      body.velocityX = velocity.x
+      body.velocityY = velocity.y
     }
 
     const clampBodyToField = (body: BlasterAsteroidBody, safeWidth: number, safeHeight: number) => {
@@ -5837,16 +5827,16 @@ export function OneVsOnePanel(props: {
         rightBody.x += directionX * overlapX * 0.52
         const leftVelocityX = leftBody.velocityX
         const rightVelocityX = rightBody.velocityX
-        leftBody.velocityX = directionX > 0 ? -Math.abs(rightVelocityX || leftVelocityX || blasterAsteroidMinSpeed) : Math.abs(rightVelocityX || leftVelocityX || blasterAsteroidMinSpeed)
-        rightBody.velocityX = directionX > 0 ? Math.abs(leftVelocityX || rightVelocityX || blasterAsteroidMinSpeed) : -Math.abs(leftVelocityX || rightVelocityX || blasterAsteroidMinSpeed)
+        leftBody.velocityX = directionX > 0 ? -Math.abs(rightVelocityX || leftVelocityX || minVelocity) : Math.abs(rightVelocityX || leftVelocityX || minVelocity)
+        rightBody.velocityX = directionX > 0 ? Math.abs(leftVelocityX || rightVelocityX || minVelocity) : -Math.abs(leftVelocityX || rightVelocityX || minVelocity)
       } else {
         const directionY = distanceY >= 0 ? 1 : -1
         leftBody.y -= directionY * overlapY * 0.52
         rightBody.y += directionY * overlapY * 0.52
         const leftVelocityY = leftBody.velocityY
         const rightVelocityY = rightBody.velocityY
-        leftBody.velocityY = directionY > 0 ? -Math.abs(rightVelocityY || leftVelocityY || blasterAsteroidMinSpeed) : Math.abs(rightVelocityY || leftVelocityY || blasterAsteroidMinSpeed)
-        rightBody.velocityY = directionY > 0 ? Math.abs(leftVelocityY || rightVelocityY || blasterAsteroidMinSpeed) : -Math.abs(leftVelocityY || rightVelocityY || blasterAsteroidMinSpeed)
+        leftBody.velocityY = directionY > 0 ? -Math.abs(rightVelocityY || leftVelocityY || minVelocity) : Math.abs(rightVelocityY || leftVelocityY || minVelocity)
+        rightBody.velocityY = directionY > 0 ? Math.abs(leftVelocityY || rightVelocityY || minVelocity) : -Math.abs(leftVelocityY || rightVelocityY || minVelocity)
       }
 
       clampBodyToField(leftBody, safeWidth, safeHeight)
@@ -5898,7 +5888,7 @@ export function OneVsOnePanel(props: {
             : Math.max(minY, Math.min(maxY, anchoredY))
         : Math.max(minY, Math.min(maxY, anchoredY))
       const direction = ((seed % 360) * Math.PI) / 180
-      const speed = 0.025 + ((Math.floor(seed / 23) % 20) / 1000)
+      const speed = minVelocity + ((Math.floor(seed / 23) % 100) / 100) * (maxVelocity - minVelocity)
       const centerDeltaX = safeWidth / 2 - initialX
       const centerDeltaY = safeHeight / 2 - initialY
       const centerDistance = Math.hypot(centerDeltaX, centerDeltaY) || 1
