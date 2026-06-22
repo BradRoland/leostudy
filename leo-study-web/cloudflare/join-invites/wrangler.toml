@@ -1,0 +1,7 @@
+name = "leo-study-join-invites"
+main = "worker.js"
+compatibility_date = "2026-06-22"
+
+[[routes]]
+pattern = "join.180.academy"
+custom_domain = true

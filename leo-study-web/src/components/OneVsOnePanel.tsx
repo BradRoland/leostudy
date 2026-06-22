@@ -1023,8 +1023,8 @@ function describeDuelProfileCurrentActivity(activity: DuelProfileSnapshot['curre
   }
 }
 
-function duelLeaderboardCacheKey(userId: string, mode: DuelStatsMode) {
-  return `leo-study:duel-leaderboard:v${duelLeaderboardCacheVersion}:${userId}:${mode}`
+function duelLeaderboardCacheKey(userId: string, mode: DuelStatsMode, classId: string) {
+  return `leo-study:duel-leaderboard:v${duelLeaderboardCacheVersion}:${userId}:${classId || 'no-class'}:${mode}`
 }
 
 function parseDuelLeaderboardEntry(value: unknown): DuelStatsLeaderboardEntry | null {
@@ -1055,12 +1055,12 @@ function parseDuelLeaderboardEntry(value: unknown): DuelStatsLeaderboardEntry | 
   }
 }
 
-function readDuelLeaderboardCache(userId: string, mode: DuelStatsMode): DuelLeaderboardCacheSnapshot | null {
+function readDuelLeaderboardCache(userId: string, mode: DuelStatsMode, classId = ''): DuelLeaderboardCacheSnapshot | null {
   if (typeof window === 'undefined') return null
   const trimmedUserId = userId.trim()
   if (!trimmedUserId) return null
   try {
-    const raw = window.localStorage.getItem(duelLeaderboardCacheKey(trimmedUserId, mode))
+    const raw = window.localStorage.getItem(duelLeaderboardCacheKey(trimmedUserId, mode, classId.trim()))
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<DuelLeaderboardCacheSnapshot>
     if (!parsed || typeof parsed !== 'object') return null
@@ -1092,6 +1092,7 @@ function readDuelLeaderboardCache(userId: string, mode: DuelStatsMode): DuelLead
 function writeDuelLeaderboardCache(
   userId: string,
   mode: DuelStatsMode,
+  classId: string,
   snapshot: {
     wins: DuelStatsLeaderboardEntry[]
     streak: DuelStatsLeaderboardEntry[]
@@ -1109,7 +1110,7 @@ function writeDuelLeaderboardCache(
     my_stats: snapshot.myStats,
   }
   try {
-    window.localStorage.setItem(duelLeaderboardCacheKey(trimmedUserId, mode), JSON.stringify(payload))
+    window.localStorage.setItem(duelLeaderboardCacheKey(trimmedUserId, mode, classId.trim()), JSON.stringify(payload))
   } catch {
     // ignore storage write failures
   }
@@ -1746,6 +1747,7 @@ function mapDuelResultSnapshot(row: Record<string, unknown>): DuelRoomResultRow 
 export function OneVsOnePanel(props: {
   currentUserId: string
   currentUsername: string
+  activeClassId?: string | null
   isOwner?: boolean
   externalJoinRoomId?: string | null
   onExternalJoinHandled?: () => void
@@ -1769,6 +1771,7 @@ export function OneVsOnePanel(props: {
   const {
     currentUserId,
     currentUsername,
+    activeClassId = null,
     isOwner = false,
     externalJoinRoomId = null,
     onExternalJoinHandled,
@@ -1780,6 +1783,7 @@ export function OneVsOnePanel(props: {
     onDuelPerformanceReward,
     sessionXpReward,
   } = props
+  const activeDuelClassId = String(activeClassId || '').trim()
 
   const availableDuelGameTypeOptions = useMemo(
     () => duelGameTypeOptions.filter((option) => option.value !== 'connect4' || connect4Enabled),
@@ -1834,7 +1838,7 @@ export function OneVsOnePanel(props: {
   const [activityLog, setActivityLog] = useState<DuelRoomActivity[]>([])
   const [selectedQuizRounds, setSelectedQuizRounds] = useState(10)
   const [duelStatsMode, setDuelStatsMode] = useState<DuelStatsMode>('all')
-  const [initialDuelLeaderboardCache] = useState(() => readDuelLeaderboardCache(currentUserId, 'all'))
+  const [initialDuelLeaderboardCache] = useState(() => readDuelLeaderboardCache(currentUserId, 'all', activeDuelClassId))
   const [winsLeaderboard, setWinsLeaderboard] = useState<DuelStatsLeaderboardEntry[]>(() => initialDuelLeaderboardCache?.wins || [])
   const [streakLeaderboard, setStreakLeaderboard] = useState<DuelStatsLeaderboardEntry[]>(() => initialDuelLeaderboardCache?.streak || [])
   const [myDuelStats, setMyDuelStats] = useState<DuelStatsLeaderboardEntry | null>(() => initialDuelLeaderboardCache?.my_stats || null)
@@ -2033,7 +2037,7 @@ export function OneVsOnePanel(props: {
 
   useEffect(() => {
     if (!isSignedIn) return
-    const cached = readDuelLeaderboardCache(currentUserId, duelStatsMode)
+    const cached = readDuelLeaderboardCache(currentUserId, duelStatsMode, activeDuelClassId)
     if (!cached) {
       setWinsLeaderboard([])
       setStreakLeaderboard([])
@@ -2043,7 +2047,7 @@ export function OneVsOnePanel(props: {
     setWinsLeaderboard(cached.wins)
     setStreakLeaderboard(cached.streak)
     setMyDuelStats(cached.my_stats)
-  }, [currentUserId, duelStatsMode, isSignedIn])
+  }, [activeDuelClassId, currentUserId, duelStatsMode, isSignedIn])
 
   const loadPublicRooms = useCallback(async () => {
     if (!supabase || !isSignedIn) return
@@ -2090,8 +2094,17 @@ export function OneVsOnePanel(props: {
 
   const loadOnlineInviteUsers = useCallback(async () => {
     if (!supabase || !isSignedIn) return
+    if (!activeDuelClassId) {
+      setOnlineInviteUsers([])
+      setOnlineInviteLoading(false)
+      setError('Join a class before inviting classmates.')
+      return
+    }
     setOnlineInviteLoading(true)
-    const { data, error: rpcError } = await supabase.rpc('list_online_1v1_users', { p_minutes_interval: 5 })
+    const { data, error: rpcError } = await supabase.rpc('list_online_class_users', {
+      p_class_id: activeDuelClassId,
+      p_minutes_interval: 5,
+    })
     if (rpcError) {
       setOnlineInviteLoading(false)
       setError(rpcError.message || 'Could not load online users.')
@@ -2154,15 +2167,24 @@ export function OneVsOnePanel(props: {
       profileDecorationKey: detailsMap[user.user_id]?.profileDecorationKey || user.profileDecorationKey,
     })))
     setOnlineInviteLoading(false)
-  }, [isSignedIn])
+  }, [activeDuelClassId, isSignedIn])
 
   const loadDuelLeaderboards = useCallback(async () => {
     if (!supabase || !isSignedIn) return
+    if (!activeDuelClassId) {
+      setWinsLeaderboard([])
+      setStreakLeaderboard([])
+      setMyDuelStats(null)
+      setDuelProfileByUserId({})
+      duelProfileCacheRef.current = {}
+      return
+    }
     const requestId = ++duelLeaderboardRequestRef.current
     const { data, error: statsError } = await supabase
       .from('duel_player_stats')
       .select('user_id,game_type,wins,losses,matches_played,current_win_streak,best_win_streak')
       .eq('game_type', duelStatsMode)
+      .eq('class_id', activeDuelClassId)
       .order('wins', { ascending: false })
       .limit(200)
     if (statsError) {
@@ -2237,7 +2259,7 @@ export function OneVsOnePanel(props: {
       setMyDuelStats(null)
       setDuelProfileByUserId({})
       duelProfileCacheRef.current = {}
-      writeDuelLeaderboardCache(currentUserId, duelStatsMode, {
+      writeDuelLeaderboardCache(currentUserId, duelStatsMode, activeDuelClassId, {
         wins: [],
         streak: [],
         myStats: null,
@@ -2279,7 +2301,7 @@ export function OneVsOnePanel(props: {
       setWinsLeaderboard(quickWinsRows)
       setStreakLeaderboard(quickStreakRows)
       setMyDuelStats(quickMyStats)
-      writeDuelLeaderboardCache(currentUserId, duelStatsMode, {
+      writeDuelLeaderboardCache(currentUserId, duelStatsMode, activeDuelClassId, {
         wins: quickWinsRows,
         streak: quickStreakRows,
         myStats: quickMyStats,
@@ -2298,7 +2320,8 @@ export function OneVsOnePanel(props: {
       supabase
         .from('duel_player_stats')
         .select('user_id,game_type,wins,losses,matches_played,current_win_streak,best_win_streak')
-        .in('user_id', spotlightUserIds),
+        .in('user_id', spotlightUserIds)
+        .eq('class_id', activeDuelClassId),
       supabase
         .from('profiles')
         .select('user_id,username,avatar_path,supporter_tier')
@@ -2433,12 +2456,12 @@ export function OneVsOnePanel(props: {
     setWinsLeaderboard(enrichedWinsRows)
     setStreakLeaderboard(enrichedStreakRows)
     setMyDuelStats(enrichedMyStats)
-    writeDuelLeaderboardCache(currentUserId, duelStatsMode, {
+    writeDuelLeaderboardCache(currentUserId, duelStatsMode, activeDuelClassId, {
       wins: enrichedWinsRows,
       streak: enrichedStreakRows,
       myStats: enrichedMyStats,
     })
-  }, [currentUserId, duelStatsMode, isSignedIn])
+  }, [activeDuelClassId, currentUserId, duelStatsMode, isSignedIn])
 
   const loadBotSkillSnapshot = useCallback(async () => {
     if (!supabase || !isSignedIn || !currentUserId) {
@@ -4787,6 +4810,10 @@ export function OneVsOnePanel(props: {
 
   const sendInvite = async (targetUser: OnlineInviteUser) => {
     if (!supabase || !isSignedIn) return
+    if (!activeDuelClassId) {
+      setError('Join a class before inviting classmates.')
+      return
+    }
     if (inviteGameType === 'connect4' && !connect4Enabled) {
       setError('Connect 4 is disabled.')
       return
@@ -6782,7 +6809,7 @@ export function OneVsOnePanel(props: {
                   exitBotMatch()
                   openInviteModal()
                 }}>
-                  Invite a Friend
+                  Invite a Classmate
                 </button>
                 <button className="secondary" type="button" onClick={exitBotMatch}>
                   Exit
@@ -6798,7 +6825,7 @@ export function OneVsOnePanel(props: {
             <aside className="onevone-leaderboard-rail">
               <div className="card onevone-card onevone-rail-card">
 	                <div className="onevone-rail-head">
-	                  <h3>1v1 Leaderboard</h3>
+	                  <h3>Class 1v1 Leaderboard</h3>
 	                  <div className="segmented compact-segmented onevone-rail-mode">
                     <button
                       type="button"
@@ -6863,8 +6890,8 @@ export function OneVsOnePanel(props: {
 	                </div>
 
 	                <div className="onevone-rail-section">
-	                  <p className="muted tiny">Most Wins</p>
-	                  {winsLeaderboard.length === 0 ? <p className="muted tiny">No wins yet.</p> : (
+                  <p className="muted tiny">Most Class Wins</p>
+	                  {winsLeaderboard.length === 0 ? <p className="muted tiny">No class wins yet.</p> : (
                     <div className="onevone-rail-list">
                       {winsLeaderboard.map((entry, index) => (
                         <button
@@ -6931,7 +6958,7 @@ export function OneVsOnePanel(props: {
 
                 {myDuelStats ? (
                   <div className="onevone-my-summary">
-                    <p className="muted tiny">Your 1v1 Summary</p>
+                  <p className="muted tiny">Your Class 1v1 Summary</p>
                     <div className="onevone-my-summary-grid">
                       <span>Wins: <strong>{myDuelStats.wins}</strong></span>
                       <span>Matches: <strong>{myDuelStats.matches_played}</strong></span>
@@ -6975,8 +7002,8 @@ export function OneVsOnePanel(props: {
                     onClick={() => openInviteModal()}
                     disabled={loading || !supabase}
                   >
-                    <span>Invite a Friend</span>
-                    <small>Send a direct 1v1 invite to someone online now.</small>
+                    <span>Invite a Classmate</span>
+                    <small>Send a direct 1v1 invite to someone online in your class.</small>
                   </button>
                   <button
                     className="secondary onevone-invite-cta onevone-bot-cta"
@@ -7735,11 +7762,11 @@ export function OneVsOnePanel(props: {
           onClick={() => setShowInviteModal(false)}
         >
           <div className="card game-settings-modal onevone-invite-modal" onClick={(event) => event.stopPropagation()}>
-            <h3>Invite a Friend</h3>
+            <h3>Invite a Classmate</h3>
             <div className="onevone-invite-modal-body">
               <div className="onevone-online-list-wrap">
                 <div className="onevone-online-list-head">
-                  <p className="muted tiny">Online Now ({onlineInviteUsers.length})</p>
+                  <p className="muted tiny">Class Online Now ({onlineInviteUsers.length})</p>
                   <button className="secondary" type="button" onClick={() => void loadOnlineInviteUsers()} disabled={onlineInviteLoading}>
                     Refresh
                   </button>
@@ -7748,7 +7775,7 @@ export function OneVsOnePanel(props: {
                 <div className="onevone-online-list">
                   {onlineInviteUsers.length === 0 ? (
                     <p className="muted tiny onevone-online-empty">
-                      {onlineInviteLoading ? 'Loading online users…' : 'No one is online right now.'}
+                      {onlineInviteLoading ? 'Loading online classmates…' : 'No classmates are online right now.'}
                     </p>
                   ) : (
                     <>
@@ -7786,7 +7813,7 @@ export function OneVsOnePanel(props: {
 
               <div className="onevone-invite-settings">
                 <p className="muted tiny">
-                  Pick game settings, then send an invite to someone currently online.
+                  Pick game settings, then send an invite to someone currently online in your class.
                 </p>
                 <label className="game-control">
                   Game Mode

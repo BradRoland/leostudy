@@ -8,6 +8,7 @@ type PublicMessage = {
   user_id: string
   display_name: string
   agency: string | null
+  department_name?: string | null
   message: string
   created_at: string
   is_deleted: boolean
@@ -62,6 +63,8 @@ type Props = {
   currentUsername: string
   userAgency?: string
   isOwner?: boolean
+  classId?: string
+  canModerateClass?: boolean
   leaderboardFirstSpotCounts?: {
     allTime: Record<string, number>
     weekly: Record<string, number>
@@ -77,14 +80,22 @@ const RATE_LIMIT_MS = 2000
 const CHAT_CACHE_KEY = 'leo_global_chat_cache_v1'
 const CHAT_CACHE_TTL_MS = 5 * 60 * 1000
 
-let hotMessageCache: PublicMessage[] = []
-let hotReactionCache: MessageReactionMap = {}
-let hotChatCacheAt = 0
+type ChatCacheEntry = {
+  messages: PublicMessage[]
+  reactions: MessageReactionMap
+  at: number
+}
 
-function readChatCache() {
+let hotChatCacheByScope: Record<string, ChatCacheEntry> = {}
+
+function chatCacheScope(classId?: string) {
+  return classId ? `class:${classId}` : 'public'
+}
+
+function readChatCache(scope: string) {
   if (typeof window === 'undefined') return null
   try {
-    const raw = window.sessionStorage.getItem(CHAT_CACHE_KEY)
+    const raw = window.sessionStorage.getItem(`${CHAT_CACHE_KEY}:${scope}`)
     if (!raw) return null
     const parsed = JSON.parse(raw) as {
       at?: number
@@ -103,7 +114,7 @@ function readChatCache() {
   }
 }
 
-function writeChatCache(messages: PublicMessage[], reactions: MessageReactionMap) {
+function writeChatCache(scope: string, messages: PublicMessage[], reactions: MessageReactionMap) {
   if (typeof window === 'undefined') return
   try {
     const payload = {
@@ -111,7 +122,7 @@ function writeChatCache(messages: PublicMessage[], reactions: MessageReactionMap
       messages: messages.slice(-MAX_MESSAGES),
       reactions,
     }
-    window.sessionStorage.setItem(CHAT_CACHE_KEY, JSON.stringify(payload))
+    window.sessionStorage.setItem(`${CHAT_CACHE_KEY}:${scope}`, JSON.stringify(payload))
   } catch {
     // ignore cache write failures
   }
@@ -185,8 +196,15 @@ export function GlobalChatWidget({
   userLevels,
   onOpenProfile,
   mode = 'widget',
+  classId,
+  canModerateClass,
 }: Props) {
   const isFullMode = mode === 'full'
+  const messageTable = classId ? 'class_messages' : 'public_messages'
+  const reactionTable = classId ? 'class_message_reactions' : 'public_message_reactions'
+  const cacheScope = chatCacheScope(classId)
+  const reportTable = classId ? 'class_message_reports' : 'public_message_reports'
+  const canModerateMessages = Boolean(isOwner || canModerateClass)
   const [isOpen, setIsOpen] = useState(() => {
     if (isFullMode) return true
     if (typeof window === 'undefined') return false
@@ -320,17 +338,19 @@ export function GlobalChatWidget({
 
   useEffect(() => {
     if (!cacheHydratedRef.current) return
-    hotMessageCache = messages
-    hotReactionCache = messageReactions
-    hotChatCacheAt = Date.now()
-    writeChatCache(messages, messageReactions)
-  }, [messageReactions, messages])
+    hotChatCacheByScope[cacheScope] = {
+      messages,
+      reactions: messageReactions,
+      at: Date.now(),
+    }
+    writeChatCache(cacheScope, messages, messageReactions)
+  }, [cacheScope, messageReactions, messages])
 
   const loadReactionsForMessageIds = useCallback(async (messageIds: string[]) => {
     if (!supabaseClient) return {}
     if (messageIds.length === 0) return {}
     const { data, error } = await supabaseClient
-      .from('public_message_reactions')
+      .from(reactionTable)
       .select('id,message_id,user_id,emoji,created_at')
       .in('message_id', messageIds)
       .order('created_at', { ascending: false })
@@ -341,7 +361,7 @@ export function GlobalChatWidget({
       return null
     }
     return reactionsToMap(data as PublicMessageReaction[])
-  }, [supabaseClient])
+  }, [reactionTable, supabaseClient])
 
   const refreshVisibleReactions = useCallback(async (messageIdsOverride?: string[]) => {
     if (!supabaseClient) return
@@ -352,7 +372,11 @@ export function GlobalChatWidget({
       : messagesRef.current.map((message) => message.id))
     if (visibleMessageIds.length === 0) {
       setMessageReactions({})
-      hotReactionCache = {}
+      hotChatCacheByScope[cacheScope] = {
+        messages: messagesRef.current,
+        reactions: {},
+        at: Date.now(),
+      }
       return
     }
 
@@ -361,14 +385,17 @@ export function GlobalChatWidget({
       const reactionMap = await loadReactionsForMessageIds(visibleMessageIds)
       if (reactionMap) {
         setMessageReactions(reactionMap)
-        hotReactionCache = reactionMap
-        hotChatCacheAt = Date.now()
-        writeChatCache(messagesRef.current, reactionMap)
+        hotChatCacheByScope[cacheScope] = {
+          messages: messagesRef.current,
+          reactions: reactionMap,
+          at: Date.now(),
+        }
+        writeChatCache(cacheScope, messagesRef.current, reactionMap)
       }
     } finally {
       reactionSyncInFlightRef.current = false
     }
-  }, [loadReactionsForMessageIds, supabaseClient])
+  }, [cacheScope, loadReactionsForMessageIds, supabaseClient])
 
   useEffect(() => {
     if (!isFullMode) return
@@ -376,56 +403,68 @@ export function GlobalChatWidget({
   }, [isFullMode])
 
   useEffect(() => {
-    const isHotCacheFresh = hotMessageCache.length > 0 && Date.now() - hotChatCacheAt <= CHAT_CACHE_TTL_MS
-    if (isHotCacheFresh) {
-      setMessages(hotMessageCache)
-      messagesRef.current = hotMessageCache
-      setMessageReactions(hotReactionCache)
+    const hotCache = hotChatCacheByScope[cacheScope]
+    const isHotCacheFresh = Boolean(hotCache?.messages.length && Date.now() - hotCache.at <= CHAT_CACHE_TTL_MS)
+    if (isHotCacheFresh && hotCache) {
+      setMessages(hotCache.messages)
+      messagesRef.current = hotCache.messages
+      setMessageReactions(hotCache.reactions)
       cacheHydratedRef.current = true
       return
     }
 
-    const sessionCache = readChatCache()
+    const sessionCache = readChatCache(cacheScope)
     if (sessionCache && sessionCache.messages.length > 0) {
       setMessages(sessionCache.messages)
       messagesRef.current = sessionCache.messages
       setMessageReactions(sessionCache.reactions)
-      hotMessageCache = sessionCache.messages
-      hotReactionCache = sessionCache.reactions
-      hotChatCacheAt = sessionCache.at
+      hotChatCacheByScope[cacheScope] = {
+        messages: sessionCache.messages,
+        reactions: sessionCache.reactions,
+        at: sessionCache.at,
+      }
     }
     cacheHydratedRef.current = true
-  }, [])
+  }, [cacheScope])
 
   // Load initial messages once on mount
   useEffect(() => {
     if (!supabaseClient) return
 
     const loadMessages = async () => {
-      const { data } = await supabaseClient
-        .from('public_messages')
+      const query = supabaseClient
+        .from(messageTable)
         .select('*')
         .order('created_at', { ascending: false })
         .limit(MAX_MESSAGES)
+      if (classId) query.eq('class_id', classId)
+      const { data } = await query
       if (data) {
         const latestMessages = (data as PublicMessage[]).reverse()
         setMessages(latestMessages)
         messagesRef.current = latestMessages
-        hotMessageCache = latestMessages
-        hotChatCacheAt = Date.now()
+        hotChatCacheByScope[cacheScope] = {
+          messages: latestMessages,
+          reactions: hotChatCacheByScope[cacheScope]?.reactions || {},
+          at: Date.now(),
+        }
         const ids = latestMessages.map((message) => message.id)
         if (ids.length > 0) {
           await refreshVisibleReactions(ids)
         } else {
           setMessageReactions({})
-          hotReactionCache = {}
-          writeChatCache(latestMessages, {})
+          hotChatCacheByScope[cacheScope] = {
+            messages: latestMessages,
+            reactions: {},
+            at: Date.now(),
+          }
+          writeChatCache(cacheScope, latestMessages, {})
         }
       }
     }
 
     void loadMessages()
-  }, [refreshVisibleReactions, supabaseClient])
+  }, [cacheScope, classId, messageTable, refreshVisibleReactions, supabaseClient])
 
   // Keep isOpenRef in sync
   useEffect(() => {
@@ -447,11 +486,22 @@ export function GlobalChatWidget({
     if (!supabaseClient || subscribedRef.current) return
     subscribedRef.current = true
 
+    const messageFilter = classId ? `class_id=eq.${classId}` : undefined
+    const messageSubscription = messageFilter
+      ? { event: 'INSERT' as const, schema: 'public', table: messageTable, filter: messageFilter }
+      : { event: 'INSERT' as const, schema: 'public', table: messageTable }
+    const messageUpdateSubscription = messageFilter
+      ? { event: 'UPDATE' as const, schema: 'public', table: messageTable, filter: messageFilter }
+      : { event: 'UPDATE' as const, schema: 'public', table: messageTable }
+    const messageDeleteSubscription = messageFilter
+      ? { event: 'DELETE' as const, schema: 'public', table: messageTable, filter: messageFilter }
+      : { event: 'DELETE' as const, schema: 'public', table: messageTable }
+
     const channel = supabaseClient
-      .channel('public_chat')
+      .channel(classId ? `class_chat_${classId}` : 'public_chat')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'public_messages' },
+        messageSubscription,
         (payload) => {
           const newMessage = payload.new as PublicMessage
           setMessages((prev) => {
@@ -473,7 +523,7 @@ export function GlobalChatWidget({
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'public_messages' },
+        messageUpdateSubscription,
         (payload) => {
           const updatedMessage = payload.new as PublicMessage
           setMessages((prev) => prev.map((message) => (message.id === updatedMessage.id ? updatedMessage : message)))
@@ -481,7 +531,7 @@ export function GlobalChatWidget({
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'public_messages' },
+        messageDeleteSubscription,
         (payload) => {
           const deletedMessage = payload.old as PublicMessage
           setMessages((prev) => prev.filter((message) => message.id !== deletedMessage.id))
@@ -495,7 +545,7 @@ export function GlobalChatWidget({
       )
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'public_message_reactions' },
+        { event: 'INSERT', schema: 'public', table: reactionTable },
         (payload) => {
           const row = payload.new as PublicMessageReaction
           void ensureReactionUserNames([row.user_id])
@@ -507,7 +557,7 @@ export function GlobalChatWidget({
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'public_message_reactions' },
+        { event: 'DELETE', schema: 'public', table: reactionTable },
         (payload) => {
           const row = payload.old as PublicMessageReaction
           setMessageReactions((prev) => removeReactionFromMap(prev, row.message_id, row.emoji, row.user_id))
@@ -519,20 +569,23 @@ export function GlobalChatWidget({
       .subscribe(() => {})
 
     return () => {
+      subscribedRef.current = false
       supabaseClient.removeChannel(channel)
     }
-  }, [ensureReactionUserNames, refreshVisibleReactions, supabaseClient])
+  }, [classId, ensureReactionUserNames, messageTable, reactionTable, refreshVisibleReactions, supabaseClient])
 
   // Poll for new messages every 5 seconds (lightweight fallback)
   useEffect(() => {
     if (!supabaseClient) return
 
     const pollMessages = async () => {
-      const { data } = await supabaseClient
-        .from('public_messages')
+      const query = supabaseClient
+        .from(messageTable)
         .select('*')
         .order('created_at', { ascending: false })
         .limit(MAX_MESSAGES)
+      if (classId) query.eq('class_id', classId)
+      const { data } = await query
       if (data) {
         const latestMessages = (data as PublicMessage[]).reverse()
         const existingIds = new Set(messagesRef.current.map((message) => message.id))
@@ -540,8 +593,11 @@ export function GlobalChatWidget({
 
         setMessages(latestMessages)
         messagesRef.current = latestMessages
-        hotMessageCache = latestMessages
-        hotChatCacheAt = Date.now()
+        hotChatCacheByScope[cacheScope] = {
+          messages: latestMessages,
+          reactions: hotChatCacheByScope[cacheScope]?.reactions || {},
+          at: Date.now(),
+        }
         void refreshVisibleReactions(latestMessages.map((message) => message.id))
 
         // Update unread indicator from polling too
@@ -559,7 +615,7 @@ export function GlobalChatWidget({
 
     const interval = setInterval(pollMessages, 5000)
     return () => clearInterval(interval)
-  }, [refreshVisibleReactions, supabaseClient])
+  }, [cacheScope, classId, messageTable, refreshVisibleReactions, supabaseClient])
 
   // Extra reaction sync so users always see others' reactions quickly, even if realtime misses an event.
   useEffect(() => {
@@ -677,24 +733,29 @@ export function GlobalChatWidget({
     setInputValue('')
 
     try {
-      await supabaseClient.from('public_messages').insert({
+      await supabaseClient.from(messageTable).insert({
+        ...(classId ? { class_id: classId, department_name: userAgency || null } : { agency: userAgency || null }),
         user_id: currentUserId,
         display_name: currentUsername,
-        agency: userAgency || null,
         message: trimmed,
       })
       // Reload messages after sending
-      const { data } = await supabaseClient
-        .from('public_messages')
+      const query = supabaseClient
+        .from(messageTable)
         .select('*')
         .order('created_at', { ascending: false })
         .limit(MAX_MESSAGES)
+      if (classId) query.eq('class_id', classId)
+      const { data } = await query
       if (data) {
         const latestMessages = (data as PublicMessage[]).reverse()
         setMessages(latestMessages)
         messagesRef.current = latestMessages
-        hotMessageCache = latestMessages
-        hotChatCacheAt = Date.now()
+        hotChatCacheByScope[cacheScope] = {
+          messages: latestMessages,
+          reactions: hotChatCacheByScope[cacheScope]?.reactions || {},
+          at: Date.now(),
+        }
         void refreshVisibleReactions(latestMessages.map((message) => message.id))
         // Scroll to bottom after sending
         setTimeout(() => {
@@ -706,7 +767,7 @@ export function GlobalChatWidget({
     } finally {
       setSending(false)
     }
-  }, [inputValue, currentUserId, currentUsername, userAgency, supabaseClient, isAuthenticated, refreshVisibleReactions])
+  }, [classId, inputValue, currentUserId, currentUsername, messageTable, userAgency, supabaseClient, isAuthenticated, refreshVisibleReactions])
 
   const addEmojiToInput = useCallback((emoji: string) => {
     setInputValue((previous) => `${previous}${emoji}`)
@@ -788,7 +849,7 @@ export function GlobalChatWidget({
     try {
       if (hasReacted) {
         const { error } = await supabaseClient
-          .from('public_message_reactions')
+          .from(reactionTable)
           .delete()
           .eq('message_id', messageId)
           .eq('emoji', emoji)
@@ -796,7 +857,7 @@ export function GlobalChatWidget({
         if (error) throw error
       } else {
         const { error } = await supabaseClient
-          .from('public_message_reactions')
+          .from(reactionTable)
           .insert({
             message_id: messageId,
             user_id: currentUserId,
@@ -815,13 +876,13 @@ export function GlobalChatWidget({
         delete reactionActionGuardRef.current[guardKey]
       }, 360)
     }
-  }, [currentUserId, isAuthenticated, messageReactions, refreshVisibleReactions, supabaseClient])
+  }, [currentUserId, isAuthenticated, messageReactions, reactionTable, refreshVisibleReactions, supabaseClient])
 
   // Handle report
   const handleReport = useCallback(async (messageId: string) => {
     if (!supabaseClient || !reportReason.trim()) return
 
-    await supabaseClient.from('public_message_reports').insert({
+    await supabaseClient.from(reportTable).insert({
       message_id: messageId,
       reporter_user_id: currentUserId,
       reason: reportReason.trim(),
@@ -829,19 +890,27 @@ export function GlobalChatWidget({
 
     setReportModalOpen(null)
     setReportReason('')
-  }, [reportReason, currentUserId, supabaseClient])
+  }, [reportReason, currentUserId, reportTable, supabaseClient])
 
   // Handle delete
   const handleDelete = useCallback(async (messageId: string) => {
-    if (!supabaseClient || !isOwner) return
+    if (!supabaseClient || !canModerateMessages) return
 
-    await supabaseClient.from('public_messages').update({
+    if (classId) {
+      await supabaseClient.rpc('class_moderate_message', {
+        p_message_id: messageId,
+        p_action: 'delete',
+      })
+      return
+    }
+
+    await supabaseClient.from(messageTable).update({
       is_deleted: true,
       deleted_at: new Date().toISOString(),
       deleted_by: currentUserId,
       message: '[Message deleted]',
     }).eq('id', messageId)
-  }, [isOwner, currentUserId, supabaseClient])
+  }, [canModerateMessages, classId, currentUserId, messageTable, supabaseClient])
 
   // Fetch user profile stats
   const fetchUserProfile = useCallback(async (userId: string) => {
@@ -1038,7 +1107,7 @@ export function GlobalChatWidget({
                     {!isSystemMessage ? (
                       <span className={`global-chat-level ${messageLevel.haloClass}`}>Lv {messageLevel.level}</span>
                     ) : null}
-                    {msg.agency && <span className="global-chat-agency">{msg.agency}</span>}
+                    {(msg.agency || msg.department_name) && <span className="global-chat-agency">{msg.agency || msg.department_name}</span>}
                     <span className="global-chat-time">{formatTime(msg.created_at)}</span>
                   </div>
                   <p className="global-chat-text">{msg.message}</p>
@@ -1099,7 +1168,7 @@ export function GlobalChatWidget({
                       ⋯
                     </button>
                   )}
-                  {isOwner && !msg.is_deleted && (
+                  {canModerateMessages && !msg.is_deleted && (
                     <button className="global-chat-delete" onClick={() => handleDelete(msg.id)} aria-label="Delete message">
                       🗑
                     </button>

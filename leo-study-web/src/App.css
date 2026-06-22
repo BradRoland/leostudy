@@ -12826,6 +12826,20 @@ button.study-session-top-action-start:active:not(:disabled) {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.agency-code-panel {
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--panel-soft) 72%, transparent);
+  display: grid;
+  gap: 8px;
+}
+
+.agency-code-panel h4,
+.agency-code-panel p {
+  margin: 0;
+}
+
 .agency-settings-list {
   display: grid;
   gap: 8px;
@@ -18871,5 +18885,393 @@ textarea:focus-visible,
 
   .onevone-change-mode-modal {
     max-height: 92dvh;
+  }
+}
+.class-status-chip {
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  width: fit-content;
+}
+
+.class-status-chip-empty {
+  color: var(--muted);
+}
+
+.auth-class-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: -0.15rem;
+}
+
+.auth-class-request-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.3rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.auth-class-request-link:hover,
+.auth-class-request-link:focus-visible {
+  color: var(--text);
+}
+
+.auth-class-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 0.62);
+  backdrop-filter: blur(10px);
+  overflow-y: auto;
+}
+
+.auth-class-modal {
+  width: min(920px, 100%);
+  max-height: min(92vh, 900px);
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 8px;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--panel) 96%, black 4%);
+  box-shadow: 0 24px 90px rgb(0 0 0 / 0.34);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.auth-invite-modal {
+  width: min(520px, 100%);
+}
+
+.auth-class-modal-head {
+  display: flex;
+  gap: 1rem;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.auth-class-modal-head h2 {
+  margin: 0.15rem 0 0;
+}
+
+.class-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.class-page-embedded {
+  padding: 0;
+}
+
+.class-page .panel-block {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.class-flow-hero {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.class-flow-hero h1,
+.class-invite-modal h1 {
+  margin: 0;
+}
+
+.request-step-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.request-step-list span {
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.auth-pending-request-card {
+  display: grid;
+  gap: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 8px;
+  padding: 0.85rem;
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+}
+
+.auth-pending-request-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.auth-pending-request-meta {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.class-join-onboarding-overlay {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.class-join-flow {
+  width: min(100%, 460px);
+  align-items: center;
+}
+
+.class-join-card {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 8px;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--panel) 94%, black 4%);
+  box-shadow: 0 24px 90px rgb(0 0 0 / 0.32);
+  display: grid;
+  gap: 0.8rem;
+}
+
+.class-request-card {
+  width: min(100%, 620px);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 8px;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--panel) 94%, black 4%);
+  box-shadow: 0 24px 90px rgb(0 0 0 / 0.32);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.class-request-card .request-step-list {
+  grid-template-columns: 1fr;
+}
+
+.class-join-card h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
+  line-height: 1;
+}
+
+.class-request-card h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 4vw, 2.15rem);
+  line-height: 1;
+}
+
+.class-join-card label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.class-invite-card {
+  gap: 0.85rem;
+}
+
+.invite-summary {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: 8px;
+  padding: 0.7rem;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+
+.invite-summary strong {
+  font-size: 1rem;
+}
+
+.invite-summary span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.class-join-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.class-join-divider::before,
+.class-join-divider::after {
+  content: "";
+  height: 1px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.join-code-field input {
+  max-width: 160px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.class-join-request-class-link {
+  justify-self: center;
+}
+
+.class-invite-overlay {
+  display: grid;
+  place-items: center;
+  min-height: min(52vh, 460px);
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 16%, transparent), transparent 34%),
+    color-mix(in srgb, var(--panel) 76%, transparent);
+}
+
+.class-invite-modal {
+  width: min(100%, 520px);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 8px;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--panel) 94%, black 4%);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 0.24);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.85rem;
+}
+
+.class-card {
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 8px;
+  padding: 0.9rem;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  display: grid;
+  gap: 0.55rem;
+}
+
+.class-card-selected {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.class-card h3 {
+  margin: 0;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.join-request-box {
+  border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.department-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.department-chip-list span {
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: 999px;
+  padding: 0.22rem 0.55rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+}
+
+.department-entry-list {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+
+.department-entry-list h4 {
+  margin: 0;
+}
+
+.department-entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.department-entry-row .secondary {
+  min-height: 42px;
+}
+
+.settings-class-requests-card {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 720px) {
+  .request-step-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .class-invite-overlay {
+    min-height: auto;
+    padding: 0.75rem;
+  }
+
+  .auth-class-modal-head {
+    display: grid;
+  }
+
+  .department-entry-row {
+    grid-template-columns: 1fr;
   }
 }

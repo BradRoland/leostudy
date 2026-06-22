@@ -6,12 +6,27 @@ import { Analytics } from '@vercel/analytics/react'
 import './App.css'
 import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem, type ScenarioBankSubQuestion, type ScenarioTrainingSection } from './content'
 import { useOwner } from './hooks/useOwner'
+import { useClassWorkspace } from './hooks/useClassWorkspace'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { OneVsOnePanel } from './components/OneVsOnePanel'
 import { DuelInviteBanner } from './components/DuelInviteBanner'
 import { GlobalChatWidget } from './components/GlobalChatWidget'
+import { ClassWorkspacePages } from './components/ClassWorkspacePages'
 import { StudyGuidePage } from './components/StudyGuidePage'
 import { StudyPracticeTestPage } from './components/StudyPracticeTestPage'
+import {
+  addClassDepartment,
+  createClassJoinCode,
+  deleteClassDepartment,
+  loadClassDepartments,
+  notifyDiscordForClassRequest,
+  renameClassDepartment,
+  submitClassCreationRequest,
+  updateOwnClassDepartment,
+  type ClassCreationRequestInput,
+  type ClassDepartment,
+} from './lib/classApi'
+import { normalizeInviteCode } from './lib/classWorkspace'
 import { buildSupportCheckoutUrl } from './lib/stripeSupport'
 import './components/GlobalChatWidget.css'
 
@@ -597,6 +612,7 @@ type SettingsTab =
   | 'banner'
   | 'bug_report'
   | 'bug_inbox'
+  | 'class_requests'
 
 type AppBannerSettings = {
   enabled: boolean
@@ -914,6 +930,7 @@ const avatarBucket = (import.meta.env.VITE_SUPABASE_AVATAR_BUCKET || 'avatars').
 const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.svg`
 const defaultAvatarPngUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.png`
 const pendingProfileSetupKey = 'pending_profile_setup'
+const pendingClassSelectionKey = 'pending_class_selection'
 const pendingProfileUsernameKey = 'pending_profile_username'
 const pendingProfileEmailKey = 'pending_profile_email'
 const profileUsernameCachePrefix = 'leo_profile_username_'
@@ -942,7 +959,7 @@ const blasterMaxAsteroids = 5
 const blasterBaseLevelStep = 50
 const homeLeaderboardCardOrder: HomeLeaderboardCardKey[] = ['study_time', 'study_streak', 'matching', 'speed', 'blaster', 'mastered', 'duel_wins', 'duel_streak']
 const homeLeaderboardCardLabel: Record<HomeLeaderboardCardKey, string> = {
-  study_time: 'Most Study Time',
+  study_time: 'Class Study Time',
   study_streak: 'Best Study Streak',
   matching: 'Best Matching Score',
   speed: 'Best Speed Test Score',
@@ -952,7 +969,7 @@ const homeLeaderboardCardLabel: Record<HomeLeaderboardCardKey, string> = {
   duel_streak: '1v1 Streak Leaderboard',
 }
 const homeLeaderboardCardDescription: Record<HomeLeaderboardCardKey, string> = {
-  study_time: 'Top total study minutes',
+  study_time: 'Study time for this class only',
   study_streak: 'Longest active daily streak',
   matching: 'Highest matching game score',
   speed: 'Highest speed test score',
@@ -1178,6 +1195,94 @@ function normalizeRoutePath(path: string): string {
 const authCallbackPath = '/auth/callback'
 const canonicalAuthRedirectBaseUrl = 'https://180.academy'
 const authCallbackNextPathKey = 'auth_callback_next_path'
+const pendingClassRequestKey = 'pending_class_creation_request'
+const pendingClassRequestSubmitKey = 'pending_class_creation_submit_after_auth'
+const pendingInviteCodeKey = 'pending_class_invite_code'
+const fixedClassRequestAcademy = {
+  name: 'Police Academy 180',
+  city: '',
+  state: 'CA',
+}
+
+function formatClassWorkspaceLabel(classInfo: { academyName?: string | null; className?: string | null } | null | undefined) {
+  if (!classInfo) return ''
+  const rawAcademyName = String(classInfo.academyName || fixedClassRequestAcademy.name).trim()
+  const academyName = rawAcademyName.replace(/\s+\d+$/, '').trim() || rawAcademyName
+  const rawClassName = String(classInfo.className || '').trim()
+  const className = /^class\b/i.test(rawClassName) ? rawClassName : `Class ${rawClassName || '180'}`
+  return `${academyName} ${className}`.replace(/\s+/g, ' ').trim()
+}
+
+type AuthClassRequestDraft = {
+  className: string
+  startDate: string
+  endDate: string
+  departments: string[]
+  requesterDepartment: string
+  requesterNote: string
+}
+
+const emptyAuthClassRequestDraft: AuthClassRequestDraft = {
+  className: '',
+  startDate: '',
+  endDate: '',
+  departments: ['', '', ''],
+  requesterDepartment: '',
+  requesterNote: '',
+}
+
+function cleanClassDepartments(value: string[]) {
+  return value
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+function serializeClassRequestDraft(input: AuthClassRequestDraft): ClassCreationRequestInput {
+  return {
+    academyName: fixedClassRequestAcademy.name,
+    academyCity: fixedClassRequestAcademy.city,
+    academyState: fixedClassRequestAcademy.state,
+    className: input.className.trim(),
+    startDate: input.startDate,
+    endDate: input.endDate,
+    departments: cleanClassDepartments(input.departments),
+    requesterDepartment: input.requesterDepartment.trim(),
+    requesterNote: input.requesterNote.trim(),
+  }
+}
+
+function isClassRequestDraftReady(input: AuthClassRequestDraft) {
+  const payload = serializeClassRequestDraft(input)
+  return Boolean(payload.className && payload.departments.length > 0)
+}
+
+function readPendingClassRequestDraft(): ClassCreationRequestInput | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(pendingClassRequestKey)
+    if (!raw) return null
+    const payload = JSON.parse(raw) as ClassCreationRequestInput
+    const departments = Array.isArray(payload.departments) ? payload.departments.map((department) => String(department).trim()).filter(Boolean) : []
+    if (!payload.className || departments.length === 0) return null
+    return {
+      academyName: fixedClassRequestAcademy.name,
+      academyCity: fixedClassRequestAcademy.city,
+      academyState: fixedClassRequestAcademy.state,
+      className: String(payload.className || '').trim(),
+      startDate: payload.startDate || '',
+      endDate: payload.endDate || '',
+      departments,
+      requesterDepartment: String(payload.requesterDepartment || '').trim(),
+      requesterNote: String(payload.requesterNote || '').trim(),
+    }
+  } catch {
+    return null
+  }
+}
+
+function writePendingClassRequestDraft(payload: ClassCreationRequestInput) {
+  window.localStorage.setItem(pendingClassRequestKey, JSON.stringify(payload))
+}
 
 function getAuthRedirectBaseUrl() {
   const configured =
@@ -1206,6 +1311,30 @@ function buildAuthRedirectTo(nextPath = '/home') {
     }
   }
   return redirectUrl.toString()
+}
+
+function rememberAuthNextPath(nextPath: string) {
+  if (typeof window === 'undefined') return
+  const normalizedNextPath = normalizeRoutePath(nextPath)
+  if (!normalizedNextPath || normalizedNextPath === authCallbackPath || normalizedNextPath === '/signin' || normalizedNextPath === '/signup') return
+  try {
+    window.localStorage.setItem(authCallbackNextPathKey, normalizedNextPath)
+  } catch {
+    // Storage can be unavailable in hardened browser modes.
+  }
+}
+
+function takeAuthNextPath(fallback = '/home') {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const stored = window.localStorage.getItem(authCallbackNextPathKey) || ''
+    window.localStorage.removeItem(authCallbackNextPathKey)
+    const normalized = normalizeRoutePath(stored || fallback)
+    if (normalized === authCallbackPath || normalized === '/signin' || normalized === '/signup') return fallback
+    return normalized.startsWith('/') ? normalized : fallback
+  } catch {
+    return fallback
+  }
 }
 
 function getAuthCallbackNextPath(search: string) {
@@ -4475,6 +4604,7 @@ function App() {
   const onlineStudyPanelRef = useRef<HTMLDivElement | null>(null)
   const onlineStudySidebarScrollTopRef = useRef(0)
   const onlineStudyWindowScrollRef = useRef({ left: 0, top: 0 })
+
   const [studyFlashFilter, setStudyFlashFilter] = useState<CodeFilter>('all')
   const [studyTestFilter, setStudyTestFilter] = useState<CodeFilter>('all')
   const [studyTestWrongness, setStudyTestWrongness] = useState<StudyWrongness>('needs_work')
@@ -4521,19 +4651,45 @@ function App() {
   const [authRedirectPending, setAuthRedirectPending] = useState(() => hasAuthRedirectParams())
   const [currentUserId, setCurrentUserId] = useState<string>('')
   const [clockNowMs, setClockNowMs] = useState<number>(() => Date.now())
+  const {
+    memberships: classMemberships,
+    activeClass,
+    activeClassId,
+    canModerateActiveClass,
+    loading: classWorkspaceLoading,
+    refresh: refreshClassWorkspace,
+  } = useClassWorkspace(currentUserId || null)
+
+  useEffect(() => {
+    setOnlineUsersCount(0)
+    setOnlinePresenceByUserId({})
+    setOnlineStudyUsers([])
+    setOnlineStudyUsersError('')
+    setOnlineStudyPanelOpen(false)
+  }, [activeClassId])
   
   const loadOnlineStudyUsers = useCallback(async (options: { showLoading?: boolean } = {}) => {
     const client = supabase
     if (!client || !currentUserId) return
+    if (!activeClassId) {
+      setOnlineUsersCount(0)
+      setOnlinePresenceByUserId({})
+      setOnlineStudyUsers([])
+      setOnlineStudyPanelOpen(false)
+      return
+    }
     const activeThresholdMs = 10 * 60 * 1000
 
     if (options.showLoading) setOnlineStudyUsersLoading(true)
     setOnlineStudyUsersError('')
 
     try {
-      const { data, error } = await client.rpc('list_online_1v1_users', { p_minutes_interval: 60 })
+      const { data, error } = await client.rpc('list_online_class_users', {
+        p_class_id: activeClassId,
+        p_minutes_interval: 60,
+      })
       if (error) {
-        console.warn('[presence] online user list failed:', error)
+        console.warn('[presence] class online user list failed:', error)
         throw error
       }
       if (Array.isArray(data)) {
@@ -4593,7 +4749,7 @@ function App() {
         return
       }
     } catch {
-      setOnlineStudyUsersError('Could not load online users.')
+      setOnlineStudyUsersError('Could not load class online users.')
     }
 
     setOnlinePresenceByUserId({ [currentUserId]: 'active' })
@@ -4608,7 +4764,10 @@ function App() {
     }])
 
     try {
-      const { data } = await client.rpc('get_online_users_count', { minutes_interval: 10 })
+      const { data } = await client.rpc('get_online_class_users_count', {
+        p_class_id: activeClassId,
+        p_minutes_interval: 10,
+      })
       const fallbackCount = Number(data || 0)
       setOnlineUsersCount(Number.isFinite(fallbackCount) ? fallbackCount : 1)
     } catch {
@@ -4616,7 +4775,7 @@ function App() {
     } finally {
       setOnlineStudyUsersLoading(false)
     }
-  }, [currentUserId, profileAvatarPreviewUrl, profileUsername])
+  }, [activeClassId, currentUserId, profileAvatarPreviewUrl, profileUsername])
 
   const touchOnlineStudyActivity = useCallback(async () => {
     const client = supabase
@@ -4624,11 +4783,11 @@ function App() {
     try {
       await client.from('profiles').update({ last_active: new Date().toISOString() }).eq('user_id', currentUserId)
     } catch { /* ignore */ }
-  }, [currentUserId])
+  }, [activeClassId, currentUserId])
 
   // Track online users - update last_active and fetch active/away presence
   useEffect(() => {
-    if (!supabase || !currentUserId) {
+    if (!supabase || !currentUserId || !activeClassId) {
       setOnlineUsersCount(0)
       setOnlinePresenceByUserId({})
       setOnlineStudyUsers([])
@@ -4644,7 +4803,7 @@ function App() {
     void loadOnlineStudyUsers()
 
     return () => clearInterval(interval)
-  }, [currentUserId, loadOnlineStudyUsers, touchOnlineStudyActivity])
+  }, [activeClassId, currentUserId, loadOnlineStudyUsers, touchOnlineStudyActivity])
 
   useEffect(() => {
     if (!onlineStudyPanelOpen) return
@@ -4709,10 +4868,18 @@ function App() {
   const [currentUserProvider, setCurrentUserProvider] = useState('email')
   const [currentUserMetadata, setCurrentUserMetadata] = useState<AuthUserMetadata>({})
   const [authSessionVersion, setAuthSessionVersion] = useState(0)
+  const [authClassRequestOpen, setAuthClassRequestOpen] = useState(false)
+  const [authClassRequestDraft, setAuthClassRequestDraft] = useState<AuthClassRequestDraft>({ ...emptyAuthClassRequestDraft })
+  const [pendingSavedClassRequest, setPendingSavedClassRequest] = useState<ClassCreationRequestInput | null>(() => readPendingClassRequestDraft())
+  const [authInviteOpen, setAuthInviteOpen] = useState(false)
+  const [authInviteCode, setAuthInviteCode] = useState('')
+  const [pendingClassSubmission, setPendingClassSubmission] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileHydrated, setProfileHydrated] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile')
   const [agencyOptions, setAgencyOptions] = useState<string[]>(() => sanitizeAgencyOptions(fallbackAgencyOptions))
+  const [classAgencyOptions, setClassAgencyOptions] = useState<ClassDepartment[]>([])
+  const [classAgencyOptionsLoading, setClassAgencyOptionsLoading] = useState(false)
   const [agencySettingsId, setAgencySettingsId] = useState(appSettingsRowId)
   const [agencyNewName, setAgencyNewName] = useState('')
   const [agencyEditingOriginal, setAgencyEditingOriginal] = useState<string | null>(null)
@@ -4720,6 +4887,7 @@ function App() {
   const [agencySaving, setAgencySaving] = useState(false)
   const [agencyError, setAgencyError] = useState('')
   const [agencySuccess, setAgencySuccess] = useState('')
+  const [classJoinCode, setClassJoinCode] = useState('')
   const [appBannerSettings, setAppBannerSettings] = useState<AppBannerSettings>({ ...defaultAppBannerSettings })
   const [ownerBannerDraft, setOwnerBannerDraft] = useState<AppBannerSettings>({ ...defaultAppBannerSettings })
   const [ownerBannerSaving, setOwnerBannerSaving] = useState(false)
@@ -4850,7 +5018,7 @@ function App() {
 
   useEffect(() => {
     awardedAchievementKeysRef.current.clear()
-  }, [currentUserId])
+  }, [activeClassId, currentUserId])
 
   useEffect(() => {
     if (!supabase || !currentUserId) {
@@ -4862,12 +5030,13 @@ function App() {
     let cancelled = false
 
     const loadCurrentUserDuelStats = async () => {
-      const { data, error } = await client
+      const query = client
         .from('duel_player_stats')
         .select('wins,losses,current_win_streak')
         .eq('user_id', currentUserId)
         .eq('game_type', 'all')
-        .maybeSingle()
+      if (activeClassId) query.eq('class_id', activeClassId)
+      const { data, error } = await query.maybeSingle()
 
       if (cancelled) return
       setCurrentUserDuelStats(error || !data ? emptyDuelLevelStats() : sanitizeDuelLevelStats(data))
@@ -4883,6 +5052,7 @@ function App() {
         (payload) => {
           const row = (payload.new || payload.old || {}) as Record<string, unknown>
           if (String(row.game_type || '') !== 'all') return
+          if (activeClassId && String(row.class_id || '') !== activeClassId) return
           if (payload.eventType === 'DELETE') {
             setCurrentUserDuelStats(emptyDuelLevelStats())
             return
@@ -4897,7 +5067,7 @@ function App() {
       cancelled = true
       void client.removeChannel(channel)
     }
-  }, [currentUserId])
+  }, [activeClassId, currentUserId])
 
   const [quizDeck, setQuizDeck] = useState<QuizQuestion[]>([])
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(null)
@@ -5095,6 +5265,30 @@ function App() {
   const [quizFireWidth, setQuizFireWidth] = useState(0)
   const [scenarioFireWidth, setScenarioFireWidth] = useState(0)
   const { isOwner, loading: ownerLoading } = useOwner(currentUserId || null)
+  const canManageAgencySettings = isOwner || activeClass?.role === 'class_admin'
+  const profileAgencyOptions = useMemo(() => {
+    if (!activeClassId) return agencyOptions
+    const names = classAgencyOptions.map((department) => department.name.trim()).filter(Boolean)
+    return names.length > 0 ? names : []
+  }, [activeClassId, agencyOptions, classAgencyOptions])
+  const profileAgencySelectDisabled = Boolean(activeClassId && profileAgencyOptions.length === 0)
+
+  const refreshClassAgencyOptions = useCallback(async () => {
+    if (!activeClassId) {
+      setClassAgencyOptions([])
+      setClassAgencyOptionsLoading(false)
+      return
+    }
+    setClassAgencyOptionsLoading(true)
+    try {
+      setClassAgencyOptions(await loadClassDepartments(activeClassId))
+    } catch (error) {
+      console.warn('[classes] could not load class departments:', error)
+      setClassAgencyOptions([])
+    } finally {
+      setClassAgencyOptionsLoading(false)
+    }
+  }, [activeClassId])
 
   const markStudyActivity = useCallback((source: StudyActivitySource) => {
     studyActivityBySourceRef.current[source] = Date.now()
@@ -5217,6 +5411,28 @@ function App() {
       setAgencySuccess('')
       return
     }
+    if (activeClassId) {
+      if (!canManageAgencySettings) return
+      if (classAgencyOptions.some((agency) => agency.name.toLowerCase() === nextName.toLowerCase())) {
+        setAgencyError('Agency already exists in this class.')
+        setAgencySuccess('')
+        return
+      }
+      setAgencySaving(true)
+      setAgencyError('')
+      setAgencySuccess('')
+      try {
+        await addClassDepartment(activeClassId, nextName)
+        await refreshClassAgencyOptions()
+        setAgencyNewName('')
+        setAgencySuccess('Class agency added.')
+      } catch (error) {
+        setAgencyError(error instanceof Error ? error.message : 'Could not add class agency.')
+      } finally {
+        setAgencySaving(false)
+      }
+      return
+    }
     if (agencyOptions.some((agency) => agency.toLowerCase() === nextName.toLowerCase())) {
       setAgencyError('Agency already exists.')
       setAgencySuccess('')
@@ -5240,6 +5456,38 @@ function App() {
     if (!nextName) {
       setAgencyError('Agency name cannot be empty.')
       setAgencySuccess('')
+      return
+    }
+    if (activeClassId) {
+      if (!canManageAgencySettings) return
+      const editingDepartment = classAgencyOptions.find((department) => department.name === agencyEditingOriginal)
+      if (!editingDepartment) {
+        setAgencyError('Agency was not found in this class.')
+        setAgencySuccess('')
+        return
+      }
+      const duplicate = classAgencyOptions.some(
+        (department) => department.name.toLowerCase() === nextName.toLowerCase() && department.id !== editingDepartment.id,
+      )
+      if (duplicate) {
+        setAgencyError('Agency already exists in this class.')
+        setAgencySuccess('')
+        return
+      }
+      setAgencySaving(true)
+      setAgencyError('')
+      setAgencySuccess('')
+      try {
+        await renameClassDepartment(editingDepartment.id, nextName)
+        await refreshClassAgencyOptions()
+        setAgencyEditingOriginal(null)
+        setAgencyEditingValue('')
+        setAgencySuccess('Class agency updated.')
+      } catch (error) {
+        setAgencyError(error instanceof Error ? error.message : 'Could not update class agency.')
+      } finally {
+        setAgencySaving(false)
+      }
       return
     }
     const duplicate = agencyOptions.some(
@@ -5266,17 +5514,59 @@ function App() {
   }
 
   const deleteAgencyOption = async (agency: string) => {
-    if (agency === defaultAgency) {
+    if (!activeClassId && agency === defaultAgency) {
       setAgencyError(`"${defaultAgency}" cannot be deleted.`)
       setAgencySuccess('')
       return
     }
     if (!window.confirm(`Delete "${agency}"?`)) return
+    if (activeClassId) {
+      if (!canManageAgencySettings) return
+      const department = classAgencyOptions.find((entry) => entry.name === agency)
+      if (!department) {
+        setAgencyError('Agency was not found in this class.')
+        setAgencySuccess('')
+        return
+      }
+      setAgencySaving(true)
+      setAgencyError('')
+      setAgencySuccess('')
+      try {
+        await deleteClassDepartment(department.id)
+        await refreshClassAgencyOptions()
+        setAgencySuccess('Class agency deleted.')
+        if (agencyEditingOriginal === agency) {
+          setAgencyEditingOriginal(null)
+          setAgencyEditingValue('')
+        }
+      } catch (error) {
+        setAgencyError(error instanceof Error ? error.message : 'Could not delete class agency.')
+      } finally {
+        setAgencySaving(false)
+      }
+      return
+    }
     const filtered = agencyOptions.filter((entry) => entry !== agency)
     const saved = await persistAgencyOptions(filtered)
     if (saved && agencyEditingOriginal === agency) {
       setAgencyEditingOriginal(null)
       setAgencyEditingValue('')
+    }
+  }
+
+  const generateClassJoinCode = async () => {
+    if (!activeClassId || !canManageAgencySettings) return
+    setAgencySaving(true)
+    setAgencyError('')
+    setAgencySuccess('')
+    try {
+      const code = await createClassJoinCode(activeClassId)
+      setClassJoinCode(code)
+      setAgencySuccess('Class join code created.')
+    } catch (error) {
+      setAgencyError(error instanceof Error ? error.message : 'Could not create class join code.')
+    } finally {
+      setAgencySaving(false)
     }
   }
 
@@ -5598,19 +5888,34 @@ function App() {
   }, [currentUserId])
 
   useEffect(() => {
+    void refreshClassAgencyOptions()
+  }, [refreshClassAgencyOptions])
+
+  useEffect(() => {
     setProfileDetails((previous) => {
+      if (activeClassId) {
+        const membershipDepartment = activeClass?.departmentName?.trim() || ''
+        const classOptions = profileAgencyOptions
+        const normalized = classOptions.find((agency) => agency.toLowerCase() === previous.agency.toLowerCase())
+          || (membershipDepartment && classOptions.some((agency) => agency.toLowerCase() === membershipDepartment.toLowerCase()) ? membershipDepartment : '')
+          || classOptions[0]
+          || ''
+        if (!normalized || normalized === previous.agency) return previous
+        return { ...previous, agency: normalized }
+      }
       const normalized = normalizeAgency(previous.agency, agencyOptions)
       if (normalized === previous.agency) return previous
       return { ...previous, agency: normalized }
     })
-  }, [agencyOptions])
+  }, [activeClass?.departmentName, activeClassId, agencyOptions, profileAgencyOptions])
 
   useEffect(() => {
     if (isOwner) return
-    if (settingsTab === 'editor' || settingsTab === 'agencies' || settingsTab === 'banner' || settingsTab === 'bug_inbox') {
+    if (settingsTab === 'agencies' && canManageAgencySettings) return
+    if (settingsTab === 'editor' || settingsTab === 'agencies' || settingsTab === 'banner' || settingsTab === 'bug_inbox' || settingsTab === 'class_requests') {
       setSettingsTab('profile')
     }
-  }, [isOwner, settingsTab])
+  }, [canManageAgencySettings, isOwner, settingsTab])
 
   useEffect(() => {
     if (!isOwner || settingsTab !== 'bug_inbox') return
@@ -6036,20 +6341,59 @@ function App() {
     const refreshPromise = (async (): Promise<LeaderboardRefreshResult> => {
       const weeklyWindow = getCurrentWeeklyWindowMs(Date.now())
       const currentWeekStartIso = new Date(weeklyWindow.weekStartMs).toISOString()
+      const allTimeQuery = supabase
+        .from('leaderboard')
+        .select('id,user_id,game,score,round,created_at,match_duration,match_filter,class_id')
+        .order('score', { ascending: false })
+        .limit(300)
+      const weeklyQuery = supabase
+        .from('weekly_leaderboard')
+        .select('id,user_id,game,score,round,created_at,updated_at,match_duration,match_filter,week_start,class_id')
+        .eq('week_start', currentWeekStartIso)
+        .order('score', { ascending: false })
+        .limit(300)
+      if (activeClassId) {
+        allTimeQuery.eq('class_id', activeClassId)
+        weeklyQuery.eq('class_id', activeClassId)
+      }
 
-      const [{ data: allTimeRows, error: allTimeError }, { data: weeklyRows, error: weeklyError }] = await Promise.all([
-        supabase
-          .from('leaderboard')
-          .select('id,user_id,game,score,round,created_at,match_duration,match_filter')
-          .order('score', { ascending: false })
-          .limit(300),
-        supabase
-          .from('weekly_leaderboard')
-          .select('id,user_id,game,score,round,created_at,updated_at,match_duration,match_filter,week_start')
-          .eq('week_start', currentWeekStartIso)
-          .order('score', { ascending: false })
-          .limit(300),
+      const [allTimeResult, weeklyResult] = await Promise.all([
+        allTimeQuery,
+        weeklyQuery,
       ])
+      let allTimeRows = allTimeResult.data
+      let allTimeError = allTimeResult.error
+      let weeklyRows = weeklyResult.data
+      let weeklyError = weeklyResult.error
+
+      const isClass180Workspace = Boolean(activeClassId && /^class\s*180$/i.test(activeClass?.className || ''))
+      if (isClass180Workspace && !allTimeError && (allTimeRows || []).length === 0) {
+        const legacyAllTimeQuery = supabase
+          .from('leaderboard')
+          .select('id,user_id,game,score,round,created_at,match_duration,match_filter,class_id')
+          .is('class_id', null)
+          .order('score', { ascending: false })
+          .limit(300)
+        const legacyWeeklyQuery = supabase
+          .from('weekly_leaderboard')
+          .select('id,user_id,game,score,round,created_at,updated_at,match_duration,match_filter,week_start,class_id')
+          .eq('week_start', currentWeekStartIso)
+          .is('class_id', null)
+          .order('score', { ascending: false })
+          .limit(300)
+        const [legacyAllTimeResult, legacyWeeklyResult] = await Promise.all([
+          legacyAllTimeQuery,
+          legacyWeeklyQuery,
+        ])
+        if (!legacyAllTimeResult.error && legacyAllTimeResult.data) {
+          allTimeRows = legacyAllTimeResult.data
+          allTimeError = null
+        }
+        if (!legacyWeeklyResult.error && legacyWeeklyResult.data) {
+          weeklyRows = legacyWeeklyResult.data
+          weeklyError = null
+        }
+      }
 
       const weeklyTableMissing =
         Boolean(weeklyError) &&
@@ -6077,8 +6421,24 @@ function App() {
       const mostStudiedModeByUserId: Record<string, CodeFilter | null> = {}
       let duelStatsByUserId: Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>> = {}
       let ownerUserIds = new Set<string>()
+      let classDepartmentByUserId: Record<string, string> = {}
 
       if (userIds.length > 0) {
+        if (activeClassId) {
+          const { data: classDepartmentRows, error: classDepartmentError } = await supabase.rpc('list_class_member_departments', {
+            p_class_id: activeClassId,
+          })
+          if (!classDepartmentError) {
+            const rows = (classDepartmentRows || []) as Array<Record<string, unknown>>
+            classDepartmentByUserId = rows.reduce<Record<string, string>>((accumulator, entry) => {
+              const userId = String(entry.user_id || '')
+              const departmentName = String(entry.department_name || '').trim()
+              if (userId && departmentName) accumulator[userId] = departmentName
+              return accumulator
+            }, {})
+          }
+        }
+
         const { data: profiles } = await supabase
           .from('profiles')
           .select('user_id,username,avatar_path,supporter_tier,bio,agency')
@@ -6149,7 +6509,7 @@ function App() {
           detailsByUserId[userId] = {
             ...existing,
             bio: parsedDetails.bio || existing.bio,
-            agency: existing.agency && existing.agency !== defaultAgency ? existing.agency : parsedDetails.agency,
+            agency: classDepartmentByUserId[userId] || (existing.agency && existing.agency !== defaultAgency ? existing.agency : parsedDetails.agency),
             themeId: parsedDetails.themeId || existing.themeId,
             profileDecorationKey: parsedDetails.profileDecorationKey || existing.profileDecorationKey,
             nameStyle: parsedDetails.nameStyle,
@@ -6175,6 +6535,32 @@ function App() {
           mostStudiedModeByUserId[userId] = mostStudiedModeFromCounts(parsedDetails.studyModeCounts)
         }
 
+        if (activeClassId) {
+          for (const userId of userIds) {
+            const departmentName = classDepartmentByUserId[userId]
+            if (!departmentName) continue
+            const existing = detailsByUserId[userId] ?? {
+              bio: '',
+              agency: defaultAgency,
+              themeId: appThemePresets[0].id,
+              profileDecorationKey: 'auto',
+              nameStyle: { ...defaultNameStyle },
+              homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
+              studySeconds: 0,
+              studyDayStreak: 0,
+              bestStudyDayStreak: 0,
+              gamePlays: { ...defaultUserStats.gamePlays },
+              flashcardsReviewed: 0,
+              scenariosReviewed: 0,
+              achievementXp: 0,
+              studyModeCounts: { ...defaultUserStats.studyModeCounts },
+              masteredCodes: null,
+              currentActivity: null,
+            }
+            detailsByUserId[userId] = { ...existing, agency: departmentName }
+          }
+        }
+
         const uniqueFallbackMasteryUserIds = [...new Set(fallbackMasteryUserIds)]
         if (uniqueFallbackMasteryUserIds.length > 0) {
           const { data: fallbackRows } = await supabase
@@ -6198,11 +6584,13 @@ function App() {
           .in('user_id', userIds)
         ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
 
-        const { data: duelRows, error: duelError } = await supabase
+        const duelStatsQuery = supabase
           .from('duel_player_stats')
           .select('user_id,game_type,wins,losses,current_win_streak')
           .in('game_type', duelLeaderboardModeOrder)
           .in('user_id', userIds)
+        if (activeClassId) duelStatsQuery.eq('class_id', activeClassId)
+        const { data: duelRows, error: duelError } = await duelStatsQuery
         if (!duelError) {
           duelStatsByUserId = (duelRows || []).reduce<Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>>>((accumulator, entry) => {
             const userId = String(entry.user_id || '')
@@ -6231,7 +6619,7 @@ function App() {
               id: String(entry.id),
               userId,
               game: String(entry.game),
-              playerName: profilesByUserId[userId]?.username || 'Player',
+              playerName: profilesByUserId[userId]?.username || (userId === currentUserId ? profileUsername.trim() || 'You' : 'Classmate'),
               avatarUrl: profilesByUserId[userId]?.avatarUrl || defaultAvatarUrl,
               supporterTier: profilesByUserId[userId]?.supporterTier || 'free',
               profileDecorationKey: detailsByUserId[userId]?.profileDecorationKey || 'auto',
@@ -6300,7 +6688,35 @@ function App() {
         .limit(400)
       if (error || !states) return
 
-      const userIds = [...new Set(states.map((entry) => String(entry.user_id || '')))].filter(Boolean)
+      let classMemberIds: Set<string> | null = null
+      let classDepartmentByUserId: Record<string, string> = {}
+      const isClass180Workspace = Boolean(activeClassId && /^class\s*180$/i.test(activeClass?.className || ''))
+      if (activeClassId) {
+        const { data: membershipRows, error: membershipError } = await supabase.rpc('list_class_member_departments', {
+          p_class_id: activeClassId,
+        })
+        if (membershipError) {
+          console.warn('[classes] could not load class members for home:', membershipError.message)
+          classMemberIds = isClass180Workspace ? null : new Set([currentUserId])
+        } else {
+          const rows = (membershipRows || []) as Array<Record<string, unknown>>
+          const memberIds = rows.map((entry) => String(entry.user_id || '')).filter(Boolean)
+          classMemberIds = isClass180Workspace && memberIds.length === 0 ? null : new Set(memberIds)
+          classDepartmentByUserId = rows.reduce<Record<string, string>>((accumulator, entry) => {
+            const userId = String(entry.user_id || '')
+            const departmentName = String(entry.department_name || '').trim()
+            if (userId && departmentName) accumulator[userId] = departmentName
+            return accumulator
+          }, {})
+        }
+      }
+
+      const classScopedStates = states.filter((entry) => {
+        const userId = String(entry.user_id || '')
+        return Boolean(userId) && (!classMemberIds || classMemberIds.has(userId))
+      })
+      const userIds = [...new Set(classScopedStates.map((entry) => String(entry.user_id || '')))]
+        .filter(Boolean)
       let profileMap: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
       let duelStatsByUserId: Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>> = {}
       let ownerUserIds = new Set<string>()
@@ -6322,8 +6738,10 @@ function App() {
           .select('user_id,username,avatar_path,supporter_tier')
           .in('user_id', userIds)
         profileMap = (profiles || []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }>>((accumulator, entry) => {
+          const userId = String(entry.user_id || '')
+          const username = String(entry.username || '').trim() || (userId === currentUserId ? profileUsername.trim() || 'You' : 'Classmate')
           accumulator[String(entry.user_id)] = {
-            username: String(entry.username || 'Player'),
+            username,
             avatarUrl: toPublicAvatarUrl(String(entry.avatar_path || '')) || defaultAvatarUrl,
             supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String(entry.supporter_tier)) ? String(entry.supporter_tier) : 'free') as SupporterTier,
           }
@@ -6337,11 +6755,13 @@ function App() {
           .in('user_id', userIds)
         ownerUserIds = new Set((roleRows || []).map((entry) => String(entry.user_id || '')))
 
-        const { data: duelRows, error: duelError } = await supabase
+        const duelStatsQuery = supabase
           .from('duel_player_stats')
           .select('user_id,game_type,wins,losses,current_win_streak')
           .in('game_type', duelLeaderboardModeOrder)
           .in('user_id', userIds)
+        if (activeClassId) duelStatsQuery.eq('class_id', activeClassId)
+        const { data: duelRows, error: duelError } = await duelStatsQuery
         if (!duelError) {
           duelStatsByUserId = (duelRows || []).reduce<Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>>>((accumulator, entry) => {
             const userId = String(entry.user_id || '')
@@ -6361,11 +6781,14 @@ function App() {
       }
 
       const fallbackMasteryUserIds: string[] = []
-      for (const row of states) {
+      for (const row of classScopedStates) {
         const userId = String(row.user_id || '')
         if (!userId) continue
         const parsedDetails = parseLeaderboardProfileSnapshot((row as Record<string, unknown>).profile_details)
-        detailsByUserId[userId] = parsedDetails
+        detailsByUserId[userId] = {
+          ...parsedDetails,
+          agency: classDepartmentByUserId[userId] || parsedDetails.agency,
+        }
         if (parsedDetails.masteredCodes === null) {
           fallbackMasteryUserIds.push(userId)
         } else {
@@ -6408,7 +6831,7 @@ function App() {
         connect4: [],
       }
       let ownerRotationMs: number | null = null
-      for (const row of states) {
+      for (const row of classScopedStates) {
         const userId = String(row.user_id || '')
         if (!userId) continue
         const details = detailsByUserId[userId] || {
@@ -6432,7 +6855,7 @@ function App() {
         if (ownerRotationMs === null && ownerUserIds.has(userId)) {
           ownerRotationMs = details.homeLeaderboardRotationMs
         }
-        const profile = profileMap[userId] || { username: 'Player', avatarUrl: defaultAvatarUrl, supporterTier: 'free' as SupporterTier }
+        const profile = profileMap[userId] || { username: userId === currentUserId ? profileUsername.trim() || 'You' : 'Classmate', avatarUrl: defaultAvatarUrl, supporterTier: 'free' as SupporterTier }
         const masteredCount = masteredCodesByUserId[userId] || 0
         const studySeconds = details.studySeconds
         const studyDayStreak = details.studyDayStreak
@@ -6641,6 +7064,38 @@ function App() {
     refreshLeaderboardRef.current = refreshLeaderboard
     refreshHomeLeaderboardsRef.current = refreshHomeLeaderboards
   })
+
+  useEffect(() => {
+    leaderboardRefreshMetaRef.current = { lastAt: 0, promise: null }
+    homeLeaderboardRefreshMetaRef.current = { lastAt: 0, promise: null }
+    setLeaderboard([])
+    setWeeklyLeaderboard([])
+    leaderboardRef.current = []
+    weeklyLeaderboardRef.current = []
+    setHomeStudyTimeLeaders([])
+    setHomeStudyStreakLeaders([])
+    setHomeMostMasteredLeaders([])
+    setLevelProfilesByUserId({})
+    setHomeDuelWinsLeadersByMode({
+      all: [],
+      matching: [],
+      quiz: [],
+      blaster: [],
+      connect4: [],
+    })
+    setHomeDuelStreakLeadersByMode({
+      all: [],
+      matching: [],
+      quiz: [],
+      blaster: [],
+      connect4: [],
+    })
+    if (stateHydrated && currentUserId && activeClassId) {
+      void refreshLeaderboardRef.current({ force: true })
+      void refreshHomeLeaderboardsRef.current({ force: true })
+      void loadOnlineStudyUsers()
+    }
+  }, [activeClassId, currentUserId, loadOnlineStudyUsers, stateHydrated])
 
   useEffect(() => {
     if (!supabase) {
@@ -7253,7 +7708,7 @@ function App() {
       if (homeRefreshTimer !== null) window.clearTimeout(homeRefreshTimer)
       client.removeChannel(channel)
     }
-  }, [currentUserId])
+  }, [activeClassId, currentUserId])
 
   const filteredSections = useMemo(
     () => sections.filter((section) => section.codeSet === libraryFilter),
@@ -7546,6 +8001,7 @@ function App() {
       isWeeklyDepartmentLeader: Boolean(weeklyDepartmentKey && currentDepartmentKey && weeklyDepartmentKey === currentDepartmentKey),
     })
   }, [
+    activeClassId,
     allTimeFirstSpotCountsByUser,
     allTimeLeaderboardAppearanceCountsByUser,
     allTimeTopPerformer,
@@ -8372,6 +8828,7 @@ function App() {
       void supabase
         .from('game_attempt_history')
         .insert({
+          class_id: activeClassId || null,
           user_id: currentUserId,
           mode,
           track_key: trackKey,
@@ -8390,7 +8847,7 @@ function App() {
           }
         })
     }
-  }, [currentUserId])
+  }, [activeClassId, currentUserId])
 
   const syncWeeklyLeaderboardEntry = useCallback(async (options: {
     game: ScoreGameName
@@ -8400,7 +8857,10 @@ function App() {
     filter: CodeFilter
     attemptedAtMs?: number
   }) => {
-    if (!supabase || !currentUserId) return
+    if (!supabase || !currentUserId || !activeClassId) {
+      if (!activeClassId) setLeaderboardError('Choose or join a class before saving leaderboard scores.')
+      return
+    }
     const attemptedAtMs = options.attemptedAtMs ?? Date.now()
     const weeklyWindow = getCurrentWeeklyWindowMs(attemptedAtMs)
     const { error } = await supabase.rpc('upsert_weekly_leaderboard', {
@@ -8412,11 +8872,12 @@ function App() {
       p_score: options.score,
       p_round: options.round,
       p_attempted_at: new Date(attemptedAtMs).toISOString(),
+      p_class_id: activeClassId,
     })
     if (error) {
       console.error('Weekly leaderboard save failed:', error)
     }
-  }, [currentUserId])
+  }, [activeClassId, currentUserId])
 
   const getFocusTips = useCallback((filter: CodeFilter, mode: SessionMode) => {
     const prioritized = sections
@@ -8596,10 +9057,16 @@ function App() {
             e.matchFilter === sessionFilter,
         )
 
+        if (!activeClassId) {
+          setLeaderboardError('Choose or join a class before saving leaderboard scores.')
+          return
+        }
+
         if (isLeaderboardScoreImprovement(finalMatchScore, finalMatchRound, existingMatch)) {
           const { error: insertError } = await supabase
             .from('leaderboard')
             .upsert({
+              class_id: activeClassId,
               game: 'Matching',
               score: finalMatchScore,
               round: finalMatchRound,
@@ -8608,7 +9075,7 @@ function App() {
               match_filter: sessionFilter,
               created_at: new Date().toISOString(),
             }, {
-              onConflict: 'user_id,game,match_duration,match_filter',
+              onConflict: 'class_id,user_id,game,match_duration,match_filter',
               ignoreDuplicates: false,
             })
 
@@ -9081,10 +9548,16 @@ function App() {
             entry.matchFilter === sessionFilter,
         )
 
+        if (!activeClassId) {
+          setLeaderboardError('Choose or join a class before saving leaderboard scores.')
+          return
+        }
+
         if (isLeaderboardScoreImprovement(finalScore, finalCorrect, existing)) {
           const { error: insertError } = await supabase
             .from('leaderboard')
             .upsert({
+              class_id: activeClassId,
               game: 'Code Blaster',
               score: finalScore,
               round: finalCorrect,
@@ -9093,7 +9566,7 @@ function App() {
               match_filter: sessionFilter,
               created_at: new Date().toISOString(),
             }, {
-              onConflict: 'user_id,game,match_duration,match_filter',
+              onConflict: 'class_id,user_id,game,match_duration,match_filter',
               ignoreDuplicates: false,
             })
 
@@ -9573,10 +10046,16 @@ function App() {
                        e.matchFilter === sessionFilter
               )
               
+              if (!activeClassId) {
+                setLeaderboardError('Choose or join a class before saving leaderboard scores.')
+                return
+              }
+
               if (isLeaderboardScoreImprovement(finalSpeedScore, finalAnswered, existing)) {
                 const { error: insertError } = await supabase
                   .from('leaderboard')
                   .upsert({
+                    class_id: activeClassId,
                     game: 'Speed Test',
                     score: finalSpeedScore,
                     round: finalAnswered,
@@ -9585,7 +10064,7 @@ function App() {
                     match_filter: sessionFilter,
                     created_at: new Date().toISOString(),
                   }, {
-                    onConflict: 'user_id,game,match_duration,match_filter',
+                    onConflict: 'class_id,user_id,game,match_duration,match_filter',
                     ignoreDuplicates: false,
                   })
 
@@ -9803,6 +10282,35 @@ function App() {
     }
 
     if (data.user) {
+      const [
+        { data: pendingClassRequest },
+        { data: activeClassMembership },
+      ] = await Promise.all([
+        supabase
+          .from('class_creation_requests')
+          .select('id')
+          .eq('requester_user_id', data.user.id)
+          .eq('status', 'pending')
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('class_memberships')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle(),
+      ])
+
+      if (pendingClassRequest?.id && !activeClassMembership?.id) {
+        await supabase.auth.signOut()
+        setAuthError('Still pending approval from owner.')
+        setAuthLoading(false)
+        setRoutePath('/signin')
+        navigate('/signin', { replace: true })
+        return
+      }
+
       setAuthEmail(normalizedEmail)
       setCurrentUserId(data.user.id)
       setCurrentUserEmail(data.user.email || '')
@@ -9812,6 +10320,116 @@ function App() {
     }
 
     setAuthLoading(false)
+    navigate(takeAuthNextPath('/home'), { replace: true })
+  }
+
+  const submitAuthClassRequestDraft = async () => {
+    const payload = serializeClassRequestDraft(authClassRequestDraft)
+    if (!isClassRequestDraftReady(authClassRequestDraft)) {
+      setAuthError('Add the class number and at least one department.')
+      return
+    }
+
+    setAuthError('')
+    setAuthSuccess('')
+    if (!currentUserId) {
+      writePendingClassRequestDraft(payload)
+      setPendingSavedClassRequest(payload)
+      rememberAuthNextPath('/classes/join')
+      setAuthClassRequestOpen(false)
+      setAuthSuccess('')
+      navigate('/signup/class-request')
+      return
+    }
+
+    setAuthLoading(true)
+    try {
+      const requestId = await submitClassCreationRequest(payload)
+      await notifyDiscordForClassRequest(requestId)
+      window.localStorage.removeItem(pendingClassRequestKey)
+      setAuthClassRequestOpen(false)
+      setAuthClassRequestDraft({ ...emptyAuthClassRequestDraft })
+      setAuthSuccess('Class request sent to the owner.')
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not send class request.')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  const continueClassRequestAfterAuth = useCallback((payload: ClassCreationRequestInput) => {
+    writePendingClassRequestDraft(payload)
+    setPendingSavedClassRequest(payload)
+    window.localStorage.setItem(pendingClassRequestSubmitKey, '1')
+    setAuthClassRequestDraft({
+      className: payload.className,
+      startDate: payload.startDate,
+      endDate: payload.endDate,
+      departments: payload.departments.length > 0 ? payload.departments : [''],
+      requesterDepartment: payload.requesterDepartment,
+      requesterNote: payload.requesterNote,
+    })
+    setAuthSuccess('')
+    setAuthError('')
+    navigate('/signup/class-request')
+  }, [navigate])
+
+  const finishClassRequestPendingApproval = useCallback(async () => {
+    if (supabase) await supabase.auth.signOut()
+    setCurrentUserId('')
+    setCurrentUserEmail('')
+    setCurrentUserProvider('email')
+    setCurrentUserMetadata({})
+    setProfile(null)
+    setProfileHydrated(false)
+    setStateHydrated(false)
+    setForceProfileSetup(false)
+    setAuthSuccess('Your request was sent. You are not approved yet. Come back later.')
+    navigate('/signin', { replace: true })
+  }, [navigate])
+
+  const continueInviteAfterAuth = useCallback((code: string, authMode: 'signin' | 'signup') => {
+    const normalized = normalizeInviteCode(code)
+    if (!normalized) return
+    window.localStorage.setItem(pendingInviteCodeKey, normalized)
+    rememberAuthNextPath(`/invite/${normalized}`)
+    setAuthInviteOpen(false)
+    setAuthInviteCode(normalized)
+    setAuthError('')
+    setAuthSuccess('')
+    navigate(authMode === 'signin' ? '/signin' : '/signup')
+  }, [navigate])
+
+  const submitAuthInviteCode = async () => {
+    const normalized = authInviteCode.trim().toUpperCase()
+    if (!normalized) {
+      setAuthError('Enter an invite code.')
+      return
+    }
+
+    setAuthError('')
+    setAuthSuccess('')
+    if (!currentUserId) {
+      window.localStorage.setItem(pendingInviteCodeKey, normalized)
+      rememberAuthNextPath(`/invite/${normalized}`)
+      setAuthInviteOpen(false)
+      setAuthSuccess('Invite code saved. Create an account or sign in to finish joining.')
+      navigate('/signup')
+      return
+    }
+
+    setAuthLoading(true)
+    try {
+      setAuthInviteOpen(false)
+      setAuthInviteCode('')
+      window.localStorage.setItem(pendingInviteCodeKey, normalized)
+      rememberAuthNextPath(`/invite/${normalized}`)
+      navigate(`/invite/${normalized}`)
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not accept invite.')
+    } finally {
+      setAuthLoading(false)
+    }
   }
 
   const handleSignInEnterKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -9825,6 +10443,7 @@ function App() {
     if (!supabase) return
     const normalizedEmail = authEmail.trim().toLowerCase()
     const normalizedUsername = profileUsername.trim()
+    const pendingClassRequest = isClassRequestSignUpPage ? pendingSavedClassRequest || readPendingClassRequestDraft() : null
     if (authPassword !== authPasswordConfirm) {
       setAuthError('Passwords do not match.')
       return
@@ -9837,56 +10456,134 @@ function App() {
       setAuthError('Enter a username.')
       return
     }
+    if (pendingClassRequest?.departments?.length && !pendingClassRequest.requesterDepartment) {
+      setAuthError('Choose your department for the saved class request.')
+      return
+    }
     setAuthLoading(true)
     setAuthError('')
     setAuthSuccess('')
     window.localStorage.removeItem(pendingProfileSetupKey)
+    window.localStorage.removeItem(pendingClassRequestSubmitKey)
 
-    const { data, error } = await supabase.auth.signUp({
-      email: normalizedEmail,
-      password: authPassword,
-      options: {
-        data: {
-          username: normalizedUsername,
-          display_name: normalizedUsername,
-        },
-      },
+    const createResponse = await fetch('/api/auth/create-account', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: normalizedEmail,
+        password: authPassword,
+        username: normalizedUsername,
+      }),
     })
 
-    if (error) {
-      const message = error.message.toLowerCase()
+    if (!createResponse.ok) {
+      const payload = await createResponse.json().catch(() => null)
+      const rawMessage = String(payload?.error || 'Could not create account.')
+      const message = rawMessage.toLowerCase()
       if (message.includes('already registered') || message.includes('already exists')) {
         setAuthError('This email is already in use. If you used Google before, sign in with Google.')
       } else {
-        setAuthError(error.message)
+        setAuthError(rawMessage)
       }
       setAuthLoading(false)
       return
     }
 
-    const hasIdentity = Boolean(data?.user?.identities && data.user.identities.length > 0)
-    if (!hasIdentity) {
-      setAuthError('This email is already in use. If you used Google before, sign in with Google.')
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password: authPassword,
+    })
+
+    if (error) {
+      setAuthError(error.message)
       setAuthLoading(false)
       return
     }
 
-    window.localStorage.setItem(pendingProfileSetupKey, '1')
+    if (isClassRequestSignUpPage && pendingClassRequest && data.user) {
+      try {
+        const { error: profileCreateError } = await supabase
+          .from('profiles')
+          .upsert(
+            {
+              user_id: data.user.id,
+              username: normalizedUsername,
+              supporter_tier: 'free',
+              bio: '',
+              agency: defaultAgency,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id' },
+          )
+        if (profileCreateError) throw profileCreateError
+
+        const { error: stateCreateError } = await supabase
+          .from('app_state')
+          .upsert(
+            {
+              user_id: data.user.id,
+              performance: {},
+              high_scores: gameHighScoreSeed,
+              best_streak: 0,
+              profile_details: {
+                ...sanitizeState(null).profileDetails,
+                agency: defaultAgency,
+              },
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id' },
+          )
+        if (stateCreateError) throw stateCreateError
+
+        const requestId = await submitClassCreationRequest(pendingClassRequest)
+        await notifyDiscordForClassRequest(requestId)
+        window.localStorage.removeItem(pendingClassRequestKey)
+        window.localStorage.removeItem(pendingClassRequestSubmitKey)
+        setPendingSavedClassRequest(null)
+        setAuthClassRequestDraft({ ...emptyAuthClassRequestDraft })
+        await supabase.auth.signOut()
+        setCurrentUserId('')
+        setCurrentUserEmail('')
+        setCurrentUserProvider('email')
+        setCurrentUserMetadata({})
+        setProfile(null)
+        setProfileHydrated(false)
+        setStateHydrated(false)
+        setForceProfileSetup(false)
+        setAuthPassword('')
+        setAuthPasswordConfirm('')
+        setShowSignUpPassword(false)
+        setShowSignUpPasswordConfirm(false)
+        setAuthSuccess('Your request was sent. Come back in 24 hours to see your results.')
+        navigate('/signin', { replace: true })
+      } catch (classRequestError) {
+        setAuthError(classRequestError instanceof Error ? classRequestError.message : 'Could not send class request.')
+      } finally {
+        setAuthLoading(false)
+      }
+      return
+    }
+
+    window.localStorage.setItem(pendingClassSelectionKey, '1')
     window.localStorage.setItem(pendingProfileUsernameKey, normalizedUsername)
     window.localStorage.setItem(pendingProfileEmailKey, normalizedEmail)
     window.localStorage.setItem('pending_dev_notice', '1')
-    setForceProfileSetup(true)
+    setForceProfileSetup(false)
     setAuthEmail(normalizedEmail)
     setProfileUsername(normalizedUsername)
     if (data.user) {
+      setCurrentUserId(data.user.id)
+      setCurrentUserEmail(data.user.email || '')
+      setCurrentUserProvider(String(data.user.app_metadata?.provider || 'email'))
       setCurrentUserMetadata((data.user.user_metadata || {}) as AuthUserMetadata)
+      setAuthSessionVersion((version) => version + 1)
     }
-    setAuthSuccess('Account created. You can sign in now.')
+    setAuthSuccess('Account created.')
     setAuthPassword('')
     setAuthPasswordConfirm('')
     setShowSignUpPassword(false)
     setShowSignUpPasswordConfirm(false)
-    navigate('/signin', { replace: true })
+    navigate('/classes/join', { replace: true })
 
     setAuthLoading(false)
   }
@@ -9904,7 +10601,7 @@ function App() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: buildAuthRedirectTo('/home'),
+        redirectTo: buildAuthRedirectTo(isClassWorkspacePage ? currentPath : '/home'),
         queryParams: {
           prompt: 'select_account',
         },
@@ -9965,6 +10662,30 @@ function App() {
       avatarPath = fileName
     }
 
+    const selectedClassDepartment = activeClassId
+      ? classAgencyOptions.find((department) => department.name.toLowerCase() === profileDetails.agency.trim().toLowerCase()) || null
+      : null
+    const selectedAgencyName = activeClassId
+      ? selectedClassDepartment?.name || ''
+      : normalizeAgency(profileDetails.agency, agencyOptions)
+
+    if (activeClassId && !selectedClassDepartment) {
+      setAuthError('Choose an agency from your class list.')
+      setAuthLoading(false)
+      return
+    }
+
+    if (activeClassId && selectedClassDepartment) {
+      try {
+        await updateOwnClassDepartment(activeClassId, selectedClassDepartment.id)
+        await refreshClassWorkspace()
+      } catch (departmentError) {
+        setAuthError(departmentError instanceof Error ? departmentError.message : 'Could not update your class agency.')
+        setAuthLoading(false)
+        return
+      }
+    }
+
     const { data: savedProfileRow, error } = await supabase
       .from('profiles')
       .upsert(
@@ -9974,7 +10695,7 @@ function App() {
           avatar_path: avatarPath,
           supporter_tier: profile?.supporterTier || 'free',
           bio: profileDetails.bio,
-          agency: normalizeAgency(profileDetails.agency, agencyOptions),
+          agency: selectedAgencyName,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' },
@@ -10027,6 +10748,7 @@ function App() {
           best_streak: bestStreak,
           profile_details: {
             ...profileDetails,
+            agency: selectedAgencyName,
             algorithmSnapshot: buildAlgorithmSnapshot(sections, performance),
           },
           updated_at: new Date().toISOString(),
@@ -10324,6 +11046,7 @@ function App() {
   const currentPath = routePath
   const isSignInPage = currentPath === '/signin'
   const isSignUpPage = currentPath === '/signup'
+  const isClassRequestSignUpPage = currentPath === '/signup/class-request'
   const isAuthCallbackPage = currentPath === authCallbackPath
   const isHomePage = currentPath === '/home'
   const isStudyHubPage = currentPath === '/study'
@@ -10342,6 +11065,13 @@ function App() {
   const isLibraryPage = currentPath === '/library'
   const isLeaderboardsPage = currentPath === '/leaderboards'
   const isChatPage = currentPath === '/chat'
+  const isClassesPage = currentPath === '/classes'
+  const isClassesJoinPage = currentPath === '/classes/join'
+  const isClassesRequestPage = currentPath === '/classes/request'
+  const isClassesAdminPage = currentPath === '/classes/admin'
+  const isOwnerClassesPage = currentPath === '/owner/classes'
+  const isInvitePage = currentPath.startsWith('/invite/')
+  const isClassWorkspacePage = isClassesPage || isClassesJoinPage || isClassesRequestPage || isClassesAdminPage || isOwnerClassesPage || isInvitePage
   const isSupportPage = currentPath === '/support'
   const isProfilePage = currentPath === '/profile'
   const isStatsPage = currentPath === '/stats'
@@ -10487,6 +11217,7 @@ function App() {
     isLibraryPage ||
     isLeaderboardsPage ||
     isChatPage ||
+    isClassWorkspacePage ||
     isSupportPage ||
     isProfilePage ||
     isStatsPage
@@ -10513,6 +11244,77 @@ function App() {
     if (!authReady || !currentUserId || !isAuthCallbackPage) return
     goToPath(getAuthCallbackNextPath(location.search), { replace: true })
   }, [authReady, currentUserId, goToPath, isAuthCallbackPage, location.search])
+
+  useEffect(() => {
+    if (!authReady || !currentUserId || !activeClass) return
+    window.localStorage.removeItem(pendingClassSelectionKey)
+    if (typeof window !== 'undefined' && window.localStorage.getItem(pendingProfileSetupKey) === '1') return
+    if (!isClassesPage && !isClassesJoinPage) return
+    goToPath('/home', { replace: true })
+  }, [activeClass, authReady, currentUserId, goToPath, isClassesJoinPage, isClassesPage])
+
+  useEffect(() => {
+    if (!authReady || !currentUserId || classWorkspaceLoading || activeClass || isClassesJoinPage || isInvitePage || isClassesRequestPage) return
+    if (window.localStorage.getItem(pendingClassSelectionKey) !== '1') return
+    goToPath('/classes/join', { replace: true })
+  }, [activeClass, authReady, classWorkspaceLoading, currentUserId, goToPath, isClassesJoinPage, isClassesRequestPage, isInvitePage])
+
+  useEffect(() => {
+    if (!authReady || currentUserId || !isClassWorkspacePage) return
+    rememberAuthNextPath(currentPath)
+  }, [authReady, currentPath, currentUserId, isClassWorkspacePage])
+
+  useEffect(() => {
+    if (!authReady || !currentUserId || pendingClassSubmission) return
+    const pendingClassRequest = window.localStorage.getItem(pendingClassRequestKey)
+    const shouldSubmitClassRequest = window.localStorage.getItem(pendingClassRequestSubmitKey) === '1'
+    const pendingInviteCode = window.localStorage.getItem(pendingInviteCodeKey)
+    if ((!pendingClassRequest || !shouldSubmitClassRequest) && !pendingInviteCode) return
+
+    let cancelled = false
+    setPendingClassSubmission(true)
+    ;(async () => {
+      try {
+        if (pendingClassRequest && shouldSubmitClassRequest) {
+          const payload = JSON.parse(pendingClassRequest) as ClassCreationRequestInput
+          const requestId = await submitClassCreationRequest(payload)
+          await notifyDiscordForClassRequest(requestId)
+          window.localStorage.removeItem(pendingClassRequestKey)
+          window.localStorage.removeItem(pendingClassRequestSubmitKey)
+          if (!cancelled) {
+            setPendingSavedClassRequest(null)
+            await supabase?.auth.signOut()
+            setCurrentUserId('')
+            setCurrentUserEmail('')
+            setCurrentUserProvider('email')
+            setCurrentUserMetadata({})
+            setProfile(null)
+            setProfileHydrated(false)
+            setStateHydrated(false)
+            setForceProfileSetup(false)
+            setAuthSuccess('Your request was sent. You are not approved yet. Come back later.')
+            goToPath('/signin', { replace: true })
+            return
+          }
+        }
+
+        if (pendingInviteCode) {
+          window.localStorage.removeItem(pendingInviteCodeKey)
+          if (!cancelled) {
+            goToPath(`/invite/${pendingInviteCode}`, { replace: true })
+          }
+        }
+      } catch (error) {
+        if (!cancelled) setAuthError(error instanceof Error ? error.message : 'Could not finish the saved class action.')
+      } finally {
+        if (!cancelled) setPendingClassSubmission(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, currentUserId, goToPath, pendingClassSubmission])
 
   // Flashcard keyboard controls: Space to flip, Arrow keys to navigate
   useEffect(() => {
@@ -11010,6 +11812,12 @@ function App() {
           ? 'Leaderboards'
           : isChatPage
             ? 'Chat'
+            : isOwnerClassesPage
+              ? 'Class Requests'
+              : isClassesAdminPage
+                ? 'Class Admin'
+                : isClassWorkspacePage
+                  ? 'Classes'
           : activeTab === 'study'
             ? 'Study'
             : activeTab === 'library'
@@ -11019,6 +11827,17 @@ function App() {
                 : activeTab === 'scenarios'
                   ? 'Scenarios'
                   : 'Home'
+  const classWorkspaceMode = isOwnerClassesPage
+    ? 'owner'
+    : isClassesAdminPage
+      ? 'admin'
+      : isClassesRequestPage
+        ? 'request'
+        : isInvitePage
+          ? 'invite'
+          : isClassesJoinPage
+            ? 'join'
+            : 'classes'
   const publicCurrentActivity = useMemo(() => {
     if (isGamesDuelPage) return { key: 'duel', label: 'In 1v1' }
     if (isGamesMatchingPage) return { key: 'matching', label: matchRunning && !matchDone ? 'Playing Matching' : 'In Matching Setup' }
@@ -12136,6 +12955,13 @@ function App() {
 
     if (!supabase) return
 
+    const profileDuelStatsQuery = supabase
+      .from('duel_player_stats')
+      .select('wins,losses,current_win_streak')
+      .eq('user_id', userId)
+      .eq('game_type', 'all')
+    if (activeClassId) profileDuelStatsQuery.eq('class_id', activeClassId)
+
     const [{ data: profileRow }, { data: stateRow }, { data: duelStats }, { data: ownerRows }] = await Promise.all([
       supabase
         .from('profiles')
@@ -12147,12 +12973,7 @@ function App() {
         .select('profile_details,high_scores,performance,best_streak')
         .eq('user_id', userId)
         .maybeSingle(),
-      supabase
-        .from('duel_player_stats')
-        .select('wins,losses,current_win_streak')
-        .eq('user_id', userId)
-        .eq('game_type', 'all')
-        .maybeSingle(),
+      profileDuelStatsQuery.maybeSingle(),
       supabase
         .from('user_roles')
         .select('user_id')
@@ -12919,6 +13740,13 @@ function App() {
     setActiveTab('scenarios')
     navigate('/scenarios')
   }
+  const pendingSignupClassDepartments = pendingSavedClassRequest?.departments || []
+  const updatePendingSavedClassRequestDepartment = (department: string) => {
+    if (!pendingSavedClassRequest) return
+    const nextRequest = { ...pendingSavedClassRequest, requesterDepartment: department }
+    writePendingClassRequestDraft(nextRequest)
+    setPendingSavedClassRequest(nextRequest)
+  }
 
   return (
     <div
@@ -13060,6 +13888,9 @@ function App() {
               Continue with Google
             </button>
             <p className="muted tiny">Need an account? <Link to="/signup">Create one</Link></p>
+            <div className="auth-class-actions">
+              <button type="button" className="auth-class-request-link" onClick={() => navigate('/classes/request')}>Request to add your class</button>
+            </div>
             {authError ? <p className="bad">{authError}</p> : null}
             {authSuccess ? <p className="good">{authSuccess}</p> : null}
           </form>
@@ -13150,7 +13981,16 @@ function App() {
               </div>
             </label>
             {authPasswordConfirm.length > 0 && authPassword !== authPasswordConfirm ? <p className="bad">Passwords do not match.</p> : null}
-            <button type="submit" className="primary" disabled={authLoading || profileUsername.trim().length < 1 || authPassword.length === 0 || authPassword !== authPasswordConfirm}>
+            <button
+              type="submit"
+              className="primary"
+              disabled={
+                authLoading ||
+                profileUsername.trim().length < 1 ||
+                authPassword.length === 0 ||
+                authPassword !== authPasswordConfirm
+              }
+            >
               Create Account
             </button>
             <button type="button" className="secondary" onClick={submitGoogle} disabled={authLoading}>
@@ -13165,8 +14005,251 @@ function App() {
               Continue with Google
             </button>
             <p className="muted tiny">Already have an account? <Link to="/signin">Sign in</Link></p>
+            <div className="auth-class-actions">
+              <button type="button" className="auth-class-request-link" onClick={() => navigate('/classes/request')}>Request to add your class</button>
+            </div>
             {authError ? <p className="bad">{authError}</p> : null}
             {authSuccess ? <p className="good">{authSuccess}</p> : null}
+          </form>
+        </div>
+      ) : null}
+
+      {authReady && !currentUserId && isClassRequestSignUpPage ? (
+        <div className="onboarding-overlay">
+          <form
+            className="onboarding-card"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void submitSignUp()
+            }}
+          >
+            <p className="eyebrow">Request a class</p>
+            <h1>Create request account</h1>
+            {pendingSavedClassRequest ? (
+              <div className="auth-pending-request-card">
+                <p className="eyebrow">Class request</p>
+                <h3>{pendingSavedClassRequest.className}</h3>
+                <div className="auth-pending-request-meta">
+                  <span>Academy: {pendingSavedClassRequest.academyName}</span>
+                  <span>Dates: {pendingSavedClassRequest.startDate || 'Not set'} to {pendingSavedClassRequest.endDate || 'Not set'}</span>
+                </div>
+                <label>
+                  Your department
+                  <select value={pendingSavedClassRequest.requesterDepartment} onChange={(event) => updatePendingSavedClassRequestDepartment(event.target.value)}>
+                    <option value="">Choose your department</option>
+                    {pendingSignupClassDepartments.map((department) => (
+                      <option key={`pending-class-request-signup-department-${department}`} value={department}>{department}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : (
+              <div className="auth-pending-request-card">
+                <p className="muted">No class request is saved yet.</p>
+                <button type="button" className="secondary" onClick={() => navigate('/classes/request')}>Start Class Request</button>
+              </div>
+            )}
+            <label>
+              Email
+              <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" />
+            </label>
+            <label>
+              Username
+              <input
+                value={profileUsername}
+                onChange={(event) => {
+                  setProfileUsername(event.target.value)
+                  if (authError.toLowerCase().includes('username')) setAuthError('')
+                }}
+                autoComplete="username"
+              />
+            </label>
+            <label>
+              Password
+              <div className="password-row">
+                <input
+                  type={showSignUpPassword ? 'text' : 'password'}
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  autoComplete="new-password"
+                />
+                <button type="button" className="password-eye" onClick={() => setShowSignUpPassword((value) => !value)} aria-label="Toggle password visibility">
+                  {showSignUpPassword ? (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M3 3l18 18" />
+                      <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
+                      <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
+                      <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </label>
+            <label>
+              Verify Password
+              <div className="password-row">
+                <input
+                  type={showSignUpPasswordConfirm ? 'text' : 'password'}
+                  value={authPasswordConfirm}
+                  onChange={(event) => setAuthPasswordConfirm(event.target.value)}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className="password-eye"
+                  onClick={() => setShowSignUpPasswordConfirm((value) => !value)}
+                  aria-label="Toggle verify password visibility"
+                >
+                  {showSignUpPasswordConfirm ? (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M3 3l18 18" />
+                      <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
+                      <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
+                      <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </label>
+            {authPasswordConfirm.length > 0 && authPassword !== authPasswordConfirm ? <p className="bad">Passwords do not match.</p> : null}
+            <button
+              type="submit"
+              className="primary"
+              disabled={
+                authLoading ||
+                !pendingSavedClassRequest ||
+                profileUsername.trim().length < 1 ||
+                authPassword.length === 0 ||
+                authPassword !== authPasswordConfirm ||
+                Boolean(pendingSavedClassRequest.departments.length && !pendingSavedClassRequest.requesterDepartment)
+              }
+            >
+              Create Account and Send Request
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              disabled={!pendingSavedClassRequest}
+              onClick={() => {
+                window.localStorage.setItem(pendingClassRequestSubmitKey, '1')
+                navigate('/signin')
+              }}
+            >
+              Sign In and Send Request
+            </button>
+            {authError ? <p className="bad">{authError}</p> : null}
+            {authSuccess ? <p className="good">{authSuccess}</p> : null}
+          </form>
+        </div>
+      ) : null}
+
+      {authReady && !currentUserId && (isClassesRequestPage || isInvitePage) ? (
+        <div className="class-join-onboarding-overlay">
+          <ClassWorkspacePages
+            mode={isInvitePage ? 'invite' : 'request'}
+            currentPath={currentPath}
+            memberships={[]}
+            activeClass={null}
+            isOwner={false}
+            currentUserId=""
+            onClassRequestNeedsAuth={continueClassRequestAfterAuth}
+            onInviteNeedsAuth={continueInviteAfterAuth}
+            onRefreshMemberships={refreshClassWorkspace}
+            embedded
+          />
+        </div>
+      ) : null}
+
+      {authReady && authClassRequestOpen ? (
+        <div className="auth-class-modal-overlay" onClick={() => setAuthClassRequestOpen(false)}>
+          <form
+            className="auth-class-modal"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={(event) => {
+              event.preventDefault()
+              void submitAuthClassRequestDraft()
+            }}
+          >
+            <div className="auth-class-modal-head">
+              <div>
+                <p className="eyebrow">Request a class</p>
+                <h2>Add your academy class</h2>
+                <p className="muted">Academy is fixed to Police Academy 180. Add the class number, dates, and each department in its own field.</p>
+              </div>
+              <button type="button" className="secondary" onClick={() => setAuthClassRequestOpen(false)}>Close</button>
+            </div>
+            <div className="request-step-list" aria-label="Class request steps">
+              <span>Step one: add your class number</span>
+              <span>Step two: add a start date and end date</span>
+              <span>Step three: add departments for owner review</span>
+            </div>
+            <div className="settings-grid">
+              <label>Class number/name<input value={authClassRequestDraft.className} onChange={(event) => setAuthClassRequestDraft((previous) => ({ ...previous, className: event.target.value }))} placeholder="Class 181" /></label>
+              <label>Start date<input type="date" value={authClassRequestDraft.startDate} onChange={(event) => setAuthClassRequestDraft((previous) => ({ ...previous, startDate: event.target.value }))} /></label>
+              <label>End date<input type="date" value={authClassRequestDraft.endDate} onChange={(event) => setAuthClassRequestDraft((previous) => ({ ...previous, endDate: event.target.value }))} /></label>
+            </div>
+            <div className="department-entry-list">
+              <div className="settings-inline-head">
+                <div>
+                  <h4>Departments in your class</h4>
+                  <p className="muted tiny">Put one department in each box.</p>
+                </div>
+                <button type="button" className="secondary" onClick={() => setAuthClassRequestDraft((previous) => ({ ...previous, departments: [...previous.departments, ''] }))}>Add Department</button>
+              </div>
+              {authClassRequestDraft.departments.map((department, index) => (
+                <div className="department-entry-row" key={`auth-department-${index}`}>
+                  <label>Department {index + 1}<input value={department} onChange={(event) => setAuthClassRequestDraft((previous) => {
+                    const departments = [...previous.departments]
+                    departments[index] = event.target.value
+                    return { ...previous, departments }
+                  })} placeholder="Fresno Police Department" /></label>
+                  <button type="button" className="secondary" disabled={authClassRequestDraft.departments.length <= 1} onClick={() => setAuthClassRequestDraft((previous) => ({ ...previous, departments: previous.departments.filter((_, departmentIndex) => departmentIndex !== index) }))}>Remove</button>
+                </div>
+              ))}
+            </div>
+            <label>Note to owner<textarea rows={4} value={authClassRequestDraft.requesterNote} onChange={(event) => setAuthClassRequestDraft((previous) => ({ ...previous, requesterNote: event.target.value }))} placeholder="Tell the owner who should manage the class and anything special about your academy." /></label>
+            <div className="button-row">
+              <button type="submit" className="primary" disabled={authLoading || !isClassRequestDraftReady(authClassRequestDraft)}>
+                {currentUserId ? 'Send Request' : 'Save Request and Continue'}
+              </button>
+              <button type="button" className="secondary" onClick={() => setAuthClassRequestDraft({ ...emptyAuthClassRequestDraft })}>Clear</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {authReady && authInviteOpen ? (
+        <div className="auth-class-modal-overlay" onClick={() => setAuthInviteOpen(false)}>
+          <form
+            className="auth-class-modal auth-invite-modal"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={(event) => {
+              event.preventDefault()
+              void submitAuthInviteCode()
+            }}
+          >
+            <div className="auth-class-modal-head">
+              <div>
+                <p className="eyebrow">Join with code</p>
+                <h2>Enter invite code</h2>
+                <p className="muted">Paste the code your class admin gave you. If you are not signed in yet, the code will be accepted after account creation or sign-in.</p>
+              </div>
+              <button type="button" className="secondary" onClick={() => setAuthInviteOpen(false)}>Close</button>
+            </div>
+            <label>Invite code<input value={authInviteCode} onChange={(event) => setAuthInviteCode(event.target.value.toUpperCase())} placeholder="PA181-X7KQ2" /></label>
+            <button type="submit" className="primary" disabled={authLoading || !authInviteCode.trim()}>
+              {currentUserId ? 'Accept Invite' : 'Save Code and Continue'}
+            </button>
           </form>
         </div>
       ) : null}
@@ -13184,8 +14267,8 @@ function App() {
           </div>
         </div>
       ) : null}
-      {authReady && !currentUserId && !isSignInPage && !isSignUpPage && !isAuthCallbackPage ? <Navigate to="/signup" replace /> : null}
-      {authReady && currentUserId && (isSignInPage || isSignUpPage) ? <Navigate to="/home" replace /> : null}
+      {authReady && !currentUserId && !isSignInPage && !isSignUpPage && !isClassRequestSignUpPage && !isClassesRequestPage && !isInvitePage && !isAuthCallbackPage ? <Navigate to="/signup" replace /> : null}
+      {authReady && currentUserId && (isSignInPage || isSignUpPage || isClassRequestSignUpPage) ? <Navigate to="/home" replace /> : null}
       {authReady && currentUserId && !isKnownAuthedPage ? <Navigate to="/home" replace /> : null}
       {needsProfileSetup ? (
         <div className="onboarding-overlay">
@@ -13268,6 +14351,24 @@ function App() {
             <span className="global-owner-banner-spacer" aria-hidden />
           </section>
         ) : null}
+        {isClassesJoinPage || isClassesRequestPage || isInvitePage ? (
+          <div className="class-join-onboarding-overlay">
+            <ClassWorkspacePages
+              mode={isInvitePage ? 'invite' : isClassesRequestPage ? 'request' : 'join'}
+              currentPath={currentPath}
+              memberships={classMemberships}
+              activeClass={activeClass}
+              isOwner={isOwner}
+              currentUserId={currentUserId}
+              onClassRequestNeedsAuth={continueClassRequestAfterAuth}
+              onInviteNeedsAuth={continueInviteAfterAuth}
+              onClassRequestSubmitted={() => { void finishClassRequestPendingApproval() }}
+              onRefreshMemberships={refreshClassWorkspace}
+              embedded
+            />
+          </div>
+        ) : null}
+        {!isClassesJoinPage && !isClassesRequestPage && !isInvitePage ? (
         <div className="workspace-layout">
           <aside className="left-taskbar">
             <div className="taskbar-section">
@@ -13413,7 +14514,7 @@ function App() {
               >
                 <span className="online-dot"></span>
                 <span className="online-count">{onlineUsersCount}</span>
-                <span className="online-label">studying now</span>
+                <span className="online-label">{activeClass ? 'class online' : 'online'}</span>
               </button>
 
               {onlineStudyPanelOpen ? (
@@ -13421,7 +14522,7 @@ function App() {
                   <div className="online-study-popover-head">
                     <div>
                       <p className="eyebrow">Who's studying</p>
-                      <h3>{onlineUsersCount} online</h3>
+                      <h3>{onlineUsersCount} online in {activeClass?.className || 'your class'}</h3>
                     </div>
                     <button
                       type="button"
@@ -13441,7 +14542,7 @@ function App() {
                   <div className="online-study-list">
                     {activeOnlineStudyUsers.length === 0 ? (
                       <p className="muted tiny online-study-empty">
-                        {onlineStudyUsersLoading ? 'Loading online users...' : 'No one is actively studying right now.'}
+                        {onlineStudyUsersLoading ? 'Loading class users...' : 'No one in this class is actively studying right now.'}
                       </p>
                     ) : (
                       activeOnlineStudyUsers.map((user) => (
@@ -13525,22 +14626,43 @@ function App() {
               <header className="top-header app-page-header">
                 <div className="header-left">
                   <h1>{pageTitle}</h1>
+                  {activeClass ? (
+                    <button className="class-status-chip" type="button" onClick={() => goToPath('/classes')}>
+                      {formatClassWorkspaceLabel(activeClass)}
+                    </button>
+                  ) : (
+                    <button className="class-status-chip class-status-chip-empty" type="button" onClick={() => goToPath('/classes/join')}>
+                      Join a class
+                    </button>
+                  )}
                 </div>
               </header>
             ) : null}
 
             <main className="content-area" key={currentPath}>
         {contentWarning ? <p className="muted content-warning">{contentWarning}</p> : null}
+        {isClassWorkspacePage ? (
+          <ClassWorkspacePages
+            mode={classWorkspaceMode}
+            currentPath={currentPath}
+            memberships={classMemberships}
+            activeClass={activeClass}
+            isOwner={isOwner}
+            currentUserId={currentUserId}
+            onInviteNeedsAuth={continueInviteAfterAuth}
+            onRefreshMemberships={refreshClassWorkspace}
+          />
+        ) : null}
         {!isProfilePage && !isStatsPage && isHomePage && (
           <section className="home-section">
             <div className="card home-hero">
               <div className="home-hero-head">
                 <div>
-                  <p className="eyebrow">Welcome</p>
+                  <p className="eyebrow">{activeClass ? formatClassWorkspaceLabel(activeClass) : 'Welcome'}</p>
                   <h2 className={displayNameClass(activeProfileTier, true)} style={displayNameStyle(profileDetails.nameStyle, activeProfileTier)}>
                     {activeProfileName}
                   </h2>
-                  <p className="muted">Pick your focus and keep building momentum.</p>
+                  <p className="muted">{activeClass ? `This workspace shows only ${activeClass.className}: class leaderboards, class chat, and classmates.` : 'Pick your focus and keep building momentum.'}</p>
                   <p className="home-quote-line">“{homeDailyQuote}”</p>
                   <div className={profileDetails.stats.studyDayStreak >= 7 ? 'day-streak-chip day-streak-chip-fire' : 'day-streak-chip'}>
                     <span className="day-streak-label">Study Streak</span>
@@ -13763,10 +14885,10 @@ function App() {
               {homeShowsStudyTimeLeaderboard ? (
               <div className="card leaderboard-card">
                 <div className="leaderboard-card-head">
-                  <h3>Most Study Time</h3>
-                  <p className="leaderboard-card-subtitle">Top total study minutes</p>
+                  <h3>Class Study Time</h3>
+                  <p className="leaderboard-card-subtitle">Study time for this class only</p>
                 </div>
-                {homeStudyTimeLeaders.length === 0 ? <p className="muted">No data yet.</p> : (
+                {homeStudyTimeLeaders.length === 0 ? <p className="muted">No study time logged in this class yet.</p> : (
                   <div className="leaderboard-list">
                     {homeStudyTimeLeaders.map((entry, index) => (
                       <button
@@ -14364,6 +15486,8 @@ function App() {
                 currentUsername={profileDisplayName || 'You'}
                 userAgency={profileDetails?.agency}
                 isOwner={isOwner}
+                classId={activeClassId}
+                canModerateClass={canModerateActiveClass}
                 leaderboardFirstSpotCounts={{
                   allTime: allTimeFirstSpotCountsByUser,
                   weekly: weeklyFirstSpotCountsByUser,
@@ -15860,6 +16984,7 @@ function App() {
               <OneVsOnePanel
                 currentUserId={currentUserId}
                 currentUsername={profileDisplayName || 'You'}
+                activeClassId={activeClassId}
                 isOwner={isOwner}
                 externalJoinRoomId={duelInviteJoinRoomId}
                 onExternalJoinHandled={() => setDuelInviteJoinRoomId(null)}
@@ -16330,9 +17455,9 @@ function App() {
                     Content Editor
                   </button>
                 ) : null}
-                {isOwner ? (
+                {canManageAgencySettings ? (
                   <button className={settingsTab === 'agencies' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('agencies')}>
-                    Agencies
+                    {activeClassId ? 'Class Agencies' : 'Agencies'}
                   </button>
                 ) : null}
                 {isOwner ? (
@@ -16343,6 +17468,11 @@ function App() {
                 {isOwner ? (
                   <button className={settingsTab === 'bug_inbox' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('bug_inbox')}>
                     Bug Inbox
+                  </button>
+                ) : null}
+                {isOwner ? (
+                  <button className={settingsTab === 'class_requests' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('class_requests')}>
+                    Class Requests
                   </button>
                 ) : null}
                 <button className={settingsTab === 'support' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('support')}>
@@ -16394,15 +17524,22 @@ function App() {
                   <label>
                     Agency
                     <select
-                      value={profileDetails.agency}
+                      value={profileAgencySelectDisabled ? '' : profileDetails.agency}
                       onChange={(event) => setProfileDetails((previous) => ({ ...previous, agency: event.target.value }))}
+                      disabled={profileAgencySelectDisabled}
                     >
-                      {agencyOptions.map((agency) => (
+                      {profileAgencySelectDisabled ? <option value="">No class agencies added yet</option> : null}
+                      {profileAgencyOptions.map((agency) => (
                         <option key={agency} value={agency}>
                           {agency}
                         </option>
                       ))}
                     </select>
+                    {activeClassId ? (
+                      <span className="muted tiny">
+                        Agencies are limited to departments added for {activeClass?.className || 'your class'}.
+                      </span>
+                    ) : null}
                   </label>
                   <div className="assisted-learning-inline">
                     <label className="assisted-learning-toggle">
@@ -17093,10 +18230,28 @@ function App() {
               ) : null}
 
               {settingsTab === 'agencies' ? (
-                isOwner ? (
+                canManageAgencySettings ? (
                   <div className="settings-section-card">
-                    <h3>Agencies</h3>
-                    <p className="muted tiny">Manage the agency list shown in profile settings.</p>
+                    <h3>{activeClassId ? 'Class Agencies' : 'Agencies'}</h3>
+                    <p className="muted tiny">
+                      {activeClassId
+                        ? `Manage the agency list shown to members of ${activeClass?.className || 'this class'}.`
+                        : 'Manage the global agency list shown when a user is not in a class.'}
+                    </p>
+                    {activeClassId ? (
+                      <div className="agency-code-panel">
+                        <div className="settings-inline-head">
+                          <div>
+                            <h4>Class join code</h4>
+                            <p className="muted tiny">Generate a five-digit code and give it to cadets so they can join this class during signup.</p>
+                          </div>
+                          <button className="secondary" type="button" onClick={() => void generateClassJoinCode()} disabled={agencySaving}>
+                            Generate Code
+                          </button>
+                        </div>
+                        {classJoinCode ? <p className="saved-pill">Code: {classJoinCode}</p> : null}
+                      </div>
+                    ) : null}
                     <div className="agency-settings-add">
                       <input
                         value={agencyNewName}
@@ -17113,8 +18268,9 @@ function App() {
                         {agencySaving ? 'Saving...' : 'Add'}
                       </button>
                     </div>
+                    {activeClassId && classAgencyOptionsLoading ? <p className="muted tiny">Loading class agencies...</p> : null}
                     <div className="agency-settings-list">
-                      {agencyOptions.map((agency) => (
+                      {(activeClassId ? classAgencyOptions.map((department) => department.name) : agencyOptions).map((agency) => (
                         <div key={`agency-option-${agency}`} className="agency-settings-row">
                           {agencyEditingOriginal === agency ? (
                             <input value={agencyEditingValue} onChange={(event) => setAgencyEditingValue(event.target.value)} />
@@ -17152,7 +18308,7 @@ function App() {
                   </div>
                 ) : (
                   <div className="settings-section-card">
-                    <p className="muted">Agency settings are available to owner accounts only.</p>
+                    <p className="muted">Agency settings are available to the site owner and class admins only.</p>
                   </div>
                 )
               ) : null}
@@ -17334,6 +18490,26 @@ function App() {
                 ) : (
                   <div className="settings-section-card">
                     <p className="muted">Global banner controls are available to owner accounts only.</p>
+                  </div>
+                )
+              ) : null}
+
+              {settingsTab === 'class_requests' ? (
+                isOwner ? (
+                  <div className="settings-section-card settings-class-requests-card">
+                    <ClassWorkspacePages
+                      mode="owner"
+                      currentPath="/owner/classes"
+                      memberships={classMemberships}
+                      activeClass={activeClass}
+                      isOwner={isOwner}
+                      onRefreshMemberships={refreshClassWorkspace}
+                      embedded
+                    />
+                  </div>
+                ) : (
+                  <div className="settings-section-card">
+                    <p className="muted">Class requests are available to owner accounts only.</p>
                   </div>
                 )
               ) : null}
@@ -17956,7 +19132,8 @@ function App() {
       ) : null}
           </div>
         </div>
-        {mobileQuickLinks.length > 0 ? (
+        ) : null}
+        {!isClassesJoinPage && !isClassesRequestPage && !isInvitePage && mobileQuickLinks.length > 0 ? (
           <div className="mobile-quick-strip" aria-label="Mobile quick shortcuts">
             <div className="mobile-quick-strip-track">
               {mobileQuickLinks.map((link) => (
@@ -17968,6 +19145,7 @@ function App() {
             </div>
           </div>
         ) : null}
+        {!isClassesJoinPage && !isClassesRequestPage && !isInvitePage ? (
         <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
           <button className={isStudyPage ? 'mobile-bottom-tab active' : 'mobile-bottom-tab'} onClick={() => navigateToTab('study')}>
             <AppIcon name="study" className="mobile-bottom-icon" />
@@ -17993,7 +19171,8 @@ function App() {
               isStatsPage ||
               isSupportPage ||
               isLeaderboardsPage ||
-              isChatPage
+              isChatPage ||
+              isClassWorkspacePage
                 ? 'mobile-bottom-tab active'
                 : 'mobile-bottom-tab'
             }
@@ -18003,7 +19182,8 @@ function App() {
             <span>Menu</span>
           </button>
         </nav>
-        {mobileNavMenuOpen ? (
+        ) : null}
+        {!isClassesJoinPage && !isClassesRequestPage && !isInvitePage && mobileNavMenuOpen ? (
           <div className="mobile-nav-backdrop" onClick={() => setMobileNavMenuOpen(false)}>
             <div className="mobile-nav-sheet card" onClick={(event) => event.stopPropagation()}>
               <div className="mobile-nav-sheet-head">
@@ -18090,12 +19270,14 @@ function App() {
         </>
       ) : null}
 
-      {authReady && currentUserId && stateHydrated && !isChatPage ? (
+      {authReady && currentUserId && stateHydrated && !isChatPage && !isClassesJoinPage && !isClassesRequestPage && !isInvitePage ? (
         <GlobalChatWidget
           currentUserId={currentUserId}
           currentUsername={profileDisplayName || 'You'}
           userAgency={profileDetails?.agency}
           isOwner={isOwner}
+          classId={activeClassId}
+          canModerateClass={canModerateActiveClass}
           leaderboardFirstSpotCounts={{
             allTime: allTimeFirstSpotCountsByUser,
             weekly: weeklyFirstSpotCountsByUser,
