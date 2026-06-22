@@ -30,7 +30,7 @@ export const supabase = isSupabaseConfigured
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: false,
+        detectSessionInUrl: true,
         flowType: 'pkce',
         ...(browserStorage ? { storage: browserStorage } : {}),
       },
