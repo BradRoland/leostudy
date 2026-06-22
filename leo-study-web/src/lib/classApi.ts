@@ -89,7 +89,11 @@ export type ClassCreationRequest = {
 export type ClassJoinRequest = {
   id: string
   user_id: string
+  class_id?: string
+  department_id?: string | null
   note?: string | null
+  status?: string
+  created_at?: string
   class_departments?: {
     name?: string | null
   } | null
@@ -478,7 +482,17 @@ export async function createClassInvite(classId: string, role: ClassRole = 'cade
   return String(data || '')
 }
 
-export async function requestToJoinClass(classId: string, departmentId: string | null, note: string) {
+export async function joinClassDirectly(classId: string, departmentId: string | null) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { data, error } = await supabase.rpc('join_class_directly', {
+    p_class_id: classId,
+    p_department_id: departmentId,
+  })
+  if (error) throw error
+  return String(data || '')
+}
+
+export async function requestToJoinClass(classId: string, departmentId: string | null, note = '') {
   if (!supabase) throw new Error('Supabase is not configured.')
   const { data, error } = await supabase.rpc('request_to_join_class', {
     p_class_id: classId,
@@ -510,6 +524,15 @@ export async function approveJoinRequest(requestId: string) {
 export async function denyJoinRequest(requestId: string, reason = '') {
   if (!supabase) throw new Error('Supabase is not configured.')
   const { error } = await supabase.rpc('deny_class_join_request', { p_request_id: requestId, p_reason: reason })
+  if (error) throw error
+}
+
+export async function updateClassJoinMode(classId: string, joinMode: 'open' | 'approval_required') {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { error } = await supabase.rpc('update_class_join_mode', {
+    p_class_id: classId,
+    p_join_mode: joinMode,
+  })
   if (error) throw error
 }
 

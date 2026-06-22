@@ -609,6 +609,7 @@ type SettingsTab =
   | 'security'
   | 'editor'
   | 'agencies'
+  | 'class_access'
   | 'banner'
   | 'bug_report'
   | 'bug_inbox'
@@ -5266,6 +5267,7 @@ function App() {
   const [scenarioFireWidth, setScenarioFireWidth] = useState(0)
   const { isOwner, loading: ownerLoading } = useOwner(currentUserId || null)
   const canManageAgencySettings = isOwner || activeClass?.role === 'class_admin'
+  const canManageClassAccess = Boolean(activeClassId && (isOwner || activeClass?.role === 'class_admin' || activeClass?.role === 'moderator'))
   const profileAgencyOptions = useMemo(() => {
     if (!activeClassId) return agencyOptions
     const names = classAgencyOptions.map((department) => department.name.trim()).filter(Boolean)
@@ -5912,10 +5914,11 @@ function App() {
   useEffect(() => {
     if (isOwner) return
     if (settingsTab === 'agencies' && canManageAgencySettings) return
-    if (settingsTab === 'editor' || settingsTab === 'agencies' || settingsTab === 'banner' || settingsTab === 'bug_inbox' || settingsTab === 'class_requests') {
+    if (settingsTab === 'class_access' && canManageClassAccess) return
+    if (settingsTab === 'editor' || settingsTab === 'agencies' || settingsTab === 'class_access' || settingsTab === 'banner' || settingsTab === 'bug_inbox' || settingsTab === 'class_requests') {
       setSettingsTab('profile')
     }
-  }, [canManageAgencySettings, isOwner, settingsTab])
+  }, [canManageAgencySettings, canManageClassAccess, isOwner, settingsTab])
 
   useEffect(() => {
     if (!isOwner || settingsTab !== 'bug_inbox') return
@@ -17460,6 +17463,11 @@ function App() {
                     {activeClassId ? 'Class Agencies' : 'Agencies'}
                   </button>
                 ) : null}
+                {canManageClassAccess ? (
+                  <button className={settingsTab === 'class_access' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('class_access')}>
+                    Class Access
+                  </button>
+                ) : null}
                 {isOwner ? (
                   <button className={settingsTab === 'banner' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('banner')}>
                     Site Banner
@@ -18490,6 +18498,26 @@ function App() {
                 ) : (
                   <div className="settings-section-card">
                     <p className="muted">Global banner controls are available to owner accounts only.</p>
+                  </div>
+                )
+              ) : null}
+
+              {settingsTab === 'class_access' ? (
+                canManageClassAccess ? (
+                  <div className="settings-section-card settings-class-requests-card">
+                    <ClassWorkspacePages
+                      mode="admin"
+                      currentPath="/classes/admin"
+                      memberships={classMemberships}
+                      activeClass={activeClass}
+                      isOwner={isOwner}
+                      onRefreshMemberships={refreshClassWorkspace}
+                      embedded
+                    />
+                  </div>
+                ) : (
+                  <div className="settings-section-card">
+                    <p className="muted">Class access settings are available to class admins only.</p>
                   </div>
                 )
               ) : null}

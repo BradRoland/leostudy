@@ -86,7 +86,7 @@ type ChatCacheEntry = {
   at: number
 }
 
-let hotChatCacheByScope: Record<string, ChatCacheEntry> = {}
+const hotChatCacheByScope: Record<string, ChatCacheEntry> = {}
 
 function chatCacheScope(classId?: string) {
   return classId ? `class:${classId}` : 'public'

@@ -14,13 +14,16 @@ import {
   lookupInvite,
   notifyDiscordForClassRequest,
   rejectClassCreationRequest,
+  joinClassDirectly,
   requestToJoinClass,
   setActiveClass,
   submitClassCreationRequest,
+  updateClassJoinMode,
   type AcademyClassRow,
   type ClassCreationRequest,
   type ClassDepartment,
   type ClassInvitePreview,
+  type ClassJoinRequest,
   type ClassMembership,
 } from '../lib/classApi'
 import { extractInviteCodeFromPath, normalizeInviteCode } from '../lib/classWorkspace'
@@ -55,15 +58,6 @@ type Props = {
   embedded?: boolean
 }
 
-type AdminJoinRequest = {
-  id: string
-  user_id: string
-  note?: string | null
-  class_departments?: {
-    name?: string | null
-  } | null
-}
-
 function cleanDepartmentFields(value: string[]) {
   return value.map((entry) => entry.trim()).filter(Boolean)
 }
@@ -81,6 +75,10 @@ function classDates(startDate?: string | null, endDate?: string | null) {
   if (!startDate && !endDate) return 'Dates not set'
   if (startDate && endDate) return `${startDate} to ${endDate}`
   return startDate ? `Starts ${startDate}` : `Ends ${endDate}`
+}
+
+function classRequiresJoinApproval(row?: AcademyClassRow | null) {
+  return ['approval_required', 'request_only', 'request_and_code'].includes(String(row?.join_mode || '').toLowerCase())
 }
 
 function StatusLine({ error, success }: { error: string; success: string }) {
@@ -110,7 +108,6 @@ export function ClassWorkspacePages({
   const [selectedClassId, setSelectedClassId] = useState('')
   const [departments, setDepartments] = useState<ClassDepartment[]>([])
   const [joinDepartmentId, setJoinDepartmentId] = useState('')
-  const [joinNote, setJoinNote] = useState('')
   const [inviteCode, setInviteCode] = useState(() => extractInviteCodeFromPath(currentPath))
   const [invitePreview, setInvitePreview] = useState<ClassInvitePreview | null>(null)
   const [inviteLoading, setInviteLoading] = useState(false)
@@ -123,7 +120,7 @@ export function ClassWorkspacePages({
     requesterNote: '',
   })
   const [ownerRequests, setOwnerRequests] = useState<ClassCreationRequest[]>([])
-  const [adminRequests, setAdminRequests] = useState<AdminJoinRequest[]>([])
+  const [adminRequests, setAdminRequests] = useState<ClassJoinRequest[]>([])
   const [lastGeneratedInvite, setLastGeneratedInvite] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -139,7 +136,7 @@ export function ClassWorkspacePages({
   }, [currentPath])
 
   useEffect(() => {
-    if (mode !== 'classes' && mode !== 'join') return
+    if (mode !== 'classes' && mode !== 'join' && mode !== 'admin') return
     setLoading(true)
     loadCreatedClasses()
       .then((rows) => {
@@ -296,17 +293,25 @@ export function ClassWorkspacePages({
     }
   }
 
-  const submitJoinRequest = async () => {
+  const joinSelectedClass = async () => {
     if (!selectedClass) return
     setLoading(true)
     setError('')
     setSuccess('')
     try {
-      await requestToJoinClass(selectedClass.id, joinDepartmentId || null, joinNote)
-      setSuccess('Join request sent to the class admin. You can sign back in after they approve it.')
-      setJoinNote('')
+      if (classRequiresJoinApproval(selectedClass)) {
+        await requestToJoinClass(selectedClass.id, joinDepartmentId || null, '')
+        window.localStorage.removeItem('pending_class_selection')
+        setSuccess('Join request sent. The class admin will review it.')
+      } else {
+        await joinClassDirectly(selectedClass.id, joinDepartmentId || null)
+        await onRefreshMemberships()
+        window.localStorage.removeItem('pending_class_selection')
+        setSuccess('Class joined.')
+        navigate('/home', { replace: true })
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send join request.')
+      setError(err instanceof Error ? err.message : 'Could not join class.')
     } finally {
       setLoading(false)
     }
@@ -436,12 +441,15 @@ export function ClassWorkspacePages({
   }
 
   if (mode === 'join') {
+    const selectedClassRequiresApproval = classRequiresJoinApproval(selectedClass)
     return (
       <main className={`${pageClassName} class-join-flow`}>
         <section className="class-join-card">
           <p className="eyebrow">Join a class</p>
           <h1>Which class are you in?</h1>
-          <p className="muted">Choose your class and send a request to that class admin.</p>
+          <p className="muted">
+            {selectedClassRequiresApproval ? 'Choose your class and department. The class admin will approve your request.' : 'Choose your class and department. You will join immediately.'}
+          </p>
           {loading ? <p className="muted">Loading classes...</p> : null}
           {!loading && availableClasses.length === 0 ? <p className="muted">No classes are available yet.</p> : null}
           <label>
@@ -465,13 +473,9 @@ export function ClassWorkspacePages({
               {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
             </select>
           </label>
-          {departments.length === 0 ? <p className="muted tiny">This class does not have departments listed yet. You can still send the request with a note.</p> : null}
-          <label>
-            Note
-            <textarea rows={3} value={joinNote} onChange={(event) => setJoinNote(event.target.value)} placeholder="Optional note for the class admin" />
-          </label>
-          <button className="primary" type="button" onClick={() => void submitJoinRequest()} disabled={loading || !selectedClass || (departments.length > 0 && !joinDepartmentId)}>
-            Request to Join
+          {departments.length === 0 ? <p className="muted tiny">This class does not have departments listed yet. You can still continue.</p> : null}
+          <button className="primary" type="button" onClick={() => void joinSelectedClass()} disabled={loading || !selectedClass || (departments.length > 0 && !joinDepartmentId)}>
+            {loading ? (selectedClassRequiresApproval ? 'Sending...' : 'Joining...') : selectedClassRequiresApproval ? 'Request to Join' : 'Join Class'}
           </button>
           <div className="class-join-divider"><span>or enter a code</span></div>
           <label className="join-code-field">
@@ -538,38 +542,109 @@ export function ClassWorkspacePages({
 
   if (mode === 'admin') {
     const canAdmin = activeClass?.role === 'class_admin' || activeClass?.role === 'moderator'
+    const activeJoinMode = activeClass ? (availableClasses.find((entry) => entry.id === activeClass.classId)?.join_mode || '') : ''
+    const approvalRequired = ['approval_required', 'request_only', 'request_and_code'].includes(activeJoinMode)
     return (
-      <main className="page-shell class-page">
+      <main className={pageClassName}>
         <section className="panel-block">
           <p className="eyebrow">Class admin</p>
-          <h1>{activeClass ? `${activeClass.academyName} ${activeClass.className}` : 'Class admin'}</h1>
+          <h1>Class Access</h1>
+          <p className="muted">
+            {activeClass ? `Control how cadets join ${activeClass.className}. Five-digit codes always join instantly.` : 'Control how cadets join your class.'}
+          </p>
           {!canAdmin ? <p className="muted">Class admin or moderator access is required.</p> : null}
           {canAdmin ? (
             <>
+              {activeClass?.role === 'class_admin' ? (
+                <div className="settings-feature-toggle-card">
+                  <div className="settings-inline-head">
+                    <div>
+                      <h4>Class join approval</h4>
+                      <p className="muted tiny">Turn this on if cadets must be approved before entering this class.</p>
+                    </div>
+                  </div>
+                  <label className="switch-row">
+                    <input
+                      type="checkbox"
+                      checked={approvalRequired}
+                      disabled={loading}
+                      onChange={async (event) => {
+                        if (!activeClass) return
+                        setLoading(true)
+                        setError('')
+                        setSuccess('')
+                        try {
+                          await updateClassJoinMode(activeClass.classId, event.target.checked ? 'approval_required' : 'open')
+                          setAvailableClasses(await loadCreatedClasses())
+                          setSuccess(event.target.checked ? 'Join approval required.' : 'Anyone can join this class.')
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : 'Could not update class access.')
+                        } finally {
+                          setLoading(false)
+                        }
+                      }}
+                    />
+                    Require admin approval to join
+                  </label>
+                </div>
+              ) : null}
               <div className="button-row">
-                <button className="secondary" type="button" onClick={() => void loadAdminRequests()} disabled={loading}>Refresh Requests</button>
                 {activeClass?.role === 'class_admin' ? (
                   <button className="primary" type="button" onClick={async () => {
                     if (!activeClass) return
+                    setError('')
+                    setSuccess('')
                     const code = await createClassJoinCode(activeClass.classId)
                     setLastGeneratedInvite(code)
+                    setSuccess('Code created.')
                   }}>Create 5-Digit Code</button>
                 ) : null}
               </div>
               {lastGeneratedInvite ? <p className="saved-pill">Code: {lastGeneratedInvite}</p> : null}
               <StatusLine error={error} success={success} />
-              {adminRequests.length === 0 ? <p className="muted">No pending join requests.</p> : null}
-              {adminRequests.map((request) => (
-                <article className="class-card" key={request.id}>
-                  <h3>Cadet {String(request.user_id || '').slice(0, 8)}</h3>
-                  <p className="muted tiny">{request.class_departments?.name || 'No department selected'}</p>
-                  <p>{request.note || 'No note provided.'}</p>
-                  <div className="button-row">
-                    <button className="primary" type="button" onClick={async () => { await approveJoinRequest(request.id); await loadAdminRequests(); await onRefreshMemberships() }}>Approve</button>
-                    <button className="secondary" type="button" onClick={async () => { await denyJoinRequest(request.id, 'Denied by class admin.'); await loadAdminRequests() }}>Deny</button>
+              {approvalRequired ? (
+                <>
+                  <div className="settings-inline-head">
+                    <div>
+                      <h4>Pending join requests</h4>
+                      <p className="muted tiny">Approve cadets who picked this class without a code.</p>
+                    </div>
+                    <button className="secondary" type="button" onClick={() => void loadAdminRequests()} disabled={loading}>Refresh</button>
                   </div>
-                </article>
-              ))}
+                  {adminRequests.length === 0 ? <p className="muted">No pending join requests.</p> : null}
+                  {adminRequests.map((request) => (
+                    <article className="class-card" key={request.id}>
+                      <h3>Cadet {String(request.user_id || '').slice(0, 8)}</h3>
+                      <p className="muted tiny">{request.class_departments?.name || 'No department selected'}</p>
+                      <div className="button-row">
+                        <button className="primary" type="button" disabled={loading} onClick={async () => {
+                          setError('')
+                          setSuccess('')
+                          try {
+                            await approveJoinRequest(request.id)
+                            setSuccess('Join request approved.')
+                            await loadAdminRequests()
+                            await onRefreshMemberships()
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : 'Could not approve join request.')
+                          }
+                        }}>Approve</button>
+                        <button className="secondary" type="button" disabled={loading} onClick={async () => {
+                          setError('')
+                          setSuccess('')
+                          try {
+                            await denyJoinRequest(request.id, 'Denied by class admin.')
+                            setSuccess('Join request denied.')
+                            await loadAdminRequests()
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : 'Could not deny join request.')
+                          }
+                        }}>Deny</button>
+                      </div>
+                    </article>
+                  ))}
+                </>
+              ) : null}
             </>
           ) : null}
         </section>
@@ -600,7 +675,7 @@ export function ClassWorkspacePages({
 
       <section className="panel-block">
         <p className="eyebrow">Active classes</p>
-        <h2>Request to join</h2>
+        <h2>Join a class</h2>
         {availableClasses.length === 0 ? <p className="muted">No classes are available.</p> : null}
         <div className="class-grid">
           {availableClasses.map((row) => (
@@ -613,13 +688,14 @@ export function ClassWorkspacePages({
         </div>
         {selectedClass ? (
           <div className="join-request-box">
-            <h3>Request {classTitle(selectedClass)}</h3>
+            <h3>Join {classTitle(selectedClass)}</h3>
             <label>Department<select value={joinDepartmentId} onChange={(event) => setJoinDepartmentId(event.target.value)}>
               <option value="">Choose department</option>
               {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
             </select></label>
-            <label>Note<textarea rows={3} value={joinNote} onChange={(event) => setJoinNote(event.target.value)} /></label>
-            <button className="primary" type="button" onClick={() => void submitJoinRequest()} disabled={loading}>Request to Join</button>
+            <button className="primary" type="button" onClick={() => void joinSelectedClass()} disabled={loading || !selectedClass || (departments.length > 0 && !joinDepartmentId)}>
+              {loading ? (classRequiresJoinApproval(selectedClass) ? 'Sending...' : 'Joining...') : classRequiresJoinApproval(selectedClass) ? 'Request to Join' : 'Join Class'}
+            </button>
           </div>
         ) : null}
         <StatusLine error={error} success={success} />
