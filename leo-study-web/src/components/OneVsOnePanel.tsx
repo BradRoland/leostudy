@@ -1,8 +1,8 @@
-import { type CSSProperties, type MouseEvent, type ReactNode, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type MouseEvent, type ReactNode, type SyntheticEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type RealtimeChannel } from '@supabase/supabase-js'
 import { loadLocalContentBundle, type ContentBankItem } from '../content'
 import { getDuelBlasterMotionSpeedBounds, normalizeDuelBlasterVelocity } from '../lib/blasterMotion'
-import { applyConnect4Move, chooseConnect4BotMove, connect4Columns, connect4Rows, createConnect4State, findConnect4WinningCells, normalizeConnect4State, type Connect4Cell, type Connect4Coordinate, type Connect4Player, type Connect4State } from '../lib/connect4'
+import { applyConnect4Move, chooseConnect4BotMove, connect4Columns, connect4Rows, createConnect4State, findConnect4WinningCells, normalizeConnect4State, type Connect4Cell, type Connect4Player, type Connect4State } from '../lib/connect4'
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
@@ -1607,22 +1607,95 @@ function connect4DropCellStyle(isLatestMove: boolean, rowIndex: number): CSSProp
   return { '--connect4-drop-rows': rowIndex + 1 } as CSSProperties
 }
 
-function connect4WinLineStyle(cells: Connect4Coordinate[]): CSSProperties | undefined {
-  if (cells.length < 2) return undefined
-  const [startCell] = cells
-  const endCell = cells[cells.length - 1]
-  const leftPercent = ((startCell.column + 0.5) / connect4Columns) * 100
-  const topPercent = ((startCell.row + 0.5) / connect4Rows) * 100
-  const deltaXPercent = ((endCell.column - startCell.column) / connect4Columns) * 100
-  const deltaYPercent = ((endCell.row - startCell.row) / connect4Rows) * 100
-  const angle = Math.atan2(deltaYPercent, deltaXPercent) * (180 / Math.PI)
+function Connect4BoardGrid(props: {
+  ariaLabel: string
+  cellKeyPrefix: string
+  state: Connect4State
+  canDropColumn: (column: number) => boolean
+  onDropColumn: (column: number) => void
+}) {
+  const { ariaLabel, cellKeyPrefix, state, canDropColumn, onDropColumn } = props
+  const boardRef = useRef<HTMLDivElement | null>(null)
+  const [winLineStyle, setWinLineStyle] = useState<CSSProperties | undefined>()
+  const winningCells = useMemo(() => findConnect4WinningCells(state.board, state.winner), [state.board, state.winner])
+  const winningCellKeys = useMemo(
+    () => new Set(winningCells.map((cell) => connect4WinningCellKey(cell.row, cell.column))),
+    [winningCells],
+  )
+  const latestMove = state.moveHistory.at(-1) || null
 
-  return {
-    left: `${leftPercent}%`,
-    top: `${topPercent}%`,
-    width: `${Math.hypot(deltaXPercent, deltaYPercent)}%`,
-    transform: `translateY(-50%) rotate(${angle}deg)`,
-  }
+  useLayoutEffect(() => {
+    let cancelled = false
+    const measureLine = () => {
+      const board = boardRef.current
+      if (!board || winningCells.length < 2) {
+        setWinLineStyle(undefined)
+        return
+      }
+      const [startCell] = winningCells
+      const endCell = winningCells[winningCells.length - 1]
+      const startElement = board.querySelector<HTMLElement>(`[data-connect4-row="${startCell.row}"][data-connect4-column="${startCell.column}"]`)
+      const endElement = board.querySelector<HTMLElement>(`[data-connect4-row="${endCell.row}"][data-connect4-column="${endCell.column}"]`)
+      if (!startElement || !endElement) {
+        setWinLineStyle(undefined)
+        return
+      }
+      const boardBox = board.getBoundingClientRect()
+      const startBox = startElement.getBoundingClientRect()
+      const endBox = endElement.getBoundingClientRect()
+      const startX = startBox.left + startBox.width / 2 - boardBox.left
+      const startY = startBox.top + startBox.height / 2 - boardBox.top
+      const endX = endBox.left + endBox.width / 2 - boardBox.left
+      const endY = endBox.top + endBox.height / 2 - boardBox.top
+      const deltaX = endX - startX
+      const deltaY = endY - startY
+      if (cancelled) return
+      setWinLineStyle({
+        left: `${startX}px`,
+        top: `${startY}px`,
+        width: `${Math.hypot(deltaX, deltaY)}px`,
+        transform: `translateY(-50%) rotate(${Math.atan2(deltaY, deltaX) * (180 / Math.PI)}deg)`,
+      })
+    }
+
+    measureLine()
+    const frame = window.requestAnimationFrame(measureLine)
+    window.addEventListener('resize', measureLine)
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('resize', measureLine)
+    }
+  }, [winningCells])
+
+  return (
+    <div ref={boardRef} className="connect4-board" role="grid" aria-label={ariaLabel}>
+      {winLineStyle ? <span className="connect4-win-line" style={winLineStyle} aria-hidden /> : null}
+      {state.board.map((row, rowIndex) => (
+        <div key={`${cellKeyPrefix}-row-${rowIndex}`} className="connect4-row" role="row">
+          {row.map((cell, columnIndex) => {
+            const canDrop = canDropColumn(columnIndex)
+            const cellKey = connect4WinningCellKey(rowIndex, columnIndex)
+            const isLatestMove = latestMove?.row === rowIndex && latestMove.column === columnIndex
+            return (
+              <button
+                key={`${cellKeyPrefix}-cell-${rowIndex}-${columnIndex}`}
+                type="button"
+                className={connect4CellClass(cell, winningCellKeys.has(cellKey), isLatestMove)}
+                style={connect4DropCellStyle(isLatestMove, rowIndex)}
+                role="gridcell"
+                disabled={!canDrop}
+                data-connect4-row={rowIndex}
+                data-connect4-column={columnIndex}
+                onClick={() => onDropColumn(columnIndex)}
+                aria-label={`${connect4CellLabel(cell, rowIndex, columnIndex)}. ${canDrop ? `Drop disc in column ${columnIndex + 1}.` : ''}`}
+              />
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function parseReadyRpcState(value: unknown): ReadyRpcState {
@@ -3696,7 +3769,7 @@ export function OneVsOnePanel(props: {
       botAnswerTimerRef.current = null
     }
     botAnswerTimerRef.current = window.setTimeout(() => {
-      const botColumn = chooseConnect4BotMove(userState, 'P2')
+      const botColumn = chooseConnect4BotMove(userState, 'P2', connect4BotMatch.resolvedDifficulty)
       if (botColumn < 0) return
       try {
         const botState = applyConnect4Move(userState, botColumn, 'connect4-bot', playersForBot).state
@@ -6459,39 +6532,17 @@ export function OneVsOnePanel(props: {
                     )
                   })}
                 </div>
-                {(() => {
-                  const winningCells = findConnect4WinningCells(connect4BotMatch.state.board, connect4BotMatch.state.winner)
-                  const winningCellKeys = new Set(winningCells.map((cell) => connect4WinningCellKey(cell.row, cell.column)))
-                  const latestMove = connect4BotMatch.state.moveHistory.at(-1) || null
-                  const winLineStyle = connect4WinLineStyle(winningCells)
-                  return (
-                    <div className="connect4-board" role="grid" aria-label="Connect 4 bot board">
-                      {winLineStyle ? <span className="connect4-win-line" style={winLineStyle} aria-hidden /> : null}
-                      {connect4BotMatch.state.board.map((row, rowIndex) => (
-                        <div key={`connect4-bot-row-${rowIndex}`} className="connect4-row" role="row">
-                          {row.map((cell, columnIndex) => {
-                            const columnFull = connect4BotMatch.state.board[0]?.[columnIndex] !== null
-                            const waitingForBot = connect4BotMatch.state.currentTurn !== 'P1'
-                            const canDrop = !columnFull && !waitingForBot && connect4BotMatch.state.status === 'active'
-                            const isLatestMove = latestMove?.row === rowIndex && latestMove.column === columnIndex
-                            return (
-                              <button
-                                key={`connect4-bot-cell-${rowIndex}-${columnIndex}`}
-                                type="button"
-                                className={connect4CellClass(cell, winningCellKeys.has(connect4WinningCellKey(rowIndex, columnIndex)), isLatestMove)}
-                                style={connect4DropCellStyle(isLatestMove, rowIndex)}
-                                role="gridcell"
-                                disabled={!canDrop}
-                                onClick={() => submitConnect4BotMove(columnIndex)}
-                                aria-label={`${connect4CellLabel(cell, rowIndex, columnIndex)}. ${canDrop ? `Drop disc in column ${columnIndex + 1}.` : ''}`}
-                              />
-                            )
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })()}
+                <Connect4BoardGrid
+                  ariaLabel="Connect 4 bot board"
+                  cellKeyPrefix="connect4-bot"
+                  state={connect4BotMatch.state}
+                  canDropColumn={(columnIndex) => (
+                    connect4BotMatch.state.board[0]?.[columnIndex] === null
+                    && connect4BotMatch.state.currentTurn === 'P1'
+                    && connect4BotMatch.state.status === 'active'
+                  )}
+                  onDropColumn={submitConnect4BotMove}
+                />
               </div>
 
               <p className="connect4-status muted" aria-live="polite">
@@ -8664,38 +8715,13 @@ export function OneVsOnePanel(props: {
                       )
                     })}
                   </div>
-                  {(() => {
-                    const winningCells = findConnect4WinningCells(connect4State.board, connect4State.winner)
-                    const winningCellKeys = new Set(winningCells.map((cell) => connect4WinningCellKey(cell.row, cell.column)))
-                    const latestMove = connect4State.moveHistory.at(-1) || null
-                    const winLineStyle = connect4WinLineStyle(winningCells)
-                    return (
-                      <div className="connect4-board" role="grid" aria-label="Connect 4 board">
-                        {winLineStyle ? <span className="connect4-win-line" style={winLineStyle} aria-hidden /> : null}
-                        {connect4State.board.map((row, rowIndex) => (
-                          <div key={`connect4-row-${rowIndex}`} className="connect4-row" role="row">
-                            {row.map((cell, columnIndex) => {
-                              const columnFull = connect4State.board[0]?.[columnIndex] !== null
-                              const canDrop = connect4IsMyTurn && !columnFull
-                              const isLatestMove = latestMove?.row === rowIndex && latestMove.column === columnIndex
-                              return (
-                                <button
-                                  key={`connect4-cell-${rowIndex}-${columnIndex}`}
-                                  type="button"
-                                  className={connect4CellClass(cell, winningCellKeys.has(connect4WinningCellKey(rowIndex, columnIndex)), isLatestMove)}
-                                  style={connect4DropCellStyle(isLatestMove, rowIndex)}
-                                  role="gridcell"
-                                  disabled={!canDrop}
-                                  onClick={() => void submitConnect4Move(columnIndex)}
-                                  aria-label={`${connect4CellLabel(cell, rowIndex, columnIndex)}. ${canDrop ? `Drop disc in column ${columnIndex + 1}.` : ''}`}
-                                />
-                              )
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  })()}
+                  <Connect4BoardGrid
+                    ariaLabel="Connect 4 board"
+                    cellKeyPrefix="connect4-live"
+                    state={connect4State}
+                    canDropColumn={(columnIndex) => connect4IsMyTurn && connect4State.board[0]?.[columnIndex] === null}
+                    onDropColumn={(columnIndex) => void submitConnect4Move(columnIndex)}
+                  />
                 </div>
 
                 <p className="connect4-status muted" aria-live="polite">

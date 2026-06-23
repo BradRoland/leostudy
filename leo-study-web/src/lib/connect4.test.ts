@@ -153,7 +153,22 @@ test('bot blocks an immediate opponent win', () => {
   assert.equal(chooseConnect4BotMove(state, 'P2'), 3)
 })
 
-test('bot creates a centered three-disc threat when no one can win immediately', () => {
+test('very-hard bot interrupts a simple four-column player plan', () => {
+  let state = createConnect4State()
+  const userPlan = [0, 1, 2, 3]
+
+  for (const userColumn of userPlan) {
+    state = applyConnect4Move(state, userColumn, player1, { player1UserId: player1, player2UserId: player2 }).state
+    if (state.status === 'completed') break
+    const botColumn = chooseConnect4BotMove(state, 'P2', 'very-hard')
+    assert.equal(Number.isInteger(botColumn), true)
+    state = applyConnect4Move(state, botColumn, player2, { player1UserId: player1, player2UserId: player2 }).state
+  }
+
+  assert.notEqual(state.winner, 'P1')
+})
+
+test('easy bot creates a centered three-disc threat when no one can win immediately', () => {
   const state: Connect4State = {
     ...createConnect4State(),
     currentTurn: 'P2',
@@ -167,7 +182,7 @@ test('bot creates a centered three-disc threat when no one can win immediately',
     ],
   }
 
-  assert.equal(chooseConnect4BotMove(state, 'P2'), 3)
+  assert.equal(chooseConnect4BotMove(state, 'P2', 'easy'), 3)
 })
 
 test('bot avoids giving the opponent a supported diagonal win', () => {

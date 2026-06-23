@@ -33,6 +33,8 @@ export type Connect4MoveResult = {
   placed: Connect4Move
 }
 
+export type Connect4BotDifficulty = 'easy' | 'medium' | 'hard' | 'very-hard'
+
 export const connect4Rows = 6
 export const connect4Columns = 7
 
@@ -159,6 +161,16 @@ function wouldWin(board: Connect4Cell[][], column: number, player: Connect4Playe
   return hasConnect4Win(nextBoard, row, column, player)
 }
 
+function boardAfterDrop(board: Connect4Cell[][], column: number, player: Connect4Player) {
+  const simulated = simulateDrop(board, column, player)
+  if (!simulated) return null
+  return {
+    ...simulated,
+    winner: hasConnect4Win(simulated.board, simulated.row, column, player),
+    draw: boardIsFull(simulated.board),
+  }
+}
+
 function simulateDrop(board: Connect4Cell[][], column: number, player: Connect4Player) {
   const nextBoard = cloneBoard(board)
   const row = findDropRow(nextBoard, column)
@@ -227,6 +239,121 @@ function scoreBoardForPlayer(board: Connect4Cell[][], player: Connect4Player) {
   return score
 }
 
+function orderedLegalColumns(board: Connect4Cell[][]) {
+  return legalColumns(board).sort((left, right) => Math.abs(left - 3) - Math.abs(right - 3))
+}
+
+function countCenterDiscs(board: Connect4Cell[][], player: Connect4Player) {
+  return board.reduce((count, row) => count + (row[3] === player ? 1 : 0), 0)
+}
+
+function scoreConnect4Position(board: Connect4Cell[][], botPlayer: Connect4Player) {
+  const opponent = botPlayer === 'P1' ? 'P2' : 'P1'
+  return scoreBoardForPlayer(board, botPlayer)
+    - scoreBoardForPlayer(board, opponent) * 1.08
+    + countCenterDiscs(board, botPlayer) * 16
+    - countCenterDiscs(board, opponent) * 18
+    + countImmediateWins(board, botPlayer) * 520
+    - countImmediateWins(board, opponent) * 760
+}
+
+function minimaxConnect4(
+  board: Connect4Cell[][],
+  depth: number,
+  activePlayer: Connect4Player,
+  botPlayer: Connect4Player,
+  alpha: number,
+  beta: number,
+  memo: Map<string, number>,
+): number {
+  const memoKey = `${depth}|${activePlayer}|${board.map((row) => row.map((cell) => cell || '-').join('')).join('/')}`
+  const memoized = memo.get(memoKey)
+  if (typeof memoized === 'number') return memoized
+  const columns = orderedLegalColumns(board)
+  if (depth <= 0 || columns.length === 0) {
+    const score = scoreConnect4Position(board, botPlayer)
+    memo.set(memoKey, score)
+    return score
+  }
+
+  const maximizing = activePlayer === botPlayer
+  let bestScore = maximizing ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY
+
+  for (const column of columns) {
+    const simulated = boardAfterDrop(board, column, activePlayer)
+    if (!simulated) continue
+    if (simulated.winner) {
+      const terminalScore = activePlayer === botPlayer
+        ? 1_000_000 + depth * 1_000
+        : -1_000_000 - depth * 1_000
+      if (maximizing) {
+        bestScore = Math.max(bestScore, terminalScore)
+        alpha = Math.max(alpha, bestScore)
+      } else {
+        bestScore = Math.min(bestScore, terminalScore)
+        beta = Math.min(beta, bestScore)
+      }
+      if (beta <= alpha) break
+      continue
+    }
+    if (simulated.draw) {
+      if (maximizing) {
+        bestScore = Math.max(bestScore, 0)
+        alpha = Math.max(alpha, bestScore)
+      } else {
+        bestScore = Math.min(bestScore, 0)
+        beta = Math.min(beta, bestScore)
+      }
+      if (beta <= alpha) break
+      continue
+    }
+
+    const nextPlayer = activePlayer === 'P1' ? 'P2' : 'P1'
+    const score = minimaxConnect4(simulated.board, depth - 1, nextPlayer, botPlayer, alpha, beta, memo)
+    if (maximizing) {
+      bestScore = Math.max(bestScore, score)
+      alpha = Math.max(alpha, bestScore)
+    } else {
+      bestScore = Math.min(bestScore, score)
+      beta = Math.min(beta, bestScore)
+    }
+    if (beta <= alpha) break
+  }
+
+  const finalScore = Number.isFinite(bestScore) ? bestScore : scoreConnect4Position(board, botPlayer)
+  memo.set(memoKey, finalScore)
+  return finalScore
+}
+
+function chooseLookaheadMove(board: Connect4Cell[][], botPlayer: Connect4Player, depth: number) {
+  const opponent = botPlayer === 'P1' ? 'P2' : 'P1'
+  const memo = new Map<string, number>()
+  const scoredColumns = orderedLegalColumns(board).map((column) => {
+    const simulated = boardAfterDrop(board, column, botPlayer)
+    if (!simulated) return { column, score: Number.NEGATIVE_INFINITY }
+    if (simulated.winner) return { column, score: 1_000_000 }
+    if (countImmediateWins(simulated.board, opponent) >= 2) {
+      return { column, score: -900_000 + (8 - Math.abs(column - 3)) }
+    }
+    const score = minimaxConnect4(
+      simulated.board,
+      Math.max(0, depth - 1),
+      opponent,
+      botPlayer,
+      Number.NEGATIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      memo,
+    )
+    return {
+      column,
+      score: score + (8 - Math.abs(column - 3)) * 0.2,
+    }
+  })
+
+  scoredColumns.sort((left, right) => right.score - left.score || Math.abs(left.column - 3) - Math.abs(right.column - 3))
+  return scoredColumns[0]?.column ?? orderedLegalColumns(board)[0] ?? -1
+}
+
 export function normalizeConnect4State(value: Partial<Connect4State> | null | undefined): Connect4State {
   const fallback = createConnect4State()
   if (!value || typeof value !== 'object') return fallback
@@ -258,18 +385,26 @@ export function normalizeConnect4State(value: Partial<Connect4State> | null | un
   }
 }
 
-export function chooseConnect4BotMove(sourceState: Connect4State, botPlayer: Connect4Player): number {
+export function chooseConnect4BotMove(
+  sourceState: Connect4State,
+  botPlayer: Connect4Player,
+  difficulty: Connect4BotDifficulty = 'hard',
+): number {
   const state = normalizeConnect4State(sourceState)
   const columns = legalColumns(state.board)
   if (columns.length === 0) return -1
   const opponent = botPlayer === 'P1' ? 'P2' : 'P1'
-  const centerBiasedColumns = [...columns].sort((left, right) => Math.abs(left - 3) - Math.abs(right - 3))
+  const centerBiasedColumns = orderedLegalColumns(state.board)
 
   const winningColumn = centerBiasedColumns.find((column) => wouldWin(state.board, column, botPlayer))
   if (typeof winningColumn === 'number') return winningColumn
 
   const blockingColumn = centerBiasedColumns.find((column) => wouldWin(state.board, column, opponent))
-  if (typeof blockingColumn === 'number') return blockingColumn
+  if (typeof blockingColumn === 'number' && difficulty !== 'easy') return blockingColumn
+
+  if (difficulty === 'very-hard') return chooseLookaheadMove(state.board, botPlayer, 7)
+  if (difficulty === 'hard') return chooseLookaheadMove(state.board, botPlayer, 5)
+  if (difficulty === 'medium') return chooseLookaheadMove(state.board, botPlayer, 3)
 
   const scoredColumns = centerBiasedColumns.map((column) => {
     const simulated = simulateDrop(state.board, column, botPlayer)
