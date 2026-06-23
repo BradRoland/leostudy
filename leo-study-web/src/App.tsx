@@ -12,6 +12,7 @@ import { OneVsOnePanel } from './components/OneVsOnePanel'
 import { DuelInviteBanner } from './components/DuelInviteBanner'
 import { GlobalChatWidget } from './components/GlobalChatWidget'
 import { ClassWorkspacePages } from './components/ClassWorkspacePages'
+import { OwnerAdminPanel } from './components/OwnerAdminPanel'
 import { StudyGuidePage } from './components/StudyGuidePage'
 import { StudyPracticeTestPage } from './components/StudyPracticeTestPage'
 import {
@@ -608,6 +609,7 @@ type SettingsTab =
   | 'support'
   | 'security'
   | 'editor'
+  | 'admin_panel'
   | 'agencies'
   | 'class_access'
   | 'banner'
@@ -5933,7 +5935,7 @@ function App() {
     if (isOwner) return
     if (settingsTab === 'agencies' && canManageAgencySettings) return
     if (settingsTab === 'class_access' && canManageClassAccess) return
-    if (settingsTab === 'editor' || settingsTab === 'agencies' || settingsTab === 'class_access' || settingsTab === 'banner' || settingsTab === 'bug_inbox' || settingsTab === 'class_requests') {
+    if (settingsTab === 'editor' || settingsTab === 'admin_panel' || settingsTab === 'agencies' || settingsTab === 'class_access' || settingsTab === 'banner' || settingsTab === 'bug_inbox' || settingsTab === 'class_requests') {
       setSettingsTab('profile')
     }
   }, [canManageAgencySettings, canManageClassAccess, isOwner, settingsTab])
@@ -17472,6 +17474,11 @@ function App() {
                   Report Bug
                 </button>
                 {isOwner ? (
+                  <button className={settingsTab === 'admin_panel' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('admin_panel')}>
+                    Admin Panel
+                  </button>
+                ) : null}
+                {isOwner ? (
                   <button className={settingsTab === 'editor' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('editor')}>
                     Content Editor
                   </button>
@@ -18556,6 +18563,18 @@ function App() {
                 ) : (
                   <div className="settings-section-card">
                     <p className="muted">Class requests are available to owner accounts only.</p>
+                  </div>
+                )
+              ) : null}
+
+              {settingsTab === 'admin_panel' ? (
+                isOwner ? (
+                  <div className="settings-section-card settings-class-requests-card">
+                    <OwnerAdminPanel onRefreshMemberships={refreshClassWorkspace} />
+                  </div>
+                ) : (
+                  <div className="settings-section-card">
+                    <p className="muted">Admin panel controls are available to owner accounts only.</p>
                   </div>
                 )
               ) : null}

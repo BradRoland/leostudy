@@ -19257,6 +19257,99 @@ textarea:focus-visible,
   gap: 0.75rem;
 }
 
+.owner-admin-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.owner-admin-panel h3,
+.owner-admin-panel h4 {
+  margin: 0;
+}
+
+.owner-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.owner-admin-section {
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 76%, transparent);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.owner-admin-department-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.owner-admin-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.owner-admin-stats span {
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-soft) 72%, transparent);
+  color: var(--text);
+  font-weight: 750;
+  padding: 0.65rem;
+  min-width: 0;
+}
+
+.owner-admin-members-section {
+  overflow: hidden;
+}
+
+.owner-admin-timeout-field {
+  width: min(180px, 100%);
+}
+
+.owner-admin-search {
+  width: 100%;
+}
+
+.owner-admin-member-list {
+  display: grid;
+  gap: 0.6rem;
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.owner-admin-member-row {
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-soft) 74%, transparent);
+  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.owner-admin-member-row p {
+  margin: 0.2rem 0 0;
+}
+
+.owner-admin-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.owner-admin-member-actions select {
+  min-width: 150px;
+}
+
 @media (max-width: 720px) {
   .request-step-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -19273,5 +19366,22 @@ textarea:focus-visible,
 
   .department-entry-row {
     grid-template-columns: 1fr;
+  }
+
+  .owner-admin-layout,
+  .owner-admin-member-row {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-admin-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-admin-member-actions {
+    justify-content: stretch;
+  }
+
+  .owner-admin-member-actions > * {
+    flex: 1 1 150px;
   }
 }

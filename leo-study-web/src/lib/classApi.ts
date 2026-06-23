@@ -99,6 +99,32 @@ export type ClassJoinRequest = {
   } | null
 }
 
+export type OwnerClassMember = {
+  membershipId: string
+  userId: string
+  email: string
+  username: string
+  avatarPath: string
+  departmentId: string | null
+  departmentName: string
+  role: ClassRole
+  isActive: boolean
+  status: string
+  joinedAt: string
+  timeoutUntil: string | null
+}
+
+export type OwnerCreateClassInput = {
+  academyName: string
+  academyCity: string
+  academyState: string
+  className: string
+  startDate: string
+  endDate: string
+  joinMode: 'open' | 'approval_required' | 'code_only'
+  departments: string[]
+}
+
 type MembershipQueryRow = {
   id?: unknown
   class_id?: unknown
@@ -156,7 +182,7 @@ export async function loadClassMemberships(): Promise<ClassMembership[]> {
     .order('joined_at', { ascending: false })
 
   if (error) throw error
-  return (data || []).map((row) => {
+  return ((data || []) as unknown[]).map((row) => {
     const value = row as MembershipQueryRow
     const classRow = value.academy_classes || {}
     const academy = classRow.academies || {}
@@ -540,4 +566,82 @@ export async function setActiveClass(classId: string) {
   if (!supabase) throw new Error('Supabase is not configured.')
   const { error } = await supabase.rpc('set_active_class', { p_class_id: classId })
   if (error) throw error
+}
+
+export async function ownerCreateClass(input: OwnerCreateClassInput) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const cleanClassName = input.className.trim()
+  if (!cleanClassName) throw new Error('Enter a class name.')
+  const { data, error } = await supabase.rpc('owner_create_class', {
+    p_payload: {
+      academyName: input.academyName.trim() || 'Police Academy 180',
+      academyCity: input.academyCity.trim(),
+      academyState: input.academyState.trim() || 'CA',
+      className: cleanClassName,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      joinMode: input.joinMode,
+      departments: input.departments.map((department) => department.trim()).filter(Boolean),
+    },
+  })
+  if (error) throw error
+  return String(data || '')
+}
+
+export async function ownerListClassMembers(classId: string): Promise<OwnerClassMember[]> {
+  if (!supabase || !classId) return []
+  const { data, error } = await supabase.rpc('owner_list_class_members', { p_class_id: classId })
+  if (error) throw error
+  return ((data || []) as unknown[]).map((row) => {
+    const value = row as Record<string, unknown>
+    const role = String(value.role || 'cadet')
+    return {
+      membershipId: String(value.membership_id || ''),
+      userId: String(value.user_id || ''),
+      email: String(value.email || ''),
+      username: String(value.username || ''),
+      avatarPath: String(value.avatar_path || ''),
+      departmentId: value.department_id ? String(value.department_id) : null,
+      departmentName: String(value.department_name || ''),
+      role: (['cadet', 'moderator', 'class_admin'].includes(role) ? role : 'cadet') as ClassRole,
+      isActive: Boolean(value.is_active),
+      status: String(value.status || ''),
+      joinedAt: String(value.joined_at || ''),
+      timeoutUntil: value.timeout_until ? String(value.timeout_until) : null,
+    }
+  })
+}
+
+export async function ownerSetClassMemberRole(membershipId: string, role: ClassRole) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  if (!membershipId) throw new Error('Choose a member.')
+  const { error } = await supabase.rpc('owner_set_class_member_role', {
+    p_membership_id: membershipId,
+    p_role: role,
+  })
+  if (error) throw error
+}
+
+export async function ownerRemoveClassMember(membershipId: string, reason = '') {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  if (!membershipId) throw new Error('Choose a member.')
+  const { error } = await supabase.rpc('owner_remove_class_member', {
+    p_membership_id: membershipId,
+    p_reason: reason,
+  })
+  if (error) throw error
+}
+
+export async function ownerTimeoutClassMember(classId: string, userId: string, minutes: number, reason = '') {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  if (!classId || !userId) throw new Error('Choose a member.')
+  const safeMinutes = Number.isFinite(minutes) ? Math.max(1, Math.min(10080, Math.round(minutes))) : 10
+  const { data, error } = await supabase.rpc('owner_timeout_class_member', {
+    p_class_id: classId,
+    p_user_id: userId,
+    p_minutes: safeMinutes,
+    p_reason: reason,
+  })
+  if (error) throw error
+  return String(data || '')
 }
