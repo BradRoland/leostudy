@@ -125,6 +125,17 @@ export type OwnerCreateClassInput = {
   departments: string[]
 }
 
+export type OwnerUpdateClassInput = {
+  classId: string
+  className: string
+  startDate: string
+  endDate: string
+  joinMode: 'open' | 'approval_required' | 'code_only'
+  status: 'pending' | 'active' | 'completed' | 'archived' | 'rejected'
+  visibility: 'listed' | 'unlisted'
+  departments: string[]
+}
+
 type MembershipQueryRow = {
   id?: unknown
   class_id?: unknown
@@ -586,6 +597,26 @@ export async function ownerCreateClass(input: OwnerCreateClassInput) {
   })
   if (error) throw error
   return String(data || '')
+}
+
+export async function ownerUpdateClass(input: OwnerUpdateClassInput) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const cleanClassName = input.className.trim()
+  if (!input.classId) throw new Error('Choose a class.')
+  if (!cleanClassName) throw new Error('Enter a class name.')
+  const { error } = await supabase.rpc('owner_update_class', {
+    p_class_id: input.classId,
+    p_payload: {
+      className: cleanClassName,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      joinMode: input.joinMode,
+      status: input.status,
+      visibility: input.visibility,
+      departments: input.departments.map((department) => department.trim()).filter(Boolean),
+    },
+  })
+  if (error) throw error
 }
 
 export async function ownerListClassMembers(classId: string): Promise<OwnerClassMember[]> {

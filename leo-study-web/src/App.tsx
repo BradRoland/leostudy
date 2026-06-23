@@ -27,7 +27,7 @@ import {
   type ClassCreationRequestInput,
   type ClassDepartment,
 } from './lib/classApi'
-import { normalizeInviteCode } from './lib/classWorkspace'
+import { formatAcademyClassLabel, normalizeInviteCode } from './lib/classWorkspace'
 import { buildSupportCheckoutUrl } from './lib/stripeSupport'
 import './components/GlobalChatWidget.css'
 
@@ -1227,11 +1227,9 @@ const fixedClassRequestAcademy = {
 
 function formatClassWorkspaceLabel(classInfo: { academyName?: string | null; className?: string | null } | null | undefined) {
   if (!classInfo) return ''
-  const rawAcademyName = String(classInfo.academyName || fixedClassRequestAcademy.name).trim()
-  const academyName = rawAcademyName.replace(/\s+\d+$/, '').trim() || rawAcademyName
   const rawClassName = String(classInfo.className || '').trim()
   const className = /^class\b/i.test(rawClassName) ? rawClassName : `Class ${rawClassName || '180'}`
-  return `${academyName} ${className}`.replace(/\s+/g, ' ').trim()
+  return formatAcademyClassLabel(classInfo.academyName || fixedClassRequestAcademy.name, className)
 }
 
 type AuthClassRequestDraft = {
@@ -14685,7 +14683,7 @@ function App() {
                   <h2 className={displayNameClass(activeProfileTier, true)} style={displayNameStyle(profileDetails.nameStyle, activeProfileTier)}>
                     {activeProfileName}
                   </h2>
-                  <p className="muted">{activeClass ? `This workspace shows only ${activeClass.className}: class leaderboards, class chat, and classmates.` : 'Pick your focus and keep building momentum.'}</p>
+                  <p className="muted">{activeClass ? `This workspace shows only ${formatClassWorkspaceLabel(activeClass)}: class leaderboards, class chat, and classmates.` : 'Pick your focus and keep building momentum.'}</p>
                   <p className="home-quote-line">“{homeDailyQuote}”</p>
                   <div className={profileDetails.stats.studyDayStreak >= 7 ? 'day-streak-chip day-streak-chip-fire' : 'day-streak-chip'}>
                     <span className="day-streak-label">Study Streak</span>

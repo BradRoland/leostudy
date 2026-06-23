@@ -30,6 +30,17 @@ export function extractInviteCodeFromPath(path: string) {
   return normalizeInviteCode(candidate || '')
 }
 
+export function formatAcademyClassLabel(academyName: string | null | undefined, className: string | null | undefined) {
+  const cleanAcademyName = String(academyName || 'Academy')
+    .replace(/\s+\d+\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const cleanClassName = String(className || 'Class')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return `${cleanAcademyName || 'Academy'} ${cleanClassName || 'Class'}`.replace(/\s+/g, ' ').trim()
+}
+
 export function shouldShowClassAsActive(classSummary: ActiveClassSummary, now = new Date()) {
   if (classSummary.status !== 'active') return false
   if (classSummary.visibility !== 'listed') return false

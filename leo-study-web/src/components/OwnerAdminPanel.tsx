@@ -7,15 +7,17 @@ import {
   ownerRemoveClassMember,
   ownerSetClassMemberRole,
   ownerTimeoutClassMember,
+  ownerUpdateClass,
   updateClassJoinMode,
   type AcademyClassRow,
   type ClassDepartment,
   type ClassRole,
   type OwnerClassMember,
 } from '../lib/classApi'
+import { formatAcademyClassLabel } from '../lib/classWorkspace'
 
 function classLabel(row: AcademyClassRow) {
-  return `${row.academies?.name || 'Academy'} ${row.class_name}`
+  return formatAcademyClassLabel(row.academies?.name, row.class_name)
 }
 
 function displayMember(member: OwnerClassMember) {
@@ -48,6 +50,15 @@ export function OwnerAdminPanel({ onRefreshMemberships }: { onRefreshMemberships
     joinMode: 'open' as 'open' | 'approval_required' | 'code_only',
     departments: ['', '', ''],
   })
+  const [editClass, setEditClass] = useState({
+    className: '',
+    startDate: '',
+    endDate: '',
+    joinMode: 'open' as 'open' | 'approval_required' | 'code_only',
+    status: 'active' as 'pending' | 'active' | 'completed' | 'archived' | 'rejected',
+    visibility: 'listed' as 'listed' | 'unlisted',
+    departments: [''],
+  })
 
   const selectedClass = useMemo(
     () => classes.find((row) => row.id === selectedClassId) || classes[0] || null,
@@ -71,14 +82,16 @@ export function OwnerAdminPanel({ onRefreshMemberships }: { onRefreshMemberships
       const rows = await loadCreatedClasses()
       setClasses(rows)
       setSelectedClassId((current) => current || rows[0]?.id || '')
+      return rows
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load classes.')
+      return []
     } finally {
       setLoading(false)
     }
   }
 
-  const refreshSelectedClass = async (classId = selectedClass?.id || '') => {
+  const refreshSelectedClass = async (classId = selectedClass?.id || '', classRows = classes) => {
     if (!classId) {
       setDepartments([])
       setMembers([])
@@ -91,8 +104,20 @@ export function OwnerAdminPanel({ onRefreshMemberships }: { onRefreshMemberships
         loadClassDepartments(classId),
         ownerListClassMembers(classId),
       ])
+      const classRow = classRows.find((row) => row.id === classId) || selectedClass
       setDepartments(departmentRows)
       setMembers(memberRows)
+      if (classRow) {
+        setEditClass({
+          className: classRow.class_name || '',
+          startDate: classRow.start_date || '',
+          endDate: classRow.end_date || '',
+          joinMode: (['open', 'approval_required', 'code_only'].includes(classRow.join_mode) ? classRow.join_mode : 'open') as 'open' | 'approval_required' | 'code_only',
+          status: (['pending', 'active', 'completed', 'archived', 'rejected'].includes(classRow.status) ? classRow.status : 'active') as 'pending' | 'active' | 'completed' | 'archived' | 'rejected',
+          visibility: (['listed', 'unlisted'].includes(classRow.visibility) ? classRow.visibility : 'listed') as 'listed' | 'unlisted',
+          departments: departmentRows.length > 0 ? departmentRows.map((department) => department.name) : [''],
+        })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load class overview.')
     } finally {
@@ -127,8 +152,8 @@ export function OwnerAdminPanel({ onRefreshMemberships }: { onRefreshMemberships
       setNewClass({ className: '', startDate: '', endDate: '', joinMode: 'open', departments: ['', '', ''] })
       setSelectedClassId(classId)
       setSuccess('Class created.')
-      await refreshClasses()
-      await refreshSelectedClass(classId)
+      const rows = await refreshClasses()
+      await refreshSelectedClass(classId, rows)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create class.')
     } finally {
@@ -147,6 +172,33 @@ export function OwnerAdminPanel({ onRefreshMemberships }: { onRefreshMemberships
       await refreshClasses()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update join mode.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const updateSelectedClass = async () => {
+    if (!selectedClass) return
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    try {
+      await ownerUpdateClass({
+        classId: selectedClass.id,
+        className: editClass.className,
+        startDate: editClass.startDate,
+        endDate: editClass.endDate,
+        joinMode: editClass.joinMode,
+        status: editClass.status,
+        visibility: editClass.visibility,
+        departments: editClass.departments,
+      })
+      setSuccess('Class details saved.')
+      const rows = await refreshClasses()
+      await refreshSelectedClass(selectedClass.id, rows)
+      await onRefreshMemberships()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update class details.')
     } finally {
       setSaving(false)
     }
@@ -301,6 +353,93 @@ export function OwnerAdminPanel({ onRefreshMemberships }: { onRefreshMemberships
           ) : <p className="muted">No class selected.</p>}
         </section>
       </div>
+
+      <section className="owner-admin-section">
+        <div className="settings-inline-head">
+          <div>
+            <h4>Edit Selected Class</h4>
+            <p className="muted tiny">Update class name, dates, discovery status, join mode, and add missing agencies.</p>
+          </div>
+          <button className="primary" type="button" disabled={saving || !selectedClass || !editClass.className.trim()} onClick={() => void updateSelectedClass()}>
+            {saving ? 'Saving...' : 'Save Class Details'}
+          </button>
+        </div>
+        <div className="settings-grid">
+          <label>
+            Class number/name
+            <input value={editClass.className} onChange={(event) => setEditClass({ ...editClass, className: event.target.value })} placeholder="Class 180" />
+          </label>
+          <label>
+            Start date
+            <input type="date" value={editClass.startDate} onChange={(event) => setEditClass({ ...editClass, startDate: event.target.value })} />
+          </label>
+          <label>
+            End date
+            <input type="date" value={editClass.endDate} onChange={(event) => setEditClass({ ...editClass, endDate: event.target.value })} />
+          </label>
+          <label>
+            Join mode
+            <select value={editClass.joinMode} onChange={(event) => setEditClass({ ...editClass, joinMode: event.target.value as typeof editClass.joinMode })}>
+              <option value="open">Anyone can join</option>
+              <option value="approval_required">Admin approval required</option>
+              <option value="code_only">Code only</option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select value={editClass.status} onChange={(event) => setEditClass({ ...editClass, status: event.target.value as typeof editClass.status })}>
+              <option value="pending">Pending</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+              <option value="archived">Archived</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </label>
+          <label>
+            Discovery
+            <select value={editClass.visibility} onChange={(event) => setEditClass({ ...editClass, visibility: event.target.value as typeof editClass.visibility })}>
+              <option value="listed">Listed</option>
+              <option value="unlisted">Unlisted</option>
+            </select>
+          </label>
+        </div>
+        <div className="owner-admin-department-list">
+          <div className="settings-inline-head">
+            <h4>Agencies</h4>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => setEditClass((previous) => ({ ...previous, departments: [...previous.departments, ''] }))}
+            >
+              Add Agency
+            </button>
+          </div>
+          {editClass.departments.map((department, index) => (
+            <div className="department-entry-row" key={`owner-edit-department-${index}`}>
+              <input
+                value={department}
+                onChange={(event) => setEditClass((previous) => {
+                  const departments = [...previous.departments]
+                  departments[index] = event.target.value
+                  return { ...previous, departments }
+                })}
+                placeholder={`Agency ${index + 1}`}
+              />
+              <button
+                className="secondary"
+                type="button"
+                disabled={editClass.departments.length <= 1}
+                onClick={() => setEditClass((previous) => ({
+                  ...previous,
+                  departments: previous.departments.filter((_, departmentIndex) => departmentIndex !== index),
+                }))}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {error ? <p className="bad">{error}</p> : null}
       {success ? <p className="saved-pill">{success}</p> : null}

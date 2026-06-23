@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   buildInviteUrl,
   extractInviteCodeFromPath,
+  formatAcademyClassLabel,
   normalizeInviteCode,
   shouldShowClassAsActive,
 } from './classWorkspace.ts'
@@ -49,4 +50,9 @@ test('shows only active listed classes whose end date has not passed', () => {
     visibility: 'unlisted',
     endDate: '2026-08-01',
   }, new Date('2026-06-22T12:00:00Z')), false)
+})
+
+test('formats Police Academy 180 classes without repeating 180', () => {
+  assert.equal(formatAcademyClassLabel('Police Academy 180', 'Class 180'), 'Police Academy Class 180')
+  assert.equal(formatAcademyClassLabel('Police Academy 180', 'class 1'), 'Police Academy class 1')
 })

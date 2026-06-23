@@ -26,7 +26,7 @@ import {
   type ClassJoinRequest,
   type ClassMembership,
 } from '../lib/classApi'
-import { extractInviteCodeFromPath, normalizeInviteCode } from '../lib/classWorkspace'
+import { extractInviteCodeFromPath, formatAcademyClassLabel, normalizeInviteCode } from '../lib/classWorkspace'
 
 const fixedClassRequestAcademy = {
   name: 'Police Academy 180',
@@ -68,7 +68,11 @@ function isClassRequestReady(input: { className: string; departments: string[] }
 }
 
 function classTitle(row: AcademyClassRow) {
-  return `${row.academies?.name || 'Academy'} ${row.class_name}`
+  return formatAcademyClassLabel(row.academies?.name, row.class_name)
+}
+
+function membershipTitle(row: ClassMembership | null | undefined) {
+  return formatAcademyClassLabel(row?.academyName, row?.className)
 }
 
 function classDates(startDate?: string | null, endDate?: string | null) {
@@ -385,7 +389,7 @@ export function ClassWorkspacePages({
     const normalizedInviteCode = normalizeInviteCode(inviteCode)
     const activeClassIsDifferent = Boolean(currentUserId && activeClass && invitePreview && activeClass.classId !== invitePreview.classId)
     const activeClassIsSame = Boolean(currentUserId && activeClass && invitePreview && activeClass.classId === invitePreview.classId)
-    const inviteTitle = invitePreview ? `Join ${invitePreview.academyName} ${invitePreview.className}?` : 'Join your class'
+    const inviteTitle = invitePreview ? `Join ${formatAcademyClassLabel(invitePreview.academyName, invitePreview.className)}?` : 'Join your class'
     const acceptLabel = activeClassIsDifferent ? 'Leave and Join Class' : activeClassIsSame ? 'Enter Class' : 'Join Class'
     return (
       <main className={`${pageClassName} class-join-flow`}>
@@ -394,7 +398,7 @@ export function ClassWorkspacePages({
           <h1>{inviteTitle}</h1>
           {invitePreview ? (
             <div className="invite-summary">
-              <strong>{invitePreview.className}</strong>
+              <strong>{formatAcademyClassLabel(invitePreview.academyName, invitePreview.className)}</strong>
               <span>{invitePreview.academyLocation || 'Location not set'} · {classDates(invitePreview.startDate, invitePreview.endDate)}</span>
             </div>
           ) : (
@@ -427,7 +431,7 @@ export function ClassWorkspacePages({
           ) : (
             <>
               {activeClassIsDifferent ? (
-                <p className="bad">You are already in {activeClass?.className}. Do you want to leave it and join {invitePreview?.className}?</p>
+                <p className="bad">You are already in {membershipTitle(activeClass)}. Do you want to leave it and join {invitePreview ? formatAcademyClassLabel(invitePreview.academyName, invitePreview.className) : 'this class'}?</p>
               ) : null}
               <button className="primary" type="button" disabled={loading || inviteLoading || !normalizedInviteCode || !invitePreview || (!invitePreview.departmentId && departments.length > 0 && !joinDepartmentId)} onClick={() => void submitInvite()}>
                 {loading ? 'Joining...' : acceptLabel}
@@ -505,7 +509,7 @@ export function ClassWorkspacePages({
           {isOwner && ownerRequests.length === 0 ? <p className="muted">No class requests yet.</p> : null}
           {ownerRequests.map((request) => (
             <article className="class-card" key={request.id}>
-              <h3>{request.academy_name} {request.class_name}</h3>
+              <h3>{formatAcademyClassLabel(request.academy_name, request.class_name)}</h3>
               <p className="muted tiny">{request.academy_city}, {request.academy_state} · {classDates(request.start_date, request.end_date)}</p>
               <p className="muted tiny">Requested by: {request.requester_name || 'Unknown'}{request.requester_email ? ` · ${request.requester_email}` : ''}</p>
               <p>{request.requester_note || 'No note provided.'}</p>
@@ -550,7 +554,7 @@ export function ClassWorkspacePages({
           <p className="eyebrow">Class admin</p>
           <h1>Class Access</h1>
           <p className="muted">
-            {activeClass ? `Control how cadets join ${activeClass.className}. Five-digit codes always join instantly.` : 'Control how cadets join your class.'}
+            {activeClass ? `Control how cadets join ${membershipTitle(activeClass)}. Five-digit codes always join instantly.` : 'Control how cadets join your class.'}
           </p>
           {!canAdmin ? <p className="muted">Class admin or moderator access is required.</p> : null}
           {canAdmin ? (
@@ -661,7 +665,7 @@ export function ClassWorkspacePages({
           <div className="class-grid">
             {memberships.map((membership) => (
               <article className="class-card" key={membership.id}>
-                <h3>{membership.academyName} {membership.className}</h3>
+                <h3>{membershipTitle(membership)}</h3>
                 <p className="muted tiny">{membership.academyLocation || 'Location not set'} · {classDates(membership.startDate, membership.endDate)}</p>
                 <p className="muted tiny">{membership.departmentName || 'No department'} · {membership.role}</p>
                 <button className={membership.isActive ? 'secondary' : 'primary'} type="button" disabled={membership.isActive || loading} onClick={() => void switchClass(membership.classId)}>
