@@ -1003,7 +1003,25 @@ const homeEncouragementQuotes = [
 ]
 type ReleaseNoteVisual = 'bot' | 'profile' | 'scrollLock' | 'gameUi' | 'blaster' | 'latency' | 'powerups' | 'flow' | 'mobile' | 'xp' | 'validation'
 
-const releaseNotesV061: Array<{ title: string; visual: ReleaseNoteVisual; items: string[] }> = [
+const releaseNotesV062: Array<{ title: string; visual: ReleaseNoteVisual; items: string[] }> = [
+  {
+    title: '1v1 Connect 4',
+    visual: 'gameUi',
+    items: [
+      'Added Connect 4 as a new 1v1 game mode with realtime player turns, win detection, draw handling, and rematch-ready game state.',
+      'Added Connect 4 bot practice with difficulty choices, including a much stronger Very Hard bot that reads ahead and blocks simple traps.',
+      'Added polished Connect 4 animations, full-column clicking, falling pieces, centered win strikes, and XP rewards for completed matches.',
+    ],
+  },
+  {
+    title: 'Class Websites and Request Flow',
+    visual: 'flow',
+    items: [
+      'Added support for multiple class workspaces inside one website so different academy classes can have their own focused area.',
+      'Added class-specific leaderboards, class chat, classmates, invites, and owner tools so each class can run separately while staying in the same app.',
+      'Added the class request flow so users can request a class, track the request status, and move into the right class workspace after approval.',
+    ],
+  },
   {
     title: '1v1 Versus Bot Practice',
     visual: 'bot',
@@ -14677,10 +14695,10 @@ function App() {
                   <button
                     className={`secondary home-whats-new-btn ${homeWhatsNewOpen ? 'active' : ''}`}
                     onClick={() => setHomeWhatsNewOpen(true)}
-                    aria-label="Open what's new for version 0.61"
+                    aria-label="Open what's new for version 0.62"
                   >
                     <AppIcon name="updates" className="button-icon" />
-                    What's New · v0.61
+                    What's New · v0.62
                   </button>
                   <button
                     className={`icon-menu-button home-leaderboard-gear ${homeLeaderboardSettingsOpen ? 'active' : ''}`}
@@ -18766,15 +18784,15 @@ function App() {
             <div className="home-whats-new-head">
               <div className="home-whats-new-title-wrap">
                 <p className="eyebrow">Release Notes</p>
-                <h3>What’s New · v0.61</h3>
+                <h3>What’s New · v0.62</h3>
               </div>
               <button className="secondary" onClick={() => setHomeWhatsNewOpen(false)}>
                 Close
               </button>
             </div>
             <div className="home-whats-new-list">
-              {releaseNotesV061.map((group) => (
-                <article key={`v061-note-${group.title}`} className="home-whats-new-card">
+              {releaseNotesV062.map((group) => (
+                <article key={`v062-note-${group.title}`} className="home-whats-new-card">
                   <div className={`home-whats-new-visual home-whats-new-visual-${group.visual}`} aria-hidden>
                     <span className="home-whats-new-visual-screen" />
                     <span className="home-whats-new-visual-main" />
