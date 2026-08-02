@@ -8,7 +8,7 @@ export type StudyGuideExamCoverage = {
   weekLabel: string
 }
 
-const studyGuideExamDefinitions: Record<StudyGuideExamId, StudyGuideExamCoverage> = {
+export const studyGuideExamDefinitions: Record<StudyGuideExamId, StudyGuideExamCoverage> = {
   tmas1: {
     id: 'tmas1',
     shortLabel: 'TMAS 1',

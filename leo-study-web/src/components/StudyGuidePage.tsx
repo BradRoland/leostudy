@@ -3,8 +3,11 @@ import { studyGuideModules, type StudyGuideDomain, type StudyGuideModuleId } fro
 import { studyGuideOfficialResearchByLd, type StudyGuideOfficialChapterGuide } from '../content/studyGuideOfficialResearch'
 import {
   getStudyGuideExamCoverage,
+  getStudyGuideExamLdNumbers,
   studyGuideExamCoverageSourceNote,
+  studyGuideExamDefinitions,
   type StudyGuideExamCoverage,
+  type StudyGuideExamId,
 } from '../content/studyGuideExamBlueprint'
 
 type StudyGuidePageProps = {
@@ -67,7 +70,7 @@ function examChipClassName(examId: StudyGuideExamCoverage['id']) {
 }
 
 export function StudyGuidePage({ onStudyActivity }: StudyGuidePageProps) {
-  const loadedDomains = useMemo<LoadedGuideDomain[]>(
+  const allLoadedDomains = useMemo<LoadedGuideDomain[]>(
     () =>
       studyGuideModules
         .filter((module) => module.hasContent)
@@ -87,6 +90,12 @@ export function StudyGuidePage({ onStudyActivity }: StudyGuidePageProps) {
         }),
     [],
   )
+
+  const [selectedExamId, setSelectedExamId] = useState<StudyGuideExamId>('tmas1')
+  const loadedDomains = useMemo<LoadedGuideDomain[]>(() => {
+    const testedLdNumbers = new Set(getStudyGuideExamLdNumbers(selectedExamId))
+    return allLoadedDomains.filter((domain) => testedLdNumbers.has(domain.ldNumber))
+  }, [allLoadedDomains, selectedExamId])
 
   const [selectedDomainId, setSelectedDomainId] = useState<string>(() => loadedDomains[0]?.guideId ?? '')
   const [searchValue, setSearchValue] = useState('')
@@ -189,6 +198,24 @@ export function StudyGuidePage({ onStudyActivity }: StudyGuidePageProps) {
             </div>
           </div>
 
+          <div className="segmented study-practice-module-switch" aria-label="Study guide exam coverage">
+            {(Object.keys(studyGuideExamDefinitions) as StudyGuideExamId[]).map((examId) => {
+              const exam = studyGuideExamDefinitions[examId]
+              return (
+                <button
+                  key={exam.id}
+                  className={selectedExamId === exam.id ? 'seg active' : 'seg'}
+                  onClick={() => {
+                    onStudyActivity()
+                    setSelectedExamId(exam.id)
+                  }}
+                >
+                  {exam.shortLabel}
+                </button>
+              )
+            })}
+          </div>
+
           <div className="study-guide-stats">
             <div className="study-guide-stat-pill">
               <small>Learning Domains</small>
@@ -231,7 +258,7 @@ export function StudyGuidePage({ onStudyActivity }: StudyGuidePageProps) {
               <div className="study-guide-panel-head">
                 <div>
                   <h3>Learning Domains</h3>
-                  <p className="muted">Select the LD you want to study for the test.</p>
+                  <p className="muted">Select an LD from {studyGuideExamDefinitions[selectedExamId].examLabel}.</p>
                 </div>
               </div>
 

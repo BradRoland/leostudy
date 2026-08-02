@@ -193,7 +193,7 @@ function buildLdBreakdown(questions: PracticeTestQuestion[], answers: Record<str
 }
 
 export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, onSessionComplete, sessionXpReward }: StudyPracticeTestPageProps) {
-  const [selectedModuleId, setSelectedModuleId] = useState<PracticeTestModuleId>('tmas2')
+  const [selectedModuleId, setSelectedModuleId] = useState<PracticeTestModuleId>('tmas1')
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<number>(20)
   const [sessionActive, setSessionActive] = useState(false)
   const [sessionComplete, setSessionComplete] = useState(false)

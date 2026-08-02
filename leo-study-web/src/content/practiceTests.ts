@@ -4,6 +4,7 @@ import { strengthenScenarioDistractors } from './practiceTestChoiceTuning'
 import { polishPracticeScenarios } from './practiceTestQuestionPolish'
 import { resolvePracticeTestTtsRefs } from './practiceTestTtsRefs'
 import { appendTrueFalseFollowUps } from './practiceTestTrueFalse'
+import { buildTmas1Scenarios } from './practiceTestTmas1Scenarios'
 
 export type PracticeTestModuleId = 'tmas1' | 'tmas2' | 'tmas3' | 'ld152016'
 
@@ -3287,6 +3288,8 @@ const allTmas2Scenarios = appendTrueFalseFollowUps(
   ),
 )
 
+const tmas1Scenarios = buildTmas1Scenarios(allTmas2Scenarios)
+
 function countQuestions(scenarios: PracticeTestScenario[]) {
   return scenarios.reduce((total, item) => total + item.questions.length, 0)
 }
@@ -3295,12 +3298,24 @@ export const practiceTestModules: PracticeTestModule[] = [
   {
     id: 'tmas1',
     title: 'TMAS 1',
-    status: 'coming_soon',
-    description: 'TMAS 1 practice tests will plug into the same scenario-based exam flow.',
-    formatSummary: 'Coming soon',
-    officialBasis: [],
-    formatSignals: [],
-    scenarios: [],
+    status: 'available',
+    description:
+      'A realistic Comprehensive Exam #1 practice bank built from the official POST TTS and workbook material for the exact five LDs listed on the Class 180 success-criteria sheet.',
+    formatSummary: `${countQuestions(tmas1Scenarios)} questions across ${tmas1Scenarios.length} scenario sets covering only LD 5, 15, 16, 20, and 39.`,
+    officialBasis: [
+      'Official POST Training and Testing Specifications for LD 5, 15, 16, 20, and 39',
+      'Official POST student workbooks mapped to the tested TTS objectives for those five LDs',
+      'Success Criteria Class 180 blueprint showing Comprehensive Exam #1 / TMAS 1 coverage in Week 6',
+      'The same scenario, answer-choice, explanation, randomization, and review structure used by the live TMAS 2 and TMAS 3 banks',
+    ],
+    formatSignals: [
+      'Every question stays inside the five LDs assigned to Comprehensive Exam #1: 5, 15, 16, 20, and 39',
+      'Scenario sets mix one-best-answer multiple choice with realistic true / false follow-ups',
+      'Questions are tagged to the matching POST TTS points and include answer explanations for review mode',
+      'Runs randomize scenario order, question order, and answer order while preserving true / false choice order',
+      'Practice content only; not an official POST exam',
+    ],
+    scenarios: tmas1Scenarios,
   },
   {
     id: 'tmas2',
@@ -3371,5 +3386,5 @@ export const practiceTestModules: PracticeTestModule[] = [
 ]
 
 export function getPracticeTestModule(moduleId: PracticeTestModuleId) {
-  return practiceTestModules.find((module) => module.id === moduleId) ?? practiceTestModules[1]
+  return practiceTestModules.find((module) => module.id === moduleId) ?? practiceTestModules[0]
 }
