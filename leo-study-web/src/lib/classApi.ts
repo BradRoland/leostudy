@@ -1,4 +1,10 @@
-import { buildInviteUrl, normalizeInviteCode, shouldShowClassAsActive } from './classWorkspace'
+import {
+  buildInviteUrl,
+  enrollmentClassNames,
+  isEnrollmentClassName,
+  normalizeInviteCode,
+  shouldShowClassAsActive,
+} from './classWorkspace'
 import { supabase } from './supabase'
 
 export type ClassRole = 'cadet' | 'moderator' | 'class_admin'
@@ -154,15 +160,6 @@ type MembershipQueryRow = {
   } | null
 }
 
-type Class180FallbackRow = {
-  id?: unknown
-  class_name?: unknown
-  start_date?: string | null
-  end_date?: string | null
-  status?: unknown
-  academies?: { name?: unknown; city?: unknown; state?: unknown } | Array<{ name?: unknown; city?: unknown; state?: unknown }> | null
-}
-
 export function inviteBaseUrl() {
   return String(import.meta.env.VITE_INVITE_BASE_URL || 'https://join.180.academy').replace(/\/+$/, '')
 }
@@ -218,75 +215,18 @@ export async function loadClassMemberships(): Promise<ClassMembership[]> {
   })
 }
 
-export async function ensureClass180Membership() {
-  if (!supabase) return false
-  const { error } = await supabase.rpc('ensure_class_180_membership')
-  if (error) throw error
-  return true
-}
-
-export async function loadClass180FallbackMembership(): Promise<ClassMembership | null> {
-  if (!supabase) return null
-  const { data, error } = await supabase
-    .from('academy_classes')
-    .select('id,class_name,start_date,end_date,status,academies(name,city,state)')
-    .eq('class_name', 'Class 180')
-    .maybeSingle()
-
-  if (error || !data) return null
-
-  const row = data as Class180FallbackRow
-  const classId = String(row.id || '')
-  if (!classId) return null
-  const academyRow = Array.isArray(row.academies) ? row.academies[0] : row.academies
-  const { data: departments } = await supabase
-    .from('class_departments')
-    .select('id,class_id,name')
-    .eq('class_id', classId)
-    .order('name', { ascending: true })
-    .limit(1)
-
-  const department = ((departments || []) as ClassDepartment[])[0]
-  return {
-    id: `fallback-class-180-${classId}`,
-    classId,
-    className: String(row.class_name || 'Class 180'),
-    academyName: String(academyRow?.name || 'Police Academy 180'),
-    academyLocation: academyLocation({
-      city: typeof academyRow?.city === 'string' ? academyRow.city : '',
-      state: typeof academyRow?.state === 'string' ? academyRow.state : '',
-    }),
-    role: 'cadet',
-    isActive: true,
-    departmentId: department?.id || null,
-    departmentName: department?.name || 'Unassigned',
-    startDate: row.start_date || null,
-    endDate: row.end_date || null,
-    status: String(row.status || 'active'),
-  }
-}
-
-export async function hasClass180LeaderboardData(userId: string, classId: string) {
-  if (!supabase || !userId || !classId) return false
-  const { data, error } = await supabase
-    .from('leaderboard')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('class_id', classId)
-    .limit(1)
-  return !error && Boolean(data?.length)
-}
-
 export async function loadActiveClasses() {
   if (!supabase) return []
   const { data, error } = await supabase
     .from('academy_classes')
     .select('id,class_name,start_date,end_date,status,visibility,join_mode,academy_id,academies(name,city,state)')
+    .in('class_name', [...enrollmentClassNames])
     .eq('status', 'active')
     .eq('visibility', 'listed')
     .order('end_date', { ascending: true, nullsFirst: false })
   if (error) throw error
   return ((data || []) as AcademyClassRow[]).filter((row) =>
+    isEnrollmentClassName(row.class_name) &&
     shouldShowClassAsActive({
       status: row.status,
       visibility: row.visibility,

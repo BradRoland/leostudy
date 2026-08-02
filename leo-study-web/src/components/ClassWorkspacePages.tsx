@@ -9,6 +9,7 @@ import {
   formatInviteUrl,
   loadClassDepartments,
   loadClassJoinRequests,
+  loadActiveClasses,
   loadCreatedClasses,
   loadOwnerClassCreationRequests,
   lookupInvite,
@@ -142,14 +143,15 @@ export function ClassWorkspacePages({
   useEffect(() => {
     if (mode !== 'classes' && mode !== 'join' && mode !== 'admin') return
     setLoading(true)
-    loadCreatedClasses()
+    const loadClasses = mode === 'admin' ? loadCreatedClasses : loadActiveClasses
+    loadClasses()
       .then((rows) => {
         setAvailableClasses(rows)
-        if (!selectedClassId && rows[0]) setSelectedClassId(rows[0].id)
+        setSelectedClassId((current) => rows.some((row) => row.id === current) ? current : rows[0]?.id || '')
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load classes.'))
       .finally(() => setLoading(false))
-  }, [mode, selectedClassId])
+  }, [mode])
 
   useEffect(() => {
     if (!selectedClassId) {
@@ -157,7 +159,15 @@ export function ClassWorkspacePages({
       return
     }
     if (mode === 'invite') return
-    loadClassDepartments(selectedClassId).then(setDepartments).catch(() => setDepartments([]))
+    loadClassDepartments(selectedClassId)
+      .then((rows) => {
+        setDepartments(rows)
+        setJoinDepartmentId((current) => rows.some((row) => row.id === current) ? current : rows.length === 1 ? rows[0].id : '')
+      })
+      .catch(() => {
+        setDepartments([])
+        setJoinDepartmentId('')
+      })
   }, [mode, selectedClassId])
 
   useEffect(() => {
@@ -450,9 +460,9 @@ export function ClassWorkspacePages({
       <main className={`${pageClassName} class-join-flow`}>
         <section className="class-join-card">
           <p className="eyebrow">Join a class</p>
-          <h1>Which class are you in?</h1>
+          <h1>Choose Class 181 or Class 182</h1>
           <p className="muted">
-            {selectedClassRequiresApproval ? 'Choose your class and department. The class admin will approve your request.' : 'Choose your class and department. You will join immediately.'}
+            {selectedClassRequiresApproval ? 'Choose your class and department. The class admin will approve your request.' : 'Pick your class and department to start with a fresh, class-only leaderboard.'}
           </p>
           {loading ? <p className="muted">Loading classes...</p> : null}
           {!loading && availableClasses.length === 0 ? <p className="muted">No classes are available yet.</p> : null}
@@ -481,15 +491,6 @@ export function ClassWorkspacePages({
           <button className="primary" type="button" onClick={() => void joinSelectedClass()} disabled={loading || !selectedClass || (departments.length > 0 && !joinDepartmentId)}>
             {loading ? (selectedClassRequiresApproval ? 'Sending...' : 'Joining...') : selectedClassRequiresApproval ? 'Request to Join' : 'Join Class'}
           </button>
-          <div className="class-join-divider"><span>or enter a code</span></div>
-          <label className="join-code-field">
-            Five-digit code
-            <input inputMode="numeric" maxLength={5} value={inviteCode} onChange={(event) => setInviteCode(event.target.value.replace(/\D/g, '').slice(0, 5))} placeholder="12345" />
-          </label>
-          <button className="secondary" type="button" disabled={loading || inviteCode.trim().length !== 5} onClick={() => void submitInvite()}>
-            {loading ? 'Joining...' : 'Join with Code'}
-          </button>
-          <a className="auth-class-request-link class-join-request-class-link" href="/classes/request">Request to add your class</a>
           <StatusLine error={error} success={success} />
         </section>
       </main>

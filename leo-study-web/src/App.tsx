@@ -10617,12 +10617,19 @@ function App() {
     clearPendingProfileUsername()
     if (isSignUpPage) {
       window.localStorage.setItem('pending_dev_notice', '1')
+      window.localStorage.setItem(pendingClassSelectionKey, '1')
     }
+
+    const authNextPath = isSignUpPage
+      ? '/classes/join'
+      : isClassWorkspacePage
+        ? currentPath
+        : '/home'
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: buildAuthRedirectTo(isClassWorkspacePage ? currentPath : '/home'),
+        redirectTo: buildAuthRedirectTo(authNextPath),
         queryParams: {
           prompt: 'select_account',
         },
@@ -11276,7 +11283,6 @@ function App() {
 
   useEffect(() => {
     if (!authReady || !currentUserId || classWorkspaceLoading || activeClass || isClassesJoinPage || isInvitePage || isClassesRequestPage) return
-    if (window.localStorage.getItem(pendingClassSelectionKey) !== '1') return
     goToPath('/classes/join', { replace: true })
   }, [activeClass, authReady, classWorkspaceLoading, currentUserId, goToPath, isClassesJoinPage, isClassesRequestPage, isInvitePage])
 
