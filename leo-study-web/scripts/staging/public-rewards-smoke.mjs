@@ -148,6 +148,11 @@ try {
       await page.getByRole('button', { name: 'Level & Rewards', exact: true }).click()
       await expect(page.locator('.profile-decoration-grid')).toBeVisible()
       await expect(page.locator('.profile-decoration-card.locked')).toHaveCount(0)
+      for (const card of await page.locator('.profile-decoration-card').all()) {
+        const box = await card.boundingBox()
+        const title = await card.locator('.profile-decoration-copy strong').boundingBox()
+        assert.ok(title.x >= box.x && title.x + title.width <= box.x + box.width && title.y + title.height <= box.y + box.height, 'Frame names must fit inside their visible cards.')
+      }
       await page.screenshot({ path: new URL(`earned-frames-${mode}-${name}.png`, output).pathname, fullPage: true, animations: 'disabled' })
       await page.getByRole('button', { name: 'All frames', exact: true }).click()
       await expect(page.locator('.profile-decoration-card').filter({ hasText: 'Academy Legend' })).toBeDisabled()
