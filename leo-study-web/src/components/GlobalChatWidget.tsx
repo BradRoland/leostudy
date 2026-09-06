@@ -2,6 +2,7 @@ import { Fragment, useEffect, useId, useRef, useState, useCallback, type Synthet
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
+import { RankBadge } from './RankBadge'
 
 type PublicMessage = {
   id: string
@@ -1174,7 +1175,7 @@ export function GlobalChatWidget({
                       </button>
                     )}
                     {!isSystemMessage ? (
-                      <span className={`global-chat-level ${messageLevel.haloClass}`}>Lv {messageLevel.level}</span>
+                      <RankBadge level={messageLevel.level} compact />
                     ) : null}
                     {(msg.agency || msg.department_name) && <span className="global-chat-agency">{msg.agency || msg.department_name}</span>}
                   </div>
@@ -1405,7 +1406,8 @@ export function GlobalChatWidget({
               </div>
 	              <div className="profile-modal-info">
 	                <h4>{selectedProfile.username}</h4>
-	                <span className={`global-chat-profile-level ${selectedProfile.haloClass}`}>Lv {selectedProfile.level} • {selectedProfile.tierName} • {selectedProfile.totalXp.toLocaleString()} XP</span>
+	                <RankBadge level={selectedProfile.level} />
+                    <span className="global-chat-profile-level">{selectedProfile.totalXp.toLocaleString()} XP earned</span>
 	                {selectedProfile.agency && <span className="profile-modal-agency">{selectedProfile.agency}</span>}
               </div>
             </div>

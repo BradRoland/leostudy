@@ -5,6 +5,7 @@ import './HomeDashboard.css'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
 type Props = {
+  rewards?: ReactNode
   name: string
   className: string
   department: string
@@ -78,6 +79,8 @@ export function HomeDashboard(props: Props) {
       <Metric icon="chart" label="Your level" value={`Level ${props.level}`} detail={`${props.totalXp.toLocaleString()} XP earned`} tone="amber"/>
     </div>
 
+
+    {props.rewards}
 
     <div className="today-hero-grid">
       <section className="today-focus-card" aria-labelledby="today-focus-title">

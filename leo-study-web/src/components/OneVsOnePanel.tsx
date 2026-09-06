@@ -7,6 +7,9 @@ import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationD
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
 import { getLiveIntegrations } from '../lib/liveIntegrations'
+import { AcademyIcon, type AcademyIconName } from './AcademyIcon'
+import { RankBadge } from './RankBadge'
+import './MultiplayerRefresh.css'
 
 type DuelGameType = 'quiz' | 'matching' | 'blaster' | 'connect4'
 type DuelCategory = 'all' | 'pc' | 'vc' | 'hs' | 'scenarios'
@@ -464,6 +467,9 @@ const duelGameTypeLabels: Record<DuelGameType, string> = {
   matching: 'Matching',
   blaster: 'Code Blaster',
   connect4: 'Connect 4',
+}
+const duelGameIcons: Record<DuelGameType, AcademyIconName> = {
+  quiz: 'test', matching: 'flashcards', blaster: 'blaster', connect4: 'games',
 }
 const duelGameTypeOptions: Array<{ value: DuelGameType; label: string; subtitle: string }> = [
   { value: 'quiz', label: '1v1 Quiz', subtitle: 'Classic question duel' },
@@ -6448,19 +6454,21 @@ export function OneVsOnePanel(props: {
 
   if (!isSignedIn) {
     return (
-      <div className="card onevone-card">
-        <h2>1v1</h2>
-        <p className="muted">Sign in to create or join realtime rooms.</p>
+      <div className="card onevone-card multiplayer-refresh multiplayer-signed-out">
+        <AcademyIcon name="duel" />
+        <h2>A little friendly competition.</h2>
+        <p className="muted">Sign in to challenge a classmate and put your practice to work.</p>
       </div>
     )
   }
 
   return (
-    <div className="onevone-wrap">
+    <div className="onevone-wrap multiplayer-refresh">
       {isJoiningRoom ? (
         <div className="card onevone-card onevone-joining-card">
+          <span className="multiplayer-state-icon"><AcademyIcon name="duel" /></span>
           <h2>Joining 1v1 Room…</h2>
-          <p className="muted">Loading the invite room now. You should be moved into the lobby as soon as it syncs.</p>
+          <p className="muted" role="status">Getting your match ready. Your room will open as soon as it connects.</p>
           <div className="actions-row">
             <button className="primary" type="button" onClick={() => void refreshRoomSnapshot()}>
               Retry Join
@@ -6867,45 +6875,66 @@ export function OneVsOnePanel(props: {
         )
       ) : !inRoom ? (
         <>
-          <h2>1v1 Multiplayer</h2>
+          <header className="multiplayer-intro">
+            <div>
+              <p className="multiplayer-eyebrow"><AcademyIcon name="duel" /> Learn together. Level up together.</p>
+              <h2>1v1 Multiplayer</h2>
+              <p className="muted">A friendly challenge. A sharper recall. Make your next study break count.</p>
+            </div>
+            <div className="multiplayer-personal-record" aria-label="Your multiplayer record">
+              <div><strong>{myDuelStats?.wins ?? '—'}</strong><span>Wins</span></div>
+              <div><strong>{myDuelStats?.matches_played ?? '—'}</strong><span>Matches</span></div>
+              <div><strong>{myDuelStats?.best_win_streak ?? '—'}</strong><span>Best streak</span></div>
+            </div>
+          </header>
           <div className="onevone-lobby-layout">
             <div className="onevone-lobby-main">
               <div className="card onevone-card onevone-entry-card">
                 <div className="onevone-entry-top">
                   <h3>Start a Match</h3>
-                  <p className="muted">Create your own room or join with a private code.</p>
+                  <p className="muted">Choose how you want to play. Every round is a chance to get better.</p>
                 </div>
                 <div className="onevone-entry-grid">
                   <button
-                    className="primary onevone-create-button"
+                    className="primary onevone-create-button multiplayer-action-card multiplayer-action-featured"
                     type="button"
                     onClick={() => setShowCreateRoomModal(true)}
                     disabled={loading || !supabase}
                   >
+                    <span className="multiplayer-action-icon"><AcademyIcon name="duel" /></span>
                     <span>Create your own room</span>
-                    <small>Choose game mode, category, privacy, and question count.</small>
+                    <small>Your game, your pace. Pick the mode and codes you want to practice.</small>
+                    <span className="multiplayer-action-footer">Set up a match <AcademyIcon name="arrow" /></span>
                   </button>
                   <button
-                    className="secondary onevone-invite-cta"
+                    className="secondary onevone-invite-cta multiplayer-action-card"
                     type="button"
                     onClick={() => openInviteModal()}
                     disabled={loading || !supabase}
                   >
+                    <span className="multiplayer-action-icon"><AcademyIcon name="class" /></span>
                     <span>Invite a Classmate</span>
-                    <small>Send a direct 1v1 invite to someone online in your class.</small>
+                    <small>Find someone from your class and turn practice into a shared challenge.</small>
+                    <span className="multiplayer-action-footer">Find your opponent <AcademyIcon name="arrow" /></span>
                   </button>
                   <button
-                    className="secondary onevone-invite-cta onevone-bot-cta"
+                    className="secondary onevone-invite-cta onevone-bot-cta multiplayer-action-card"
                     type="button"
                     onClick={() => openBotSetupModal()}
                   >
+                    <span className="multiplayer-action-icon"><AcademyIcon name="games" /></span>
                     <span>1v1 Versus Bot</span>
-                    <small>Practice Quiz, Matching, Rope Blaster, or Connect 4 with adaptive bots.</small>
+                    <small>Warm up on your own with a practice partner and a difficulty that suits you.</small>
+                    <span className="multiplayer-action-footer">Build your confidence <AcademyIcon name="arrow" /></span>
                   </button>
                   <div className="onevone-join-block">
-                    <p className="muted tiny">Join Private Room</p>
+                    <div>
+                      <label htmlFor="multiplayer-room-code">Have a room code?</label>
+                      <p className="muted tiny">Enter the six digits shared by your classmate.</p>
+                    </div>
                     <div className="onevone-join-row">
                       <input
+                        id="multiplayer-room-code"
                         value={joinCodeInput}
                         maxLength={6}
                         inputMode="numeric"
@@ -6921,14 +6950,20 @@ export function OneVsOnePanel(props: {
                 </div>
               </div>
 
-              <div className="card onevone-card">
+              <div className="card onevone-card multiplayer-public-card">
                 <div className="onevone-list-head">
-                  <h3>Public Rooms {publicRooms.length > 0 ? `(${publicRooms.length})` : ''}</h3>
+                  <div><h3>Public Rooms {publicRooms.length > 0 ? `(${publicRooms.length})` : ''}</h3><p className="muted tiny">Join an open match or watch a round in progress.</p></div>
                   <button className="secondary" onClick={() => void loadPublicRooms()} disabled={loading || !supabase}>
-                    Refresh
+                    <AcademyIcon name="updates" /> Refresh
                   </button>
                 </div>
-                {publicRooms.length === 0 ? <p className="muted">No public rooms available right now.</p> : null}
+                {publicRooms.length === 0 ? (
+                  <div className="multiplayer-empty-state">
+                    <span className="multiplayer-state-icon"><AcademyIcon name="class" /></span>
+                    <strong>The next match could be yours.</strong>
+                    <p className="muted">No public rooms available right now. Create a room to get things started, or warm up against a bot.</p>
+                  </div>
+                ) : null}
                 <div className="onevone-public-list">
                   {publicRooms.map((item) => {
                     const isActive = item.status === 'in_progress'
@@ -6940,14 +6975,16 @@ export function OneVsOnePanel(props: {
 
                     // Build player display
                     const playerDisplay = playersList.map(p => p.display_name).join(' vs ') || 'Waiting for players'
-                    const statusLabel = isActive ? '🔴 Live' : '🟢 Waiting'
+                    const statusLabel = isActive ? 'Live match' : 'Open room'
 
                     return (
                       <div key={item.id} className={`onevone-public-item ${isActive ? 'active-room' : ''}`}>
-                        <div>
+                        <span className="multiplayer-room-icon"><AcademyIcon name={duelGameIcons[item.game_type]} /></span>
+                        <div className="multiplayer-room-copy">
+                          <span className={`multiplayer-room-status${isActive ? ' is-live' : ''}`}>{statusLabel}</span>
                           <strong>{playerDisplay}</strong>
                           <p className="muted tiny">
-                            {statusLabel} • {duelGameTypeLabels[item.game_type]} • {item.category.toUpperCase()} • {formatDuelRoomRuleLabel(item)}
+                            {duelGameTypeLabels[item.game_type]} · {duelCategoryLabel(item.category)} · {formatDuelRoomRuleLabel(item)}
                           </p>
                         </div>
                         <div className="onevone-public-actions">
@@ -7143,8 +7180,8 @@ export function OneVsOnePanel(props: {
           className="profile-modal-overlay game-setup-overlay"
           onClick={() => setShowCreateRoomModal(false)}
         >
-          <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
-            <h3>Create Room</h3>
+          <div className="card game-settings-modal multiplayer-create-modal" role="dialog" aria-modal="true" aria-label="Create Room" onClick={(event) => event.stopPropagation()}>
+            <div className="multiplayer-modal-intro"><span className="multiplayer-state-icon"><AcademyIcon name="duel" /></span><div><p className="multiplayer-eyebrow">Make it your match</p><h3>Create Room</h3><p className="muted tiny">Choose your challenge. Invite someone when you’re ready.</p></div></div>
             <label className="game-control">
               Game Mode
               <div className="segmented onevone-mode-segmented">
@@ -7153,12 +7190,15 @@ export function OneVsOnePanel(props: {
                     key={`duel-mode-${option.value}`}
                     type="button"
                     className={selectedGameType === option.value ? 'seg active' : 'seg'}
+                      aria-pressed={selectedGameType === option.value}
+                      aria-label={option.label}
                     onClick={() => {
                       setSelectedGameType(option.value)
                       if (option.value === 'connect4') setSelectedCategory('all')
                       if (option.value !== 'quiz' && selectedCategory === 'scenarios') setSelectedCategory('all')
                     }}
                   >
+                    <AcademyIcon name={duelGameIcons[option.value]} />
                     <span>{option.label}</span>
                     <small>{option.subtitle}</small>
                   </button>
@@ -7359,12 +7399,15 @@ export function OneVsOnePanel(props: {
                     key={`lobby-mode-${option.value}`}
                     type="button"
                       className={lobbyEditGameType === option.value ? 'seg active' : 'seg'}
+                      aria-pressed={lobbyEditGameType === option.value}
+                      aria-label={option.label}
                       onClick={() => {
                         setLobbyEditGameType(option.value)
                         if (option.value === 'connect4') setLobbyEditCategory('all')
                         if (option.value !== 'quiz' && lobbyEditCategory === 'scenarios') setLobbyEditCategory('all')
                       }}
                   >
+                    <AcademyIcon name={duelGameIcons[option.value]} />
                     <span>{option.label}</span>
                     <small>{option.subtitle}</small>
                   </button>
@@ -7553,7 +7596,7 @@ export function OneVsOnePanel(props: {
           className="profile-modal-overlay game-setup-overlay onevone-bot-setup-overlay"
           onClick={() => setShowBotSetupModal(false)}
         >
-          <div className="card game-settings-modal onevone-bot-setup-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="card game-settings-modal onevone-bot-setup-modal" role="dialog" aria-modal="true" aria-label="1v1 Versus Bot" onClick={(event) => event.stopPropagation()}>
             <div className="onevone-bot-setup-head">
               <div className="onevone-bot-title-lockup">
                 <p className="muted tiny">Bot match setup</p>
@@ -7571,10 +7614,10 @@ export function OneVsOnePanel(props: {
             <div className="onevone-bot-setup-body">
               <section className="onevone-bot-lab onevone-bot-command-panel">
                 <div className="onevone-bot-lab-head">
-                  <span className="onevone-bot-icon" aria-hidden>🤖</span>
+                  <span className="onevone-bot-icon" aria-hidden><AcademyIcon name="games" /></span>
                   <div>
-                    <strong>Bot Training Room</strong>
-                    <p className="muted tiny">Tune the bot pressure, then build a quick private match around the codes you want to sharpen.</p>
+                    <strong>Your practice partner</strong>
+                    <p className="muted tiny">Pick a comfortable challenge and practice the codes you want to sharpen.</p>
                   </div>
                 </div>
                 <div className="onevone-bot-difficulty-grid" aria-label="Bot difficulty">
@@ -7583,6 +7626,7 @@ export function OneVsOnePanel(props: {
                       key={`bot-modal-difficulty-${option.value}`}
                       type="button"
                       className={botDifficulty === option.value ? 'onevone-bot-difficulty active' : 'onevone-bot-difficulty'}
+                      aria-pressed={botDifficulty === option.value}
                       onClick={() => setBotDifficulty(option.value)}
                     >
                       <strong>{option.label}</strong>
@@ -7644,13 +7688,16 @@ export function OneVsOnePanel(props: {
                           key={`bot-mode-${option.value}`}
                           type="button"
                           className={inviteGameType === option.value ? 'seg active' : 'seg'}
+                      aria-pressed={inviteGameType === option.value}
+                      aria-label={option.label}
                           onClick={() => {
                             setInviteGameType(option.value)
                             if (option.value === 'connect4') setInviteCategory('all')
                             if (option.value !== 'quiz' && inviteCategory === 'scenarios') setInviteCategory('all')
                           }}
                         >
-                          <span>{option.label}</span>
+                          <AcademyIcon name={duelGameIcons[option.value]} />
+                    <span>{option.label}</span>
                           <small>{option.subtitle}</small>
                         </button>
                       ))}
@@ -7808,7 +7855,7 @@ export function OneVsOnePanel(props: {
 	          className="profile-modal-overlay game-setup-overlay"
           onClick={() => setShowInviteModal(false)}
         >
-          <div className="card game-settings-modal onevone-invite-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="card game-settings-modal onevone-invite-modal" role="dialog" aria-modal="true" aria-label="Invite a Classmate" onClick={(event) => event.stopPropagation()}>
             <h3>Invite a Classmate</h3>
             <div className="onevone-invite-modal-body">
               <div className="onevone-online-list-wrap">
@@ -7870,12 +7917,15 @@ export function OneVsOnePanel(props: {
                         key={`invite-mode-${option.value}`}
                         type="button"
                         className={inviteGameType === option.value ? 'seg active' : 'seg'}
+                      aria-pressed={inviteGameType === option.value}
+                      aria-label={option.label}
                         onClick={() => {
                           setInviteGameType(option.value)
                           if (option.value !== 'quiz' && inviteCategory === 'scenarios') setInviteCategory('all')
                         }}
                       >
-                        <span>{option.label}</span>
+                        <AcademyIcon name={duelGameIcons[option.value]} />
+                    <span>{option.label}</span>
                         <small>{option.subtitle}</small>
                       </button>
                     ))}
@@ -8038,6 +8088,7 @@ export function OneVsOnePanel(props: {
           {room.status === 'waiting' ? (
             <div className="onevone-waiting-room">
               <div className="onevone-waiting-title">
+                <p className="multiplayer-eyebrow"><AcademyIcon name="duel" /> Your match room</p>
                 <h2>1v1 {duelGameTypeLabels[room.game_type]}</h2>
                 <p className="muted">{roomRuleLabel} · {roomCategoryLabel}</p>
                 <div className="onevone-lobby-settings-strip" aria-label="Current lobby settings">
@@ -8073,7 +8124,7 @@ export function OneVsOnePanel(props: {
                       </span>
                     </>
                   ) : (
-                    <span className="onevone-player-slot-empty">Waiting...</span>
+                    <span className="onevone-player-slot-empty"><AcademyIcon name="class" /><span>Waiting for a player</span></span>
                   )}
                 </div>
 
@@ -8092,14 +8143,14 @@ export function OneVsOnePanel(props: {
                       </span>
                     </>
                   ) : (
-                    <span className="onevone-player-slot-empty">Waiting...</span>
+                    <span className="onevone-player-slot-empty"><AcademyIcon name="class" /><span>Waiting for a player</span></span>
                   )}
                 </div>
               </div>
 
               <div className="onevone-waiting-footer">
                 {lobbyReadyCount < 2 ? (
-                  <p className="muted">Waiting for both players to ready up...</p>
+                  <p className="muted" role="status">{opponentPlayer ? "Both here? Select Ready Up when you’re set." : "Your seat is saved. The match starts when both players are ready."}</p>
                 ) : (
                   <p className="good">Match starting soon!</p>
                 )}
@@ -8145,7 +8196,8 @@ export function OneVsOnePanel(props: {
                         void sendWaitingChatMessage()
                       }}
                       maxLength={240}
-                      placeholder="Send a message..."
+                      aria-label="Message your opponent"
+                      placeholder="Say hello to your opponent…"
                     />
                     <button
                       type="button"
@@ -8922,6 +8974,7 @@ export function OneVsOnePanel(props: {
                     </span>
                   </div>
                   <div className="leader-profile-pills">
+                    <RankBadge level={selectedDuelProfile.level} compact />
                     <p className="leader-theme-pill">Tier: {supporterTierLabel[selectedDuelProfile.supporterTier]}</p>
                     {selectedProfileHasTopCurrentStreak ? (
                       <p className="leader-theme-pill onevone-top-streak-pill">
@@ -9001,8 +9054,8 @@ export function OneVsOnePanel(props: {
         </div>
       ) : null}
 
-      {error ? <p className="bad">{error}</p> : null}
-      {!error && notice ? <p className="good">{notice}</p> : null}
+      {error ? <p className="bad multiplayer-feedback" role="alert"><AcademyIcon name="warning" />{error}</p> : null}
+      {!error && notice ? <p className="good multiplayer-feedback" role="status">{notice}</p> : null}
     </div>
   )
 }

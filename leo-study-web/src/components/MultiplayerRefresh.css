@@ -1,0 +1,181 @@
+/* Scoped multiplayer presentation. Game state, arena motion and scoring stay in the existing engine. */
+.professional-ui .multiplayer-refresh {
+  --multiplayer-radius: 18px;
+  display: grid;
+  gap: 24px;
+  color: var(--academy-ink);
+  min-width: 0;
+}
+.professional-ui .multiplayer-refresh :is(h2, h3, p) { margin-top: 0; }
+.professional-ui .multiplayer-refresh .multiplayer-intro { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 7px 0 5px; }
+.professional-ui .multiplayer-refresh .multiplayer-intro h2 { font-size: clamp(28px, 3.3vw, 42px); line-height: 1.1; letter-spacing: -.05em; margin-bottom: 12px; }
+.professional-ui .multiplayer-refresh .multiplayer-intro > div > p:last-child { font-size: 13px; max-width: 470px; margin-bottom: 0; line-height: 1.7; }
+.professional-ui .multiplayer-refresh .multiplayer-eyebrow { display: flex; align-items: center; gap: 8px; color: var(--academy-accent); text-transform: uppercase; letter-spacing: .1em; font-size: 9px; font-weight: 650; margin: 0 0 13px; }
+.professional-ui .multiplayer-refresh .multiplayer-eyebrow svg { width: 16px; height: 16px; flex-shrink: 0; }
+.professional-ui .multiplayer-refresh .multiplayer-personal-record { display: grid; grid-template-columns: repeat(3, minmax(56px, 1fr)); gap: 22px; padding: 20px 24px; border: 1px solid var(--academy-line); border-radius: 14px; background: var(--academy-surface); flex-shrink: 0; }
+.professional-ui .multiplayer-refresh .multiplayer-personal-record > div { display: grid; gap: 5px; }
+.professional-ui .multiplayer-refresh .multiplayer-personal-record strong { font-size: 25px; font-weight: 650; line-height: 1; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.professional-ui .multiplayer-refresh .multiplayer-personal-record span { font-size: 10px; color: var(--academy-muted); white-space: nowrap; }
+.professional-ui .multiplayer-refresh .onevone-lobby-layout { grid-template-columns: minmax(0, 1fr) minmax(245px, 295px); gap: 22px; }
+.professional-ui .multiplayer-refresh .onevone-lobby-main { gap: 22px; }
+.professional-ui .multiplayer-refresh :is(.onevone-entry-card, .onevone-rail-card, .multiplayer-public-card) { padding: 24px !important; border-radius: var(--multiplayer-radius) !important; box-shadow: none !important; }
+.professional-ui .multiplayer-refresh .onevone-entry-card { gap: 0; }
+.professional-ui .multiplayer-refresh .onevone-entry-top { border: 0; margin-bottom: 21px; padding: 0; gap: 6px; }
+.professional-ui .multiplayer-refresh .onevone-entry-top h3 { font-size: 19px; letter-spacing: -.035em; }
+.professional-ui .multiplayer-refresh .onevone-entry-top p { font-size: 12px; line-height: 1.6; }
+.professional-ui .multiplayer-refresh .onevone-entry-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.professional-ui .multiplayer-refresh .multiplayer-action-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%; min-width: 0; min-height: 230px; padding: 18px 16px;
+  border: 1px solid var(--academy-line) !important; border-radius: 13px; background: var(--academy-surface) !important; color: var(--academy-ink) !important;
+  text-align: left; box-shadow: none !important; transform: none;
+}
+.professional-ui .multiplayer-refresh .multiplayer-action-card:hover:not(:disabled) { border-color: var(--academy-accent) !important; background: var(--academy-accent-soft) !important; transform: none; }
+.professional-ui .multiplayer-refresh .multiplayer-action-card .multiplayer-action-icon { display: grid; place-items: center; width: 37px; height: 37px; border-radius: 10px; background: var(--academy-surface-soft); color: var(--academy-accent); margin-bottom: 21px; }
+.professional-ui .multiplayer-refresh .multiplayer-action-card > span:not(.multiplayer-action-icon, .multiplayer-action-footer) { font-size: 14px; font-weight: 650; letter-spacing: -.02em; line-height: 1.35; }
+.professional-ui .multiplayer-refresh .multiplayer-action-card > small { display: block; font-size: 11px; font-weight: 400; line-height: 1.65; color: var(--academy-muted); margin: 10px 0 23px; }
+.professional-ui .multiplayer-refresh .multiplayer-action-card .multiplayer-action-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; width: 100%; font-size: 9px; line-height: 1.5; font-weight: 600; color: var(--academy-accent); }
+.professional-ui .multiplayer-refresh .multiplayer-action-footer svg { width: 15px; height: 15px; flex-shrink: 0; }
+.professional-ui .multiplayer-refresh .multiplayer-action-featured { background: var(--academy-accent-soft) !important; border-color: color-mix(in srgb, var(--academy-accent) 25%, var(--academy-line)) !important; }
+.professional-ui .multiplayer-refresh .multiplayer-action-featured .multiplayer-action-icon { background: var(--academy-accent); color: var(--academy-on-accent); }
+.professional-ui .multiplayer-refresh .onevone-join-block { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 9px; padding: 16px !important; background: var(--academy-surface-soft) !important; border: 0 !important; border-radius: 11px !important; box-shadow: none !important; }
+.professional-ui .multiplayer-refresh .onevone-join-block label { font-size: 12px; font-weight: 600; }
+.professional-ui .multiplayer-refresh .onevone-join-block .tiny { font-size: 10px; margin-top: 3px; }
+.professional-ui .multiplayer-refresh .onevone-join-row { width: 215px; flex-shrink: 0; }
+.professional-ui .multiplayer-refresh .onevone-join-row input { width: 100%; min-width: 0; min-height: 43px; background: var(--academy-surface); color: var(--academy-ink); border-color: var(--academy-line); font-size: 12px; }
+.professional-ui .multiplayer-refresh .onevone-join-row button { min-height: 43px; padding: 0 17px; font-size: 12px; }
+.professional-ui .multiplayer-refresh .onevone-list-head { align-items: center; gap: 14px; }
+.professional-ui .multiplayer-refresh .onevone-list-head h3 { font-size: 17px; margin: 0 0 5px; }
+.professional-ui .multiplayer-refresh .onevone-list-head p { margin-bottom: 0; font-size: 11px; }
+.professional-ui .multiplayer-refresh .onevone-list-head button { display: flex; align-items: center; gap: 6px; min-height: 38px; width: auto; font-size: 11px; padding: 8px 11px; flex-shrink: 0; }
+.professional-ui .multiplayer-refresh .onevone-list-head button svg { width: 14px; height: 14px; }
+.professional-ui .multiplayer-refresh .multiplayer-empty-state { padding: 28px 18px 19px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+.professional-ui .multiplayer-refresh .multiplayer-state-icon { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 12px; color: var(--academy-accent); background: var(--academy-accent-soft); flex-shrink: 0; }
+.professional-ui .multiplayer-refresh .multiplayer-empty-state strong { font-size: 14px; margin-top: 3px; }
+.professional-ui .multiplayer-refresh .multiplayer-empty-state p { max-width: 370px; font-size: 12px; line-height: 1.7; margin: 0; }
+.professional-ui .multiplayer-refresh .onevone-public-list { padding: 0; background: transparent; border: 0; gap: 10px; }
+.professional-ui .multiplayer-refresh .onevone-public-list:empty { display: none; }
+.professional-ui .multiplayer-refresh .onevone-public-item { display: flex; align-items: center; gap: 13px; padding: 16px; box-shadow: none !important; border-radius: 12px; }
+.professional-ui .multiplayer-refresh .multiplayer-room-icon { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; color: var(--academy-accent); background: var(--academy-accent-soft); border-radius: 10px; }
+.professional-ui .multiplayer-refresh .multiplayer-room-copy { min-width: 0; flex: 1; }
+.professional-ui .multiplayer-refresh .multiplayer-room-copy strong { display: block; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.professional-ui .multiplayer-refresh .multiplayer-room-copy p { font-size: 10px; margin: 4px 0 0; }
+.professional-ui .multiplayer-refresh .multiplayer-room-status { display: inline-flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 600; color: var(--academy-muted); margin-bottom: 5px; }
+.professional-ui .multiplayer-refresh .multiplayer-room-status::before { content: ''; width: 5px; height: 5px; background: var(--academy-positive); border-radius: 50%; }
+.professional-ui .multiplayer-refresh .multiplayer-room-status.is-live { color: var(--academy-accent); }
+.professional-ui .multiplayer-refresh .multiplayer-room-status.is-live::before { background: currentColor; }
+.professional-ui .multiplayer-refresh .onevone-public-actions { flex-wrap: wrap; }
+.professional-ui .multiplayer-refresh .onevone-public-actions button { font-size: 11px; min-height: 38px; padding: 8px 13px; }
+.professional-ui .multiplayer-refresh .onevone-rail-card { gap: 22px; }
+.professional-ui .multiplayer-refresh .onevone-rail-head { gap: 14px; }
+.professional-ui .multiplayer-refresh .onevone-rail-head h3 { font-size: 15px; letter-spacing: -.02em; }
+.professional-ui .multiplayer-refresh .onevone-rail-head .onevone-rail-mode { display: flex; flex-wrap: wrap; width: 100%; padding: 4px; gap: 2px; }
+.professional-ui .multiplayer-refresh .onevone-rail-mode .seg { font-size: 9px; padding: 7px 5px; flex: 1 0 auto; min-width: 0; }
+.professional-ui .multiplayer-refresh :is(.onevone-rail-spotlight, .onevone-my-summary) { background: var(--academy-surface-soft); border: 0; padding: 15px; border-radius: 12px; }
+.professional-ui .multiplayer-refresh :is(.onevone-rail-section > p:first-child, .onevone-my-summary > p:first-child, .onevone-rail-spotlight > p:first-child) { font-size: 9px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 12px; }
+.professional-ui .multiplayer-refresh .onevone-rail-row { grid-template-columns: 20px 30px minmax(0, 1fr) auto !important; padding: 10px 0; gap: 7px !important; border: 0 !important; border-bottom: 1px solid var(--academy-line) !important; border-radius: 0; background: transparent !important; }
+.professional-ui .multiplayer-refresh .onevone-rail-row:last-child { border-bottom: 0 !important; }
+.professional-ui .multiplayer-refresh .onevone-rail-row .onevone-rail-name { font-size: 10px; }
+.professional-ui .multiplayer-refresh .onevone-rail-row > strong { color: var(--academy-ink); font-size: 12px; }
+.professional-ui .multiplayer-refresh .onevone-my-summary-grid { gap: 10px; font-size: 10px; }
+.professional-ui .multiplayer-refresh .onevone-my-summary-grid > span { display: grid; gap: 3px; color: var(--academy-muted); }
+.professional-ui .multiplayer-refresh .onevone-my-summary-grid strong { color: var(--academy-ink); font-size: 15px; }
+.professional-ui .multiplayer-refresh .onevone-bot-board > small { display: block; margin-top: 12px; font-size: 9px; }
+
+/* Setup screens and the waiting room use the same quiet card vocabulary. */
+.professional-ui .multiplayer-refresh .game-setup-overlay { z-index: 100; }
+.professional-ui .multiplayer-refresh .game-settings-modal { background: var(--academy-surface) !important; border-color: var(--academy-line) !important; color: var(--academy-ink); border-radius: 20px !important; box-shadow: 0 22px 80px #0003 !important; padding: 28px; max-height: calc(100dvh - 40px); }
+.professional-ui .multiplayer-refresh .multiplayer-modal-intro { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.professional-ui .multiplayer-refresh .multiplayer-modal-intro .multiplayer-eyebrow { margin-bottom: 5px; }
+.professional-ui .multiplayer-refresh .multiplayer-modal-intro h3 { font-size: 25px; letter-spacing: -.04em; margin: 0 0 6px; }
+.professional-ui .multiplayer-refresh .multiplayer-modal-intro p:last-child { margin: 0; }
+.professional-ui .multiplayer-refresh .game-settings-modal .game-control { gap: 11px; font-size: 12px; font-weight: 600; }
+.professional-ui .multiplayer-refresh .game-control small { font-weight: 400; line-height: 1.65; }
+.professional-ui .multiplayer-refresh .onevone-mode-segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 0 !important; background: transparent !important; padding: 0; gap: 10px; }
+.professional-ui .multiplayer-refresh .onevone-mode-segmented .seg { display: grid; grid-template-columns: 24px minmax(0, 1fr); width: 100%; text-align: left; gap: 3px 10px; align-items: center; padding: 14px; min-height: 76px; border-radius: 11px; background: var(--academy-surface) !important; border: 1px solid var(--academy-line) !important; }
+.professional-ui .multiplayer-refresh .onevone-mode-segmented .seg > svg { grid-row: 1 / 3; color: var(--academy-muted); }
+.professional-ui .multiplayer-refresh .onevone-mode-segmented .seg > span { font-size: 12px; line-height: 1.4; }
+.professional-ui .multiplayer-refresh .onevone-mode-segmented .seg > small { font-size: 10px; color: var(--academy-muted); line-height: 1.5; }
+.professional-ui .multiplayer-refresh .onevone-mode-segmented .seg.active { background: var(--academy-accent-soft) !important; border-color: var(--academy-accent) !important; color: var(--academy-ink) !important; }
+.professional-ui .multiplayer-refresh .onevone-mode-segmented .seg.active > svg { color: var(--academy-accent); }
+.professional-ui .multiplayer-refresh .game-settings-modal > .actions-row { border-top: 1px solid var(--academy-line); padding-top: 18px; margin-top: 6px; gap: 10px; }
+.professional-ui .multiplayer-refresh .game-settings-modal .actions-row button { min-height: 44px; font-size: 12px; }
+.professional-ui .multiplayer-refresh :is(.onevone-bot-lab, .onevone-bot-settings-panel, .onevone-online-list-wrap, .onevone-invite-settings) { background: var(--academy-surface-soft); border: 1px solid var(--academy-line); border-radius: 13px; padding: 18px; box-shadow: none; }
+.professional-ui .multiplayer-refresh .onevone-bot-icon { background: var(--academy-accent-soft); color: var(--academy-accent); box-shadow: none; border-color: var(--academy-line); }
+.professional-ui .multiplayer-refresh .onevone-bot-difficulty { background: var(--academy-surface); color: var(--academy-ink); border-color: var(--academy-line); box-shadow: none; }
+.professional-ui .multiplayer-refresh .onevone-bot-difficulty.active { background: var(--academy-accent-soft); border-color: var(--academy-accent); }
+.professional-ui .multiplayer-refresh .onevone-online-empty { padding: 24px 12px; text-align: center; line-height: 1.7; }
+.professional-ui .multiplayer-refresh .onevone-waiting-room { padding: 28px !important; border-radius: 20px !important; box-shadow: none !important; gap: 26px; }
+.professional-ui .multiplayer-refresh .onevone-waiting-title .multiplayer-eyebrow { justify-content: center; }
+.professional-ui .multiplayer-refresh .onevone-waiting-title h2 { font-size: clamp(24px, 3vw, 34px); letter-spacing: -.04em; }
+.professional-ui .multiplayer-refresh .onevone-lobby-settings-strip { justify-content: center; margin-top: 18px; }
+.professional-ui .multiplayer-refresh .onevone-waiting-players { gap: 22px; }
+.professional-ui .multiplayer-refresh .onevone-player-slot { border-radius: 16px; padding: 23px 18px; background: var(--academy-surface-soft) !important; border-color: var(--academy-line) !important; box-shadow: none; }
+.professional-ui .multiplayer-refresh .onevone-player-slot.filled { background: var(--academy-surface) !important; }
+.professional-ui .multiplayer-refresh .onevone-player-slot-empty { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--academy-muted); font-size: 12px; }
+.professional-ui .multiplayer-refresh .onevone-player-slot-empty svg { width: 37px; height: 37px; margin: 10px; color: var(--academy-muted); }
+.professional-ui .multiplayer-refresh .onevone-waiting-vs { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid var(--academy-line); border-radius: 50%; font-size: 11px; color: var(--academy-muted); background: var(--academy-surface); text-shadow: none; }
+.professional-ui .multiplayer-refresh .onevone-waiting-buttons button { min-height: 44px; font-size: 12px; }
+.professional-ui .multiplayer-refresh .onevone-waiting-footer > p { font-size: 12px; line-height: 1.65; }
+.professional-ui .multiplayer-refresh .onevone-waiting-chat { background: var(--academy-surface-soft) !important; box-shadow: none !important; padding: 18px; margin-top: 24px; }
+.professional-ui .multiplayer-refresh .onevone-waiting-chat-input input { min-width: 0; min-height: 44px; background: var(--academy-surface); color: var(--academy-ink); border-color: var(--academy-line); }
+.professional-ui .multiplayer-refresh .onevone-waiting-chat-message { background: var(--academy-surface); border-color: var(--academy-line); }
+.professional-ui .multiplayer-refresh .onevone-waiting-chat-message.own { background: var(--academy-accent-soft); }
+.professional-ui .multiplayer-refresh .onevone-joining-card { padding: 30px; border-radius: 18px !important; box-shadow: none !important; }
+.professional-ui .multiplayer-refresh .onevone-joining-card h2 { font-size: 23px; }
+.professional-ui .multiplayer-refresh .onevone-result-shell { border-radius: 20px !important; padding: 28px; box-shadow: 0 22px 80px #0003 !important; }
+.professional-ui .multiplayer-refresh :is(.onevone-result-summary-chip, .onevone-compare-card, .onevone-hud-chip) { border-radius: 12px; box-shadow: none !important; }
+.professional-ui .multiplayer-refresh .multiplayer-feedback { display: flex; align-items: center; gap: 10px; padding: 14px 17px; font-size: 12px; line-height: 1.6; border: 1px solid var(--academy-line); border-radius: 12px; background: var(--academy-surface); margin: 0; }
+.professional-ui .multiplayer-refresh .multiplayer-feedback svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+@media (max-width: 1200px) {
+  .professional-ui .multiplayer-refresh .onevone-lobby-layout { grid-template-columns: minmax(0, 1fr) 250px; }
+  .professional-ui .multiplayer-refresh .multiplayer-action-card { padding: 16px 13px; }
+  .professional-ui .multiplayer-refresh .onevone-join-block { flex-direction: column; align-items: stretch; gap: 12px; }
+  .professional-ui .multiplayer-refresh .onevone-join-row { width: 100%; }
+}
+@media (max-width: 1050px) {
+  .professional-ui .multiplayer-refresh .onevone-lobby-layout { grid-template-columns: minmax(0, 1fr); }
+  .professional-ui .multiplayer-refresh .multiplayer-personal-record { gap: 17px; padding: 18px; }
+  .professional-ui .multiplayer-refresh .onevone-rail-card { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .professional-ui .multiplayer-refresh .onevone-rail-head { grid-column: 1 / -1; }
+  .professional-ui .multiplayer-refresh .onevone-rail-mode { max-width: 350px; }
+}
+@media (max-width: 640px) {
+  .professional-ui .multiplayer-refresh { gap: 20px; }
+  .professional-ui .multiplayer-refresh .multiplayer-intro { flex-direction: column; align-items: stretch; gap: 22px; padding-top: 0; }
+  .professional-ui .multiplayer-refresh .multiplayer-intro h2 { font-size: 32px; }
+  .professional-ui .multiplayer-refresh .multiplayer-personal-record { padding: 18px 20px; grid-template-columns: repeat(3, 1fr); }
+  .professional-ui .multiplayer-refresh :is(.onevone-entry-card, .onevone-rail-card, .multiplayer-public-card) { padding: 18px !important; }
+  .professional-ui .multiplayer-refresh .onevone-entry-grid { grid-template-columns: 1fr; }
+  .professional-ui .multiplayer-refresh .multiplayer-action-card { display: grid; grid-template-columns: 37px minmax(0, 1fr); gap: 0 13px; min-height: 0; padding: 18px; }
+  .professional-ui .multiplayer-refresh .multiplayer-action-card .multiplayer-action-icon { grid-row: 1 / 4; margin: 0; }
+  .professional-ui .multiplayer-refresh .multiplayer-action-card > small { margin: 7px 0 12px; }
+  .professional-ui .multiplayer-refresh .multiplayer-action-card .multiplayer-action-footer { grid-column: 2; }
+  .professional-ui .multiplayer-refresh .onevone-list-head { align-items: flex-start; }
+  .professional-ui .multiplayer-refresh .onevone-list-head h3 { font-size: 16px; }
+  .professional-ui .multiplayer-refresh .onevone-list-head p { font-size: 10px; }
+  .professional-ui .multiplayer-refresh .multiplayer-empty-state { padding: 23px 2px 8px; }
+  .professional-ui .multiplayer-refresh .onevone-public-item { flex-wrap: wrap; padding: 13px; gap: 10px; }
+  .professional-ui .multiplayer-refresh .onevone-public-actions { margin-left: 48px; }
+  .professional-ui .multiplayer-refresh .onevone-rail-card { grid-template-columns: minmax(0, 1fr); }
+  .professional-ui .multiplayer-refresh .onevone-rail-row .onevone-rail-name { font-size: 12px; }
+  .professional-ui .multiplayer-refresh .game-settings-modal { width: min(100%, 580px); max-height: calc(100dvh - 24px); padding: 20px 17px; border-radius: 17px !important; }
+  .professional-ui .multiplayer-refresh .game-setup-overlay { padding: 12px; }
+  .professional-ui .multiplayer-refresh .onevone-mode-segmented { grid-template-columns: 1fr; }
+  .professional-ui .multiplayer-refresh .onevone-mode-segmented .seg { min-height: 67px; padding: 12px 14px; }
+  .professional-ui .multiplayer-refresh .onevone-bot-setup-body { grid-template-columns: 1fr; }
+  .professional-ui .multiplayer-refresh .onevone-bot-setup-actions { flex-direction: column; align-items: stretch; }
+  .professional-ui .multiplayer-refresh .onevone-bot-action-buttons { display: grid; grid-template-columns: 1fr; }
+  .professional-ui .multiplayer-refresh .onevone-waiting-room { padding: 20px 16px !important; }
+  .professional-ui .multiplayer-refresh .onevone-waiting-players { gap: 8px; }
+  .professional-ui .multiplayer-refresh .onevone-player-slot { padding: 18px 10px; }
+  .professional-ui .multiplayer-refresh .onevone-waiting-vs { width: 30px; height: 30px; font-size: 9px; }
+  .professional-ui .multiplayer-refresh .onevone-player-slot-name { font-size: 12px; overflow-wrap: anywhere; }
+  .professional-ui .multiplayer-refresh .onevone-player-slot-empty { font-size: 10px; }
+  .professional-ui .multiplayer-refresh .onevone-waiting-chat { padding: 13px; }
+  .professional-ui .multiplayer-refresh .onevone-waiting-chat-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .professional-ui .multiplayer-refresh .onevone-waiting-chat-input { grid-template-columns: minmax(0, 1fr) auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .professional-ui .multiplayer-refresh :is(.multiplayer-action-card, .seg, .onevone-bot-difficulty, .onevone-player-slot, .onevone-waiting-vs) { animation: none !important; transition: none !important; }
+}

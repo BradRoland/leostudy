@@ -11,6 +11,13 @@ import { AcademyIcon } from './components/AcademyIcon'
 import { academyThemeOverrides } from './lib/academyTheme'
 import { getLiveIntegrations } from './lib/liveIntegrations'
 import './FeatureRefresh.css'
+import './components/AcademyWorkspaceRefresh.css'
+import { AcademyGamesHub } from './components/AcademyGamesHub'
+import { RankBadge } from './components/RankBadge'
+import { RewardsPanel, RewardAvatarPicker } from './components/RewardsPanel'
+import { useDailyRewards } from './hooks/useDailyRewards'
+import { xpRequiredForLevel, levelFromXp, levelTierName, type RewardAvatar } from './lib/academyProgression'
+import { profileDecorationCatalog, profileDecorationAssetPath, getProfileDecoration, autoDecorationKeyForLevel, type ProfileDecoration } from './lib/profileDecorationData'
 import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem, type ScenarioBankSubQuestion, type ScenarioTrainingSection } from './content'
 import { useOwner } from './hooks/useOwner'
 import { useClassWorkspace } from './hooks/useClassWorkspace'
@@ -822,20 +829,10 @@ type LeaderboardProfileSnapshot = {
   flashcardsReviewed: number
   scenariosReviewed: number
   achievementXp: number
+  dailyRewardXp?: number
   studyModeCounts: Record<CodeFilter, number>
   masteredCodes: number | null
   currentActivity: CurrentUserActivity | null
-}
-
-type ProfileDecoration = {
-  key: string
-  title: string
-  unlockLevel: number
-  description: string
-  cssClass: string
-  tone: 'classic' | 'cute' | 'funny' | 'elite'
-  animated: boolean
-  modalEffect: 'none' | 'sparkle' | 'sirens' | 'cosmic' | 'inferno' | 'legend'
 }
 
 type UserLevelProfile = {
@@ -851,6 +848,7 @@ type UserLevelProfile = {
 }
 
 type UserLevelInput = {
+  pendingRewardXpFloor?: number
   studySeconds: number
   studyDayStreak: number
   bestStudyDayStreak: number
@@ -860,6 +858,7 @@ type UserLevelInput = {
   flashcardsReviewed: number
   scenariosReviewed: number
   achievementXp: number
+  dailyRewardXp?: number
   duelWins: number
   duelLosses: number
   duelCurrentWinStreak: number
@@ -2109,48 +2108,6 @@ function cloneDefaultUserStats(): UserStats {
   }
 }
 
-const profileDecorationCatalog: ProfileDecoration[] = [
-  { key: 'auto', title: 'Auto Rank', unlockLevel: 1, description: 'Automatically wears your highest unlocked rank frame.', cssClass: 'avatar-decor-auto', tone: 'classic', animated: false, modalEffect: 'none' },
-  { key: 'none', title: 'Clean Avatar', unlockLevel: 1, description: 'Halo only. No rank frame overlay.', cssClass: 'avatar-decor-none', tone: 'classic', animated: false, modalEffect: 'none' },
-  { key: 'rank_01', title: 'Bronze Recruit', unlockLevel: 1, description: 'Your first academy rank frame.', cssClass: 'avatar-decor-rank-01', tone: 'classic', animated: false, modalEffect: 'none' },
-  { key: 'rank_02', title: 'Bronze Star', unlockLevel: 2, description: 'Adds a first-star badge to your profile ring.', cssClass: 'avatar-decor-rank-02', tone: 'classic', animated: false, modalEffect: 'none' },
-  { key: 'rank_03', title: 'Silver Shield', unlockLevel: 4, description: 'A clean silver shield frame for early momentum.', cssClass: 'avatar-decor-rank-03', tone: 'classic', animated: false, modalEffect: 'none' },
-  { key: 'rank_04', title: 'Silver Laurel', unlockLevel: 6, description: 'Silver laurels for consistent study habits.', cssClass: 'avatar-decor-rank-04', tone: 'classic', animated: false, modalEffect: 'sparkle' },
-  { key: 'rank_05', title: 'Blue Chevron', unlockLevel: 8, description: 'A blue chevron frame for stronger progress.', cssClass: 'avatar-decor-rank-05', tone: 'classic', animated: false, modalEffect: 'sparkle' },
-  { key: 'rank_06', title: 'Study Cadet', unlockLevel: 10, description: 'Notebook-and-book frame for serious study reps.', cssClass: 'avatar-decor-rank-06', tone: 'cute', animated: false, modalEffect: 'sparkle' },
-  { key: 'rank_07', title: 'Gold Sergeant', unlockLevel: 12, description: 'Gold chevrons for players leveling with purpose.', cssClass: 'avatar-decor-rank-07', tone: 'elite', animated: false, modalEffect: 'sparkle' },
-  { key: 'rank_08', title: 'Code 3', unlockLevel: 15, description: 'Animated red-and-blue rank frame.', cssClass: 'avatar-decor-rank-08', tone: 'elite', animated: true, modalEffect: 'sirens' },
-  { key: 'rank_09', title: 'Crystal Vanguard', unlockLevel: 18, description: 'Crystal glow frame for sharp test performance.', cssClass: 'avatar-decor-rank-09', tone: 'elite', animated: true, modalEffect: 'cosmic' },
-  { key: 'rank_10', title: 'Command Elite', unlockLevel: 22, description: 'Gold command frame with ribbon finish.', cssClass: 'avatar-decor-rank-10', tone: 'elite', animated: true, modalEffect: 'sparkle' },
-  { key: 'rank_11', title: 'Winged Silver', unlockLevel: 26, description: 'Silver wing frame for high performers.', cssClass: 'avatar-decor-rank-11', tone: 'elite', animated: true, modalEffect: 'cosmic' },
-  { key: 'rank_12', title: 'Radiant Gold', unlockLevel: 30, description: 'Radiant gold frame with animated glow.', cssClass: 'avatar-decor-rank-12', tone: 'elite', animated: true, modalEffect: 'inferno' },
-  { key: 'rank_13', title: 'Tactical Neon', unlockLevel: 35, description: 'Animated tactical neon frame for elite grinders.', cssClass: 'avatar-decor-rank-13', tone: 'elite', animated: true, modalEffect: 'cosmic' },
-  { key: 'rank_14', title: 'Crown Commander', unlockLevel: 42, description: 'Crowned gold commander frame.', cssClass: 'avatar-decor-rank-14', tone: 'elite', animated: true, modalEffect: 'legend' },
-  { key: 'rank_15', title: 'Legend Ascendant', unlockLevel: 50, description: 'The highest animated legend frame.', cssClass: 'avatar-decor-rank-15', tone: 'elite', animated: true, modalEffect: 'legend' },
-]
-
-const profileDecorationAssetByKey: Record<string, string> = {
-  rank_01: '/avatar-decorations/rank-01.png',
-  rank_02: '/avatar-decorations/rank-02.png',
-  rank_03: '/avatar-decorations/rank-03.png',
-  rank_04: '/avatar-decorations/rank-04.png',
-  rank_05: '/avatar-decorations/rank-05.png',
-  rank_06: '/avatar-decorations/rank-06.png',
-  rank_07: '/avatar-decorations/rank-07.png',
-  rank_08: '/avatar-decorations/rank-08.png',
-  rank_09: '/avatar-decorations/rank-09.png',
-  rank_10: '/avatar-decorations/rank-10.png',
-  rank_11: '/avatar-decorations/rank-11.png',
-  rank_12: '/avatar-decorations/rank-12.png',
-  rank_13: '/avatar-decorations/rank-13.png',
-  rank_14: '/avatar-decorations/rank-14.png',
-  rank_15: '/avatar-decorations/rank-15.png',
-}
-
-function profileDecorationAssetPath(decorationKey: string) {
-  return profileDecorationAssetByKey[decorationKey] || ''
-}
-
 const stripeTierLinks = liveIntegrations.stripeLinks
 const appContentSource = String(import.meta.env.VITE_CONTENT_SOURCE || 'supabase')
   .trim()
@@ -2255,10 +2212,6 @@ function describeProfileCurrentActivity(
   }
 }
 
-function getProfileDecoration(key?: string) {
-  return profileDecorationCatalog.find((decoration) => decoration.key === key) || profileDecorationCatalog[0]
-}
-
 function sanitizeProfileDecorationKey(value: unknown) {
   const key = typeof value === 'string' ? value : 'auto'
   return getProfileDecoration(key).key
@@ -2279,33 +2232,6 @@ function sanitizeHighScores(input: unknown): PersistedState['highScores'] {
     rapidFire: sanitizeScore(value.rapidFire),
     gravity: sanitizeScore(value.gravity),
   }
-}
-
-function xpRequiredForLevel(level: number) {
-  if (level <= 1) return 0
-  let total = 0
-  for (let currentLevel = 1; currentLevel < level; currentLevel += 1) {
-    total += 260 + currentLevel * 70 + Math.floor(Math.pow(currentLevel, 1.52) * 24)
-  }
-  return total
-}
-
-function levelFromXp(totalXp: number) {
-  let level = 1
-  while (level < 100 && totalXp >= xpRequiredForLevel(level + 1)) level += 1
-  return level
-}
-
-function levelTierName(level: number) {
-  if (level >= 50) return 'Legend'
-  if (level >= 40) return 'Inferno'
-  if (level >= 30) return 'Diamond'
-  if (level >= 25) return 'Neon'
-  if (level >= 15) return 'Gold'
-  if (level >= 10) return 'Siren'
-  if (level >= 5) return 'Academy Blue'
-  if (level >= 2) return 'Bronze'
-  return 'Recruit'
 }
 
 function levelHaloClass(level: number) {
@@ -2345,13 +2271,6 @@ function sanitizeDuelLevelStats(value: unknown): DuelLevelStats {
   }
 }
 
-function autoDecorationKeyForLevel(level: number) {
-  const unlocked = profileDecorationCatalog
-    .filter((decoration) => decoration.key !== 'auto' && decoration.key !== 'none' && decoration.unlockLevel <= level)
-    .sort((left, right) => right.unlockLevel - left.unlockLevel)
-  return unlocked[0]?.key || 'rank_01'
-}
-
 function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
   const duelStreakXp =
     cappedLevelXp(input.duelCurrentWinStreak, 18, 180) +
@@ -2373,6 +2292,7 @@ function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
     Math.floor(input.flashcardsReviewed / 4) +
     input.scenariosReviewed * 6 +
     input.achievementXp +
+    Math.max(0, Math.floor(input.dailyRewardXp || 0)) +
     (input.gamePlays.matching + input.gamePlays.speed + input.gamePlays.blaster) * 6 +
     Math.floor(input.highScores.matching / 18) +
     Math.floor(input.highScores.blaster / 20) +
@@ -2380,7 +2300,7 @@ function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
     input.duelWins * duelWinXpValue +
     input.duelLosses * duelLossXpValue +
     competitiveXp
-  const totalXp = Math.max(0, Math.round(xp))
+  const totalXp = Math.max(0, Math.round(xp), input.pendingRewardXpFloor || 0)
   const level = levelFromXp(totalXp)
   const levelFloor = xpRequiredForLevel(level)
   const levelCeiling = xpRequiredForLevel(level + 1)
@@ -3246,7 +3166,7 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
   }
   if (!input || typeof input !== 'object') return fallback
 
-  const value = input as Partial<ProfileDetails> & { publicMasteredCodes?: unknown }
+  const value = input as Partial<ProfileDetails> & { publicMasteredCodes?: unknown; dailyRewardXp?: unknown }
   const statsRaw = value.stats && typeof value.stats === 'object' ? (value.stats as Record<string, unknown>) : {}
   const studyModeCountsRaw =
     statsRaw.studyModeCounts && typeof statsRaw.studyModeCounts === 'object'
@@ -3275,6 +3195,7 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
     flashcardsReviewed: normalizeCount(statsRaw.flashcardsReviewed),
     scenariosReviewed: normalizeCount(statsRaw.scenariosReviewed),
     achievementXp: normalizeCount(statsRaw.achievementXp),
+    dailyRewardXp: normalizeCount(value.dailyRewardXp),
     studyModeCounts: {
       all: normalizeCount(studyModeCountsRaw.all),
       penal: normalizeCount(studyModeCountsRaw.penal),
@@ -4508,6 +4429,8 @@ function App() {
   const [profileUsername, setProfileUsername] = useState('')
   const [profileAvatar, setProfileAvatar] = useState<File | null>(null)
   const [profileAvatarPreviewUrl, setProfileAvatarPreviewUrl] = useState('')
+  const [rewardAvatarLoading, setRewardAvatarLoading] = useState(false)
+  const rewardAvatarRequest = useRef(0)
   const [avatarCropSourceUrl, setAvatarCropSourceUrl] = useState('')
   const [avatarCropSourceName, setAvatarCropSourceName] = useState('')
   const [avatarCropOpen, setAvatarCropOpen] = useState(false)
@@ -4524,6 +4447,10 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false)
   const [authRedirectPending, setAuthRedirectPending] = useState(() => hasAuthRedirectParams())
   const [currentUserId, setCurrentUserId] = useState<string>('')
+  useEffect(() => {
+    rewardAvatarRequest.current += 1
+    setRewardAvatarLoading(false)
+  }, [currentUserId])
   const [clockNowMs, setClockNowMs] = useState<number>(() => Date.now())
   const {
     memberships: classMemberships,
@@ -6757,6 +6684,7 @@ function App() {
           flashcardsReviewed: details.flashcardsReviewed,
           scenariosReviewed: details.scenariosReviewed,
           achievementXp: details.achievementXp,
+          dailyRewardXp: details.dailyRewardXp,
           duelWins: duelStats.wins,
           duelLosses: duelStats.losses,
           duelCurrentWinStreak: duelStats.currentWinStreak,
@@ -7857,6 +7785,7 @@ function App() {
     }))
   }, [currentMasteredCodeCount, currentUserId, profileDetails.stats.lifetimeMasteredCodes, stateHydrated])
 
+  const dailyRewards = useDailyRewards(currentUserId || '', activeClassId)
   const currentUserLevelProfile = useMemo(() => {
     const currentLeaderboardEntry = currentUserId
       ? duelHubLeaderboard.find((entry) => entry.userId === currentUserId) || leaderboard.find((entry) => entry.userId === currentUserId)
@@ -7876,6 +7805,8 @@ function App() {
       flashcardsReviewed: profileDetails.stats.flashcardsReviewed,
       scenariosReviewed: profileDetails.stats.scenariosReviewed,
       achievementXp: profileDetails.stats.achievementXp,
+      dailyRewardXp: dailyRewards.status?.totalBonusXp || 0,
+      pendingRewardXpFloor: dailyRewards.status ? 0 : profileDetails.levelSnapshot?.totalXp || 0,
       duelWins,
       duelLosses,
       duelCurrentWinStreak,
@@ -7889,6 +7820,8 @@ function App() {
     })
   }, [
     activeClassId,
+    dailyRewards.status,
+    profileDetails.levelSnapshot?.totalXp,
     allTimeFirstSpotCountsByUser,
     allTimeLeaderboardAppearanceCountsByUser,
     allTimeTopPerformer,
@@ -7912,6 +7845,8 @@ function App() {
   )
   useEffect(() => {
     if (!stateHydrated || !currentUserId) return
+    // Keep the saved display snapshot until the separate reward ledger is known.
+    if (activeClassId && !dailyRewards.status) return
     const nextLevelSnapshot: ProfileLevelSnapshot = {
       level: currentUserLevelProfile.level,
       totalXp: currentUserLevelProfile.totalXp,
@@ -7939,6 +7874,8 @@ function App() {
     })
   }, [
     currentUserId,
+    activeClassId,
+    dailyRewards.status,
     currentUserLevelProfile.autoDecorationKey,
     currentUserLevelProfile.currentLevelXp,
     currentUserLevelProfile.haloClass,
@@ -10528,6 +10465,29 @@ function App() {
     }
   }
 
+  const selectRewardAvatar = async (avatar: RewardAvatar) => {
+    if (avatar.unlockLevel > currentUserLevelProfile.level || !currentUserId || authLoading) return
+    const request = ++rewardAvatarRequest.current
+    setRewardAvatarLoading(true)
+    setAuthError('')
+    try {
+      const response = await fetch(avatar.path)
+      if (!response.ok) throw new Error('Could not load this avatar. Please try again.')
+      const blob = await response.blob()
+      if (!blob.type.startsWith('image/png')) throw new Error('Could not load this avatar. Please try again.')
+      if (request !== rewardAvatarRequest.current) return
+      const file = new File([blob], `academy-${avatar.key}.png`, { type: 'image/png' })
+      if (profileAvatarPreviewUrl) URL.revokeObjectURL(profileAvatarPreviewUrl)
+      setProfileAvatar(file)
+      setProfileAvatarPreviewUrl(URL.createObjectURL(file))
+      setAuthSuccess('Avatar selected. Save your profile to use it everywhere.')
+    } catch (error) {
+      if (request === rewardAvatarRequest.current) setAuthError(error instanceof Error ? error.message : 'Could not load this avatar.')
+    } finally {
+      if (request === rewardAvatarRequest.current) setRewardAvatarLoading(false)
+    }
+  }
+
   const submitProfile = async () => {
     if (!supabase || !currentUserId) return
     setAuthLoading(true)
@@ -12226,12 +12186,7 @@ function App() {
   const selectedLeaderboardLevelProfile = selectedLeaderboardEntry
     ? levelProfilesByUserId[selectedLeaderboardEntry.userId]
     : null
-  const renderLevelBadge = (levelProfile: UserLevelProfile, compact = false) => (
-    <span className={compact ? 'level-badge level-badge-compact' : 'level-badge'}>
-      <span className="level-badge-level">Lv {levelProfile.level}</span>
-      <span className="level-badge-tier">{levelProfile.tierName}</span>
-    </span>
-  )
+  const renderLevelBadge = (levelProfile: UserLevelProfile, compact = false) => <RankBadge level={levelProfile.level} compact={compact} />
   const renderDecorationLayer = (decoration: ProfileDecoration) => {
     if (decoration.key === 'none') return null
     const decorationAssetPath = profileDecorationAssetPath(decoration.key)
@@ -12783,6 +12738,8 @@ function App() {
   }, [editorItems, editorCategoryFilter, editorTypeFilter])
   const openAvatarCropper = (file: File | null) => {
     if (!file) return
+    rewardAvatarRequest.current += 1
+    setRewardAvatarLoading(false)
     const sourceUrl = URL.createObjectURL(file)
     if (avatarCropSourceUrl) URL.revokeObjectURL(avatarCropSourceUrl)
     setAvatarCropSourceUrl(sourceUrl)
@@ -12918,6 +12875,7 @@ function App() {
       flashcardsReviewed: details.flashcardsReviewed,
       scenariosReviewed: details.scenariosReviewed,
       achievementXp: details.achievementXp,
+          dailyRewardXp: details.dailyRewardXp,
       duelWins,
       duelLosses,
       duelCurrentWinStreak,
@@ -13921,7 +13879,7 @@ function App() {
                 onChange={(event) => setProfileDetails((previous) => ({ ...previous, bio: event.target.value }))}
               />
             </label>
-            <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
+            <button className="primary" onClick={submitProfile} disabled={authLoading || rewardAvatarLoading || profileUsername.trim().length < 1}>
               Save Profile
             </button>
             {authError ? <p className="bad">{authError}</p> : null}
@@ -14182,6 +14140,7 @@ function App() {
         {!isProfilePage && !isStatsPage && isHomePage && (
           <section className="home-section">
             <HomeDashboard
+              rewards={<RewardsPanel rewards={dailyRewards} level={currentUserLevelProfile.level} currentXp={currentUserLevelProfile.currentLevelXp} nextXp={currentUserLevelProfile.nextLevelXp} onOpenRewards={() => openSettingsTab('progression')} onStudy={openStudyFlashcardsPage} />}
               name={profileDetails.firstName || activeProfileName}
               className={activeClass?.className || ''}
               department={activeClass?.departmentName || profileDetails.agency}
@@ -15735,48 +15694,7 @@ function App() {
           <section className="games-section">
             {isGamesHubPage ? (
               <>
-                <div className="games-hub-grid">
-                  <button
-                    type="button"
-                    className="card compact game-mode-card games-hub-game-card"
-                    onClick={() => {
-                      navigate('/games/matching')
-                    }}
-                  >
-                    <span className="game-mode-title"><AppIcon name="games" className="button-icon" /> Matching</span>
-                    <span className="muted tiny">Match code sections fast</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="card compact game-mode-card games-hub-game-card"
-                    onClick={() => {
-                      navigate('/games/speed')
-                    }}
-                  >
-                    <span className="game-mode-title"><AppIcon name="study" className="button-icon" /> Speed Test</span>
-                    <span className="muted tiny">Answer as many as possible</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="card compact game-mode-card games-hub-game-card"
-                    onClick={() => {
-                      navigate('/games/blaster')
-                    }}
-                  >
-                    <span className="game-mode-title"><AppIcon name="blaster" className="button-icon" /> Code Blaster</span>
-                    <span className="muted tiny">Blast the right code in space</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="card compact game-mode-card games-hub-game-card"
-                    onClick={() => {
-                      navigate('/games/duel')
-                    }}
-                  >
-                    <span className="game-mode-title"><AppIcon name="duel" className="button-icon" /> 1v1</span>
-                    <span className="muted tiny">Realtime head-to-head</span>
-                  </button>
-                </div>
+                <AcademyGamesHub onOpenGame={navigate} />
 
                 <div className="card games-hub-filter-card">
                   <div className="game-leaderboard-filters">
@@ -17000,7 +16918,7 @@ function App() {
         ) : null}
 
         {isProfilePage && profile && (
-          <section>
+          <section className="academy-settings-page">
             <div className="card profile-page-shell">
               <aside className="settings-sidebar">
                 <button className={settingsTab === 'profile' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('profile')}>
@@ -17060,7 +16978,7 @@ function App() {
 
               <div className="settings-panel">
               {settingsTab === 'profile' ? (
-                <div className="settings-section-card">
+                <div className="settings-section-card academy-profile-settings">
                   <div className={`avatar-frame avatar-decoration-wrap level-halo-frame ${currentUserLevelProfile.haloClass}`}>
                     <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
                     {renderAvatarDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
@@ -17094,6 +17012,7 @@ function App() {
                       onChange={(event) => openAvatarCropper(event.target.files?.[0] || null)}
                     />
                   </label>
+                  <RewardAvatarPicker level={currentUserLevelProfile.level} busy={rewardAvatarLoading || authLoading} selectedKey={profileAvatar?.name.match(/^academy-(.+)\.png$/)?.[1]} onSelect={(avatar) => { void selectRewardAvatar(avatar) }} />
                   <label>
                     About me
                     <textarea
@@ -17161,8 +17080,8 @@ function App() {
                       <p className="tiny">Controls how long each rotating leaderboard view stays visible.</p>
                     </div>
                   ) : null}
-                  <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
-                    Save Profile Details
+                  <button className="primary" onClick={submitProfile} disabled={authLoading || rewardAvatarLoading || profileUsername.trim().length < 1}>
+                    Save profile
                   </button>
                   {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
                   {authError ? <p className="bad">{authError}</p> : null}
@@ -17171,6 +17090,7 @@ function App() {
 
               {settingsTab === 'progression' ? (
                 <div className="settings-section-card progression-card">
+                  <RewardsPanel rewards={dailyRewards} level={currentUserLevelProfile.level} currentXp={currentUserLevelProfile.currentLevelXp} nextXp={currentUserLevelProfile.nextLevelXp} onStudy={openStudyFlashcardsPage} />
                   <div className="progression-hero">
                     <div className={`avatar-frame progression-avatar avatar-decoration-wrap level-halo-frame ${currentUserLevelProfile.haloClass}`}>
                       <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
@@ -17220,8 +17140,8 @@ function App() {
                   <div className="profile-decoration-picker">
                     <div className="profile-decoration-heading">
                       <div>
-                        <h3>Avatar Decorations</h3>
-                        <p className="muted">Pick a full-profile decoration: hats, frames, auras, and animated high-level effects.</p>
+                        <h3>Your frame collection</h3>
+                        <p className="muted">Celebrate your progress with a frame you have earned. Automatic follows your latest unlock.</p>
                       </div>
                       <span className="level-badge level-badge-compact">{unlockedDecorationsForCurrentUser.length}/{profileDecorationCatalog.length} unlocked</span>
                     </div>
@@ -17240,6 +17160,7 @@ function App() {
                               setProfileDetails((previous) => ({ ...previous, profileDecorationKey: decoration.key }))
                             }}
                             disabled={!unlocked}
+                            aria-pressed={active}
                           >
                             <span className="profile-decoration-preview avatar-decoration-wrap">
                               <span className="profile-decoration-preview-face" aria-hidden>
@@ -17256,15 +17177,15 @@ function App() {
                             </span>
                             <span className="profile-decoration-copy">
                               <strong>{decoration.title}</strong>
-                              <small>{decoration.tone} • Lv {decoration.unlockLevel}</small>
+                              <small>{unlocked ? active ? 'Selected' : 'Unlocked' : 'Locked'} · Level {decoration.unlockLevel}</small>
                               <span>{unlocked ? decoration.description : `Unlocks at Level ${decoration.unlockLevel}`}</span>
                             </span>
                           </button>
                         )
                       })}
                     </div>
-                    <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
-                      Save Decoration
+                    <button className="primary" onClick={submitProfile} disabled={authLoading || rewardAvatarLoading || profileUsername.trim().length < 1}>
+                      Save frame
                     </button>
                   </div>
                 </div>
@@ -17460,7 +17381,7 @@ function App() {
                   </div>
                   {!canUseThemes ? <p className="muted">Themes are preview-only. Upgrade to $5 Supporter+ to apply them.</p> : null}
                   <p className="muted">Current theme: {selectedTheme.name}</p>
-                  <button className="primary" onClick={submitProfile} disabled={authLoading || profileUsername.trim().length < 1}>
+                  <button className="primary" onClick={submitProfile} disabled={authLoading || rewardAvatarLoading || profileUsername.trim().length < 1}>
                     Save Customization
                   </button>
                   {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
