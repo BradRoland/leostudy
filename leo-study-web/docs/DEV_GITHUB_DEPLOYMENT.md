@@ -13,7 +13,7 @@ Select the application directory `leo-study-web` as the build context and `ops/d
 
 Never supply a service-role key, SMTP password, server password, Stripe secret, or other runtime credential to a build. The build helper forwards a small allow-list of environment values, fixes the browser API to `https://dev.180.academy/supabase`, and fixes sign-in and invitation links to the development domain. Live integrations and telemetry are disabled; payment links are empty. Provider-injected commit variables cannot override `SOURCE_COMMIT` in the served version manifest.
 
-The pinned Node image runs `npm ci --ignore-scripts`, the unit tests, lint, TypeScript checks and Vite compilation. The final image contains compiled assets, five explicitly named backend runtime modules, two deployment guard modules and locked production dependencies. Environment files, test fixtures, database scripts and browser reports are excluded. It runs as the unprivileged Node user on port 8789.
+The pinned Node image runs `npm ci --ignore-scripts`, the unit tests, lint, TypeScript checks and Vite compilation. The final image contains compiled assets, explicitly named backend runtime modules and the generated private practice bank, two deployment guard modules and locked production dependencies. Environment files, test fixtures, database scripts and browser reports are excluded. It runs as the unprivileged Node user on port 8789.
 
 ## Runtime contract
 

@@ -175,3 +175,5 @@
   .professional-skip-link { left: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .professional-ui *, .professional-ui *::before, .professional-ui *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+
+.professional-skip-link{visibility:hidden}.professional-skip-link:focus{visibility:visible}

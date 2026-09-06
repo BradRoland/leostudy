@@ -1,3 +1,4 @@
+import { MembershipBadge } from './MembershipBadge'
 import { Fragment, useEffect, useId, useRef, useState, useCallback, type SyntheticEvent } from 'react'
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
@@ -26,6 +27,7 @@ type PublicMessageReaction = {
 type MessageReactionMap = Record<string, Record<string, string[]>>
 
 type UserProfileStats = {
+  membershipTier?: string
   user_id: string
   username: string
   avatarUrl: string
@@ -336,7 +338,7 @@ export function GlobalChatWidget({
     if (unknownIds.length === 0) return
 
     const { data, error } = await supabaseClient
-      .from('profiles')
+      .from('academy_public_profiles')
       .select('user_id,username')
       .in('user_id', unknownIds)
 
@@ -985,8 +987,8 @@ export function GlobalChatWidget({
     try {
       // Get user profile
       const { data: profile } = await supabaseClient
-        .from('profiles')
-        .select('user_id, username, avatar_path, agency, bio')
+        .from('academy_public_profiles')
+        .select('user_id, username, avatar_path, agency, bio,membership_tier')
         .eq('user_id', userId)
         .maybeSingle()
       
@@ -1053,6 +1055,7 @@ export function GlobalChatWidget({
         setSelectedProfile({
           user_id: userId,
           username: profile.username || 'Unknown',
+          membershipTier: profile.membership_tier,
           avatarUrl,
           agency: profile.agency || '',
           bio: profile.bio || '',
@@ -1401,11 +1404,11 @@ export function GlobalChatWidget({
                   </div>
                 )}
                 <ProfileAvatarDecoration
-                  decoration={getEffectiveProfileDecorationForLevel(selectedProfile.level, selectedProfile.profileDecorationKey)}
+                  decoration={getEffectiveProfileDecorationForLevel(selectedProfile.level, selectedProfile.profileDecorationKey, selectedProfile.membershipTier === 'tier10')}
                 />
               </div>
 	              <div className="profile-modal-info">
-	                <h4>{selectedProfile.username}</h4>
+	                <h4>{selectedProfile.username} <MembershipBadge tier={selectedProfile.membershipTier}/></h4>
 	                <RankBadge level={selectedProfile.level} />
                     <span className="global-chat-profile-level">{selectedProfile.totalXp.toLocaleString()} XP earned</span>
 	                {selectedProfile.agency && <span className="profile-modal-agency">{selectedProfile.agency}</span>}

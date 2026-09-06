@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 export type ClassRosterMember = {
   userId: string
   name: string
+  membershipTier?: string
   avatarUrl: string
   department: string
   bio: string
@@ -43,7 +44,7 @@ export async function loadClassRoster(classId: string): Promise<ClassRosterMembe
     const batch = unique.slice(offset, offset + profileBatchSize)
     const ids = batch.map(member => member.user_id)
     const [profiles, states, duels] = await Promise.all([
-      supabase.from('profiles').select('user_id,username,avatar_path,bio').in('user_id', ids),
+      supabase.from('academy_public_profiles').select('user_id,username,avatar_path,bio,legacy_supporter_tier,membership_tier').in('user_id', ids),
       supabase.from('public_study_profiles').select('user_id,profile_details,best_streak,mastered_codes').in('user_id', ids),
       supabase.from('duel_player_stats').select('user_id,wins,losses,current_win_streak').eq('class_id', classId).eq('game_type', 'all').in('user_id', ids),
     ])
@@ -62,6 +63,7 @@ export async function loadClassRoster(classId: string): Promise<ClassRosterMembe
       roster.push({
         userId: member.user_id,
         name: String(profile?.username || '').trim() || 'Classmate',
+        membershipTier: String(profile?.membership_tier || 'free'),
         avatarUrl: avatarPath ? /^https?:\/\//i.test(avatarPath) ? avatarPath : supabase.storage.from('avatars').getPublicUrl(avatarPath).data.publicUrl : rosterDefaultAvatar,
         department: member.department_name || 'Department not set',
         bio: String(profile?.bio || details.bio || '').trim(),

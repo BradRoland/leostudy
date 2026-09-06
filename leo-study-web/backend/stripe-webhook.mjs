@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import http from 'node:http'
-import { createStripeTierService, handleStripeEvent } from './stripe-tier-service.mjs'
+import { createStripeTierService } from './stripe-tier-service.mjs'
+import { createStripeMembershipService } from './stripe-membership-service.mjs'
 import { liveIntegrationsDisabled } from './live-integrations.mjs'
 
 if (liveIntegrationsDisabled()) {
@@ -17,7 +18,8 @@ if (!stripeWebhookSecret || !process.env.STRIPE_SECRET_KEY || !process.env.SUPAB
   process.exit(1)
 }
 
-const { stripe, findUserByEmail, applyTierToUser, applyTierFromCheckoutSession, verifySupabaseServiceAccess } = createStripeTierService()
+const { stripe, supabase, findUserByEmail, applyTierToUser, applyTierFromCheckoutSession, verifySupabaseServiceAccess } = createStripeTierService()
+const membershipService = createStripeMembershipService({ stripe, supabase, legacyCheckout: applyTierFromCheckoutSession })
 
 try {
   await verifySupabaseServiceAccess()
@@ -107,7 +109,7 @@ const server = http.createServer(async (req, res) => {
         return
       }
 
-      await handleStripeEvent(event, applyTierFromCheckoutSession)
+      await membershipService.handleEvent(event)
 
       res.writeHead(200, { 'content-type': 'application/json' })
       res.end(JSON.stringify({ received: true }))

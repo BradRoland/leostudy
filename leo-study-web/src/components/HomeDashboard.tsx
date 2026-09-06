@@ -5,6 +5,7 @@ import './HomeDashboard.css'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
 type Props = {
+  hasAnalytics?: boolean
   rewards?: ReactNode
   name: string
   className: string
@@ -54,7 +55,8 @@ function Icon({ kind }: { kind: 'arrow' | 'book' | 'target' | 'clock' | 'bolt' |
 const subjectLabels: Record<CodeSet, string> = { penal: 'Penal Code', hs: 'Health & Safety', vehicle: 'Vehicle Code' }
 
 export function HomeDashboard(props: Props) {
-  const { now, streak, totalAttempts, focusCodes } = props
+  const { now, streak, totalAttempts } = props
+  const focusCodes = props.hasAnalytics ? props.focusCodes : []
   const activity = buildWeeklyActivity(props.sessions, now)
   const weeklySessions = activity.reduce((total, day) => total + day.count, 0)
   const maxSessions = Math.max(1, ...activity.map((day) => day.count))
@@ -73,9 +75,11 @@ export function HomeDashboard(props: Props) {
     </header>
 
     <div className="today-metrics" aria-label="Your learning statistics">
+      {props.hasAnalytics ? <>
       <Metric icon="target" label="Practice accuracy" value={totalAttempts ? `${props.accuracy}%` : '—'} detail={totalAttempts ? `${totalAttempts.toLocaleString()} answers recorded` : 'Complete a session to begin'} tone="teal"/>
       <Metric icon="book" label="Codes mastered" value={String(props.mastered)} detail={`Of ${props.totalCodes.toLocaleString()} codes in your library`} tone="blue"/>
       <Metric icon="clock" label="Study time" value={formatDashboardTime(props.studySeconds)} detail="Total active study time" tone="purple"/>
+      </> : <Metric icon="book" label="Your study toolkit" value="Ready" detail="Practice, play, and build your streak" tone="blue"/>}
       <Metric icon="chart" label="Your level" value={`Level ${props.level}`} detail={`${props.totalXp.toLocaleString()} XP earned`} tone="amber"/>
     </div>
 
@@ -106,25 +110,25 @@ export function HomeDashboard(props: Props) {
         <button className="today-plan-row" onClick={props.onPracticeTest}><span className="today-plan-number">03</span><span><strong>Check your understanding</strong><small>Take a practice test and review your results</small></span><Icon kind="arrow"/></button>
       </section>
 
-      <section className="today-panel" aria-labelledby="weekly-activity-title">
+      {props.hasAnalytics ? <section className="today-panel" aria-labelledby="weekly-activity-title">
         <div className="today-section-head"><div><p className="today-eyebrow">YOUR WEEK AT A GLANCE</p><h2 id="weekly-activity-title">This week</h2></div><span className="today-soft-badge">Mon – Sun</span></div>
         <div className="today-activity-total"><strong>{weeklySessions}</strong><span>completed session{weeklySessions === 1 ? '' : 's'}</span></div>
         <div className="today-activity-chart" role="img" aria-label={`Completed sessions this week: ${activity.map((day) => `${day.label} ${day.count}`).join(', ')}`}>
           {activity.map((day) => <div className={`today-chart-day${day.isToday ? ' is-today' : ''}${day.isFuture ? ' is-future' : ''}`} key={day.key} title={`${day.dateLabel}: ${day.count} completed sessions`}><span className="today-chart-count">{day.count || ''}</span><div className="today-chart-track"><span style={{ height: day.count ? `${Math.max(8, day.count / maxSessions * 100)}%` : '3px' }}/></div><span className="today-chart-label">{day.label}</span><span className="today-chart-dot"/></div>)}
         </div>
         <p className="today-chart-caption">{weeklySessions ? 'Completed tests and game sessions. Keep your rhythm going.' : 'Finish a test or game to add your first session here.'}</p>
-      </section>
+      </section> : <section className="today-panel"><p className="today-eyebrow">ACADEMY PLUS + PRO</p><h2>Unlock your study insights</h2><p className="today-panel-intro">See your trends, subject progress, and the areas that need your attention.</p><button className="secondary" onClick={props.onStats}>Explore your analytics</button></section>}
     </div>
 
     <div className="today-learning-grid">
-      <section className="today-panel" aria-labelledby="subject-progress-title">
+      {props.hasAnalytics ? <section className="today-panel" aria-labelledby="subject-progress-title">
         <div className="today-section-head"><div><p className="today-eyebrow">BUILD YOUR FOUNDATION</p><h2 id="subject-progress-title">Your subject progress</h2></div><button className="today-text-link" onClick={props.onStats}>View progress<Icon kind="arrow"/></button></div>
         <div className="today-subjects">{(['penal', 'hs', 'vehicle'] as CodeSet[]).map((codeSet) => {
           const subject = props.subjects.find((item) => item.codeSet === codeSet)
           const accuracy = subject?.accuracyPercent || 0
           return <button className="today-subject-row" onClick={() => props.onStudy(codeSet)} key={codeSet}><div><strong>{subjectLabels[codeSet]}</strong><span>{subject?.attempts ? `${accuracy}% accuracy` : 'Ready to begin'}</span></div><div className="today-progress-track"><span style={{ width: `${accuracy}%` }}/></div></button>
         })}</div>
-      </section>
+      </section> : <section className="today-panel"><p className="today-eyebrow">ACADEMY PLUS + PRO</p><h2>Unlock your study insights</h2><p className="today-panel-intro">See your trends, subject progress, and the areas that need your attention.</p><button className="secondary" onClick={props.onStats}>Explore your analytics</button></section>}
       <section className="today-panel today-journey" aria-labelledby="journey-title"><div className="today-section-head"><div><p className="today-eyebrow">YOUR NEXT MILESTONE</p><h2 id="journey-title">Your academy journey</h2></div><span className="today-icon-tile teal"><AcademyLogo label=""/></span></div>
         {graduation ? <><div className="today-journey-value"><strong>{graduation.daysRemaining ? graduation.daysRemaining : 'Complete'}</strong><span>{graduation.daysRemaining ? `${graduation.daysRemaining === 1 ? 'day' : 'days'} until graduation` : 'Class timeline'}</span></div><div className="today-progress-track" role="progressbar" aria-label="Class timeline progress" aria-valuenow={graduation.percent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${graduation.percent}%` }}/></div><p>{graduation.daysRemaining === 0 ? 'Your class has reached its graduation date. Keep sharpening your skills for what comes next.' : graduation.hasStarted ? 'Keep building the habits you will carry beyond the academy.' : 'Get a head start before your first day at the academy.'}</p></> : <><p>Each session is an investment in the cadet you are becoming. Keep building your foundation.</p><div className="today-level-line"><strong>Level {props.level}</strong><span>{props.levelPercent}% to next level</span></div><div className="today-progress-track" role="progressbar" aria-label="Progress to next level" aria-valuenow={props.levelPercent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${props.levelPercent}%` }}/></div></>}
         <button className="today-text-link" onClick={props.onClass}>View your class<Icon kind="arrow"/></button>

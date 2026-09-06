@@ -1,12 +1,14 @@
 import 'dotenv/config'
 import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { stat, readFile } from 'node:fs/promises'
 import { createHash, randomInt } from 'node:crypto'
 import http from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
-import { createStripeTierService, handleStripeEvent } from './stripe-tier-service.mjs'
+import { createStripeTierService } from './stripe-tier-service.mjs'
+import { createStripeMembershipService } from './stripe-membership-service.mjs'
+import { buildMembershipAnalytics } from './membership-analytics.mjs'
 import { createClassRequestService } from './class-request-service.mjs'
 import { createClassRequestEmailService } from './class-request-email-service.mjs'
 import { liveIntegrationsDisabled, isLiveIntegrationPath } from './live-integrations.mjs'
@@ -37,6 +39,7 @@ if ((!disableLiveIntegrations && (!stripeWebhookSecret || !process.env.STRIPE_SE
 }
 
 const { stripe, supabase, applyTierFromCheckoutSession, verifySupabaseServiceAccess } = createStripeTierService()
+const membershipService = createStripeMembershipService({ stripe, supabase, legacyCheckout: applyTierFromCheckoutSession })
 const classRequestService = createClassRequestService({
   supabase,
   userClient: (token) => createClient(
@@ -182,7 +185,7 @@ async function handleStripeWebhook(req, res) {
     return
   }
 
-  await handleStripeEvent(event, applyTierFromCheckoutSession)
+  await membershipService.handleEvent(event)
 
   sendJson(res, 200, { received: true })
 }
@@ -510,6 +513,45 @@ const server = http.createServer(async (req, res) => {
   try {
     if (disableLiveIntegrations && isLiveIntegrationPath(req.url)) {
       sendJson(res, 404, { ok: false, error: 'This integration is disabled in this preview.' })
+      return
+    }
+    if (['/api/membership/checkout','/api/membership/portal'].includes(req.url)) {
+      if (req.method !== 'POST') { sendJson(res, 405, { error: 'Use POST' }); return }
+      const token = String(req.headers.authorization || '').replace(/^Bearer /i, '')
+      const { data, error } = await supabase.auth.getUser(token)
+      if (error || !data.user) { sendJson(res, 401, { error: 'Sign in to manage your membership' }); return }
+      try {
+        const body = JSON.parse((await readRawBody(req)).toString('utf8') || '{}')
+        const result = req.url.endsWith('/checkout') ? await membershipService.checkout(data.user, body.tier) : await membershipService.portal(data.user)
+        sendJson(res, 200, result)
+      } catch (error) { sendJson(res, error.status || 400, { error: error.message || 'Membership request failed' }) }
+      return
+    }
+    if (req.url === '/api/membership/analytics') {
+      if (req.method !== 'GET') { sendJson(res, 405, { error: 'Use GET' }); return }
+      const token = String(req.headers.authorization || '').replace(/^Bearer /i, '')
+      const { data, error } = await supabase.auth.getUser(token)
+      if (error || !data.user) { sendJson(res, 401, { error: 'Sign in to view your report' }); return }
+      try {
+        await membershipService.requireMembership(data.user.id, true)
+        const { data: state, error: stateError } = await supabase.from('app_state').select('profile_details,performance').eq('user_id', data.user.id).maybeSingle()
+        if (stateError) throw stateError
+        res.setHeader('cache-control', 'private, no-store')
+        sendJson(res, 200, buildMembershipAnalytics(state))
+      } catch (error) { sendJson(res, error.status || 503, { error: error.status === 403 ? error.message : 'Your report is temporarily unavailable' }) }
+      return
+    }
+    if (req.url === '/api/membership/content') {
+      if (req.method !== 'GET') { sendJson(res, 405, { error: 'Use GET' }); return }
+      const token = String(req.headers.authorization || '').replace(/^Bearer /i, '')
+      const { data, error } = await supabase.auth.getUser(token)
+      if (error || !data.user) { sendJson(res, 401, { error: 'Sign in to access practice content' }); return }
+      try {
+        await membershipService.requireMembership(data.user.id)
+        const content = await readFile(path.join(__dirname, 'data/membership-content.json'), 'utf8')
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'private, no-store', vary: 'Authorization' })
+        res.end(content)
+      } catch (error) { sendJson(res, error.status || 503, { error: error.status === 403 ? error.message : 'Practice content is temporarily unavailable' }) }
       return
     }
     if (req.method === 'GET' && (req.url === '/health' || req.url === '/api/health')) {

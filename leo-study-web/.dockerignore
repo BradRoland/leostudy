@@ -13,3 +13,5 @@ coverage
 *.local
 playwright-report
 test-results
+
+backend/data/membership-content.json

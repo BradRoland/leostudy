@@ -16,7 +16,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=build --chown=node:node /app/dist ./dist
-COPY --chown=node:node backend/coolify-server.mjs backend/stripe-tier-service.mjs backend/class-request-service.mjs backend/class-request-email-service.mjs backend/live-integrations.mjs ./backend/
+COPY --chown=node:node backend/coolify-server.mjs backend/stripe-tier-service.mjs backend/stripe-membership-service.mjs backend/membership-analytics.mjs backend/class-request-service.mjs backend/class-request-email-service.mjs backend/live-integrations.mjs ./backend/
+COPY --from=build --chown=node:node /app/backend/data/membership-content.json ./backend/data/membership-content.json
 COPY --chown=node:node scripts/development/deployment-config.mjs scripts/development/start-github.mjs ./scripts/development/
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8789
 USER node

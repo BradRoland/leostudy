@@ -1,5 +1,6 @@
 export type ProfileDecoration = {
   key: string
+  membership?: 'tier10'
   title: string
   unlockLevel: number
   description: string
@@ -27,9 +28,13 @@ export const profileDecorationCatalog: ProfileDecoration[] = [
   { key: 'rank_13', title: 'Nova', unlockLevel: 35, description: 'An earned nova frame for your academy profile.', cssClass: 'avatar-decor-rank-13', tone: 'elite', animated: false, modalEffect: 'none' },
   { key: 'rank_14', title: 'Luminary', unlockLevel: 42, description: 'An earned luminary frame for your academy profile.', cssClass: 'avatar-decor-rank-14', tone: 'elite', animated: false, modalEffect: 'none' },
   { key: 'rank_15', title: 'Academy Legend', unlockLevel: 50, description: 'An earned academy legend frame for your academy profile.', cssClass: 'avatar-decor-rank-15', tone: 'elite', animated: false, modalEffect: 'none' },
+  { key: 'pro_crest', title: 'Pro Crest', unlockLevel: 1, membership: 'tier10', description: 'A refined academy crest available with Pro.', cssClass: 'avatar-decor-pro-crest', tone: 'elite', animated: false, modalEffect: 'none' },
+  { key: 'pro_laurel', title: 'Pro Laurel', unlockLevel: 1, membership: 'tier10', description: 'A clean silver laurel available with Pro.', cssClass: 'avatar-decor-pro-laurel', tone: 'elite', animated: false, modalEffect: 'none' },
 ]
 
 const profileDecorationAssetByKey: Record<string, string> = {
+  pro_crest: '/avatar-decorations/academy-pro-crest.svg',
+  pro_laurel: '/avatar-decorations/academy-pro-laurel.svg',
   rank_01: '/avatar-decorations/academy-rank-01.svg',
   rank_02: '/avatar-decorations/academy-rank-02.svg',
   rank_03: '/avatar-decorations/academy-rank-03.svg',
@@ -57,16 +62,17 @@ export function getProfileDecoration(key?: string) {
 
 export function autoDecorationKeyForLevel(level: number) {
   const unlocked = profileDecorationCatalog
-    .filter((decoration) => decoration.key !== 'auto' && decoration.key !== 'none' && decoration.unlockLevel <= level)
+    .filter((decoration) => !decoration.membership && decoration.key !== 'auto' && decoration.key !== 'none' && decoration.unlockLevel <= level)
     .sort((left, right) => right.unlockLevel - left.unlockLevel)
   return unlocked[0]?.key || 'rank_01'
 }
 
-export function getEffectiveProfileDecorationForLevel(level: number, selectedKey = 'auto') {
+export function getEffectiveProfileDecorationForLevel(level: number, selectedKey = 'auto', hasPro = false) {
   const safeLevel = Math.max(1, Math.floor(Number(level) || 1))
   const decoration = getProfileDecoration(selectedKey)
   if (decoration.key === 'none') return decoration
   if (decoration.key === 'auto') return getProfileDecoration(autoDecorationKeyForLevel(safeLevel))
+  if (decoration.membership) return hasPro ? decoration : getProfileDecoration(autoDecorationKeyForLevel(safeLevel))
   if (decoration.unlockLevel <= safeLevel) return decoration
   return getProfileDecoration(autoDecorationKeyForLevel(safeLevel))
 }

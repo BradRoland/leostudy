@@ -15,7 +15,7 @@
     "pm2:webhook:restart": "pm2 restart leo-stripe-webhook",
     "pm2:webhook:logs": "pm2 logs leo-stripe-webhook",
     "test": "node --test src/**/*.test.ts backend/*.test.mjs cloudflare/**/*.test.mjs",
-    "build": "node scripts/write-build-version.mjs && tsc -b && vite build",
+    "build": "node scripts/build-membership-content.mjs && node scripts/write-build-version.mjs && tsc -b && vite build && node scripts/check-membership-bundle.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "playwright test",
@@ -23,7 +23,7 @@
     "test:staging:seed": "node --env-file=.env.staging.local tests/e2e/seed-staging.mjs",
     "dev:staging": "node scripts/staging/dev.mjs",
     "test:staging:http": "node backend/staging-class-request-check.mjs",
-    "build:staging": "node scripts/write-build-version.mjs && tsc -b && vite build --mode staging",
+    "build:staging": "node scripts/build-membership-content.mjs && node scripts/write-build-version.mjs && tsc -b && vite build --mode staging && node scripts/check-membership-bundle.mjs",
     "preview:staging": "vite preview --mode staging --host 127.0.0.1 --port 5177 --strictPort",
     "test:staging:build": "node scripts/staging/build-smoke.mjs"
   },
@@ -37,7 +37,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
-    "stripe": "^20.3.1"
+    "stripe": "22.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -46,6 +46,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "esbuild": "0.27.3",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

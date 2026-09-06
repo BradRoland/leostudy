@@ -37,6 +37,8 @@ for(let i=0;i<30;i++){
 }
 if(!ready){console.error('Test API unavailable. Check the isolated server stack and relay file.');stop(1)}
 else{
+ const content=spawn(process.execPath,['scripts/build-membership-content.mjs'],{cwd:root,env:childEnv,stdio:'inherit'})
+ if(await new Promise(resolve=>content.on('close',resolve))!==0)throw Error('Could not prepare private practice content.')
  run(process.execPath,['backend/coolify-server.mjs'])
  run(process.execPath,['node_modules/vite/bin/vite.js','--mode','staging','--host','127.0.0.1','--port','5176','--strictPort'])
  console.log('Test preview: http://127.0.0.1:5176 · Mail sink: http://127.0.0.1:55432 · Stop local processes with Ctrl+C. The cloned database is retained.')

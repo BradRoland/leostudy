@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  getPracticeTestModule,
-  practiceTestModules,
-  type PracticeTestModuleId,
-  type PracticeTestQuestion,
-  type PracticeTestScenario,
+import type {
+  PracticeTestModule,
+  PracticeTestModuleId,
+  PracticeTestQuestion,
+  PracticeTestScenario,
 } from '../content/practiceTests'
 
 type StudyPracticeTestPageProps = {
+  practiceTestModules: PracticeTestModule[]
   onStudyActivity: () => void
   onSessionStateChange?: (state: { active: boolean; complete: boolean }) => void
   onSessionComplete?: (result: {
@@ -192,7 +192,8 @@ function buildLdBreakdown(questions: PracticeTestQuestion[], answers: Record<str
     .sort((left, right) => Number(left.ldNumber) - Number(right.ldNumber))
 }
 
-export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, onSessionComplete, sessionXpReward }: StudyPracticeTestPageProps) {
+export function StudyPracticeTestPage({
+  practiceTestModules, onStudyActivity, onSessionStateChange, onSessionComplete, sessionXpReward }: StudyPracticeTestPageProps) {
   const [selectedModuleId, setSelectedModuleId] = useState<PracticeTestModuleId>('tmas1')
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<number>(20)
   const [sessionActive, setSessionActive] = useState(false)
@@ -216,7 +217,7 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
     onSessionStateChange?.({ active: sessionActive, complete: sessionComplete })
   }, [onSessionStateChange, sessionActive, sessionComplete])
 
-  const selectedModule = useMemo(() => getPracticeTestModule(selectedModuleId), [selectedModuleId])
+  const selectedModule = useMemo(() => practiceTestModules.find(module => module.id === selectedModuleId) || practiceTestModules[0], [selectedModuleId, practiceTestModules])
   const availableQuestionCount = useMemo(
     () => selectedModule.scenarios.reduce((total, scenario) => total + scenario.questions.length, 0),
     [selectedModule.scenarios],
@@ -244,11 +245,11 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
   )
   const corePracticeModules = useMemo(
     () => practiceTestModules.filter((module) => module.id === 'tmas1' || module.id === 'tmas2' || module.id === 'tmas3'),
-    [],
+    [practiceTestModules],
   )
   const focusedPracticeModules = useMemo(
     () => practiceTestModules.filter((module) => module.id === 'ld152016'),
-    [],
+    [practiceTestModules],
   )
 
   const currentScenario = activeScenarios[scenarioIndex] ?? null
@@ -321,6 +322,8 @@ export function StudyPracticeTestPage({ onStudyActivity, onSessionStateChange, o
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    const lengthTarget = Number(window.sessionStorage.getItem('practice-test-length-target'))
+    if ([10,20,50,100].includes(lengthTarget)) { setSelectedQuestionCount(lengthTarget); window.sessionStorage.removeItem('practice-test-length-target') }
     const moduleTarget = window.sessionStorage.getItem('practice-test-module-target')
     if (moduleTarget === 'tmas1' || moduleTarget === 'tmas2' || moduleTarget === 'tmas3') {
       setSelectedModuleId(moduleTarget)

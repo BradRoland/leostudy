@@ -4,6 +4,7 @@ import { formatAcademyClassLabel } from '../lib/classWorkspace'
 import type { ClassMembership } from '../lib/classApi'
 import { AcademyIcon } from './AcademyIcon'
 import './ClassRoster.css'
+import { MembershipBadge } from './MembershipBadge'
 
 function Avatar({ member }: { member: ClassRosterMember }) {
   return <img src={member.avatarUrl} alt="" loading="lazy" onError={event => { if (!event.currentTarget.src.endsWith(rosterDefaultAvatar)) event.currentTarget.src = rosterDefaultAvatar }} />
@@ -49,7 +50,7 @@ function ClassmateProfile({ member, onClose }: { member: ClassRosterMember; onCl
   }}>
     <header><span className="eyebrow">CLASSMATE PROFILE</span><button type="button" className="secondary" onClick={onClose}>Close</button></header>
     <div className="classmate-profile-scroll" tabIndex={0} role="region" aria-label="Classmate study and game statistics">
-      <div className="classmate-profile-identity"><Avatar member={member}/><div><h2 id="classmate-profile-name">{member.name}</h2><p>{member.department}</p></div></div>
+      <div className="classmate-profile-identity"><Avatar member={member}/><div><h2 id="classmate-profile-name">{member.name} <MembershipBadge tier={member.membershipTier}/></h2><p>{member.department}</p></div></div>
       {member.bio ? <p className="classmate-bio">{member.bio}</p> : null}
       <h3>Study &amp; game stats</h3>
       <MemberStats member={member} expanded/>
@@ -85,7 +86,7 @@ export function ClassRoster({ activeClass, currentUserId }: { activeClass: Class
       {ready && !result.error && !members.length ? <p className="class-roster-empty">No classmates are listed yet. Refresh to check for new members.</p> : null}
       {ready && members.length > 0 && !visible.length ? <p className="class-roster-empty">No classmates match your search.</p> : null}
       <ul className="classmate-list">{visible.map(member => <li key={member.userId} className="classmate-row">
-        <button type="button" className="classmate-open" aria-label={`View ${member.name}'s stats`} onClick={() => setSelection({ scope, member })}><Avatar member={member}/><span><strong>{member.name}{member.userId === currentUserId ? <small>You</small> : null}</strong><span>{member.department}</span></span></button>
+        <button type="button" className="classmate-open" aria-label={`View ${member.name}'s stats`} onClick={() => setSelection({ scope, member })}><Avatar member={member}/><span><strong>{member.name} <MembershipBadge tier={member.membershipTier}/>{member.userId === currentUserId ? <small>You</small> : null}</strong><span>{member.department}</span></span></button>
         <MemberStats member={member}/>
         <button type="button" className="classmate-view" aria-label={`Open stats for ${member.name}`} onClick={() => setSelection({ scope, member })}>View stats<AcademyIcon name="arrow"/></button>
       </li>)}</ul>

@@ -1,10 +1,10 @@
-import customRaw from './custom.json'
-import hsRaw from './hs.json'
-import pcRaw from './pc.json'
-const scenariosRaw: unknown[] = []
-const scenariosTmas2Raw: unknown[] = []
-
-import vcRaw from './vc.json'
+import customRaw from '../src/content/custom.json'
+import hsRaw from '../src/content/hs.json'
+import pcRaw from '../src/content/pc.json'
+import scenariosRaw from '../src/content/scenarios.json'
+import scenariosTmas2Raw from '../src/content/scenarios-tmas2.json'
+import { tmas3Scenarios } from '../src/content/practiceTestTmas3Scenarios'
+import vcRaw from '../src/content/vc.json'
 
 export type ContentCategory = string
 export type ScenarioTrainingSection = 'tmas1' | 'tmas2' | 'tmas3'
@@ -214,7 +214,28 @@ function parseScenarioItems(raw: unknown, sourceName: string, warnings: string[]
   return items
 }
 
-function buildTmas3ScenarioBankItems(): ScenarioBankItem[] { return [] }
+function buildTmas3ScenarioBankItems(): ScenarioBankItem[] {
+  return tmas3Scenarios.map((scenario) => ({
+    id: scenario.id,
+    category: 'scenario',
+    title: scenario.title,
+    scenario: scenario.stem,
+    questions: scenario.questions.map((question) => question.prompt),
+    tmasSet: 'tmas3',
+    subQuestions: scenario.questions.map((question) => ({
+      id: question.id,
+      prompt: question.prompt,
+      choices: question.choices,
+      expectedAnswer: question.choices[question.correctIndex] || question.choices[0] || '',
+      explanation: question.explanation,
+    })),
+    keyPoints: scenario.questions.map((question) => question.explanation),
+    tags: ['tmas3', ...scenario.ldNumbers.map((ldNumber) => `ld-${ldNumber}`)],
+    difficulty: 'advanced',
+    explanation: scenario.questions.map((question) => question.explanation).join(' '),
+    sourceUrl: 'TMAS 3 scenario practice bank',
+  }))
+}
 
 export function loadLocalContentBundle(): LocalContentBundle {
   const warnings: string[] = []
@@ -240,5 +261,5 @@ export const localContentFiles = {
   custom: customRaw,
   scenarios: scenariosRaw,
   scenariosTmas2: scenariosTmas2Raw,
-  scenariosTmas3: [],
+  scenariosTmas3: tmas3Scenarios,
 }

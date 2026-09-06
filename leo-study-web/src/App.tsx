@@ -33,6 +33,13 @@ import { requiresAccountProfileCompletion, splitProfileName, safeAuthNextPath, s
 import { OwnerAdminPanel } from './components/OwnerAdminPanel'
 import { StudyGuidePage } from './components/StudyGuidePage'
 import { StudyPracticeTestPage } from './components/StudyPracticeTestPage'
+import { MembershipPage, MembershipGate } from './components/MembershipPage'
+import { MembershipBadge } from './components/MembershipBadge'
+import { useMembership } from './lib/useMembership'
+import { membershipPalette, themeAllowed } from './lib/membershipTheme'
+import { ProStudyTools } from './components/ProStudyTools'
+import { sanitizeProStudyPreferences, type ProStudyPreferences } from './lib/proStudy'
+import type { PracticeTestModule } from './content/practiceTests'
 import {
   addClassDepartment,
   createClassJoinCode,
@@ -45,7 +52,6 @@ import {
   type ClassDepartment,
 } from './lib/classApi'
 import { formatAcademyClassLabel, normalizeInviteCode } from './lib/classWorkspace'
-import { buildSupportCheckoutUrl } from './lib/stripeSupport'
 import './components/GlobalChatWidget.css'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
@@ -251,6 +257,7 @@ type HomeLeaderboardEntry = {
   playerName: string
   avatarUrl: string
   supporterTier: SupporterTier
+  membershipTier?: string
   profileDecorationKey: string
   themeId: string
   nameStyle: NameStyle
@@ -355,6 +362,7 @@ type LeaderboardEntry = {
   playerName: string
   avatarUrl: string
   supporterTier: SupporterTier
+  membershipTier?: string
   profileDecorationKey: string
   bio: string
   agency: string
@@ -402,6 +410,7 @@ type UserProfile = {
   avatarPath: string
   avatarUrl: string
   supporterTier: SupporterTier
+  membershipTier?: string
   isOwner: boolean
   createdAt: string
 }
@@ -411,6 +420,7 @@ type OnlineStudyUser = {
   username: string
   avatarUrl: string
   supporterTier: SupporterTier
+  membershipTier?: string
   lastActive: string
   presence: PresenceStatus
   isCurrentUser: boolean
@@ -457,6 +467,7 @@ type ContentEditorItem = {
 }
 
 type ProfileDetails = {
+  proStudyPreferences?: ProStudyPreferences
   firstName: string
   lastName: string
   dailyGoalMinutes: number
@@ -1210,9 +1221,9 @@ function loadTaskbarCollapsedGroups() {
 
 const tierLabel: Record<SupporterTier, string> = {
   free: 'Free',
-  tier2: '$2 Supporter',
-  tier5: '$5 Supporter+',
-  tier10: '$10 Pro Supporter',
+  tier2: 'Original Supporter',
+  tier5: 'Academy Plus',
+  tier10: 'Academy Pro',
 }
 
 function normalizeRoutePath(path: string): string {
@@ -2110,7 +2121,6 @@ function cloneDefaultUserStats(): UserStats {
   }
 }
 
-const stripeTierLinks = liveIntegrations.stripeLinks
 const appContentSource = String(import.meta.env.VITE_CONTENT_SOURCE || 'supabase')
   .trim()
   .toLowerCase()
@@ -2313,7 +2323,7 @@ function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
     tierName: levelTierName(level),
     haloClass: levelHaloClass(level),
     autoDecorationKey: autoDecorationKeyForLevel(level),
-    nextReward: profileDecorationCatalog.find((decoration) => decoration.unlockLevel > level && decoration.key !== 'auto' && decoration.key !== 'none') || null,
+    nextReward: profileDecorationCatalog.find((decoration) => !decoration.membership && decoration.unlockLevel > level && decoration.key !== 'auto' && decoration.key !== 'none') || null,
   }
 }
 
@@ -2413,10 +2423,11 @@ function buildDuelAchievementReward(input: DuelAchievementRewardInput): Achievem
   return combineAchievementRewards('⚔️ 1v1 XP Bonus', rewards)
 }
 
-function getEffectiveProfileDecoration(levelProfile: UserLevelProfile, selectedKey = 'auto') {
+function getEffectiveProfileDecoration(levelProfile: UserLevelProfile, selectedKey = 'auto', hasPro = false) {
   const decoration = getProfileDecoration(selectedKey)
   if (decoration.key === 'none') return decoration
   if (decoration.key === 'auto') return getProfileDecoration(levelProfile.autoDecorationKey)
+  if (decoration.membership) return hasPro ? decoration : getProfileDecoration(levelProfile.autoDecorationKey)
   if (decoration.unlockLevel <= levelProfile.level) return decoration
   return getProfileDecoration(levelProfile.autoDecorationKey)
 }
@@ -3459,6 +3470,7 @@ function sanitizeState(input: unknown): PersistedState {
             profileDecorationKey: sanitizeProfileDecorationKey((state.profileDetails as Partial<ProfileDetails>).profileDecorationKey),
             nameStyle: sanitizeNameStyle((state.profileDetails as Partial<ProfileDetails>).nameStyle),
             namePresets: sanitizeNamePresets((state.profileDetails as Partial<ProfileDetails>).namePresets),
+            proStudyPreferences: sanitizeProStudyPreferences(state.profileDetails.proStudyPreferences),
             systemNoticesSeen: sanitizeSystemNoticesSeen((state.profileDetails as Partial<ProfileDetails>).systemNoticesSeen),
             stats: sanitizeUserStats((state.profileDetails as Partial<ProfileDetails>).stats),
             levelSnapshot: sanitizeProfileLevelSnapshot((state.profileDetails as Partial<ProfileDetails>).levelSnapshot),
@@ -3532,8 +3544,8 @@ function mapProfileRow(row: Record<string, unknown>, userId: string): UserProfil
     username: String(row.username || ''),
     avatarPath,
     avatarUrl: toPublicAvatarUrl(avatarPath) || defaultAvatarUrl,
-    supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String(row.supporter_tier))
-      ? String(row.supporter_tier)
+    supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String((row.legacy_supporter_tier ?? row.supporter_tier)))
+      ? String((row.legacy_supporter_tier ?? row.supporter_tier))
       : 'free') as SupporterTier,
     isOwner: Boolean(row.is_owner),
     createdAt: String(row.created_at || ''),
@@ -4448,6 +4460,29 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false)
   const [authRedirectPending, setAuthRedirectPending] = useState(() => hasAuthRedirectParams())
   const [currentUserId, setCurrentUserId] = useState<string>('')
+  const membership = useMembership(supabase, currentUserId)
+  const hasMembership = membership.access.tier !== 'free'
+  const hasProMembership = membership.access.tier === 'tier10'
+  const [membershipModules, setMembershipModules] = useState<PracticeTestModule[]>([])
+  const [membershipContentError, setMembershipContentError] = useState('')
+  const [membershipContentRetry, setMembershipContentRetry] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    setMembershipModules([])
+    if (!hasMembership || !supabase || !currentUserId) { setScenarioItems([]); return }
+    const load = async () => {
+      try {
+        const { data } = await supabase!.auth.getSession()
+        const response = await fetch('/api/membership/content', { headers: { Authorization: `Bearer ${data.session?.access_token || ''}` } })
+        const content = await response.json()
+        if (!response.ok || !Array.isArray(content.modules) || !content.modules.length) throw new Error(content.error || 'Practice content is unavailable.')
+        if (!cancelled) { setMembershipModules(content.modules); setScenarioItems(content.scenarios || []); setMembershipContentError('') }
+      } catch (error) { if (!cancelled) setMembershipContentError(error instanceof Error ? error.message : 'Practice content is unavailable.') }
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [hasMembership, currentUserId, membershipContentRetry])
+
   useEffect(() => {
     rewardAvatarRequest.current += 1
     setRewardAvatarLoading(false)
@@ -6221,7 +6256,7 @@ function App() {
 
       const combinedRows = [...allTimeRows, ...effectiveWeeklyRows]
       const userIds = [...new Set(combinedRows.map((entry) => String(entry.user_id)).filter(Boolean))]
-      let profilesByUserId: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
+      let profilesByUserId: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier; membershipTier?: string }> = {}
       let detailsByUserId: Record<string, LeaderboardProfileSnapshot> = {}
       const masteredCodesByUserId: Record<string, number> = {}
       const studySecondsByUserId: Record<string, number> = {}
@@ -6248,13 +6283,14 @@ function App() {
         }
 
         const { data: profiles } = await supabase
-          .from('profiles')
-          .select('user_id,username,avatar_path,supporter_tier,bio,agency')
+          .from('academy_public_profiles')
+          .select('user_id,username,avatar_path,supporter_tier,bio,agency,legacy_supporter_tier,membership_tier')
           .in('user_id', userIds)
-        profilesByUserId = (profiles || []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }>>(
+        profilesByUserId = (profiles || []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier; membershipTier?: string }>>(
           (accumulator, entry) => {
             accumulator[String(entry.user_id)] = {
               username: String(entry.username || ''),
+              membershipTier: String(entry.membership_tier || 'free'),
               avatarUrl: toPublicAvatarUrl(String(entry.avatar_path || '')) || defaultAvatarUrl,
               supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String(entry.supporter_tier))
                 ? String(entry.supporter_tier)
@@ -6430,6 +6466,7 @@ function App() {
               playerName: profilesByUserId[userId]?.username || (userId === currentUserId ? profileUsername.trim() || 'You' : 'Classmate'),
               avatarUrl: profilesByUserId[userId]?.avatarUrl || defaultAvatarUrl,
               supporterTier: profilesByUserId[userId]?.supporterTier || 'free',
+              membershipTier: profilesByUserId[userId]?.membershipTier,
               profileDecorationKey: detailsByUserId[userId]?.profileDecorationKey || 'auto',
               bio: detailsByUserId[userId]?.bio || '',
               agency: detailsByUserId[userId]?.agency || '',
@@ -6525,7 +6562,7 @@ function App() {
       })
       const userIds = [...new Set(classScopedStates.map((entry) => String(entry.user_id || '')))]
         .filter(Boolean)
-      let profileMap: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }> = {}
+      let profileMap: Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier; membershipTier?: string }> = {}
       let duelStatsByUserId: Record<string, Record<DuelLeaderboardMode, { wins: number; losses: number; currentWinStreak: number }>> = {}
       let ownerUserIds = new Set<string>()
       const detailsByUserId: Record<string, LeaderboardProfileSnapshot> = {}
@@ -6542,14 +6579,15 @@ function App() {
 
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
-          .from('profiles')
-          .select('user_id,username,avatar_path,supporter_tier')
+          .from('academy_public_profiles')
+          .select('user_id,username,avatar_path,supporter_tier,legacy_supporter_tier,membership_tier')
           .in('user_id', userIds)
-        profileMap = (profiles || []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }>>((accumulator, entry) => {
+        profileMap = (profiles || []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier; membershipTier?: string }>>((accumulator, entry) => {
           const userId = String(entry.user_id || '')
           const username = String(entry.username || '').trim() || (userId === currentUserId ? profileUsername.trim() || 'You' : 'Classmate')
           accumulator[String(entry.user_id)] = {
             username,
+            membershipTier: String(entry.membership_tier || 'free'),
             avatarUrl: toPublicAvatarUrl(String(entry.avatar_path || '')) || defaultAvatarUrl,
             supporterTier: (['free', 'tier2', 'tier5', 'tier10'].includes(String(entry.supporter_tier)) ? String(entry.supporter_tier) : 'free') as SupporterTier,
           }
@@ -6702,6 +6740,7 @@ function App() {
           playerName: profile.username,
           avatarUrl: profile.avatarUrl,
           supporterTier: profile.supporterTier,
+          membershipTier: profile.membershipTier,
           profileDecorationKey: details.profileDecorationKey,
           themeId: details.themeId || appThemePresets[0].id,
           nameStyle: details.nameStyle,
@@ -6723,6 +6762,7 @@ function App() {
           playerName: profile.username,
           avatarUrl: profile.avatarUrl,
           supporterTier: profile.supporterTier,
+          membershipTier: profile.membershipTier,
           profileDecorationKey: details.profileDecorationKey,
           themeId: details.themeId || appThemePresets[0].id,
           nameStyle: details.nameStyle,
@@ -6744,6 +6784,7 @@ function App() {
           playerName: profile.username,
           avatarUrl: profile.avatarUrl,
           supporterTier: profile.supporterTier,
+          membershipTier: profile.membershipTier,
           profileDecorationKey: details.profileDecorationKey,
           themeId: details.themeId || appThemePresets[0].id,
           nameStyle: details.nameStyle,
@@ -6769,6 +6810,7 @@ function App() {
               playerName: profile.username,
               avatarUrl: profile.avatarUrl,
               supporterTier: profile.supporterTier,
+          membershipTier: profile.membershipTier,
               profileDecorationKey: details.profileDecorationKey,
               themeId: details.themeId || appThemePresets[0].id,
               nameStyle: details.nameStyle,
@@ -6792,6 +6834,7 @@ function App() {
               playerName: profile.username,
               avatarUrl: profile.avatarUrl,
               supporterTier: profile.supporterTier,
+          membershipTier: profile.membershipTier,
               profileDecorationKey: details.profileDecorationKey,
               themeId: details.themeId || appThemePresets[0].id,
               nameStyle: details.nameStyle,
@@ -7133,8 +7176,8 @@ function App() {
       }
 
       const { data: profileRow, error: profileLookupError } = await client
-        .from('profiles')
-        .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')
+        .from('academy_public_profiles')
+        .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at,legacy_supporter_tier,membership_tier')
         .eq('user_id', currentUserId)
         .maybeSingle()
 
@@ -7469,8 +7512,8 @@ function App() {
     const client = supabase
     const timer = setInterval(async () => {
       const { data: profileRow } = await client
-        .from('profiles')
-        .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')
+        .from('academy_public_profiles')
+        .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at,legacy_supporter_tier,membership_tier')
         .eq('user_id', currentUserId)
         .maybeSingle()
       if (!profileRow) return
@@ -7880,7 +7923,7 @@ function App() {
     currentUserLevelProfile.totalXp,
     stateHydrated,
   ])
-  const selectedProfileDecoration = getEffectiveProfileDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)
+  const selectedProfileDecoration = getEffectiveProfileDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey, hasProMembership)
   const chatLevelProfiles = useMemo(() => {
     const next: Record<string, { level: number; tierName: string; totalXp: number; haloClass: string }> = {}
     for (const [userId, levelProfile] of Object.entries(levelProfilesByUserId)) {
@@ -10391,7 +10434,7 @@ function App() {
     const validationError = validateOnboardingProfile(input)
     if (validationError) throw new Error(validationError)
     const displayName = input.displayName.trim() || `${input.firstName.trim()} ${input.lastName.trim()}`
-    const { data: existing, error: lookupError } = await supabase.from('profiles').select('user_id').ilike('username', displayName).neq('user_id', currentUserId).limit(1).maybeSingle()
+    const { data: existing, error: lookupError } = await supabase.from('academy_public_profiles').select('user_id,legacy_supporter_tier,membership_tier').ilike('username', displayName).neq('user_id', currentUserId).limit(1).maybeSingle()
     if (lookupError) throw new Error('We couldn’t check your display name. Please try again.')
     if (existing) throw new Error('That display name is already taken. Go back and choose a different display name.')
     let avatarPath = profile?.avatarPath || ''
@@ -10498,8 +10541,8 @@ function App() {
 
     try {
       const { data: existingUsernameRow, error: existingUsernameError } = await supabase
-        .from('profiles')
-        .select('user_id')
+        .from('academy_public_profiles')
+        .select('user_id,legacy_supporter_tier,membership_tier')
         .ilike('username', normalizedUsername)
         .neq('user_id', currentUserId)
         .limit(1)
@@ -10704,19 +10747,26 @@ function App() {
     setAuthLoading(false)
   }
 
-  const startTierCheckout = (tier: Exclude<SupporterTier, 'free'>) => {
+  const openMembershipBilling = async (action: 'checkout' | 'portal', tier?: 'tier5' | 'tier10') => {
     setSupportError('')
     if (liveIntegrations.disabled) { setSupportError('Payments are unavailable in this development preview.'); return }
-    if (!currentUserId) { setSupportError('Sign in before choosing a supporter tier.'); return }
+    if (!supabase || !currentUserId) { setSupportError('Sign in before choosing a membership.'); return }
+    setSupportRefreshing(true)
     try {
-      const checkoutUrl = stripeTierLinks[tier]
-      if (!checkoutUrl) throw new Error('Missing payment link')
-      const url = buildSupportCheckoutUrl({ checkoutUrl, currentUserEmail, currentUserId })
-      if (url.protocol !== 'https:' || url.hostname !== 'buy.stripe.com') throw new Error('Invalid payment link')
-      window.location.assign(url.toString())
-    } catch {
-      setSupportError('Checkout is temporarily unavailable. Please try again later.')
-    }
+      const { data } = await supabase.auth.getSession()
+      if (!data.session?.access_token) throw new Error('Sign in again to manage your membership.')
+      const response = await fetch(`/api/membership/${action}`, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify({ tier }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Membership checkout is unavailable.')
+      const target = new URL(result.url)
+      if (target.protocol !== 'https:' || !['checkout.stripe.com','billing.stripe.com'].includes(target.hostname)) throw new Error('Invalid billing destination.')
+      window.location.assign(target.toString())
+    } catch (error) { setSupportError(error instanceof Error ? error.message : 'Membership checkout is unavailable.') }
+    finally { setSupportRefreshing(false) }
+  }
+  const startTierCheckout = (tier: Exclude<SupporterTier, 'free'>) => {
+    if (tier === 'tier2') return
+    void openMembershipBilling('checkout', tier)
   }
 
   const signOut = async () => {
@@ -11646,7 +11696,8 @@ function App() {
       if (error || !data || !['free', 'tier2', 'tier5', 'tier10'].includes(data.supporter_tier)) throw new Error('Refresh failed')
       const tier = data.supporter_tier as SupporterTier
       setProfile(previous => previous?.userId === currentUserId ? { ...previous, supporterTier: tier } : previous)
-      setSupportStatus(tier === 'free' ? 'No paid tier is confirmed yet. If you just paid, confirmation may take a moment.' : `Your ${tierLabel[tier]} access is active.`)
+      const refreshed = await membership.refresh()
+      setSupportStatus(refreshed.tier !== 'free' ? `Your Academy ${refreshed.tier === 'tier10' ? 'Pro' : 'Plus'} membership is active.` : tier !== 'free' ? 'Your original supporter benefits are active.' : 'No active membership is confirmed yet. If you just subscribed, confirmation may take a moment.')
     } catch { setSupportError('We could not refresh your supporter access. Please try again.') }
     finally { setSupportRefreshing(false) }
   }
@@ -11683,11 +11734,12 @@ function App() {
     lastAppStateUpdateRef.current = Math.max(lastAppStateUpdateRef.current, nextUpdatedAt)
   }
 
-  const canCustomizeName = profile?.supporterTier === 'tier10'
-  const canUseThemes = tierRank(profile?.supporterTier || 'free') >= tierRank('tier5')
-  const selectedTheme = getThemePreset(canUseThemes ? profileDetails.themeId : appThemePresets[0].id)
+  const activeProfileTier: SupporterTier = tierRank(profile?.supporterTier || 'free') > tierRank(membership.access.tier) ? profile!.supporterTier : membership.access.tier
+  const canCustomizeName = activeProfileTier === 'tier10'
+  const canUseThemes = activeProfileTier === 'tier5' || activeProfileTier === 'tier10'
+  const canUseTheme = (id: string) => themeAllowed(id, membership.access.tier, profile?.supporterTier || 'free')
+  const selectedTheme = getThemePreset(canUseTheme(profileDetails.themeId) ? profileDetails.themeId : appThemePresets[0].id)
   const isUiLightMode = profileDetails.displayMode === 'light'
-  const activeProfileTier: SupporterTier = profile?.supporterTier || 'free'
   const profileDisplayName = profile?.username || profileUsername.trim()
   const activeProfileName = profileDisplayName || (profileHydrated ? 'Profile' : 'Loading profile…')
   const pageTitle = isProfilePage
@@ -11695,7 +11747,7 @@ function App() {
     : isStatsPage
     ? 'Stats'
     : isSupportPage
-        ? 'Support Creator'
+        ? 'Memberships'
         : isStudyGuidePage
           ? 'Study Guide'
         : isStudyPracticeTestPage
@@ -12234,9 +12286,9 @@ function App() {
       </span>
     )
   }
-  const renderAvatarDecoration = (levelProfile?: UserLevelProfile | null, selectedKey = 'auto') => {
+  const renderAvatarDecoration = (levelProfile?: UserLevelProfile | null, selectedKey = 'auto', pro = false) => {
     if (!levelProfile) return null
-    return renderDecorationLayer(getEffectiveProfileDecoration(levelProfile, selectedKey))
+    return renderDecorationLayer(getEffectiveProfileDecoration(levelProfile, selectedKey, pro))
   }
   const avatarDecorationEffectClass = (levelProfile?: UserLevelProfile | null, selectedKey = 'auto') => {
     if (!levelProfile) return ''
@@ -12309,32 +12361,7 @@ function App() {
       </span>
     </span>
   )
-  const resolvedThemeVars = useMemo(() => (isUiLightMode
-      ? {
-        ...lightModeVars,
-        bg: `color-mix(in srgb, ${selectedTheme.vars.bodyBase} 10%, #f6f9ff)`,
-        panel: `color-mix(in srgb, ${selectedTheme.vars.panelStrong} 14%, #ffffff)`,
-        panelStrong: `color-mix(in srgb, ${selectedTheme.vars.panelStrong} 20%, #f2f6ff)`,
-        sidebar: `color-mix(in srgb, ${selectedTheme.vars.bodyBase} 12%, #f9fbff)`,
-        border: `color-mix(in srgb, ${selectedTheme.vars.accent} 30%, #d5deef)`,
-        text: '#18233d',
-        muted: `color-mix(in srgb, ${selectedTheme.vars.accent} 24%, #5f7193)`,
-        textMuted: `color-mix(in srgb, ${selectedTheme.vars.accent} 18%, #7f91b3)`,
-        accent: selectedTheme.vars.accent,
-        good: selectedTheme.vars.good,
-        bad: selectedTheme.vars.bad,
-        gold: selectedTheme.vars.accent,
-        bodyRadial: `color-mix(in srgb, ${selectedTheme.vars.bodyRadial} 16%, #eaf1fc)`,
-        bodyBase: `color-mix(in srgb, ${selectedTheme.vars.bodyBase} 10%, #f6f9ff)`,
-      }
-      : {
-        ...darkModeVars,
-        ...selectedTheme.vars,
-        sidebar: selectedTheme.vars.panelStrong,
-        textMuted: selectedTheme.vars.muted,
-        gold: selectedTheme.vars.accent,
-      }
-  ), [isUiLightMode, selectedTheme])
+  const resolvedThemeVars = useMemo(() => ({ ...(isUiLightMode ? lightModeVars : darkModeVars), ...membershipPalette(selectedTheme.vars.accent, isUiLightMode) }), [isUiLightMode, selectedTheme])
   useEffect(() => {
     const root = document.documentElement
     const vars = resolvedThemeVars
@@ -12799,6 +12826,7 @@ function App() {
     playerName: entry.playerName,
     avatarUrl: entry.avatarUrl,
     supporterTier: entry.supporterTier,
+    membershipTier: entry.membershipTier,
     profileDecorationKey: entry.profileDecorationKey,
     themeId: entry.themeId,
     bio: entry.bio,
@@ -12861,8 +12889,8 @@ function App() {
 
     const [{ data: profileRow }, { data: stateRow }, { data: duelStats }, { data: ownerRows }] = await Promise.all([
       supabase
-        .from('profiles')
-        .select('user_id,username,avatar_path,supporter_tier,agency,bio')
+        .from('academy_public_profiles')
+        .select('user_id,username,avatar_path,supporter_tier,agency,bio,legacy_supporter_tier,membership_tier')
         .eq('user_id', userId)
         .maybeSingle(),
       supabase
@@ -12920,6 +12948,7 @@ function App() {
       playerName: String((profileRow as Record<string, unknown> | null)?.username || '').trim() || `User ${userId.slice(0, 8)}`,
       avatarUrl: toPublicAvatarUrl(String((profileRow as Record<string, unknown> | null)?.avatar_path || '')) || defaultAvatarUrl,
       supporterTier,
+      membershipTier: String(profileRow?.membership_tier || 'free'),
       profileDecorationKey: details.profileDecorationKey,
       themeId: details.themeId,
       bio: String((profileRow as Record<string, unknown> | null)?.bio || '').trim() || details.bio,
@@ -14077,8 +14106,8 @@ function App() {
                     <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={activeProfileName} className="taskbar-profile-image" onError={handleAvatarImageError} />
                   </span>
                   <span className="taskbar-profile-info">
-                    <span className={`taskbar-profile-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
-                      {profileDisplayName || 'Profile'}
+                    <span className={`taskbar-profile-name ${displayNameClass(activeProfileTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, activeProfileTier)}>
+                      {profileDisplayName || 'Profile'} <MembershipBadge tier={membership.access.tier}/>
                     </span>
                     <span className="taskbar-profile-tier">{tierLabel[activeProfileTier]} • Lv {currentUserLevelProfile.level}</span>
                     <span className="taskbar-xp-meta">
@@ -14164,6 +14193,7 @@ function App() {
         {!isProfilePage && !isStatsPage && isHomePage && (
           <section className="home-section">
             <HomeDashboard
+              hasAnalytics={hasMembership}
               rewards={<RewardsPanel rewards={dailyRewards} level={currentUserLevelProfile.level} currentXp={currentUserLevelProfile.currentLevelXp} nextXp={currentUserLevelProfile.nextLevelXp} onOpenRewards={() => openSettingsTab('progression')} onStudy={openStudyFlashcardsPage} />}
               name={profileDetails.firstName || activeProfileName}
               className={activeClass?.className || ''}
@@ -14201,10 +14231,10 @@ function App() {
               <div>
                 <p className="eyebrow">Built for your next step</p>
                 <h2>Support 180 Academy</h2>
-                <p className="muted">Help grow the academy and unlock supporter badges, themes, and name styling. Study progress and earned ranks stay earned.</p>
-                {activeProfileTier !== 'free' ? <small>Thank you for being a {tierLabel[activeProfileTier]}.</small> : <small>Optional one-time support from $2. Tax may apply.</small>}
+                <p className="muted">Unlock T-MAS practice, study analytics, and a toolkit that grows with your goals. Compare Plus and Pro memberships.</p>
+                {activeProfileTier !== 'free' ? <small>Thank you for being a {tierLabel[activeProfileTier]}.</small> : <small>Memberships from $5/month. Tax may apply.</small>}
               </div>
-              <button className="secondary" onClick={() => navigate('/support')}>Explore supporter benefits <span aria-hidden="true">→</span></button>
+              <button className="secondary" onClick={() => navigate('/support')}>Explore memberships <span aria-hidden="true">→</span></button>
             </aside>
             <details className="home-class-activity">
               <summary>Class leaderboards &amp; activities<small>Your classmates, challenges, and announcements</small></summary>
@@ -14332,7 +14362,7 @@ function App() {
                 </button>
                 <button className="secondary" onClick={() => navigate('/support')}>
                   <AppIcon name="support" className="button-icon" />
-                  Support Creator
+                  Memberships
                 </button>
               </div>
             </div>
@@ -15058,55 +15088,7 @@ function App() {
         ) : null}
 
         {!isProfilePage && !isStatsPage && isSupportPage && profile ? (
-          <section className="support-section">
-            <div className="card support-intro">
-              <p className="eyebrow">Support 180 Academy</p>
-              <h2>Choose a Supporter Tier</h2>
-              <p className="muted">Support helps us keep building features, question banks, and new training tools.</p>
-              <p className="muted" aria-live="polite">Current tier: {tierLabel[activeProfileTier]}</p>
-              <p className="muted">Each tier is a separate one-time purchase, with no recurring subscription. Tax may apply. Higher tiers include the benefits below them.</p>
-              {liveIntegrations.disabled ? <p className="support-preview-note" role="status">Development preview — payments are disabled. You will not be charged.</p> : null}
-              <p className="muted">Already paid? Return here to see your access update after Stripe confirms payment.</p>
-              <button className="secondary" onClick={refreshSupporterTier} disabled={supportRefreshing}>{supportRefreshing ? 'Checking access…' : 'Refresh supporter access'}</button>
-              {supportError ? <p role="alert">{supportError}</p> : null}
-              {supportStatus ? <p role="status">{supportStatus}</p> : null}
-            </div>
-
-            <div className="support-grid">
-              <article className={tierRank(activeProfileTier) >= tierRank('tier2') ? 'card support-card tier-locked' : 'card support-card'}>
-                <h3>$2 Supporter</h3>
-                <ul>
-                  <li>Support the project and roadmap</li>
-                  <li>Supporter badge on your account</li>
-                </ul>
-                <button className="primary" onClick={() => startTierCheckout('tier2')} disabled={liveIntegrations.disabled || tierRank(activeProfileTier) >= tierRank('tier2')}>
-                  {tierRank(activeProfileTier) >= tierRank('tier2') ? 'Included' : liveIntegrations.disabled ? 'Unavailable in preview' : 'Continue to Stripe'}
-                </button>
-              </article>
-
-              <article className={tierRank(activeProfileTier) >= tierRank('tier5') ? 'card support-card tier-locked' : 'card support-card'}>
-                <h3>$5 Supporter+</h3>
-                <ul>
-                  <li>Everything in $2 tier</li>
-                  <li>Unlock all website themes</li>
-                </ul>
-                <button className="primary" onClick={() => startTierCheckout('tier5')} disabled={liveIntegrations.disabled || tierRank(activeProfileTier) >= tierRank('tier5')}>
-                  {tierRank(activeProfileTier) >= tierRank('tier5') ? 'Included' : liveIntegrations.disabled ? 'Unavailable in preview' : 'Continue to Stripe'}
-                </button>
-              </article>
-
-              <article className={tierRank(activeProfileTier) >= tierRank('tier10') ? 'card support-card tier-locked' : 'card support-card'}>
-                <h3>$10 Pro Supporter</h3>
-                <ul>
-                  <li>Everything in $2 and $5 tiers</li>
-                  <li>Name customization (color, font, glow)</li>
-                </ul>
-                <button className="primary" onClick={() => startTierCheckout('tier10')} disabled={liveIntegrations.disabled || tierRank(activeProfileTier) >= tierRank('tier10')}>
-                  {tierRank(activeProfileTier) >= tierRank('tier10') ? 'Current Tier' : liveIntegrations.disabled ? 'Unavailable in preview' : 'Continue to Stripe'}
-                </button>
-              </article>
-            </div>
-          </section>
+          <MembershipPage access={membership.access} preview={liveIntegrations.disabled} busy={supportRefreshing} error={supportError || membership.error} status={supportStatus} onCheckout={startTierCheckout} onManage={() => void openMembershipBilling('portal')} onRefresh={() => void refreshSupporterTier()} onStudy={openStudyFlashcardsPage} />
         ) : null}
 
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isLibraryPage && (
@@ -15188,6 +15170,7 @@ function App() {
               </button>
             </div>
 
+            {hasMembership ? <>
             <article className="card study-focus-block">
               <div className="study-focus-head">
                 <h3>What To Focus On</h3>
@@ -15332,6 +15315,7 @@ function App() {
                 </div>
               </article>
             </div>
+            </> : <MembershipGate title="Find your next study focus" onExplore={() => navigate('/support')} />}
           </section>
         )}
 
@@ -15343,8 +15327,11 @@ function App() {
           />
         ) : null}
 
-        {isStudyPracticeTestPage ? (
+        {isStudyPracticeTestPage && !hasMembership ? <MembershipGate title="T-MAS practice exams" onExplore={() => navigate('/support')} /> : null}
+        {isStudyPracticeTestPage && hasMembership && !membershipModules.length ? <section className="card"><p role="status">{membershipContentError || 'Loading your practice toolkit…'}</p>{membershipContentError ? <button onClick={() => setMembershipContentRetry(value => value + 1)}>Try again</button> : null}</section> : null}
+        {isStudyPracticeTestPage && hasMembership && membershipModules.length > 0 ? (
           <StudyPracticeTestPage
+            practiceTestModules={membershipModules}
             onStudyActivity={() => markStudyActivity('study_practice')}
             onSessionStateChange={handleStudyPracticeSessionStateChange}
             onSessionComplete={handlePracticeTestComplete}
@@ -16518,7 +16505,8 @@ function App() {
           </section>
         )}
 
-        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isScenariosPage && (
+        {isScenariosPage && !hasMembership ? <MembershipGate title="T-MAS scenario training" onExplore={() => navigate('/support')} /> : null}
+        {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isScenariosPage && hasMembership && (
           <section className="scenario-section">
             <div className="card compact scenario-section-switcher">
               <div className="segmented compact-segmented">
@@ -16651,8 +16639,11 @@ function App() {
           </section>
         )}
 
-        {isStatsPage && profile ? (
+        {isStatsPage && profile && !hasMembership ? <MembershipGate title="Your study analytics" onExplore={() => navigate('/support')} /> : null}
+        {isStatsPage && profile && hasMembership ? (
           <section className="stats-section">
+            {hasProMembership ? <ProStudyTools preferences={profileDetails.proStudyPreferences} onPreferences={value => setProfileDetails(previous => ({ ...previous, proStudyPreferences: value }))} onPractice={setup => { window.sessionStorage.setItem('practice-test-module-target', setup.module); window.sessionStorage.setItem('practice-test-length-target', String(setup.length)); openStudyPracticeTestPage() }} onDrill={(codeSet, sectionNumber) => { const matches = sections.filter(section => section.codeSet === codeSet && section.sectionNumber === sectionNumber); setStudyFlashFilter(codeSet); setStudyFlashSessionFilter(codeSet); setStudyFlashSessionOrder(matches.map(section => section.id)); setStudyFlashSessionIndex(0); setStudyFlashSessionFlipped(false); setStudyFlashSessionOpen(matches.length > 0); openStudyFlashcardsPage() }} /> : <MembershipGate title="Build your personal study plan" pro onExplore={() => navigate('/support')} />}
+
             <div className="card profile-page-card">
               <div className="stats-heading">
                 <span className="stats-heading-icon" aria-hidden>
@@ -17004,7 +16995,7 @@ function App() {
                   </button>
                 ) : null}
                 <button className={settingsTab === 'support' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('support')}>
-                  Support
+                  Memberships
                 </button>
                 <button className={settingsTab === 'security' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('security')}>
                   Account Security
@@ -17016,10 +17007,10 @@ function App() {
                 <div className="settings-section-card academy-profile-settings">
                   <div className={`avatar-frame avatar-decoration-wrap level-halo-frame ${currentUserLevelProfile.haloClass}`}>
                     <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
-                    {renderAvatarDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
+                    {renderAvatarDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey, hasProMembership)}
                   </div>
                   <div className="profile-level-preview">
-                    {renderLevelBadge(currentUserLevelProfile)}
+                    {renderLevelBadge(currentUserLevelProfile)}<MembershipBadge tier={membership.access.tier}/>
                     <span>{currentUserLevelProfile.totalXp.toLocaleString()} XP • {selectedProfileDecoration.title}</span>
                   </div>
                   {isOwner ? <p className="owner-pill">Owner</p> : null}
@@ -17156,7 +17147,7 @@ function App() {
                       ).toLocaleString()}</strong>
                     </div>
                   </div>
-                  <FrameCollection level={currentUserLevelProfile.level} selectedKey={profileDetails.profileDecorationKey} avatarUrl={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} onAvatarError={handleAvatarImageError} onSelect={(key) => setProfileDetails(previous => ({ ...previous, profileDecorationKey: key }))} onSave={submitProfile} saving={authLoading} disabled={rewardAvatarLoading || profileUsername.trim().length < 1} error={authError} success={authSuccess} />
+                  <FrameCollection hasPro={hasProMembership} level={currentUserLevelProfile.level} selectedKey={profileDetails.profileDecorationKey} avatarUrl={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} onAvatarError={handleAvatarImageError} onSelect={(key) => setProfileDetails(previous => ({ ...previous, profileDecorationKey: key }))} onSave={submitProfile} saving={authLoading} disabled={rewardAvatarLoading || profileUsername.trim().length < 1} error={authError} success={authSuccess} />
                 </div>
               ) : null}
 
@@ -17279,7 +17270,7 @@ function App() {
                     </div>
                   ) : (
                     <div className="locked-preview-card">
-                      <p className="locked-title">Locked • $10 Pro Supporter</p>
+                      <p className="locked-title">Locked • Academy Pro</p>
                       <p className="muted">Name customization (font, color, glow, presets) unlocks with the $10 tier.</p>
                     </div>
                   )}
@@ -17318,7 +17309,7 @@ function App() {
                         Preview:{' '}
                         <span
                           className="tier-name"
-                          style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}
+                          style={displayNameStyle(profileDetails.nameStyle, activeProfileTier)}
                         >
                           {profileUsername.trim() || profile.username || 'Your Name'}
                         </span>
@@ -17329,18 +17320,18 @@ function App() {
                   )}
                   <h3>Website Theme</h3>
                   <div className={!canUseThemes ? 'locked-preview-card theme-paywall-wrap' : ''}>
-                    {!canUseThemes ? <p className="locked-title">Locked • $5 Supporter+</p> : null}
+                    {!canUseThemes ? <p className="locked-title">Themes · Plus and Pro</p> : null}
                     <div className="theme-grid">
                       {appThemePresets.map((theme) => (
                         <button
                           key={theme.id}
                           type="button"
-                          className={`${profileDetails.themeId === theme.id && canUseThemes ? 'theme-card active' : 'theme-card'} ${!canUseThemes ? 'locked' : ''}`}
+                          className={`${profileDetails.themeId === theme.id && canUseTheme(theme.id) ? 'theme-card active' : 'theme-card'} ${!canUseTheme(theme.id) ? 'locked' : ''}`}
                           onClick={() => {
-                            if (!canUseThemes) return
+                            if (!canUseTheme(theme.id)) return
                             setProfileDetails((previous) => ({ ...previous, themeId: theme.id }))
                           }}
-                          disabled={!canUseThemes}
+                          disabled={!canUseTheme(theme.id)}
                         >
                           <span className="theme-swatch" style={{ background: theme.swatch }} />
                           <span className="theme-name">{theme.name}</span>
@@ -17348,7 +17339,7 @@ function App() {
                       ))}
                     </div>
                   </div>
-                  {!canUseThemes ? <p className="muted">Themes are preview-only. Upgrade to $5 Supporter+ to apply them.</p> : null}
+                  {!canUseThemes ? <p className="muted">Plus includes Academy Blue, Pastel Sky, Ocean Mint, and Obsidian Black. Pro includes the full collection.</p> : null}
                   <p className="muted">Current theme: {selectedTheme.name}</p>
                   <button className="primary" onClick={submitProfile} disabled={authLoading || rewardAvatarLoading || profileUsername.trim().length < 1}>
                     Save Customization
@@ -18017,55 +18008,7 @@ function App() {
                 )
               ) : null}
 
-              {settingsTab === 'support' ? (
-                <div className="settings-section-card">
-                  <h3>Support Tiers</h3>
-                  <p className="muted">Optional one-time purchases. Tax may apply.</p>
-                  {supportError ? <p role="alert">{supportError}</p> : null}
-                  <p className="muted">Current tier: {tierLabel[profile.supporterTier]}</p>
-                  <div className="tier-upgrade-grid">
-                    {(['tier2', 'tier5', 'tier10'] as Exclude<SupporterTier, 'free'>[]).map((tier) => (
-                      <div
-                        key={tier}
-                        className={tierRank(profile.supporterTier) >= tierRank(tier) ? 'tier-upgrade-card tier-locked' : 'tier-upgrade-card'}
-                      >
-                        <p className="tier-upgrade-title">{tierLabel[tier]}</p>
-                        <ul className="muted support-benefits-list">
-                          {tier === 'tier2' ? (
-                            <>
-                              <li>Support the project and roadmap</li>
-                              <li>Supporter badge on your account</li>
-                            </>
-                          ) : null}
-                          {tier === 'tier5' ? (
-                            <>
-                              <li>Everything in $2 tier</li>
-                              <li>Unlock all website themes</li>
-                                        </>
-                          ) : null}
-                          {tier === 'tier10' ? (
-                            <>
-                              <li>Everything in $2 and $5 tiers</li>
-                              <li>Name customization (font, glow, color)</li>
-                            </>
-                          ) : null}
-                        </ul>
-                        <button
-                          className="primary"
-                          onClick={() => startTierCheckout(tier)}
-                          disabled={liveIntegrations.disabled || tierRank(profile.supporterTier) >= tierRank(tier)}
-                        >
-                          {tierRank(profile.supporterTier) > tierRank(tier)
-                            ? 'Included'
-                            : tierRank(profile.supporterTier) === tierRank(tier)
-                              ? 'Current Tier'
-                              : liveIntegrations.disabled ? 'Unavailable in preview' : 'Upgrade with Stripe'}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              {settingsTab === 'support' ? <MembershipPage access={membership.access} preview={liveIntegrations.disabled} busy={supportRefreshing} error={supportError || membership.error} status={supportStatus} onCheckout={startTierCheckout} onManage={() => void openMembershipBilling('portal')} onRefresh={() => void membership.refresh().catch(() => {})} onStudy={openStudyFlashcardsPage} /> : null}
 
               {settingsTab === 'security' ? (
                 <div className="settings-section-card academy-security-card">
@@ -18420,12 +18363,12 @@ function App() {
                 {selectedLeaderboardIsTop ? <span className="leader-crown leader-crown-modal" aria-label="Top Player">👑</span> : null}
                 <span className={`${leaderAvatarFrameClass(selectedLeaderboardEntry.userId, 'modal-avatar')} avatar-decoration-wrap`}>
                   <img src={avatarFor(selectedLeaderboardEntry.avatarUrl)} alt={selectedLeaderboardEntry.playerName} className="leader-avatar" loading="lazy" decoding="async" onError={handleAvatarImageError} />
-                  {renderAvatarDecoration(selectedLeaderboardLevelProfile, selectedLeaderboardEntry.profileDecorationKey)}
+                  {renderAvatarDecoration(selectedLeaderboardLevelProfile, selectedLeaderboardEntry.profileDecorationKey, selectedLeaderboardEntry.membershipTier === 'tier10')}
                 </span>
               </span>
               <div className="leader-profile-head">
                 <div className="leader-profile-name-row">
-                  <h3 className={`leader-profile-name ${displayNameClass(selectedLeaderboardEntry.supporterTier, true)}`} style={leaderboardProfileNameStyle}>
+                  <MembershipBadge tier={selectedLeaderboardEntry.membershipTier}/><h3 className={`leader-profile-name ${displayNameClass(selectedLeaderboardEntry.supporterTier, true)}`} style={leaderboardProfileNameStyle}>
                     {selectedLeaderboardEntry.playerName}
                   </h3>
                   <span className={`profile-presence-pill is-${selectedLeaderboardCurrentActivity.state}`}>

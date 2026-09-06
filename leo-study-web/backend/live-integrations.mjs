@@ -6,6 +6,7 @@ export function isLiveIntegrationPath(url) {
   const pathname = new URL(url || '/', 'http://localhost').pathname.replace(/\/+$/, '')
   return [
     '/api/stripe/webhook', '/stripe/webhook', '/stripe/test/apply',
+    '/api/membership/checkout', '/api/membership/portal',
     '/api/class-requests/notify-discord', '/webhooks/source/github/events/manual',
   ].includes(pathname)
 }

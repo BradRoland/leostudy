@@ -223,11 +223,11 @@ test('profile completion waits for account refresh and preserves the unfinished 
     await admin.from('profiles').upsert({ user_id: userId, username: `Hydration ${marker}`, supporter_tier: 'free', agency: 'Test Department' }).throwOnError()
     await admin.from('class_memberships').insert({ user_id: userId, class_id: classId, department_id: department.data!.id, role: 'class_admin', status: 'active', is_active: true }).throwOnError()
     await admin.from('app_state').upsert({ user_id: userId, profile_details: { firstName: 'Original', lastName: marker, onboardingCompleted: false, displayMode: 'light', dailyGoalMinutes: 15, studyFocus: 'balanced' } }).throwOnError()
-    await page.route('**/rest/v1/profiles?*', async route => {
+    await page.route('**/rest/v1/*profiles?*', async route => {
       const request = route.request()
       const url = new URL(request.url())
       if (holdProfileRead && request.method() === 'GET' && url.searchParams.get('user_id') === `eq.${userId}`
-        && url.searchParams.get('select') === 'user_id,username,avatar_path,supporter_tier,bio,agency,created_at') {
+        && url.searchParams.get('select')?.startsWith('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')) {
         profileReadStarted()
         await profileReadGate
       }

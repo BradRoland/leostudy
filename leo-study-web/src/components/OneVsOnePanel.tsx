@@ -3,6 +3,7 @@ import { type RealtimeChannel } from '@supabase/supabase-js'
 import { loadLocalContentBundle, type ContentBankItem } from '../content'
 import { getDuelBlasterMotionSpeedBounds, normalizeDuelBlasterVelocity } from '../lib/blasterMotion'
 import { applyConnect4Move, chooseConnect4BotMove, connect4Columns, connect4Rows, createConnect4State, findConnect4WinningCells, normalizeConnect4State, type Connect4Cell, type Connect4Player, type Connect4State } from '../lib/connect4'
+import { MembershipBadge } from './MembershipBadge'
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
@@ -345,6 +346,7 @@ type DuelStatsLeaderboardEntry = {
   user_id: string
   username: string
   avatarUrl: string
+  membershipTier?: string
   supporterTier: SupporterTier
   nameStyle: NameStyle
   level: number
@@ -369,6 +371,7 @@ type DuelProfileSnapshot = {
   user_id: string
   username: string
   avatarUrl: string
+  membershipTier?: string
   supporterTier: SupporterTier
   nameStyle: NameStyle
   level: number
@@ -415,6 +418,7 @@ type OnlineInviteUser = {
   user_id: string
   username: string
   avatarUrl: string
+  membershipTier?: string
   supporterTier: SupporterTier
   level: number
   haloClass: string
@@ -440,9 +444,9 @@ type QuizSpamSample = {
 
 const supporterTierLabel: Record<SupporterTier, string> = {
   free: 'Free',
-  tier2: '$2 Supporter',
-  tier5: '$5 Supporter',
-  tier10: '$10 Supporter',
+  tier2: 'Original Supporter',
+  tier5: 'Academy Plus',
+  tier10: 'Academy Pro',
 }
 
 const duelQuizRoundOptions = [5, 10, 20, 30]
@@ -2196,6 +2200,7 @@ export function OneVsOnePanel(props: {
         username: username || `User ${userId.slice(0, 8)}`,
         avatarUrl: toPublicAvatarUrl(avatarPath),
         supporterTier: sanitizeSupporterTier(value.supporter_tier),
+        membershipTier: String(value.membership_tier || 'free'),
         level: 1,
         haloClass: 'level-halo-recruit',
         profileDecorationKey: 'auto',
@@ -2315,6 +2320,7 @@ export function OneVsOnePanel(props: {
         username: profile?.username || fallbackUsername(row.user_id),
         avatarUrl: profile?.avatarUrl || defaultAvatarUrl,
         supporterTier: profile?.supporterTier || 'free',
+        membershipTier: profile?.membershipTier,
         nameStyle: profile?.nameStyle || { ...defaultNameStyle },
         level: profile?.level || 1,
         haloClass: profile?.haloClass || 'level-halo-recruit',
@@ -2398,8 +2404,8 @@ export function OneVsOnePanel(props: {
         .in('user_id', spotlightUserIds)
         .eq('class_id', activeDuelClassId),
       supabase
-        .from('profiles')
-        .select('user_id,username,avatar_path,supporter_tier')
+        .from('academy_public_profiles')
+        .select('user_id,username,avatar_path,supporter_tier,legacy_supporter_tier,membership_tier')
         .in('user_id', spotlightUserIds),
       supabase
         .from('public_study_profiles')
@@ -2426,7 +2432,8 @@ export function OneVsOnePanel(props: {
       })
     })
 
-    const profileMap = (Array.isArray(profileRows) ? profileRows : []).reduce<Record<string, { username: string; avatarUrl: string; supporterTier: SupporterTier }>>((accumulator, row) => {
+    const profileMap = (Array.isArray(profileRows) ? profileRows : []).reduce<Record<string, { username: string; avatarUrl: string; membershipTier?: string
+  supporterTier: SupporterTier }>>((accumulator, row) => {
       const value = row as Record<string, unknown>
       const userId = String(value.user_id || '')
       if (!userId) return accumulator
@@ -2434,6 +2441,7 @@ export function OneVsOnePanel(props: {
         username: String(value.username || '').trim() || `User ${userId.slice(0, 8)}`,
         avatarUrl: toPublicAvatarUrl(String(value.avatar_path || '')),
         supporterTier: sanitizeSupporterTier(value.supporter_tier),
+        membershipTier: String(value.membership_tier || 'free'),
       }
       return accumulator
     }, {})
@@ -2489,6 +2497,7 @@ export function OneVsOnePanel(props: {
         username: profile?.username || fallbackProfile.username,
         avatarUrl: profile?.avatarUrl || fallbackProfile.avatarUrl,
         supporterTier: profile?.supporterTier || fallbackProfile.supporterTier,
+        membershipTier: profile?.membershipTier,
         nameStyle: details?.nameStyle || fallbackProfile.nameStyle,
         level: details?.level || fallbackProfile.level,
         haloClass: details?.haloClass || fallbackProfile.haloClass,
@@ -2611,8 +2620,8 @@ export function OneVsOnePanel(props: {
 
     const [{ data: profileRows }, { data: appStateRows }] = await Promise.all([
       supabase
-        .from('profiles')
-        .select('user_id,username,avatar_path,supporter_tier')
+        .from('academy_public_profiles')
+        .select('user_id,username,avatar_path,supporter_tier,legacy_supporter_tier,membership_tier')
         .in('user_id', uniqueUserIds),
       supabase
         .from('public_study_profiles')
@@ -2623,7 +2632,8 @@ export function OneVsOnePanel(props: {
     const profileMap = (Array.isArray(profileRows) ? profileRows : []).reduce<Record<string, {
       username: string
       avatarUrl: string
-      supporterTier: SupporterTier
+      membershipTier?: string
+  supporterTier: SupporterTier
     }>>((accumulator, row) => {
       const value = row as Record<string, unknown>
       const userId = String(value.user_id || '')
@@ -2632,6 +2642,7 @@ export function OneVsOnePanel(props: {
         username: String(value.username || '').trim() || fallbackUsername(userId),
         avatarUrl: toPublicAvatarUrl(String(value.avatar_path || '')),
         supporterTier: sanitizeSupporterTier(value.supporter_tier),
+        membershipTier: String(value.membership_tier || 'free'),
       }
       return accumulator
     }, {})
@@ -2691,6 +2702,7 @@ export function OneVsOnePanel(props: {
           username: profile?.username || fallbackProfile.username,
           avatarUrl: profile?.avatarUrl || fallbackProfile.avatarUrl,
           supporterTier: profile?.supporterTier || fallbackProfile.supporterTier,
+        membershipTier: profile?.membershipTier,
           nameStyle: details?.nameStyle || fallbackProfile.nameStyle,
           level: details?.level || fallbackProfile.level,
           haloClass: details?.haloClass || fallbackProfile.haloClass,
@@ -6230,7 +6242,7 @@ export function OneVsOnePanel(props: {
           onError={handleAvatarImageError}
         />
         <ProfileAvatarDecoration
-          decoration={getEffectiveProfileDecorationForLevel(profile.level, profile.profileDecorationKey)}
+          decoration={getEffectiveProfileDecorationForLevel(profile.level, profile.profileDecorationKey, profile.membershipTier === 'tier10')}
         />
       </span>
     )
@@ -6244,7 +6256,7 @@ export function OneVsOnePanel(props: {
         onError={handleAvatarImageError}
       />
       <ProfileAvatarDecoration
-        decoration={getEffectiveProfileDecorationForLevel(user.level, user.profileDecorationKey)}
+        decoration={getEffectiveProfileDecorationForLevel(user.level, user.profileDecorationKey, user.membershipTier === 'tier10')}
       />
     </span>
   )
@@ -8957,7 +8969,7 @@ export function OneVsOnePanel(props: {
                       onError={handleAvatarImageError}
                     />
                     <ProfileAvatarDecoration
-                      decoration={getEffectiveProfileDecorationForLevel(selectedDuelProfile.level, selectedDuelProfile.profileDecorationKey)}
+                      decoration={getEffectiveProfileDecorationForLevel(selectedDuelProfile.level, selectedDuelProfile.profileDecorationKey, selectedDuelProfile.membershipTier === 'tier10')}
                     />
                   </span>
                 </span>
@@ -8967,7 +8979,7 @@ export function OneVsOnePanel(props: {
                       className={`leader-profile-name ${displayNameClass(selectedDuelProfile.supporterTier, true)}`}
                       style={displayNameStyle(selectedDuelProfile.nameStyle, selectedDuelProfile.supporterTier)}
                     >
-                      {selectedDuelProfile.username}
+                      {selectedDuelProfile.username}<MembershipBadge tier={selectedDuelProfile.membershipTier}/>
                     </h3>
                     <span className={`profile-presence-pill is-${selectedDuelProfileActivity.state}`}>
                       {selectedDuelProfileActivity.statusLabel}
