@@ -11684,6 +11684,8 @@ function App() {
               ? 'Class Requests'
               : isClassesAdminPage
                 ? 'Class Admin'
+                : isClassesPage
+                  ? 'My class'
                 : isClassWorkspacePage
                   ? 'Classes'
           : activeTab === 'study'
@@ -14100,7 +14102,7 @@ function App() {
                 <button type="button" className="academy-icon-button" onClick={() => openSettingsTab('profile')} aria-label="Account settings"><AcademyIcon name="settings"/></button>
               </div>
             </div>
-            {!isHomePage && !isChatPage ? (
+            {!isHomePage && !isChatPage && !isClassesPage ? (
               <header className="top-header app-page-header">
                 <div className="header-left">
                   <h1>{pageTitle}</h1>

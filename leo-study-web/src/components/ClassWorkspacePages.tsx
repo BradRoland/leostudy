@@ -17,7 +17,6 @@ import {
   rejectClassCreationRequest,
   joinClassDirectly,
   requestToJoinClass,
-  setActiveClass,
   submitClassCreationRequest,
   updateClassJoinMode,
   type AcademyClassRow,
@@ -29,6 +28,7 @@ import {
 } from '../lib/classApi'
 import { AcademyWelcome, OnboardingStatus } from './AuthOnboarding'
 import { ClassEnrollment, type EnrollmentProfileSeed } from './ClassEnrollment'
+import { ClassRoster } from './ClassRoster'
 import { cleanRequestDepartments, validateClassRequest, type OnboardingProfile } from '../lib/onboarding'
 import { extractInviteCodeFromPath, formatAcademyClassLabel, normalizeInviteCode } from '../lib/classWorkspace'
 
@@ -72,10 +72,6 @@ type Props = {
   profileSeed?: EnrollmentProfileSeed
   onSaveOnboardingProfile?: (profile: OnboardingProfile) => Promise<void>
   onFinishOnboarding?: () => Promise<void>
-}
-
-function classTitle(row: AcademyClassRow) {
-  return formatAcademyClassLabel(row.academies?.name, row.class_name)
 }
 
 function membershipTitle(row: ClassMembership | null | undefined) {
@@ -151,7 +147,7 @@ export function ClassWorkspacePages({
   }, [currentPath])
 
   useEffect(() => {
-    if (mode !== 'classes' && mode !== 'join' && mode !== 'admin') return
+    if (mode !== 'join' && mode !== 'admin') return
     let cancelled = false
     setLoading(true)
     setError('')
@@ -161,7 +157,7 @@ export function ClassWorkspacePages({
         if (cancelled) return
         const activeRow: AcademyClassRow | null = profileOnly && activeClass ? { id: activeClass.classId, class_name: activeClass.className, start_date: activeClass.startDate, end_date: activeClass.endDate, status: activeClass.status, visibility: 'listed', join_mode: 'open', academy_id: '', academies: { name: activeClass.academyName } } : null
         const classRows = activeRow && !rows.some((row) => row.id === activeRow.id) ? [activeRow, ...rows] : rows
-        const selectableRows = mode === 'classes' ? classRows.filter((row) => !memberships.some((membership) => membership.classId === row.id)) : classRows
+        const selectableRows = classRows
         setAvailableClasses(selectableRows)
         setSelectedClassId((current) => profileOnly && activeClass ? activeClass.classId : selectableRows.some((row) => row.id === current) ? current : selectableRows[0]?.id || '')
       })
@@ -354,22 +350,6 @@ export function ClassWorkspacePages({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not finish joining. Your choices are still here so you can retry.')
     } finally { setSubmittingEnrollment(false) }
-  }
-
-  const switchClass = async (classId: string) => {
-    setLoading(true)
-    setError('')
-    setSuccess('')
-    try {
-      await setActiveClass(classId)
-      await onRefreshMemberships()
-      setSuccess('Active class changed.')
-      navigate('/home', { replace: true })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not switch class.')
-    } finally {
-      setLoading(false)
-    }
   }
 
   const reviewClassRequest = async (requestId: string, decision: 'approve' | 'reject') => {
@@ -630,59 +610,5 @@ export function ClassWorkspacePages({
     )
   }
 
-  return (
-    <main className="page-shell class-page">
-      <section className="panel-block">
-        <p className="eyebrow">Classes</p>
-        <h1>Your class workspace</h1>
-        <div className="button-row class-management-actions">
-          <button className="secondary" type="button" onClick={() => navigate('/classes/request')}>Request to add a class</button>
-          {isOwner ? <button className="primary" type="button" onClick={() => navigate('/owner/classes')}>Review class requests</button> : null}
-        </div>
-        {memberships.length > 0 ? (
-          <div className="class-grid">
-            {memberships.map((membership) => (
-              <article className="class-card" key={membership.id}>
-                <h3>{membershipTitle(membership)}</h3>
-                <p className="muted tiny">{membership.academyLocation || 'Location not set'} · {classDates(membership.startDate, membership.endDate)}</p>
-                <p className="muted tiny">{membership.departmentName || 'No department'} · {{ cadet: 'Cadet', class_admin: 'Class admin', moderator: 'Moderator' }[membership.role]}</p>
-                <button className={membership.isActive ? 'secondary' : 'primary'} type="button" disabled={membership.isActive || loading} onClick={() => void switchClass(membership.classId)}>
-                  {membership.isActive ? 'Active Class' : 'Set Active'}
-                </button>
-                {membership.isActive && (membership.role === 'class_admin' || membership.role === 'moderator') ? <button className="primary class-manage-button" type="button" onClick={() => navigate('/classes/admin')}>Manage class</button> : null}
-              </article>
-            ))}
-          </div>
-        ) : <p className="muted">You are not in a class yet.</p>}
-      </section>
-
-      <section className="panel-block">
-        <p className="eyebrow">Active classes</p>
-        <h2>Join a class</h2>
-        {availableClasses.length === 0 ? <p className="muted">No classes are available.</p> : null}
-        <div className="class-grid">
-          {availableClasses.map((row) => (
-            <article className="class-card" key={row.id}>
-              <h3>{classTitle(row)}</h3>
-              <p className="muted tiny">{row.academies?.city || ''}{row.academies?.state ? `, ${row.academies.state}` : ''} · {classDates(row.start_date, row.end_date)}</p>
-              <button className="secondary" type="button" onClick={() => setSelectedClassId(row.id)}>Select</button>
-            </article>
-          ))}
-        </div>
-        {selectedClass ? (
-          <div className="join-request-box">
-            <h3>Join {classTitle(selectedClass)}</h3>
-            <label>Department<select value={joinDepartmentId} onChange={(event) => setJoinDepartmentId(event.target.value)}>
-              <option value="">Choose department</option>
-              {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-            </select></label>
-            <button className="primary" type="button" onClick={() => void joinSelectedClass()} disabled={loading || !selectedClass || (departments.length > 0 && !joinDepartmentId)}>
-              {loading ? (classRequiresJoinApproval(selectedClass) ? 'Sending...' : 'Joining...') : classRequiresJoinApproval(selectedClass) ? 'Request to Join' : 'Join Class'}
-            </button>
-          </div>
-        ) : null}
-        <StatusLine error={error} success={success} />
-      </section>
-    </main>
-  )
+  return <ClassRoster key={`${currentUserId}:${activeClass?.classId || ''}`} activeClass={activeClass} currentUserId={currentUserId}/>
 }

@@ -1,0 +1,29 @@
+.academy-class-roster { max-width:1280px; margin:0 auto; padding:8px 0 40px; color:var(--academy-ink); }
+.class-roster-heading { display:flex; align-items:center; justify-content:space-between; gap:22px; margin:8px 0 30px; }
+.class-roster-heading h1 { margin:8px 0; font-size:30px; letter-spacing:-.04em; }
+.class-roster-heading p:last-child { margin:0; font-size:14px; color:var(--academy-muted); }
+.class-roster-emblem { display:grid; place-items:center; width:58px; height:58px; border:1px solid var(--academy-line); border-radius:17px; background:var(--academy-surface); color:var(--academy-accent); flex-shrink:0; }
+.class-roster-emblem svg { width:25px; height:25px; }
+.class-roster-panel { background:var(--academy-surface); border:1px solid var(--academy-line); border-radius:18px; padding:26px; }
+.class-roster-toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
+.class-roster-toolbar h2 { font-size:18px; margin:0 0 6px; }.class-roster-toolbar p { font-size:12px; color:var(--academy-muted); margin:0; }
+.class-roster-search { display:grid; gap:8px; max-width:430px; margin:24px 0; font-size:12px; color:var(--academy-muted); }
+.class-roster-search input { width:100%; min-height:44px; box-sizing:border-box; }
+.classmate-list { padding:0; margin:0; list-style:none; }
+.classmate-row { display:grid; grid-template-columns:minmax(180px,1.1fr) minmax(320px,1.7fr) auto; align-items:center; gap:22px; padding:22px 0; border-top:1px solid var(--academy-line); }
+.professional-ui button.classmate-open { display:flex; align-items:center; gap:13px; width:100%; padding:5px; border:0; border-radius:10px; background:transparent; color:var(--academy-ink); text-align:left; box-shadow:none; min-width:0; }
+.classmate-open img { width:46px; height:46px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+.classmate-open > span { min-width:0; }.classmate-open strong { display:block; font-size:13px; overflow-wrap:anywhere; }.classmate-open strong small { display:inline-block; margin-left:8px; padding:3px 6px; border-radius:5px; font-size:9px; color:var(--academy-accent); background:var(--academy-accent-soft); }
+.classmate-open > span > span { display:block; font-size:11px; line-height:1.6; color:var(--academy-muted); margin-top:5px; overflow-wrap:anywhere; }
+.classmate-stats { margin:0; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }.classmate-stats div { min-width:0; }.classmate-stats dt { color:var(--academy-muted); font-size:10px; margin-bottom:7px; }.classmate-stats dd { margin:0; font-size:16px; font-weight:650; overflow-wrap:anywhere; }
+.professional-ui button.classmate-view { display:flex; align-items:center; justify-content:center; gap:8px; background:var(--academy-accent-soft); border:0; color:var(--academy-accent); border-radius:8px; min-height:44px; padding:10px 12px; font-size:11px; box-shadow:none; }
+.classmate-view svg { width:15px; height:15px; }
+.class-roster-error { color:var(--academy-danger); }.class-roster-empty { color:var(--academy-muted); padding:28px 0; }
+.professional-ui .classmate-profile { width:min(630px,calc(100vw - 28px)); max-height:calc(100dvh - 32px); box-sizing:border-box; margin:auto; overflow:hidden; padding:26px; border:1px solid var(--academy-line); border-radius:18px; background:var(--academy-surface); color:var(--academy-ink); box-shadow:0 24px 80px #0005; }
+.classmate-profile[open] { display:flex; flex-direction:column; }.classmate-profile::backdrop { background:#0a1025a6; backdrop-filter:blur(3px); }.classmate-profile > header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:24px; flex-shrink:0; }.classmate-profile header button { min-height:44px; }
+.classmate-profile-scroll { min-height:0; overflow:auto; }.classmate-profile-identity { display:flex; align-items:center; gap:16px; }.classmate-profile-identity img { width:68px; height:68px; border-radius:50%; object-fit:cover; }.classmate-profile-identity h2 { font-size:23px; margin:0 0 6px; overflow-wrap:anywhere; }.classmate-profile-identity p { font-size:12px; color:var(--academy-muted); margin:0; overflow-wrap:anywhere; }.classmate-profile h3 { margin:28px 0 18px; font-size:15px; }
+.classmate-profile .classmate-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }.classmate-profile .classmate-stats > div { background:var(--academy-surface-soft); border-radius:10px; padding:16px; }.classmate-profile .classmate-stats dd { font-size:20px; }.classmate-bio { font-size:13px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--academy-muted); }.classmate-stats-note { font-size:11px; line-height:1.7; color:var(--academy-muted); margin:20px 0 0; }
+@media(max-width:1150px) { .classmate-row { grid-template-columns:minmax(180px,1fr) auto; gap:16px; }.classmate-row .classmate-stats { grid-row:2; grid-column:1/-1; }.classmate-view { grid-column:2; grid-row:1; } }
+@media(max-width:600px) { .academy-class-roster { padding:8px 0 30px; }.class-roster-heading h1 { font-size:25px; }.class-roster-emblem { display:none; }.class-roster-panel { padding:18px; }.classmate-row { grid-template-columns:minmax(0,1fr) auto; }.classmate-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }.classmate-open img { width:38px; height:38px; }.professional-ui button.classmate-view { font-size:10px; padding:9px; }.classmate-view svg { display:none; }.professional-ui .classmate-profile { padding:20px; }.classmate-profile-identity { align-items:flex-start; }.classmate-profile-identity img { width:48px; height:48px; }.classmate-profile-identity h2 { font-size:20px; } }
+
+.professional-ui .classmate-profile header button { width:auto; min-width:76px; flex-shrink:0; }
