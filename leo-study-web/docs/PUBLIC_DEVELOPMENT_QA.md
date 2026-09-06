@@ -12,7 +12,9 @@ The clone now issues password-reset links with the public preview host. The loca
 
 ## Public checks
 
-**Passed on September 6, 2026, at 17:00:22.962 UTC.** The final run completed in 12.9 seconds against deployed build `b3854b5d8d0e03695a3def0eba46a90f600a547c-dev-1788711736990` (built at 16:22:17.213 UTC).
+**Passed on September 6, 2026, at 17:56:03.370 UTC.** The final run started at 17:55:50.481 UTC and completed in **12.9 seconds** against the native Coolify deployment of source/build `59a30a0841aa9518fdad33f957cb484a94ae67ce` (built at 17:54:25.638 UTC). The reported build identity matched that exact source commit.
+
+[GitHub Linux CI for the tested source](https://github.com/BradRoland/leostudy/actions/runs/34050020838) passed installation, automated tests, lint, TypeScript, and the credential-free build on Node 22. The preceding native deployment at `2d7da58d5932e5cb424662185c3a47463aaf5838` also [passed Linux CI](https://github.com/BradRoland/leostudy/actions/runs/34048653033); public verification then exposed the account-loading race described below.
 
 `scripts/staging/public-dev-smoke.mjs` requires an explicit execution flag. It checks:
 
@@ -30,15 +32,23 @@ The test recorded two expected anonymous `403` responses for `content_items`, on
 
 Google Fonts and Cloudflare's injected analytics script were blocked during the check and recorded separately from production API/integration traffic. The blocked origins were `fonts.googleapis.com` and `static.cloudflareinsights.com`. Screenshots therefore use the app's fallback font. No Cloudflare global settings were changed.
 
-An initial public run encountered an onboarding visibility timeout. It did not recur in three subsequent runs through profile setup, avatar handling, and chat. Diagnostic runs identified the expected anonymous content denials described above; the final check distinguishes those exact denials while retaining all other error checks. No app changes were required during public QA.
+## Account-loading regression and fix
 
-Saved evidence:
+Public verification of `2d7da58` exposed a real readiness race: the final onboarding action could remain enabled while the same signed-in account refreshed its profile and saved study state. Submitting during that interval stayed on the wizard with “Your account is still loading. Please try again in a moment.” Profile loading and state loading finished at separate times, so checking only the existing hydration flags was insufficient.
+
+Commit `59a30a0` tracks completed account hydration for the current user, disables final submission until both reads succeed, and guards both the form handler and profile save. The wizard stays mounted so names, the selected avatar, and study choices survive the refresh. A successful lookup with no profile row still allows first-time completion to create that row. Membership and approval checks remain in place.
+
+The focused browser command `npx playwright test tests/e2e/class-request-flow.spec.ts --grep 'profile completion'` passed **4 of 4 desktop and mobile cases in 25.4 seconds**. The refresh regression holds the exact profile response, then the exact saved-state response, and verifies disabled and programmatic submission, preserved fields and avatar, and successful persistence after release. The second case verifies a successful empty profile lookup can create the first profile. The held-profile test failed before the fix, demonstrating the reproduced defect. TypeScript passed; targeted lint reported **0 errors and 8 existing App warnings**. The public pass above then verified the fixed native build with ordinary browser timing.
+
+## Saved evidence
 
 - `result.json`: timestamp, build identity, all passed checks, expected denials, and cleanup result.
-- `signin-desktop.png` and `signin-mobile.png`: public email/password sign-in and development branding.
+- `signin-desktop.png`: public email/password sign-in and development branding.
 - `dashboard-desktop.png` and `dashboard-narrow.png`: synthetic user's dashboard.
 - `chat-desktop.png`, `chat-mobile.png`, and `chat-narrow.png`: actual synthetic conversation with the composer above mobile navigation.
 
-The obsolete screenshot from the first diagnostic failure was removed. The sign-in images were refreshed after the brand image finished loading; this did not rerun or change application behavior.
+These listed images were captured by the final successful run. The sign-in brand image was loaded before capture. The desktop sign-in and narrow dashboard screenshots were visually inspected, and the obsolete failure screenshot was removed. Any earlier `signin-mobile.png` is historical evidence and is not part of this final run.
 
 The preview hides unconfigured Google authentication and directs visitors to email/password sign-in. The normal build retains Google authentication.
+
+A subsequent documentation-only commit may become the displayed development build. This browser report records the exact application source tested above; publishing unchanged application code with updated reports does not imply a second browser run.
