@@ -68,6 +68,7 @@ type Props = {
   embedded?: boolean
   initialError?: string
   profileOnly?: boolean
+  profileSaveReady?: boolean
   profileSeed?: EnrollmentProfileSeed
   onSaveOnboardingProfile?: (profile: OnboardingProfile) => Promise<void>
   onFinishOnboarding?: () => Promise<void>
@@ -114,6 +115,7 @@ export function ClassWorkspacePages({
   embedded = false,
   profileSeed,
   profileOnly = false,
+  profileSaveReady = false,
   initialError = '',
   onSaveOnboardingProfile,
   onFinishOnboarding,
@@ -328,6 +330,7 @@ export function ClassWorkspacePages({
 
   const joinSelectedClass = async (profileInput?: OnboardingProfile) => {
     if (!selectedClass || (!joinDepartmentId && !profileOnly) || submittingEnrollment) return
+    if (profileInput && !profileSaveReady) return
     setSubmittingEnrollment(true)
     setError('')
     setSuccess('')
@@ -474,7 +477,7 @@ export function ClassWorkspacePages({
   if (mode === 'join') {
     return <ClassEnrollment classes={availableClasses} selectedClassId={selectedClassId} departments={departments} departmentId={joinDepartmentId}
       onClassChange={(id) => { setSelectedClassId(id); setJoinDepartmentId(''); setError('') }} onDepartmentChange={setJoinDepartmentId}
-      classesLoading={loading || (!!currentUserId && !ownRequestsLoaded)} departmentsLoading={departmentsLoading} submitting={submittingEnrollment} error={error} success={success}
+      classesLoading={loading || (!!currentUserId && !ownRequestsLoaded)} departmentsLoading={departmentsLoading} submitting={submittingEnrollment} profileSaveReady={profileSaveReady} error={error || initialError} success={success}
       key={profileOnly ? `profile-${activeClass?.classId}` : 'class-enrollment'} profileOnly={profileOnly} profileOnlyDepartmentName={profileOnly ? activeClass?.departmentName : undefined} profileSeed={profileSeed} onComplete={joinSelectedClass} onRetry={() => setClassReload((value) => value + 1)} />
   }
 

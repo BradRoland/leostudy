@@ -4751,6 +4751,7 @@ function App() {
   const onboardingDetailsRef = useRef<ProfileDetails | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileHydrated, setProfileHydrated] = useState(false)
+  const [onboardingReadyUserId, setOnboardingReadyUserId] = useState('')
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile')
   const [agencyOptions, setAgencyOptions] = useState<string[]>(() => sanitizeAgencyOptions(fallbackAgencyOptions))
   const [classAgencyOptions, setClassAgencyOptions] = useState<ClassDepartment[]>([])
@@ -4828,6 +4829,7 @@ function App() {
   const [selectedLeaderboardEntry, setSelectedLeaderboardEntry] = useState<LeaderboardEntry | null>(null)
   const [selectedLeaderboardIsTop, setSelectedLeaderboardIsTop] = useState(false)
   const [stateHydrated, setStateHydrated] = useState(false)
+  const profileSaveReady = Boolean(supabase && currentUserId && stateHydrated && profileHydrated && onboardingReadyUserId === currentUserId)
   const [celebration, setCelebration] = useState<{ title: string; subtitle: string; burst: number } | null>(null)
   const [homeStudyTimeLeaders, setHomeStudyTimeLeaders] = useState<HomeLeaderboardEntry[]>([])
   const [homeStudyStreakLeaders, setHomeStudyStreakLeaders] = useState<HomeLeaderboardEntry[]>([])
@@ -7157,6 +7159,7 @@ function App() {
     if (!supabase || !currentUserId) {
       authHydrationRunRef.current += 1
       setProfileHydrated(false)
+      setOnboardingReadyUserId('')
       return
     }
     const client = supabase
@@ -7166,6 +7169,7 @@ function App() {
 
     const hydrate = async () => {
       setProfileHydrated(false)
+      setOnboardingReadyUserId('')
       const { data: banRow, error: banLookupErrorRaw } = await client
         .from('banned_users')
         .select('user_id,reason')
@@ -7381,6 +7385,7 @@ function App() {
 
       lastAppStateUpdateRef.current = Date.parse(String(stateRow?.updated_at || '')) || Date.now()
       setStateHydrated(true)
+      if (!profileLookupError) setOnboardingReadyUserId(currentUserId)
 
       await refreshLeaderboard({ force: true })
       await refreshHomeLeaderboards({ force: true })
@@ -7388,6 +7393,7 @@ function App() {
 
     hydrate().catch((error) => {
       if (isStaleHydration()) return
+      setOnboardingReadyUserId('')
       console.warn('[auth] hydration failed:', error)
       setAuthError('Signed in, but your account data could not be loaded. Please refresh or try signing in again.')
       setProfileHydrated(true)
@@ -10450,7 +10456,7 @@ function App() {
   }
 
   const saveOnboardingProfile = async (input: OnboardingProfile) => {
-    if (!supabase || !currentUserId || !stateHydrated || !profileHydrated) throw new Error('Your account is still loading. Please try again in a moment.')
+    if (!supabase || !currentUserId || !stateHydrated || !profileHydrated || !profileSaveReady) throw new Error('Your account is still loading. Please try again in a moment.')
     const validationError = validateOnboardingProfile(input)
     if (validationError) throw new Error(validationError)
     const displayName = input.displayName.trim() || `${input.firstName.trim()} ${input.lastName.trim()}`
@@ -13967,6 +13973,7 @@ function App() {
               onRefreshMemberships={refreshClassWorkspace}
               onSaveOnboardingProfile={saveOnboardingProfile}
               onFinishOnboarding={finishOnboarding}
+              profileSaveReady={profileSaveReady}
               initialError={authError}
               profileOnly={accountProfileIncomplete}
               profileSeed={{ firstName: profileDetails.firstName || (needsAccountProfileCompletion ? suggestedProfileName.firstName : ''), lastName: profileDetails.lastName || (needsAccountProfileCompletion ? suggestedProfileName.lastName : ''), displayName: profileUsername, dailyGoalMinutes: profileDetails.dailyGoalMinutes, studyFocus: profileDetails.studyFocus, avatarUrl: profile?.avatarUrl || '' }}

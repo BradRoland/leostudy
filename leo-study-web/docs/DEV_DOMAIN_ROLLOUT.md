@@ -2,13 +2,15 @@
 
 Live development site: **https://dev.180.academy**. The domain was switched to the isolated server deployment on September 6, 2026.
 
+This document records the initial domain and artifact rollout. Subsequent updates use the GitHub `dev` branch and its separate Coolify application; see [Development workflow](DEVELOPMENT_WORKFLOW.md). The domain, isolated API, and mail sink retain the routing described here.
+
 ## Scope
 
-The user authorized publishing the refreshed test version at this development hostname. Main, the production Coolify application, and the production database must remain unchanged. All source changes belong to `codex/class180-ui-overhaul-test`.
+The user authorized publishing the refreshed test version at this development hostname. Main, the production Coolify application, and the production database must remain unchanged. The initial source was prepared on `codex/class180-ui-overhaul-test` and subsequently advanced to the existing GitHub `dev` branch without rewriting history.
 
 The deployment serves locally compiled assets and the Node backend from the retained isolated TrueNAS stack. The browser connects to `https://dev.180.academy/supabase`; the development reverse proxy removes that prefix and forwards to the cloned Auth, REST, Storage, and Realtime services. SMTP remains on the private mail sink. Live payments, outbound integration webhooks, the production game Worker, and telemetry are disabled. The preview is labeled in its wordmark.
 
-## Build
+## Initial artifact build
 
 Run `node scripts/development/build.mjs` from the app directory on the test branch. The helper reads the ignored `.env.staging.local`, verifies the clone origin and anonymous-key role/expiry, sets all public URLs explicitly, and creates `.dev-deployment.local/180-academy-runtime.tar.gz`.
 

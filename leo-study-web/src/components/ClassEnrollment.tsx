@@ -8,7 +8,7 @@ export type EnrollmentProfileSeed = { firstName: string; lastName: string; displ
 type Props = {
   classes: AcademyClassRow[]; selectedClassId: string; departments: ClassDepartment[]; departmentId: string
   onClassChange: (id: string) => void; onDepartmentChange: (id: string) => void
-  classesLoading: boolean; departmentsLoading: boolean; submitting: boolean; error: string; success: string
+  classesLoading: boolean; departmentsLoading: boolean; submitting: boolean; profileSaveReady: boolean; error: string; success: string
   profileOnlyDepartmentName?: string; profileOnly?: boolean; profileSeed?: EnrollmentProfileSeed; onComplete: (profile: OnboardingProfile) => Promise<void>
   onRetry: () => void
 }
@@ -42,6 +42,7 @@ export function ClassEnrollment(props: Props) {
   }, [avatar])
   const profile: OnboardingProfile = { firstName, lastName, displayName: displayName.trim() || `${firstName.trim()} ${lastName.trim()}`.trim(), dailyGoalMinutes: goal, studyFocus: focus, avatar, departmentName: department?.name || props.profileOnlyDepartmentName || '' }
   const next = () => {
+    if (props.submitting || (step === 3 && !props.profileSaveReady)) return
     setLocalError('')
     if (step === 0 && !selectedClass) { setLocalError('Choose your class to continue.'); return }
     if (step === 1 && !department) { setLocalError('Choose your department to continue.'); return }
@@ -71,7 +72,8 @@ export function ClassEnrollment(props: Props) {
       </> : null}
       {step === 3 ? <><fieldset className="academy-goals"><legend>Daily study goal</legend>{dailyStudyGoals.map((minutes) => <label key={minutes} className={goal === minutes ? 'is-selected' : ''}><input type="radio" name="daily-goal" checked={goal === minutes} onChange={() => setGoal(minutes)} /><strong>{minutes}</strong><span>min / day</span>{minutes === 15 ? <small>A good start</small> : null}</label>)}</fieldset><fieldset className="academy-choice-list"><legend>What would help you most?</legend>{focusOptions.map((option) => <label key={option.value} className={`academy-choice-card ${focus === option.value ? 'is-selected' : ''}`}><input type="radio" name="study-focus" checked={focus === option.value} onChange={() => setFocus(option.value)} /><span className="academy-choice-copy"><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</fieldset><div className="academy-selection-summary"><strong>{[`${firstName} ${lastName}`.trim(), selectedClass?.class_name].filter(Boolean).join(' · ')}</strong><span>{department?.name || props.profileOnlyDepartmentName}</span></div></> : null}
       <OnboardingStatus error={localError || props.error} />
-      <div className="academy-form-actions">{step > (props.profileOnly ? 2 : 0) ? <button className="academy-secondary" type="button" disabled={props.submitting} onClick={() => { setLocalError(''); setStep(step - 1) }}>Back</button> : null}<button className="academy-primary" type="submit" disabled={props.submitting || props.classesLoading || (step === 0 && !selectedClass) || (step === 1 && (props.departmentsLoading || !department))}>{props.submitting ? 'Saving your study space…' : step === 3 ? needsApproval ? 'Send join request' : 'Let’s get started' : 'Continue'}<span aria-hidden> →</span></button></div>
+      {step === 3 && !props.profileSaveReady && !props.error ? <p className="academy-feedback" role="status">Getting your account ready… Your choices are still here.</p> : null}
+      <div className="academy-form-actions">{step > (props.profileOnly ? 2 : 0) ? <button className="academy-secondary" type="button" disabled={props.submitting} onClick={() => { setLocalError(''); setStep(step - 1) }}>Back</button> : null}<button className="academy-primary" type="submit" disabled={props.submitting || props.classesLoading || (step === 3 && !props.profileSaveReady) || (step === 0 && !selectedClass) || (step === 1 && (props.departmentsLoading || !department))}>{props.submitting ? 'Saving your study space…' : step === 3 ? needsApproval ? 'Send join request' : 'Let’s get started' : 'Continue'}<span aria-hidden> →</span></button></div>
     </form>}
   </AcademyWelcome>
 }

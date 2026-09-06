@@ -1,6 +1,6 @@
 # Development and production releases
 
-The GitHub repository is `BradRoland/leostudy`. Development work is published through its existing `dev` branch; `main` remains the production branch.
+The GitHub repository is [BradRoland/leostudy](https://github.com/BradRoland/leostudy). Development work is published through its existing [dev branch](https://github.com/BradRoland/leostudy/tree/dev); `main` remains the production branch.
 
 | Branch | Website | Data | Release behavior |
 | --- | --- | --- | --- |
@@ -26,6 +26,8 @@ Development build settings fix the public API and account links to `dev.180.acad
 Google sign-in, real payment processing, real email delivery, and the production game worker remain disabled in the development environment. The preview retains ordinary email/password sign-in and routes class-approval and recovery messages into the private test inbox.
 
 Database migrations are **not** applied automatically by a code push. Schema changes must be tested against the existing clone, and any production migration must be included in a separately approved release plan. Never refresh the clone over its existing data as part of a routine deployment.
+
+For the current overhaul, the production release plan must include the tested class-request/email workflow and private-study-profile migrations, plus production email and authentication settings. The new interface depends on that schema. Prepare the production backup, configuration, migration order, and rollback before seeking release approval; do not merge the UI alone and expect development database changes to appear in production.
 
 ## Troubleshooting
 

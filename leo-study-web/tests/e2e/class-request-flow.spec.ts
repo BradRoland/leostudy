@@ -194,3 +194,154 @@ test('password recovery delivers to the local sink and saves a working new passw
     } finally { await freshContext.close() }
   } finally { if (userId) await admin.auth.admin.deleteUser(userId) }
 })
+
+test('profile completion waits for account refresh and preserves the unfinished profile', async ({ page }) => {
+  const marker = unique()
+  const email = `ui-hydration-${marker}@example.invalid`
+  const password = `Test-${marker}-A!`
+  let userId = '', classId = '', academyId = ''
+  let releaseProfileRead: () => void = () => {}
+  const profileReadGate = new Promise<void>(resolve => { releaseProfileRead = resolve })
+  let profileReadStarted: () => void = () => {}
+  const profileReadHeld = new Promise<void>(resolve => { profileReadStarted = resolve })
+  let releaseStateRead: () => void = () => {}
+  const stateReadGate = new Promise<void>(resolve => { releaseStateRead = resolve })
+  let stateReadStarted: () => void = () => {}
+  const stateReadHeld = new Promise<void>(resolve => { stateReadStarted = resolve })
+  let holdProfileRead = false
+  let holdStateRead = false
+  let profileWrites = 0
+  try {
+    const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { username: `Hydration ${marker}`, academy_onboarding_version: 1 } })
+    if (created.error) throw created.error
+    userId = created.data.user!.id
+    const academy = await admin.from('academies').insert({ name: `Hydration Academy ${marker}` }).select('id').single().throwOnError()
+    academyId = academy.data!.id
+    const createdClass = await admin.from('academy_classes').insert({ academy_id: academyId, class_name: `Hydration Class ${marker}`, status: 'active', visibility: 'unlisted', join_mode: 'open' }).select('id').single().throwOnError()
+    classId = createdClass.data!.id
+    const department = await admin.from('class_departments').insert({ class_id: classId, name: 'Test Department' }).select('id').single().throwOnError()
+    await admin.from('profiles').upsert({ user_id: userId, username: `Hydration ${marker}`, supporter_tier: 'free', agency: 'Test Department' }).throwOnError()
+    await admin.from('class_memberships').insert({ user_id: userId, class_id: classId, department_id: department.data!.id, role: 'class_admin', status: 'active', is_active: true }).throwOnError()
+    await admin.from('app_state').upsert({ user_id: userId, profile_details: { firstName: 'Original', lastName: marker, onboardingCompleted: false, displayMode: 'light', dailyGoalMinutes: 15, studyFocus: 'balanced' } }).throwOnError()
+    await page.route('**/rest/v1/profiles?*', async route => {
+      const request = route.request()
+      const url = new URL(request.url())
+      if (holdProfileRead && request.method() === 'GET' && url.searchParams.get('user_id') === `eq.${userId}`
+        && url.searchParams.get('select') === 'user_id,username,avatar_path,supporter_tier,bio,agency,created_at') {
+        profileReadStarted()
+        await profileReadGate
+      }
+      if (request.method() === 'POST' || request.method() === 'PATCH') profileWrites += 1
+      await route.continue()
+    })
+    await page.route('**/rest/v1/app_state?*', async route => {
+      const request = route.request()
+      const url = new URL(request.url())
+      if (holdStateRead && request.method() === 'GET' && url.searchParams.get('user_id') === `eq.${userId}`
+        && url.searchParams.get('select') === 'performance,high_scores,best_streak,profile_details,updated_at') {
+        stateReadStarted()
+        await stateReadGate
+      }
+      await route.continue()
+    })
+    await signIn(page, email, password)
+    await expect(page.getByRole('heading', { name: 'Make yourself at home.' })).toBeVisible()
+    await page.getByLabel('First name', { exact: true }).fill('Taylor')
+    await page.getByLabel('Last name', { exact: true }).fill(`Preserved${marker}`)
+    await page.locator('input[type=file]').setInputFiles({ name: 'preserved-avatar.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aFfQAAAAASUVORK5CYII=', 'base64') })
+    await page.getByRole('button', { name: 'Continue', exact: false }).click()
+    await page.getByRole('radio', { name: '30 min / day', exact: true }).check()
+    await page.getByRole('radio', { name: /Remember the essentials/ }).check()
+    const complete = page.getByRole('button', { name: 'Let’s get started', exact: false })
+    await expect(complete).toBeEnabled()
+    holdProfileRead = true
+    holdStateRead = true
+    await page.evaluate(async value => {
+      const modulePath = '/src/lib/supabase.ts'
+      const { supabase } = await import(modulePath)
+      const { error } = await supabase.auth.updateUser({ data: { qa_hydration_refresh: value } })
+      if (error) throw new Error(error.message)
+    }, marker)
+    await profileReadHeld
+    await expect(complete).toBeDisabled()
+    await expect(page.getByRole('status')).toContainText('Getting your account ready')
+    const writesBeforeSubmit = profileWrites
+    await page.locator('.academy-form').evaluate(form => (form as HTMLFormElement).requestSubmit())
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await expect(page.getByLabel('First name', { exact: true })).toHaveValue('Taylor')
+    await expect(page.getByLabel('Last name', { exact: true })).toHaveValue(`Preserved${marker}`)
+    await expect(page.getByAltText('Your profile preview')).toBeVisible()
+    await expect(page.getByAltText('Your profile preview')).toHaveAttribute('src', /^blob:/)
+    await page.getByRole('button', { name: 'Continue', exact: false }).click()
+    await expect(page.getByRole('radio', { name: '30 min / day', exact: true })).toBeChecked()
+    await expect(page.getByRole('radio', { name: /Remember the essentials/ })).toBeChecked()
+    expect(profileWrites).toBe(writesBeforeSubmit)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    holdProfileRead = false
+    releaseProfileRead()
+    await stateReadHeld
+    await expect(complete).toBeDisabled()
+    await expect(page.getByRole('status')).toContainText('Getting your account ready')
+    await page.locator('.academy-form').evaluate(form => (form as HTMLFormElement).requestSubmit())
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    expect(profileWrites).toBe(writesBeforeSubmit)
+    holdStateRead = false
+    releaseStateRead()
+    await expect(complete).toBeEnabled()
+    await complete.click()
+    await expect(page.locator('.today-dashboard')).toBeVisible()
+    const saved = await admin.from('app_state').select('profile_details').eq('user_id', userId).single().throwOnError()
+    expect(saved.data!.profile_details).toMatchObject({ firstName: 'Taylor', lastName: `Preserved${marker}`, dailyGoalMinutes: 30, studyFocus: 'recall', onboardingCompleted: true })
+    const membership = await admin.from('class_memberships').select('role').eq('user_id', userId).eq('class_id', classId).single().throwOnError()
+    expect(membership.data!.role).toBe('class_admin')
+    const profile = await admin.from('profiles').select('avatar_path').eq('user_id', userId).single().throwOnError()
+    expect(profile.data!.avatar_path).toMatch(new RegExp(`^${userId}/`))
+    const objects = await admin.storage.from('avatars').list(userId)
+    if (objects.error) throw objects.error
+    expect(objects.data!.some(object => `${userId}/${object.name}` === profile.data!.avatar_path)).toBe(true)
+  } finally {
+    holdProfileRead = false
+    holdStateRead = false
+    releaseProfileRead()
+    releaseStateRead()
+    if (userId) {
+      const objects = await admin.storage.from('avatars').list(userId)
+      if (objects.data?.length) await admin.storage.from('avatars').remove(objects.data.map(object => `${userId}/${object.name}`))
+    }
+    if (classId) await admin.from('academy_classes').delete().eq('id', classId)
+    if (academyId) await admin.from('academies').delete().eq('id', academyId)
+    if (userId) await admin.auth.admin.deleteUser(userId)
+  }
+})
+
+test('profile completion can create a missing first profile after a successful empty lookup', async ({ page }) => {
+  const marker = unique()
+  const email = `ui-first-profile-${marker}@example.invalid`
+  const password = `Test-${marker}-A!`
+  let userId = ''
+  try {
+    const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: 'New Profile', academy_onboarding_version: 1 } })
+    if (created.error) throw created.error
+    userId = created.data.user!.id
+    await admin.from('profiles').delete().eq('user_id', userId).throwOnError()
+    await signIn(page, email, password)
+    await expect(page.getByRole('heading', { name: 'Find your class.' })).toBeVisible()
+    await page.getByRole('radio', { name: /Class 181/ }).check()
+    await page.getByRole('button', { name: 'Continue', exact: false }).click()
+    await page.getByRole('radio').first().check()
+    await page.getByRole('button', { name: 'Continue', exact: false }).click()
+    await page.getByLabel('First name', { exact: true }).fill('New')
+    await page.getByLabel('Last name', { exact: true }).fill(`Profile${marker}`)
+    await page.getByRole('button', { name: 'Continue', exact: false }).click()
+    const complete = page.getByRole('button', { name: 'Let’s get started', exact: false })
+    await expect(complete).toBeEnabled()
+    const before = await admin.from('profiles').select('user_id').eq('user_id', userId).maybeSingle().throwOnError()
+    expect(before.data).toBeNull()
+    await complete.click()
+    await expect(page.locator('.today-dashboard')).toBeVisible()
+    const after = await admin.from('profiles').select('username').eq('user_id', userId).single().throwOnError()
+    expect(after.data!.username).toBe(`New Profile${marker}`)
+    const saved = await admin.from('app_state').select('profile_details').eq('user_id', userId).single().throwOnError()
+    expect(saved.data!.profile_details).toMatchObject({ firstName: 'New', lastName: `Profile${marker}`, onboardingCompleted: true })
+  } finally { if (userId) await admin.auth.admin.deleteUser(userId) }
+})
