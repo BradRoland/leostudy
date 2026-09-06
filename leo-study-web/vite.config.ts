@@ -113,6 +113,7 @@ function localAuthApiPlugin(): Plugin {
             password,
             email_confirm: true,
             user_metadata: {
+              academy_onboarding_version: 1,
               username,
               display_name: username,
             },
@@ -281,6 +282,9 @@ export default defineConfig(({ mode }) => {
   server: {
     host: '0.0.0.0',
     port: 5174,
+    proxy: process.env.DEV_CLASS_REQUEST_API_URL
+      ? { '/api/class-requests': { target: process.env.DEV_CLASS_REQUEST_API_URL, changeOrigin: true } }
+      : undefined,
     allowedHosts: ['180.academy', 'test.180.academy', 'testt.180.academy', 'dev.180.academy', 'localhost', '127.0.0.1', '10.0.0.225', '10.0.0.42'],
     hmr: publicHmrHost
       ? {

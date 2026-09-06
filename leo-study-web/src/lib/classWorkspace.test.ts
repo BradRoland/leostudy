@@ -4,7 +4,6 @@ import {
   buildInviteUrl,
   extractInviteCodeFromPath,
   formatAcademyClassLabel,
-  isEnrollmentClassName,
   normalizeInviteCode,
   shouldShowClassAsActive,
 } from './classWorkspace.ts'
@@ -53,11 +52,10 @@ test('shows only active listed classes whose end date has not passed', () => {
   }, new Date('2026-06-22T12:00:00Z')), false)
 })
 
-test('limits new enrollment to Class 181 and Class 182', () => {
-  assert.equal(isEnrollmentClassName('Class 181'), true)
-  assert.equal(isEnrollmentClassName(' class   182 '), true)
-  assert.equal(isEnrollmentClassName('Class 180'), false)
-  assert.equal(isEnrollmentClassName('Class 183'), false)
+test('new approved classes are eligible based on status without a class-name allowlist', () => {
+  assert.equal(shouldShowClassAsActive({ status: 'active', visibility: 'listed', endDate: null }), true)
+  assert.equal(shouldShowClassAsActive({ status: 'pending', visibility: 'listed', endDate: null }), false)
+  assert.equal(shouldShowClassAsActive({ status: 'archived', visibility: 'listed', endDate: null }), false)
 })
 
 test('formats Police Academy 180 classes without repeating 180', () => {

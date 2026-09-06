@@ -1,7 +1,5 @@
 import {
   buildInviteUrl,
-  enrollmentClassNames,
-  isEnrollmentClassName,
   normalizeInviteCode,
   shouldShowClassAsActive,
 } from './classWorkspace'
@@ -89,6 +87,8 @@ export type ClassCreationRequest = {
   requester_note: string
   status: string
   created_invite_code: string | null
+  created_class_id: string | null
+  decision_note: string
   created_at: string
 }
 
@@ -220,13 +220,11 @@ export async function loadActiveClasses() {
   const { data, error } = await supabase
     .from('academy_classes')
     .select('id,class_name,start_date,end_date,status,visibility,join_mode,academy_id,academies(name,city,state)')
-    .in('class_name', [...enrollmentClassNames])
     .eq('status', 'active')
     .eq('visibility', 'listed')
     .order('end_date', { ascending: true, nullsFirst: false })
   if (error) throw error
   return ((data || []) as AcademyClassRow[]).filter((row) =>
-    isEnrollmentClassName(row.class_name) &&
     shouldShowClassAsActive({
       status: row.status,
       visibility: row.visibility,
@@ -351,22 +349,34 @@ export async function updateOwnClassDepartment(classId: string, departmentId: st
 }
 
 export async function submitClassCreationRequest(input: ClassCreationRequestInput) {
+  const result = await classRequestAction('/api/class-requests', input)
+  return String(result.requestId || '')
+}
+
+async function classRequestAction(url: string, body: object) {
   if (!supabase) throw new Error('Supabase is not configured.')
-  const { data, error } = await supabase.rpc('request_class_creation', {
-    p_payload: {
-      academyName: input.academyName,
-      academyCity: input.academyCity,
-      academyState: input.academyState,
-      className: input.className,
-      startDate: input.startDate,
-      endDate: input.endDate,
-      departments: input.departments,
-      requesterDepartment: input.requesterDepartment,
-      requesterNote: input.requesterNote,
-    },
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error('Sign in to continue.')
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
   })
+  const payload = await response.json().catch(() => null)
+  if (!response.ok || !payload?.ok) throw new Error(String(payload?.error || 'The class service is unavailable. Your details are still here; please try again.'))
+  return payload as { requestId?: string; classId?: string; inviteCode?: string }
+}
+
+export async function loadOwnClassCreationRequests() {
+  if (!supabase) return []
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError) throw authError
+  if (!authData.user) return []
+  const { data, error } = await supabase.from('class_creation_requests').select('*')
+    .eq('requester_user_id', authData.user.id).order('created_at', { ascending: false }).limit(20)
   if (error) throw error
-  return String(data || '')
+  return (data || []) as ClassCreationRequest[]
 }
 
 export async function notifyDiscordForClassRequest(requestId: string) {
@@ -395,16 +405,11 @@ export async function loadOwnerClassCreationRequests() {
 }
 
 export async function approveClassCreationRequest(requestId: string) {
-  if (!supabase) throw new Error('Supabase is not configured.')
-  const { data, error } = await supabase.rpc('owner_approve_class_creation_request', { p_request_id: requestId })
-  if (error) throw error
-  return data as { classId?: string; inviteCode?: string }
+  return classRequestAction('/api/class-requests/approve', { requestId })
 }
 
 export async function rejectClassCreationRequest(requestId: string, reason = '') {
-  if (!supabase) throw new Error('Supabase is not configured.')
-  const { error } = await supabase.rpc('owner_reject_class_creation_request', { p_request_id: requestId, p_reason: reason })
-  if (error) throw error
+  await classRequestAction('/api/class-requests/reject', { requestId, reason })
 }
 
 export async function acceptInvite(code: string, departmentId?: string) {

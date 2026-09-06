@@ -7,13 +7,6 @@ export type ActiveClassSummary = {
   endDate?: string | null
 }
 
-export const enrollmentClassNames = ['Class 181', 'Class 182'] as const
-
-export function isEnrollmentClassName(value: string | null | undefined) {
-  const normalized = String(value || '').trim().replace(/\s+/g, ' ').toLowerCase()
-  return enrollmentClassNames.some((className) => className.toLowerCase() === normalized)
-}
-
 const inviteCodePattern = /^[A-Z0-9][A-Z0-9-]{2,38}[A-Z0-9]$/
 
 export function normalizeInviteCode(value: string) {

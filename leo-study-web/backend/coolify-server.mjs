@@ -5,13 +5,17 @@ import { createHash, randomInt } from 'node:crypto'
 import http from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createClient } from '@supabase/supabase-js'
 import { createStripeTierService } from './stripe-tier-service.mjs'
+import { createClassRequestService } from './class-request-service.mjs'
+import { createClassRequestEmailService } from './class-request-email-service.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.resolve(__dirname, '..')
 const distRoot = path.join(appRoot, 'dist')
 const indexPath = path.join(distRoot, 'index.html')
 const port = Number(process.env.PORT || 80)
+const host = process.env.HOST || '0.0.0.0'
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
 
 const contentTypes = new Map([
@@ -31,6 +35,15 @@ if (!stripeWebhookSecret || !process.env.STRIPE_SECRET_KEY || !process.env.SUPAB
 }
 
 const { stripe, supabase, applyTierFromCheckoutSession, verifySupabaseServiceAccess } = createStripeTierService()
+const classRequestService = createClassRequestService({
+  supabase,
+  userClient: (token) => createClient(
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } },
+  ),
+})
+const classEmailService = createClassRequestEmailService({ supabase })
 
 try {
   await verifySupabaseServiceAccess()
@@ -271,6 +284,37 @@ async function handleClassRequestDiscordNotification(req, res) {
   sendJson(res, 200, { ok: true, notified: true })
 }
 
+async function handleClassRequestAction(req, res, action) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { allow: 'POST' })
+    res.end('Method not allowed')
+    return
+  }
+  let bytes = 0
+  const chunks = []
+  for await (const chunk of req) {
+    bytes += chunk.length
+    if (bytes > 48 * 1024) {
+      sendJson(res, 413, { error: 'Class request is too large.' })
+      return
+    }
+    chunks.push(chunk)
+  }
+  let payload
+  try { payload = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') }
+  catch {
+    sendJson(res, 400, { error: 'Invalid request. Please try again.' })
+    return
+  }
+  const authorization = String(req.headers.authorization || '')
+  const token = authorization.toLowerCase().startsWith('bearer ') ? authorization.slice(7).trim() : ''
+  const result = await classRequestService({ token, action, payload })
+  sendJson(res, result.status, result.body)
+  if (result.status === 200) {
+    void classEmailService.drain().catch(() => console.error('Class request saved; queued email will retry.'))
+  }
+}
+
 async function handleCreateAccount(req, res) {
   if (req.method !== 'POST') {
     res.writeHead(405, { allow: 'POST' })
@@ -302,6 +346,7 @@ async function handleCreateAccount(req, res) {
     user_metadata: {
       username,
       display_name: username,
+      academy_onboarding_version: 1,
     },
   })
 
@@ -483,6 +528,16 @@ const server = http.createServer(async (req, res) => {
       return
     }
 
+    const classRequestActions = {
+      '/api/class-requests': 'submit',
+      '/api/class-requests/approve': 'approve',
+      '/api/class-requests/reject': 'reject',
+    }
+    if (classRequestActions[req.url]) {
+      await handleClassRequestAction(req, res, classRequestActions[req.url])
+      return
+    }
+
     if (req.url === '/api/auth/create-account') {
       await handleCreateAccount(req, res)
       return
@@ -512,6 +567,7 @@ const server = http.createServer(async (req, res) => {
   }
 })
 
-server.listen(port, '0.0.0.0', () => {
-  console.log(`LEO Study Coolify server listening on 0.0.0.0:${port}`)
+server.listen(port, host, () => {
+  console.log(`LEO Study Coolify server listening on ${host}:${port}`)
+  classEmailService.start()
 })

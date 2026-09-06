@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   acceptInvite,
@@ -12,8 +12,8 @@ import {
   loadActiveClasses,
   loadCreatedClasses,
   loadOwnerClassCreationRequests,
+  loadOwnClassCreationRequests,
   lookupInvite,
-  notifyDiscordForClassRequest,
   rejectClassCreationRequest,
   joinClassDirectly,
   requestToJoinClass,
@@ -27,12 +27,21 @@ import {
   type ClassJoinRequest,
   type ClassMembership,
 } from '../lib/classApi'
+import { AcademyWelcome, OnboardingStatus } from './AuthOnboarding'
+import { ClassEnrollment, type EnrollmentProfileSeed } from './ClassEnrollment'
+import { cleanRequestDepartments, validateClassRequest, type OnboardingProfile } from '../lib/onboarding'
 import { extractInviteCodeFromPath, formatAcademyClassLabel, normalizeInviteCode } from '../lib/classWorkspace'
 
-const fixedClassRequestAcademy = {
-  name: 'Police Academy 180',
-  city: '',
-  state: 'CA',
+const initialClassRequest = {
+  academyName: '', academyCity: '', academyState: '',
+  className: '', startDate: '', endDate: '', departments: [''], requesterDepartment: '', requesterNote: '',
+}
+function readClassRequestForm() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem('pending_class_creation_request') || 'null')
+    if (saved && typeof saved.className === 'string' && Array.isArray(saved.departments)) return { ...initialClassRequest, ...saved } as typeof initialClassRequest
+  } catch { /* A malformed draft should not prevent a new request. */ }
+  return { ...initialClassRequest }
 }
 
 type Props = {
@@ -57,15 +66,11 @@ type Props = {
   onInviteNeedsAuth?: (code: string, authMode: 'signin' | 'signup') => void
   onClassRequestSubmitted?: () => void
   embedded?: boolean
-}
-
-function cleanDepartmentFields(value: string[]) {
-  return value.map((entry) => entry.trim()).filter(Boolean)
-}
-
-function isClassRequestReady(input: { className: string; departments: string[] }) {
-  const departments = cleanDepartmentFields(input.departments)
-  return Boolean(input.className.trim() && departments.length > 0)
+  initialError?: string
+  profileOnly?: boolean
+  profileSeed?: EnrollmentProfileSeed
+  onSaveOnboardingProfile?: (profile: OnboardingProfile) => Promise<void>
+  onFinishOnboarding?: () => Promise<void>
 }
 
 function classTitle(row: AcademyClassRow) {
@@ -89,8 +94,8 @@ function classRequiresJoinApproval(row?: AcademyClassRow | null) {
 function StatusLine({ error, success }: { error: string; success: string }) {
   return (
     <>
-      {error ? <p className="bad">{error}</p> : null}
-      {success ? <p className="saved-pill">{success}</p> : null}
+      {error ? <p className="bad" role="alert">{error}</p> : null}
+      {success ? <p className="saved-pill" role="status">{success}</p> : null}
     </>
   )
 }
@@ -107,28 +112,31 @@ export function ClassWorkspacePages({
   onInviteNeedsAuth,
   onClassRequestSubmitted,
   embedded = false,
+  profileSeed,
+  profileOnly = false,
+  initialError = '',
+  onSaveOnboardingProfile,
+  onFinishOnboarding,
 }: Props) {
   const navigate = useNavigate()
   const [availableClasses, setAvailableClasses] = useState<AcademyClassRow[]>([])
-  const [selectedClassId, setSelectedClassId] = useState('')
+  const [selectedClassId, setSelectedClassId] = useState(profileOnly ? activeClass?.classId || '' : '')
   const [departments, setDepartments] = useState<ClassDepartment[]>([])
   const [joinDepartmentId, setJoinDepartmentId] = useState('')
   const [inviteCode, setInviteCode] = useState(() => extractInviteCodeFromPath(currentPath))
   const [invitePreview, setInvitePreview] = useState<ClassInvitePreview | null>(null)
   const [inviteLoading, setInviteLoading] = useState(false)
-  const [classRequest, setClassRequest] = useState({
-    className: '',
-    startDate: '',
-    endDate: '',
-    departments: ['', '', ''],
-    requesterDepartment: '',
-    requesterNote: '',
-  })
+  const [classRequest, setClassRequest] = useState(readClassRequestForm)
+  const [classReload, setClassReload] = useState(0)
+  const [departmentsLoading, setDepartmentsLoading] = useState(false)
+  const [submittingEnrollment, setSubmittingEnrollment] = useState(false)
+  const [ownRequests, setOwnRequests] = useState<ClassCreationRequest[]>([])
+  const [ownRequestsLoaded, setOwnRequestsLoaded] = useState(false)
   const [ownerRequests, setOwnerRequests] = useState<ClassCreationRequest[]>([])
   const [adminRequests, setAdminRequests] = useState<ClassJoinRequest[]>([])
   const [lastGeneratedInvite, setLastGeneratedInvite] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialError)
   const [success, setSuccess] = useState('')
 
   const selectedClass = useMemo(() => {
@@ -142,33 +150,40 @@ export function ClassWorkspacePages({
 
   useEffect(() => {
     if (mode !== 'classes' && mode !== 'join' && mode !== 'admin') return
+    let cancelled = false
     setLoading(true)
+    setError('')
     const loadClasses = mode === 'admin' ? loadCreatedClasses : loadActiveClasses
     loadClasses()
       .then((rows) => {
-        setAvailableClasses(rows)
-        setSelectedClassId((current) => rows.some((row) => row.id === current) ? current : rows[0]?.id || '')
+        if (cancelled) return
+        const activeRow: AcademyClassRow | null = profileOnly && activeClass ? { id: activeClass.classId, class_name: activeClass.className, start_date: activeClass.startDate, end_date: activeClass.endDate, status: activeClass.status, visibility: 'listed', join_mode: 'open', academy_id: '', academies: { name: activeClass.academyName } } : null
+        const classRows = activeRow && !rows.some((row) => row.id === activeRow.id) ? [activeRow, ...rows] : rows
+        const selectableRows = mode === 'classes' ? classRows.filter((row) => !memberships.some((membership) => membership.classId === row.id)) : classRows
+        setAvailableClasses(selectableRows)
+        setSelectedClassId((current) => profileOnly && activeClass ? activeClass.classId : selectableRows.some((row) => row.id === current) ? current : selectableRows[0]?.id || '')
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load classes.'))
-      .finally(() => setLoading(false))
-  }, [mode])
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load classes.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [mode, classReload, profileOnly, activeClass, memberships])
 
   useEffect(() => {
-    if (!selectedClassId) {
-      setDepartments([])
-      return
-    }
-    if (mode === 'invite') return
+    if (!selectedClassId || mode === 'invite') return
+    let cancelled = false
+    setDepartments([])
+    setJoinDepartmentId('')
+    setDepartmentsLoading(true)
     loadClassDepartments(selectedClassId)
       .then((rows) => {
+        if (cancelled) return
         setDepartments(rows)
-        setJoinDepartmentId((current) => rows.some((row) => row.id === current) ? current : rows.length === 1 ? rows[0].id : '')
+        setJoinDepartmentId(profileOnly && activeClass?.departmentId && rows.some((row) => row.id === activeClass.departmentId) ? activeClass.departmentId : rows.length === 1 ? rows[0].id : '')
       })
-      .catch(() => {
-        setDepartments([])
-        setJoinDepartmentId('')
-      })
-  }, [mode, selectedClassId])
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load departments. Please refresh the class list.') })
+      .finally(() => { if (!cancelled) setDepartmentsLoading(false) })
+    return () => { cancelled = true }
+  }, [mode, selectedClassId, classReload, profileOnly, activeClass?.departmentId])
 
   useEffect(() => {
     if (mode !== 'invite') return
@@ -205,7 +220,26 @@ export function ClassWorkspacePages({
     }
   }, [inviteCode, mode])
 
-  const loadOwnerRequests = async () => {
+  useEffect(() => {
+    if ((mode !== 'join' && mode !== 'request' && mode !== 'invite') || !currentUserId) return
+    let cancelled = false
+    setOwnRequestsLoaded(false)
+    loadOwnClassCreationRequests().then((rows) => { if (!cancelled) setOwnRequests(rows) })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load your request status.') })
+      .finally(() => { if (!cancelled) setOwnRequestsLoaded(true) })
+    return () => { cancelled = true }
+  }, [mode, currentUserId, classReload])
+
+  useEffect(() => {
+    if (mode !== 'owner' || ownerRequests.length === 0) return
+    const requestId = new URLSearchParams(window.location.search).get('request')
+    if (!requestId) return
+    const target = document.getElementById(`class-request-${requestId}`)
+    target?.scrollIntoView({ block: 'center', behavior: 'auto' })
+    target?.focus({ preventScroll: true })
+  }, [mode, ownerRequests])
+
+  const loadOwnerRequests = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -215,13 +249,13 @@ export function ClassWorkspacePages({
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     if (mode === 'owner' && isOwner) void loadOwnerRequests()
-  }, [mode, isOwner])
+  }, [mode, isOwner, loadOwnerRequests])
 
-  const loadAdminRequests = async () => {
+  const loadAdminRequests = useCallback(async () => {
     if (!activeClass) return
     setLoading(true)
     setError('')
@@ -232,45 +266,30 @@ export function ClassWorkspacePages({
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeClass])
 
   useEffect(() => {
     if (mode === 'admin' && activeClass) void loadAdminRequests()
-  }, [mode, activeClass?.classId])
+  }, [mode, activeClass, loadAdminRequests])
 
   const submitRequest = async () => {
-    const payload = {
-      academyName: fixedClassRequestAcademy.name,
-      academyCity: fixedClassRequestAcademy.city,
-      academyState: fixedClassRequestAcademy.state,
-      ...classRequest,
-      departments: cleanDepartmentFields(classRequest.departments),
-    }
-    if (!currentUserId && onClassRequestNeedsAuth) {
-      onClassRequestNeedsAuth(payload)
-      return
-    }
+    const payload = { ...classRequest, departments: cleanRequestDepartments(classRequest.departments) }
+    const validationError = validateClassRequest(payload)
+    if (validationError) { setError(validationError); return }
+    window.localStorage.setItem('pending_class_creation_request', JSON.stringify(payload))
+    if (!currentUserId && onClassRequestNeedsAuth) { onClassRequestNeedsAuth(payload); return }
     setLoading(true)
     setError('')
     setSuccess('')
     try {
-      const requestId = await submitClassCreationRequest(payload)
-      await notifyDiscordForClassRequest(requestId)
-      setSuccess('Class request submitted. The site owner will review it.')
+      await submitClassCreationRequest(payload)
+      window.localStorage.removeItem('pending_class_creation_request')
+      setSuccess('Your request is saved. We’ll email you when it’s approved, and you’ll become your class admin.')
       onClassRequestSubmitted?.()
-      setClassRequest({
-        className: '',
-        startDate: '',
-        endDate: '',
-        departments: ['', '', ''],
-        requesterDepartment: '',
-        requesterNote: '',
-      })
+      setClassRequest({ ...initialClassRequest })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not submit class request.')
-    } finally {
-      setLoading(false)
-    }
+      setError(err instanceof Error ? err.message : 'Could not submit class request. Your details are saved so you can retry.')
+    } finally { setLoading(false) }
   }
 
   const submitInvite = async () => {
@@ -307,28 +326,31 @@ export function ClassWorkspacePages({
     }
   }
 
-  const joinSelectedClass = async () => {
-    if (!selectedClass) return
-    setLoading(true)
+  const joinSelectedClass = async (profileInput?: OnboardingProfile) => {
+    if (!selectedClass || (!joinDepartmentId && !profileOnly) || submittingEnrollment) return
+    setSubmittingEnrollment(true)
     setError('')
     setSuccess('')
     try {
-      if (classRequiresJoinApproval(selectedClass)) {
-        await requestToJoinClass(selectedClass.id, joinDepartmentId || null, '')
+      if (profileInput) await onSaveOnboardingProfile?.(profileInput)
+      if (profileOnly && activeClass) {
+        await onFinishOnboarding?.()
+        await onRefreshMemberships()
+        navigate('/home', { replace: true })
+      } else if (classRequiresJoinApproval(selectedClass)) {
+        await requestToJoinClass(selectedClass.id, joinDepartmentId, '')
         window.localStorage.removeItem('pending_class_selection')
-        setSuccess('Join request sent. The class admin will review it.')
+        setSuccess('Join request sent. Your class admin will review it.')
       } else {
-        await joinClassDirectly(selectedClass.id, joinDepartmentId || null)
+        await joinClassDirectly(selectedClass.id, joinDepartmentId)
+        await onFinishOnboarding?.()
         await onRefreshMemberships()
         window.localStorage.removeItem('pending_class_selection')
-        setSuccess('Class joined.')
         navigate('/home', { replace: true })
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not join class.')
-    } finally {
-      setLoading(false)
-    }
+      setError(err instanceof Error ? err.message : 'Could not finish joining. Your choices are still here so you can retry.')
+    } finally { setSubmittingEnrollment(false) }
   }
 
   const switchClass = async (classId: string) => {
@@ -347,52 +369,47 @@ export function ClassWorkspacePages({
     }
   }
 
+  const reviewClassRequest = async (requestId: string, decision: 'approve' | 'reject') => {
+    if (loading || !isOwner) return
+    setLoading(true)
+    setError('')
+    setSuccess('')
+    try {
+      if (decision === 'approve') {
+        await approveClassCreationRequest(requestId)
+        setSuccess('Class approved. The requester is now the class admin, and their approval email is queued.')
+      } else {
+        await rejectClassCreationRequest(requestId, 'Please review your class details and submit an updated request.')
+        setSuccess('Class request declined.')
+      }
+      setOwnerRequests(await loadOwnerClassCreationRequests())
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not update the request. Please try again.') }
+    finally { setLoading(false) }
+  }
+
+  const pendingRequest = ownRequests.find((request) => request.status === 'pending')
+  if ((mode === 'join' || mode === 'request' || mode === 'invite') && pendingRequest && (mode === 'request' || !activeClass)) return <AcademyWelcome><header className="academy-form-heading"><p className="academy-eyebrow">REQUEST RECEIVED</p><h2>Your class is under review.</h2><p>Your request for {pendingRequest.class_name} is saved. We’ll email you when the owner approves it, and you’ll become the class admin.</p></header><div className="academy-form"><div className="academy-selection-summary"><strong>{pendingRequest.academy_name} · {pendingRequest.class_name}</strong><span>{classDates(pendingRequest.start_date, pendingRequest.end_date)}</span><span>{pendingRequest.departments.length} departments · Pending approval</span></div><button type="button" className="academy-primary" disabled={loading} onClick={() => { void onRefreshMemberships(); setClassReload((value) => value + 1) }}>Check approval status</button><OnboardingStatus error={error} /></div></AcademyWelcome>
+
   if (mode === 'request') {
-    return (
-      <main className={pageClassName}>
-        <section className="class-request-card">
-          <div className="class-flow-hero">
-            <p className="eyebrow">Request a class</p>
-            <h1>Add your academy class</h1>
-            <p className="muted">Add the class number, dates, and departments. You will sign in before the request is sent.</p>
-          </div>
-          <div className="request-step-list" aria-label="Class request steps">
-            <span>Step one: add your class number</span>
-            <span>Step two: add a start date and end date</span>
-            <span>Step three: add departments for owner review</span>
-          </div>
-          <div className="settings-grid">
-            <label>Class number/name<input value={classRequest.className} onChange={(event) => setClassRequest({ ...classRequest, className: event.target.value })} placeholder="Class 181" /></label>
-            <label>Start date<input type="date" value={classRequest.startDate} onChange={(event) => setClassRequest({ ...classRequest, startDate: event.target.value })} /></label>
-            <label>End date<input type="date" value={classRequest.endDate} onChange={(event) => setClassRequest({ ...classRequest, endDate: event.target.value })} /></label>
-          </div>
-          <div className="department-entry-list">
-            <div className="settings-inline-head">
-              <div>
-                <h4>Departments in your class</h4>
-                <p className="muted tiny">Put one department in each box.</p>
-              </div>
-              <button type="button" className="secondary" onClick={() => setClassRequest((previous) => ({ ...previous, departments: [...previous.departments, ''] }))}>Add Department</button>
-            </div>
-            {classRequest.departments.map((department, index) => (
-              <div className="department-entry-row" key={`class-request-department-${index}`}>
-                <label>Department {index + 1}<input value={department} onChange={(event) => setClassRequest((previous) => {
-                  const departments = [...previous.departments]
-                  departments[index] = event.target.value
-                  return { ...previous, departments }
-                })} placeholder="Fresno Police Department" /></label>
-                <button type="button" className="secondary" disabled={classRequest.departments.length <= 1} onClick={() => setClassRequest((previous) => ({ ...previous, departments: previous.departments.filter((_, departmentIndex) => departmentIndex !== index) }))}>Remove</button>
-              </div>
-            ))}
-          </div>
-          <label>Note to owner<textarea value={classRequest.requesterNote} onChange={(event) => setClassRequest({ ...classRequest, requesterNote: event.target.value })} rows={4} placeholder="Tell the owner who should manage the class and anything special about your academy." /></label>
-          <button className="primary" type="button" disabled={loading || !isClassRequestReady(classRequest)} onClick={() => void submitRequest()}>
-            {loading ? 'Submitting...' : currentUserId ? 'Submit Class Request' : 'Continue to Sign In'}
-          </button>
-          <StatusLine error={error} success={success} />
+    const departmentOptions = cleanRequestDepartments(classRequest.departments)
+    return <div className="academy-request-flow"><AcademyWelcome steps={['Class details', 'Your account', 'Owner approval']} step={0}>
+      <header className="academy-form-heading"><p className="academy-eyebrow">BRING YOUR CLASS TOGETHER</p><h2>Add your academy class.</h2><p>Tell us about your class. The site owner will review your request, and we’ll email you when it’s approved. You’ll become the class admin.</p></header>
+      <form className="academy-form" onSubmit={(event) => { event.preventDefault(); void submitRequest() }}>
+        <label>Academy name<input required maxLength={160} value={classRequest.academyName} placeholder="Your police academy" onChange={(event) => setClassRequest({ ...classRequest, academyName: event.target.value })} /></label>
+        <div className="academy-form-grid"><label>City <span className="academy-optional">optional</span><input maxLength={100} value={classRequest.academyCity} onChange={(event) => setClassRequest({ ...classRequest, academyCity: event.target.value })} /></label><label>State <span className="academy-optional">optional</span><input maxLength={50} value={classRequest.academyState} placeholder="California" onChange={(event) => setClassRequest({ ...classRequest, academyState: event.target.value })} /></label></div>
+        <label>Class number or name<input required maxLength={100} value={classRequest.className} placeholder="Class 183" onChange={(event) => setClassRequest({ ...classRequest, className: event.target.value })} /></label>
+        <div className="academy-form-grid"><label>Start date<input required type="date" value={classRequest.startDate} onChange={(event) => setClassRequest({ ...classRequest, startDate: event.target.value })} /></label><label>Graduation date<input required type="date" min={classRequest.startDate || undefined} value={classRequest.endDate} onChange={(event) => setClassRequest({ ...classRequest, endDate: event.target.value })} /></label></div>
+        <section className="academy-request-section"><h3>Departments in your class</h3><p className="academy-field-hint">Add every department represented in your class. Your classmates will choose from this list when they join.</p>
+          {classRequest.departments.map((department, index) => <div className="academy-request-department" key={index}><label>Department {index + 1}<input maxLength={160} required={index === 0} value={department} placeholder="Police department or agency" onChange={(event) => setClassRequest((previous) => ({ ...previous, departments: previous.departments.map((value, position) => position === index ? event.target.value : value) }))} /></label><button type="button" className="academy-secondary" aria-label={`Remove department ${index + 1}`} disabled={classRequest.departments.length === 1} onClick={() => setClassRequest((previous) => ({ ...previous, departments: previous.departments.filter((_, position) => position !== index), requesterDepartment: previous.requesterDepartment === department ? '' : previous.requesterDepartment }))}>×</button></div>)}
+          <button className="academy-secondary" type="button" onClick={() => setClassRequest((previous) => ({ ...previous, departments: [...previous.departments, ''] }))}>＋ Add another department</button>
+          {departmentOptions.length ? <label>Your department<select aria-label="Your department" required value={classRequest.requesterDepartment} onChange={(event) => setClassRequest({ ...classRequest, requesterDepartment: event.target.value })}><option value="">Choose your department</option>{departmentOptions.map((department) => <option key={department}>{department}</option>)}</select></label> : null}
         </section>
-      </main>
-    )
+        <label>Anything else we should know? <span className="academy-optional">optional</span><textarea maxLength={2000} value={classRequest.requesterNote} rows={3} placeholder="Add context that will help the owner review your request." onChange={(event) => setClassRequest({ ...classRequest, requesterNote: event.target.value })} /></label>
+        <OnboardingStatus error={error} success={success} />
+        <button className="academy-primary" disabled={loading || (!!currentUserId && !ownRequestsLoaded)} type="submit">{loading ? 'Saving your request…' : currentUserId ? 'Submit for approval' : 'Continue to your account'} <span aria-hidden>→</span></button>
+        <button className="academy-text-button" type="button" onClick={() => navigate(currentUserId ? '/classes/join' : '/signup')}>Back to {currentUserId ? 'class selection' : 'sign up'}</button>
+      </form>
+    </AcademyWelcome></div>
   }
 
   if (mode === 'invite') {
@@ -443,7 +460,7 @@ export function ClassWorkspacePages({
               {activeClassIsDifferent ? (
                 <p className="bad">You are already in {membershipTitle(activeClass)}. Do you want to leave it and join {invitePreview ? formatAcademyClassLabel(invitePreview.academyName, invitePreview.className) : 'this class'}?</p>
               ) : null}
-              <button className="primary" type="button" disabled={loading || inviteLoading || !normalizedInviteCode || !invitePreview || (!invitePreview.departmentId && departments.length > 0 && !joinDepartmentId)} onClick={() => void submitInvite()}>
+              <button className="primary" type="button" disabled={loading || inviteLoading || (!!currentUserId && !ownRequestsLoaded) || !normalizedInviteCode || !invitePreview || (!invitePreview.departmentId && departments.length > 0 && !joinDepartmentId)} onClick={() => void submitInvite()}>
                 {loading ? 'Joining...' : acceptLabel}
               </button>
             </>
@@ -455,46 +472,10 @@ export function ClassWorkspacePages({
   }
 
   if (mode === 'join') {
-    const selectedClassRequiresApproval = classRequiresJoinApproval(selectedClass)
-    return (
-      <main className={`${pageClassName} class-join-flow`}>
-        <section className="class-join-card">
-          <p className="eyebrow">Join a class</p>
-          <h1>Choose Class 181 or Class 182</h1>
-          <p className="muted">
-            {selectedClassRequiresApproval ? 'Choose your class and department. The class admin will approve your request.' : 'Pick your class and department to start with a fresh, class-only leaderboard.'}
-          </p>
-          {loading ? <p className="muted">Loading classes...</p> : null}
-          {!loading && availableClasses.length === 0 ? <p className="muted">No classes are available yet.</p> : null}
-          <label>
-            Class
-            <select value={selectedClassId} onChange={(event) => {
-              setSelectedClassId(event.target.value)
-              setJoinDepartmentId('')
-            }}>
-              {availableClasses.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {classTitle(row)}
-                </option>
-              ))}
-            </select>
-          </label>
-          {selectedClass ? <p className="muted tiny">{classDates(selectedClass.start_date, selectedClass.end_date)}</p> : null}
-          <label>
-            Department
-            <select value={joinDepartmentId} onChange={(event) => setJoinDepartmentId(event.target.value)}>
-              <option value="">Choose department</option>
-              {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-            </select>
-          </label>
-          {departments.length === 0 ? <p className="muted tiny">This class does not have departments listed yet. You can still continue.</p> : null}
-          <button className="primary" type="button" onClick={() => void joinSelectedClass()} disabled={loading || !selectedClass || (departments.length > 0 && !joinDepartmentId)}>
-            {loading ? (selectedClassRequiresApproval ? 'Sending...' : 'Joining...') : selectedClassRequiresApproval ? 'Request to Join' : 'Join Class'}
-          </button>
-          <StatusLine error={error} success={success} />
-        </section>
-      </main>
-    )
+    return <ClassEnrollment classes={availableClasses} selectedClassId={selectedClassId} departments={departments} departmentId={joinDepartmentId}
+      onClassChange={(id) => { setSelectedClassId(id); setJoinDepartmentId(''); setError('') }} onDepartmentChange={setJoinDepartmentId}
+      classesLoading={loading || (!!currentUserId && !ownRequestsLoaded)} departmentsLoading={departmentsLoading} submitting={submittingEnrollment} error={error} success={success}
+      key={profileOnly ? `profile-${activeClass?.classId}` : 'class-enrollment'} profileOnly={profileOnly} profileOnlyDepartmentName={profileOnly ? activeClass?.departmentName : undefined} profileSeed={profileSeed} onComplete={joinSelectedClass} onRetry={() => setClassReload((value) => value + 1)} />
   }
 
   if (mode === 'owner') {
@@ -509,7 +490,7 @@ export function ClassWorkspacePages({
           <StatusLine error={error} success={success} />
           {isOwner && ownerRequests.length === 0 ? <p className="muted">No class requests yet.</p> : null}
           {ownerRequests.map((request) => (
-            <article className="class-card" key={request.id}>
+            <article id={`class-request-${request.id}`} tabIndex={-1} className={`class-card ${new URLSearchParams(window.location.search).get('request') === request.id ? 'class-request-highlight' : ''}`} key={request.id}>
               <h3>{formatAcademyClassLabel(request.academy_name, request.class_name)}</h3>
               <p className="muted tiny">{request.academy_city}, {request.academy_state} · {classDates(request.start_date, request.end_date)}</p>
               <p className="muted tiny">Requested by: {request.requester_name || 'Unknown'}{request.requester_email ? ` · ${request.requester_email}` : ''}</p>
@@ -523,19 +504,8 @@ export function ClassWorkspacePages({
               {request.created_invite_code ? <p className="saved-pill">{formatInviteUrl(request.created_invite_code)}</p> : null}
               {request.status === 'pending' ? (
                 <div className="button-row">
-                  <button className="primary" type="button" onClick={async () => {
-                    setError('')
-                    const result = await approveClassCreationRequest(request.id).catch((err) => {
-                      setError(err instanceof Error ? err.message : 'Could not approve request.')
-                      return null
-                    })
-                    if (result?.inviteCode) setSuccess(`Approved. Invite: ${formatInviteUrl(result.inviteCode)}`)
-                    await loadOwnerRequests()
-                  }}>Approve</button>
-                  <button className="secondary" type="button" onClick={async () => {
-                    await rejectClassCreationRequest(request.id, 'Rejected by owner.')
-                    await loadOwnerRequests()
-                  }}>Reject</button>
+                  <button className="primary" type="button" disabled={loading} onClick={() => void reviewClassRequest(request.id, 'approve')}>{loading ? 'Saving…' : 'Approve class'}</button>
+                  <button className="secondary" type="button" disabled={loading} onClick={() => void reviewClassRequest(request.id, 'reject')}>Decline request</button>
                 </div>
               ) : null}
             </article>
@@ -618,7 +588,7 @@ export function ClassWorkspacePages({
                   </div>
                   {adminRequests.length === 0 ? <p className="muted">No pending join requests.</p> : null}
                   {adminRequests.map((request) => (
-                    <article className="class-card" key={request.id}>
+                    <article id={`class-request-${request.id}`} tabIndex={-1} className={`class-card ${new URLSearchParams(window.location.search).get('request') === request.id ? 'class-request-highlight' : ''}`} key={request.id}>
                       <h3>Cadet {String(request.user_id || '').slice(0, 8)}</h3>
                       <p className="muted tiny">{request.class_departments?.name || 'No department selected'}</p>
                       <div className="button-row">
@@ -661,17 +631,22 @@ export function ClassWorkspacePages({
     <main className="page-shell class-page">
       <section className="panel-block">
         <p className="eyebrow">Classes</p>
-        <h1>Choose your class</h1>
+        <h1>Your class workspace</h1>
+        <div className="button-row class-management-actions">
+          <button className="secondary" type="button" onClick={() => navigate('/classes/request')}>Request to add a class</button>
+          {isOwner ? <button className="primary" type="button" onClick={() => navigate('/owner/classes')}>Review class requests</button> : null}
+        </div>
         {memberships.length > 0 ? (
           <div className="class-grid">
             {memberships.map((membership) => (
               <article className="class-card" key={membership.id}>
                 <h3>{membershipTitle(membership)}</h3>
                 <p className="muted tiny">{membership.academyLocation || 'Location not set'} · {classDates(membership.startDate, membership.endDate)}</p>
-                <p className="muted tiny">{membership.departmentName || 'No department'} · {membership.role}</p>
+                <p className="muted tiny">{membership.departmentName || 'No department'} · {{ cadet: 'Cadet', class_admin: 'Class admin', moderator: 'Moderator' }[membership.role]}</p>
                 <button className={membership.isActive ? 'secondary' : 'primary'} type="button" disabled={membership.isActive || loading} onClick={() => void switchClass(membership.classId)}>
                   {membership.isActive ? 'Active Class' : 'Set Active'}
                 </button>
+                {membership.isActive && (membership.role === 'class_admin' || membership.role === 'moderator') ? <button className="primary class-manage-button" type="button" onClick={() => navigate('/classes/admin')}>Manage class</button> : null}
               </article>
             ))}
           </div>

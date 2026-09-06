@@ -1,0 +1,156 @@
+/* Shared surface and navigation system. Game boards retain their own geometry. */
+.app-shell.professional-ui {
+  --bg-main: #101a24; --bg-panel: #17232e; --bg-sidebar: #11232f;
+  --card-bg: #17232e; --card-border: #2a3945;
+  --text-primary: #edf2f5; --text-secondary: #adbdc8; --text-muted: #93a5b1;
+  --accent: #5cb8a7; --accent-strong: #79cdbd;
+  --success: #66c6a1; --warning: #dab578; --danger: #f18c93;
+  --bg: var(--bg-main); --panel: var(--card-bg); --panel-strong: var(--bg-panel);
+  --panel-soft: #21313e; --border: var(--card-border); --text: var(--text-primary);
+  --muted: var(--text-secondary); --good: var(--success); --bad: var(--danger);
+  --bg-secondary: var(--panel-soft); --bg-tertiary: var(--panel-soft);
+  --surface-canvas: var(--bg-main); --surface-sidebar: var(--bg-sidebar);
+  --surface-card: var(--card-bg); --surface-subtle: var(--panel-soft);
+  color-scheme: dark; background: var(--bg-main); color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 0; line-height: 1.6;
+}
+.app-shell.professional-ui.ui-light-mode {
+  --bg-main: #f5f6f8; --bg-panel: #ffffff; --card-bg: #ffffff;
+  --card-border: #e5e9ed; --text-primary: #1f3042; --text-secondary: #657581;
+  --text-muted: #70818e; --accent: #087f78; --accent-strong: #076c65;
+  --success: #087c62; --warning: #a36b28; --danger: #b83d49;
+  --panel-soft: #f0f3f5; --body-base: #f5f6f8;
+  color-scheme: light;
+}
+.professional-ui .workspace-layout { grid-template-columns: 228px minmax(0, 1fr); gap: 0; align-items: start; max-width: none; }
+.app-shell.professional-ui .left-taskbar {
+  border: 0 !important; border-right: 1px solid #253b48 !important; border-radius: 0;
+  background: #11232f !important; color: #e7f0f4; padding: 25px 16px 15px;
+  position: sticky; top: var(--global-banner-offset); height: calc(100dvh - var(--global-banner-offset));
+  overflow-y: auto; overflow-x: visible; gap: 17px; box-shadow: none !important;
+  --text-primary: #edf3f6; --text-secondary: #9db1bf; --text-muted: #839dac;
+  --card-bg: #172e3d; --bg-panel: #172e3d; --panel-strong: #172e3d; --card-border: #294250; --accent: #8bd5c5;
+  --text: #edf3f6; --muted: #9db1bf; --panel: #172e3d; --panel-soft: #1a3444;
+}
+.left-taskbar .academy-brand { display: flex; align-items: center; gap: 10px; padding: 3px 9px 25px; border-bottom: 1px solid #ffffff12; margin-bottom: 3px; }
+.left-taskbar .academy-brand > svg { height: 34px; width: 30px; color: #a4d5ce; }
+.left-taskbar .academy-brand > span { display: flex; flex-direction: column; }
+.left-taskbar .academy-brand strong { color: #f0f6f7; font-size: 16px; letter-spacing: -.025em; font-weight: 600; line-height: 1.4; }
+.left-taskbar .academy-brand small { color: #8fa7b5; font-size: 8px; letter-spacing: .16em; font-weight: 500; }
+.app-shell.professional-ui .left-taskbar .taskbar-section { border: 0; padding: 0; margin: 0; gap: 4px; }
+.app-shell.professional-ui .left-taskbar .taskbar-nav-btn, .app-shell.professional-ui .left-taskbar .taskbar-sub-btn {
+  border: 0 !important; color: #a9bdc9 !important; font-size: 12px; font-weight: 450;
+  min-height: 41px; padding: 10px 13px; border-radius: 7px; gap: 12px; line-height: 1.35;
+}
+.app-shell.professional-ui .left-taskbar .taskbar-nav-btn.active,
+.app-shell.professional-ui .left-taskbar .taskbar-sub-btn.active { background: #b4e6d615 !important; color: #b6e3d9 !important; box-shadow: none !important; }
+.app-shell.professional-ui .left-taskbar .taskbar-nav-btn:hover,
+.app-shell.professional-ui .left-taskbar .taskbar-sub-btn:hover { background: #ffffff08 !important; color: #ecf6f6 !important; }
+.professional-ui .taskbar-icon { width: 18px; height: 18px; }
+.app-shell.professional-ui .left-taskbar .taskbar-label { color: #758f9e; font-size: 8px; letter-spacing: .14em; font-weight: 650; }
+.app-shell.professional-ui .left-taskbar .taskbar-section-toggle { padding: 8px 13px 4px; }
+.app-shell.professional-ui .left-taskbar .taskbar-section-chevron { font-size: 11px; color: #718c9d; }
+.app-shell.professional-ui .left-taskbar .taskbar-sub-btn { min-height: 32px; font-size: 11px; padding: 7px 13px 7px 29px; }
+.professional-ui .taskbar-sub-icon { width: 14px; height: 14px; }
+.app-shell.professional-ui .left-taskbar .taskbar-submenu { border: 0; padding: 0; gap: 2px; }
+.professional-ui .taskbar-profile-wrap { border-top: 1px solid #ffffff12; padding-top: 16px; margin-top: auto; }
+.app-shell.professional-ui .left-taskbar .taskbar-profile { background: transparent !important; border: 0 !important; border-radius: 8px; padding: 7px; box-shadow: none !important; gap: 10px; }
+.professional-ui .taskbar-profile-name { font-size: 12px; }
+.professional-ui .taskbar-profile-tier { font-size: 9px; color: #88a6b7; }
+.professional-ui .taskbar-xp-meta { font-size: 8px; margin-top: 3px; color: #8ca7b7; }
+.professional-ui .taskbar-xp-track { height: 3px; margin-top: 5px; }
+.professional-ui .taskbar-xp-fill { background: #71bba9; }
+.professional-ui .taskbar-online-indicator { background: transparent !important; border-color: #2b4351 !important; padding: 10px 12px; font-size: 10px; color: #a3bdcb; border-radius: 7px; }
+.professional-ui .taskbar-online-indicator .online-count { font-size: 12px; }
+.professional-ui .workspace-main { padding: 31px 36px 22px; width: 100%; }
+.professional-ui .content-area { padding: 0; width: 100%; min-width: 0; max-width: 1400px; margin-inline: auto; }
+.professional-ui .app-page-header { padding: 0 0 25px; margin-bottom: 4px; background: transparent; border: 0; box-shadow: none; }
+.professional-ui .app-page-header h1 { font-size: 30px; font-weight: 650; letter-spacing: -.04em; }
+.professional-ui .class-status-chip { background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-secondary); font-size: 11px; border-radius: 6px; }
+.professional-ui .card, .professional-ui .settings-section-card, .professional-ui .section-row,
+.professional-ui .stats-card, .professional-ui .class-card, .professional-ui .class-workspace-hero,
+.professional-ui .leaderboard-card, .professional-ui .class-request-card {
+  background: var(--card-bg) !important; border: 1px solid var(--card-border) !important;
+  border-radius: 12px; box-shadow: 0 2px 4px #122b3903 !important;
+}
+.professional-ui .card h2, .professional-ui .card h3, .professional-ui .settings-section-card h3 { font-weight: 650; letter-spacing: -.025em; }
+.professional-ui .card h3 { font-size: 17px; }
+.professional-ui .muted { color: var(--text-secondary); line-height: 1.7; }
+.professional-ui .eyebrow { font-size: 10px; letter-spacing: .11em; font-weight: 650; color: var(--text-muted); }
+.professional-ui .primary { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; border-radius: 8px; box-shadow: none !important; font-weight: 600; min-height: 42px; }
+.professional-ui:not(.ui-light-mode) .primary { color: #102e28 !important; }
+.professional-ui .primary:hover:not(:disabled) { filter: brightness(.94); transform: none; }
+.professional-ui .secondary { background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; color: var(--text-primary) !important; border-radius: 8px; box-shadow: none !important; font-weight: 500; }
+.professional-ui .secondary:hover:not(:disabled) { border-color: var(--accent) !important; background: var(--panel-soft) !important; transform: none; }
+.professional-ui button:disabled { cursor: not-allowed; opacity: .48; }
+.professional-ui input, .professional-ui select, .professional-ui textarea { background: var(--card-bg) !important; border: 1px solid var(--card-border) !important; border-radius: 8px; color: var(--text-primary) !important; box-shadow: none !important; min-height: 43px; font-size: 14px; }
+.professional-ui input[type='checkbox'], .professional-ui input[type='radio'], .professional-ui input[type='range'] { min-height: auto; }
+.professional-ui input::placeholder, .professional-ui textarea::placeholder { color: var(--text-muted); opacity: .85; }
+.professional-ui label { color: var(--text-primary); font-weight: 500; font-size: 12px; }
+.professional-ui :is(button, a, input, select, textarea, summary):focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 65%, transparent); outline-offset: 3px; }
+.professional-ui .segmented { background: var(--panel-soft); border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; }
+.professional-ui .seg { border-radius: 5px; font-size: 12px; font-weight: 500; }
+.professional-ui .seg.active { background: var(--card-bg); color: var(--accent); box-shadow: 0 1px 3px #16333c0d; }
+.professional-ui .settings-nav-btn.active { color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 8%, var(--card-bg)) !important; border-color: transparent !important; }
+.professional-ui .home-section { display: grid; gap: 22px; }
+.professional-ui .home-class-activity { border: 1px solid var(--card-border); border-radius: 11px; background: var(--card-bg); max-width: 1300px; width: 100%; margin-inline: auto; }
+.professional-ui .home-class-activity > summary { display: flex; align-items: center; gap: 11px; padding: 17px 20px; cursor: pointer; font-size: 12px; font-weight: 600; list-style: none; }
+.professional-ui .home-class-activity > summary::-webkit-details-marker { display: none; }
+.professional-ui .home-class-activity > summary::after { content: '+'; margin-left: auto; font-size: 19px; color: var(--text-muted); font-weight: 400; }
+.professional-ui .home-class-activity[open] > summary::after { content: '−'; }
+.professional-ui .home-class-activity > summary > small { font-size: 10px; font-weight: 400; color: var(--text-muted); }
+.professional-ui .home-class-activity-content { display: grid; gap: 18px; padding: 0 18px 18px; }
+.professional-ui .home-hero { padding: 23px; }
+.professional-ui .home-hero h2 { font-size: 25px; }
+.professional-ui .home-hero .home-quote-line { font-size: 13px; color: var(--text-secondary); }
+.professional-ui .home-guidance-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.professional-ui .home-guidance-grid .home-guidance-card:nth-child(3) { grid-column: auto; }
+.professional-ui .home-leaderboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.professional-ui .leader-row { border-radius: 7px; border-color: var(--card-border); }
+.professional-ui .leader-row-button:hover { transform: none; }
+.professional-ui .onboarding-overlay { background: var(--bg-main); }
+.professional-ui .academy-welcome { --card-bg: var(--onboarding-paper); --card-border: var(--onboarding-line); --text-primary: var(--onboarding-ink); --text-secondary: var(--onboarding-muted); --text-muted: var(--onboarding-muted); --panel-soft: var(--onboarding-bg); color-scheme: light; }
+.professional-ui .academy-welcome .academy-secondary { background: var(--onboarding-paper) !important; color: var(--onboarding-ink) !important; border-color: var(--onboarding-line) !important; }
+.professional-ui:not(.ui-light-mode) .academy-welcome { --onboarding-accent: #79cdbd; color-scheme: dark; }
+.professional-ui:not(.ui-light-mode) .academy-welcome .academy-primary { color: #102e28 !important; }
+.professional-ui .onboarding-card { background: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 12px 50px #1426320a; border-radius: 16px; }
+.professional-ui .class-join-onboarding-overlay { background: var(--bg-main); min-height: 100dvh; }
+.professional-ui .class-page .panel-block { gap: 14px; padding: 0; }
+.professional-ui .class-page .panel-block > h1, .professional-ui .class-page .panel-block > h2 { font-size: 22px; line-height: 1.4; font-weight: 600; letter-spacing: -.03em; margin: 0 0 3px; }
+.professional-ui .class-page .panel-block > .eyebrow { margin: 0; }
+.professional-ui .class-page { gap: 30px; }
+.professional-ui .class-card { gap: 9px; padding: 21px; }
+.professional-ui .class-card h3 { font-size: 16px; line-height: 1.5; margin: 0; font-weight: 600; }
+.professional-ui .class-card p { margin: 0; font-size: 12px; line-height: 1.65; }
+.professional-ui .class-card .button-row, .professional-ui .class-card > button { margin-top: 9px; }
+.professional-ui .join-request-box { background: var(--card-bg); border: 1px solid var(--card-border); padding: 21px; border-radius: 12px; }
+.professional-ui .department-chip-list > span { background: var(--panel-soft); border: 1px solid var(--card-border); color: var(--text-secondary); border-radius: 5px; font-size: 11px; padding: 5px 8px; }
+.professional-ui .study-action-card, .professional-ui .game-mode-card { border-radius: 12px; }
+.professional-ui .study-action-icon { border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--card-bg)); color: var(--accent); }
+.professional-ui .study-action-card:hover { border-color: var(--accent) !important; transform: translateY(-2px); }
+.professional-ui .stats-highlight, .professional-ui .stats-item, .professional-ui .stats-focus-card { background: var(--card-bg); border-color: var(--card-border); border-radius: 10px; }
+.professional-ui .global-owner-banner { border-radius: 0; margin: 0; }
+.professional-ui .global-chat-shell { border-color: var(--card-border); box-shadow: 0 12px 45px #081f3222; }
+.professional-skip-link { position: fixed; left: 245px; top: -80px; z-index: 9999; background: var(--card-bg); color: var(--accent); border: 1px solid var(--accent); padding: 10px 16px; border-radius: 8px; }
+.professional-skip-link:focus { top: 12px; }
+@media (min-width: 1600px) { .professional-ui .workspace-main { padding: 40px 50px 28px; } }
+@media (max-width: 1200px) { .professional-ui .workspace-main { padding: 27px 25px 20px; } .professional-ui .workspace-layout { grid-template-columns: 209px minmax(0, 1fr); } .app-shell.professional-ui .left-taskbar { padding-inline: 12px; } }
+@media (max-width: 980px) and (min-width: 761px) { .professional-ui .workspace-layout { grid-template-columns: 187px minmax(0, 1fr); } .app-shell.professional-ui .left-taskbar { display: flex; } .professional-ui .workspace-main { padding: 25px 22px; } .left-taskbar .academy-brand { gap: 7px; padding-inline: 7px; } .left-taskbar .academy-brand strong { font-size: 14px; } .left-taskbar .academy-brand small { font-size: 7px; } .professional-ui .home-guidance-grid { grid-template-columns: 1fr; } .professional-ui .home-leaderboard-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .professional-ui .workspace-layout { grid-template-columns: 1fr; display: block; }
+  .app-shell.professional-ui .left-taskbar { display: none; }
+  .professional-ui .workspace-main { padding: 24px 18px calc(91px + env(safe-area-inset-bottom)); }
+  .professional-ui .mobile-quick-strip { display: none !important; }
+  .professional-ui .mobile-bottom-nav { background: var(--card-bg) !important; border-top: 1px solid var(--card-border); box-shadow: 0 -3px 15px #152e3d06; backdrop-filter: none; }
+  .professional-ui .mobile-bottom-tab { color: var(--text-muted) !important; font-size: 9px; border: 0 !important; border-radius: 8px; min-height: 47px; }
+  .professional-ui .mobile-bottom-tab.active { background: color-mix(in srgb, var(--accent) 7%, var(--card-bg)) !important; color: var(--accent) !important; }
+  .professional-ui .home-guidance-grid, .professional-ui .home-leaderboard-grid { grid-template-columns: 1fr; }
+  .professional-ui .home-class-activity > summary { flex-wrap: wrap; gap: 3px 10px; }
+  .professional-ui .home-class-activity > summary > small { display: none; }
+  .professional-ui .home-class-activity-content { padding: 0 12px 12px; }
+  .professional-ui .app-page-header h1 { font-size: 27px; }
+  .professional-ui .app-page-header { padding-bottom: 20px; }
+  .professional-skip-link { left: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .professional-ui *, .professional-ui *::before, .professional-ui *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

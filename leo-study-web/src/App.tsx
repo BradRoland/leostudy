@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { FireFlame, type FireFlameOption } from '@9am/fire-flame-react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { Analytics } from '@vercel/analytics/react'
 import './App.css'
+import './Professional.css'
+import { AcademyMark, HomeDashboard } from './components/HomeDashboard'
 import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem, type ScenarioBankSubQuestion, type ScenarioTrainingSection } from './content'
 import { useOwner } from './hooks/useOwner'
 import { useClassWorkspace } from './hooks/useClassWorkspace'
@@ -12,6 +14,8 @@ import { OneVsOnePanel } from './components/OneVsOnePanel'
 import { DuelInviteBanner } from './components/DuelInviteBanner'
 import { GlobalChatWidget } from './components/GlobalChatWidget'
 import { ClassWorkspacePages } from './components/ClassWorkspacePages'
+import { AuthEntry, PasswordRecovery } from './components/AuthOnboarding'
+import { requiresAccountProfileCompletion, splitProfileName, safeAuthNextPath, sanitizeStudyFocus, sanitizeStudyGoal, validateClassRequest, validateOnboardingProfile, type OnboardingProfile, type StudyFocus } from './lib/onboarding'
 import { OwnerAdminPanel } from './components/OwnerAdminPanel'
 import { StudyGuidePage } from './components/StudyGuidePage'
 import { StudyPracticeTestPage } from './components/StudyPracticeTestPage'
@@ -20,7 +24,6 @@ import {
   createClassJoinCode,
   deleteClassDepartment,
   loadClassDepartments,
-  notifyDiscordForClassRequest,
   renameClassDepartment,
   submitClassCreationRequest,
   updateOwnClassDepartment,
@@ -443,6 +446,11 @@ type ContentEditorItem = {
 }
 
 type ProfileDetails = {
+  firstName: string
+  lastName: string
+  dailyGoalMinutes: number
+  studyFocus: StudyFocus
+  onboardingCompleted: boolean
   bio: string
   agency: string
   displayMode: DisplayMode
@@ -1171,7 +1179,7 @@ function loadTaskbarCollapsedGroups() {
   if (typeof window === 'undefined') {
     return {
       study: false,
-      games: false,
+      games: true,
     }
   }
 
@@ -1180,7 +1188,7 @@ function loadTaskbarCollapsedGroups() {
     if (!raw) {
       return {
         study: false,
-        games: false,
+        games: true,
       }
     }
 
@@ -1192,7 +1200,7 @@ function loadTaskbarCollapsedGroups() {
   } catch {
     return {
       study: false,
-      games: false,
+      games: true,
     }
   }
 }
@@ -1284,9 +1292,9 @@ function readPendingClassRequestDraft(): ClassCreationRequestInput | null {
     const departments = Array.isArray(payload.departments) ? payload.departments.map((department) => String(department).trim()).filter(Boolean) : []
     if (!payload.className || departments.length === 0) return null
     return {
-      academyName: fixedClassRequestAcademy.name,
-      academyCity: fixedClassRequestAcademy.city,
-      academyState: fixedClassRequestAcademy.state,
+      academyName: String(payload.academyName || fixedClassRequestAcademy.name),
+      academyCity: String(payload.academyCity || ''),
+      academyState: String(payload.academyState || ''),
       className: String(payload.className || '').trim(),
       startDate: payload.startDate || '',
       endDate: payload.endDate || '',
@@ -1321,7 +1329,7 @@ function buildAuthRedirectTo(nextPath = '/home') {
   const baseUrl = getAuthRedirectBaseUrl()
   if (!baseUrl) return undefined
   const redirectUrl = new URL(authCallbackPath, `${baseUrl}/`)
-  const normalizedNextPath = normalizeRoutePath(nextPath)
+  const normalizedNextPath = safeAuthNextPath(nextPath)
   if (normalizedNextPath && normalizedNextPath !== authCallbackPath && typeof window !== 'undefined') {
     try {
       window.localStorage.setItem(authCallbackNextPathKey, normalizedNextPath)
@@ -1329,12 +1337,13 @@ function buildAuthRedirectTo(nextPath = '/home') {
       // Storage can be unavailable in hardened browser modes.
     }
   }
+  redirectUrl.searchParams.set('next', normalizedNextPath)
   return redirectUrl.toString()
 }
 
 function rememberAuthNextPath(nextPath: string) {
   if (typeof window === 'undefined') return
-  const normalizedNextPath = normalizeRoutePath(nextPath)
+  const normalizedNextPath = safeAuthNextPath(nextPath)
   if (!normalizedNextPath || normalizedNextPath === authCallbackPath || normalizedNextPath === '/signin' || normalizedNextPath === '/signup') return
   try {
     window.localStorage.setItem(authCallbackNextPathKey, normalizedNextPath)
@@ -1348,7 +1357,7 @@ function takeAuthNextPath(fallback = '/home') {
   try {
     const stored = window.localStorage.getItem(authCallbackNextPathKey) || ''
     window.localStorage.removeItem(authCallbackNextPathKey)
-    const normalized = normalizeRoutePath(stored || fallback)
+    const normalized = safeAuthNextPath(stored || fallback, fallback)
     if (normalized === authCallbackPath || normalized === '/signin' || normalized === '/signup') return fallback
     return normalized.startsWith('/') ? normalized : fallback
   } catch {
@@ -1367,7 +1376,7 @@ function getAuthCallbackNextPath(search: string) {
     }
   }
   const nextPath = new URLSearchParams(search).get('next') || storedNextPath || '/home'
-  const normalized = normalizeRoutePath(nextPath)
+  const normalized = safeAuthNextPath(nextPath)
   if (normalized === authCallbackPath || normalized === '/signin' || normalized === '/signup') return '/home'
   return normalized.startsWith('/') ? normalized : '/home'
 }
@@ -3491,9 +3500,10 @@ function sanitizeState(input: unknown): PersistedState {
     highScores: gameHighScoreSeed,
     bestStreak: 0,
     profileDetails: {
+      firstName: '', lastName: '', dailyGoalMinutes: 15, studyFocus: 'balanced', onboardingCompleted: false,
       bio: '',
       agency: defaultAgency,
-      displayMode: 'dark',
+      displayMode: 'light',
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
       themeId: appThemePresets[0].id,
@@ -3518,6 +3528,11 @@ function sanitizeState(input: unknown): PersistedState {
     profileDetails:
       state.profileDetails && typeof state.profileDetails === 'object'
         ? {
+            firstName: String(state.profileDetails.firstName || ''),
+            lastName: String(state.profileDetails.lastName || ''),
+            dailyGoalMinutes: sanitizeStudyGoal(state.profileDetails.dailyGoalMinutes),
+            studyFocus: sanitizeStudyFocus(state.profileDetails.studyFocus),
+            onboardingCompleted: state.profileDetails.onboardingCompleted === true,
             bio: String((state.profileDetails as Partial<ProfileDetails>).bio || ''),
             agency: String((state.profileDetails as Partial<ProfileDetails>).agency || ''),
             displayMode: sanitizeDisplayMode((state.profileDetails as Partial<ProfileDetails>).displayMode),
@@ -3538,9 +3553,10 @@ function sanitizeState(input: unknown): PersistedState {
                 : undefined,
           }
         : {
+            firstName: '', lastName: '', dailyGoalMinutes: 15, studyFocus: 'balanced', onboardingCompleted: false,
             bio: '',
             agency: defaultAgency,
-            displayMode: 'dark',
+            displayMode: 'light',
             homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
             homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
             themeId: appThemePresets[0].id,
@@ -4603,7 +4619,7 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
 function App() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [routePath, setRoutePath] = useState(() => normalizeRoutePath(location.pathname))
+  const routePath = normalizeRoutePath(location.pathname)
 
   const [sections, setSections] = useState<CodeSection[]>([])
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
@@ -4644,12 +4660,11 @@ function App() {
   const [libraryFilter, setLibraryFilter] = useState<CodeSet>('penal')
 
   const [authReady, setAuthReady] = useState(false)
+  const authNavigationTargetRef = useRef<string | null>(null)
+  const [passwordRecovery, setPasswordRecovery] = useState(() => new URLSearchParams(window.location.search).get('recovery') === '1' || /(?:[?#&])type=recovery(?:&|$)/.test(window.location.href))
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
   const [authPasswordConfirm, setAuthPasswordConfirm] = useState('')
-  const [showSignInPassword, setShowSignInPassword] = useState(false)
-  const [showSignUpPassword, setShowSignUpPassword] = useState(false)
-  const [showSignUpPasswordConfirm, setShowSignUpPasswordConfirm] = useState(false)
   const [profileUsername, setProfileUsername] = useState('')
   const [profileAvatar, setProfileAvatar] = useState<File | null>(null)
   const [profileAvatarPreviewUrl, setProfileAvatarPreviewUrl] = useState('')
@@ -4892,7 +4907,8 @@ function App() {
   const [pendingSavedClassRequest, setPendingSavedClassRequest] = useState<ClassCreationRequestInput | null>(() => readPendingClassRequestDraft())
   const [authInviteOpen, setAuthInviteOpen] = useState(false)
   const [authInviteCode, setAuthInviteCode] = useState('')
-  const [pendingClassSubmission, setPendingClassSubmission] = useState(false)
+  const pendingClassSubmissionRef = useRef(false)
+  const onboardingDetailsRef = useRef<ProfileDetails | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileHydrated, setProfileHydrated] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile')
@@ -4929,9 +4945,10 @@ function App() {
   const [ownerBugReportsSuccess, setOwnerBugReportsSuccess] = useState('')
   const [forceProfileSetup, setForceProfileSetup] = useState(false)
   const [profileDetails, setProfileDetails] = useState<ProfileDetails>({
+    firstName: '', lastName: '', dailyGoalMinutes: 15, studyFocus: 'balanced', onboardingCompleted: false,
     bio: '',
     agency: defaultAgency,
-    displayMode: 'dark',
+    displayMode: 'light',
     homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
     homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
     themeId: appThemePresets[0].id,
@@ -7194,6 +7211,7 @@ function App() {
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') { setPasswordRecovery(true); setAuthError(''); setAuthSuccess('') }
       const shouldHoldEmptyRedirectSession =
         waitingForRedirectSession &&
         !session?.user &&
@@ -7466,6 +7484,7 @@ function App() {
       const profileBio = String(effectiveProfileRow?.bio || '')
       const profileAgency = String(effectiveProfileRow?.agency || '')
       const hydratedProfileDetails: ProfileDetails = {
+        ...nextState.profileDetails,
         bio: profileBio || nextState.profileDetails.bio,
         agency: profileAgency || nextState.profileDetails.agency,
         displayMode: nextState.profileDetails.displayMode,
@@ -7628,6 +7647,7 @@ function App() {
             writeCachedProfileUsername(currentUserId, mapped.username)
           }
           setProfileDetails((previous) => ({
+            ...previous,
             bio: String(row.bio || ''),
             agency: String(row.agency || ''),
             displayMode: previous.displayMode,
@@ -10274,8 +10294,14 @@ function App() {
     nextScenarioQuestion([])
   }, [nextScenarioQuestion, scenarioTrainingSection, scenarioItems])
 
+  const navigateAfterAuth = useCallback((path: string) => {
+    // React Router may commit navigation after urgent auth state. Preserve the destination until that commit.
+    authNavigationTargetRef.current = path
+    navigate(path, { replace: true })
+  }, [navigate])
+
   const submitSignIn = async () => {
-    if (!supabase) return
+    if (!supabase || authLoading) return
     const normalizedEmail = authEmail.trim().toLowerCase()
     if (!normalizedEmail) {
       setAuthError('Enter an email address.')
@@ -10291,6 +10317,7 @@ function App() {
     setProfileHydrated(false)
     setStateHydrated(false)
 
+    try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password: authPassword,
@@ -10300,6 +10327,24 @@ function App() {
       setAuthError(error.message)
       setAuthLoading(false)
       return
+    }
+
+    if (data.user && window.localStorage.getItem(pendingClassRequestSubmitKey) === '1') {
+      const savedRequest = readPendingClassRequestDraft()
+      if (savedRequest) {
+        try {
+          await submitClassCreationRequest(savedRequest)
+          window.localStorage.removeItem(pendingClassRequestKey)
+          window.localStorage.removeItem(pendingClassRequestSubmitKey)
+          setPendingSavedClassRequest(null)
+          await finishClassRequestPendingApproval()
+        } catch (requestError) {
+          window.localStorage.removeItem(pendingClassRequestSubmitKey)
+          setAuthError(requestError instanceof Error ? requestError.message : 'Your class request could not be submitted. Please retry.')
+          navigateAfterAuth('/classes/request')
+        }
+        return
+      }
     }
 
     if (data.user) {
@@ -10325,10 +10370,9 @@ function App() {
 
       if (pendingClassRequest?.id && !activeClassMembership?.id) {
         await supabase.auth.signOut()
-        setAuthError('Still pending approval from owner.')
+        setAuthError('Your class request is awaiting owner approval. We’ll email you when it’s ready.')
         setAuthLoading(false)
-        setRoutePath('/signin')
-        navigate('/signin', { replace: true })
+        navigateAfterAuth('/signin')
         return
       }
 
@@ -10341,7 +10385,10 @@ function App() {
     }
 
     setAuthLoading(false)
-    navigate(takeAuthNextPath('/home'), { replace: true })
+    navigateAfterAuth(takeAuthNextPath('/home'))
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not sign in. Check your connection and try again.')
+    } finally { setAuthLoading(false) }
   }
 
   const submitAuthClassRequestDraft = async () => {
@@ -10365,12 +10412,11 @@ function App() {
 
     setAuthLoading(true)
     try {
-      const requestId = await submitClassCreationRequest(payload)
-      await notifyDiscordForClassRequest(requestId)
+      await submitClassCreationRequest(payload)
       window.localStorage.removeItem(pendingClassRequestKey)
       setAuthClassRequestOpen(false)
       setAuthClassRequestDraft({ ...emptyAuthClassRequestDraft })
-      setAuthSuccess('Class request sent to the owner.')
+      setAuthSuccess('Your request is saved. We’ll email you when it’s approved.')
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Could not send class request.')
     } finally {
@@ -10396,6 +10442,9 @@ function App() {
   }, [navigate])
 
   const finishClassRequestPendingApproval = useCallback(async () => {
+    setAuthLoading(true)
+    window.localStorage.removeItem(authCallbackNextPathKey)
+    navigateAfterAuth('/signin')
     if (supabase) await supabase.auth.signOut()
     setCurrentUserId('')
     setCurrentUserEmail('')
@@ -10405,9 +10454,10 @@ function App() {
     setProfileHydrated(false)
     setStateHydrated(false)
     setForceProfileSetup(false)
-    setAuthSuccess('Your request was sent. You are not approved yet. Come back later.')
-    navigate('/signin', { replace: true })
-  }, [navigate])
+    setAuthError('')
+    setAuthSuccess('Your request is saved. We’ll email you when it’s approved, and you’ll become your class admin.')
+    setAuthLoading(false)
+  }, [navigateAfterAuth])
 
   const continueInviteAfterAuth = useCallback((code: string, authMode: 'signin' | 'signup') => {
     const normalized = normalizeInviteCode(code)
@@ -10453,160 +10503,150 @@ function App() {
     }
   }
 
-  const handleSignInEnterKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter') return
-    event.preventDefault()
-    if (authLoading) return
-    void submitSignIn()
-  }
-
   const submitSignUp = async () => {
-    if (!supabase) return
+    if (!supabase || authLoading) return
     const normalizedEmail = authEmail.trim().toLowerCase()
-    const normalizedUsername = profileUsername.trim()
     const pendingClassRequest = isClassRequestSignUpPage ? pendingSavedClassRequest || readPendingClassRequestDraft() : null
-    if (authPassword !== authPasswordConfirm) {
-      setAuthError('Passwords do not match.')
-      return
-    }
-    if (!normalizedEmail) {
-      setAuthError('Enter an email address.')
-      return
-    }
-    if (!normalizedUsername) {
-      setAuthError('Enter a username.')
-      return
-    }
-    if (pendingClassRequest?.departments?.length && !pendingClassRequest.requesterDepartment) {
-      setAuthError('Choose your department for the saved class request.')
-      return
+    const normalizedUsername = isClassRequestSignUpPage ? profileUsername.trim() : `Cadet ${crypto.randomUUID().slice(0, 8)}`
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) { setAuthError('Enter a valid email address.'); return }
+    if (authPassword.length < 8) { setAuthError('Use a password with at least 8 characters.'); return }
+    if (authPassword !== authPasswordConfirm) { setAuthError('Passwords do not match.'); return }
+    if (isClassRequestSignUpPage && (!pendingClassRequest || !normalizedUsername)) { setAuthError('Add your class details and full name first.'); return }
+    if (pendingClassRequest) {
+      const requestError = validateClassRequest(pendingClassRequest)
+      if (requestError) { setAuthError(requestError); return }
+      if (!pendingClassRequest.requesterDepartment) { setAuthError('Choose your department.'); return }
     }
     setAuthLoading(true)
     setAuthError('')
     setAuthSuccess('')
     window.localStorage.removeItem(pendingProfileSetupKey)
     window.localStorage.removeItem(pendingClassRequestSubmitKey)
-
-    const createResponse = await fetch('/api/auth/create-account', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        email: normalizedEmail,
-        password: authPassword,
-        username: normalizedUsername,
-      }),
-    })
-
-    if (!createResponse.ok) {
-      const payload = await createResponse.json().catch(() => null)
-      const rawMessage = String(payload?.error || 'Could not create account.')
-      const message = rawMessage.toLowerCase()
-      if (message.includes('already registered') || message.includes('already exists')) {
-        setAuthError('This email is already in use. If you used Google before, sign in with Google.')
-      } else {
-        setAuthError(rawMessage)
+    try {
+      const createResponse = await fetch('/api/auth/create-account', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password: authPassword, username: normalizedUsername }),
+      })
+      if (!createResponse.ok) {
+        const payload = await createResponse.json().catch(() => null)
+        const message = String(payload?.error || 'Could not create account.')
+        throw new Error(/already registered|already exists/i.test(message) ? 'This email is already in use. Sign in to continue, or use Google if that’s how you created your account.' : message)
       }
-      setAuthLoading(false)
-      return
-    }
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password: authPassword,
-    })
-
-    if (error) {
-      setAuthError(error.message)
-      setAuthLoading(false)
-      return
-    }
-
-    if (isClassRequestSignUpPage && pendingClassRequest && data.user) {
-      try {
-        const { error: profileCreateError } = await supabase
-          .from('profiles')
-          .upsert(
-            {
-              user_id: data.user.id,
-              username: normalizedUsername,
-              supporter_tier: 'free',
-              bio: '',
-              agency: defaultAgency,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'user_id' },
-          )
-        if (profileCreateError) throw profileCreateError
-
-        const { error: stateCreateError } = await supabase
-          .from('app_state')
-          .upsert(
-            {
-              user_id: data.user.id,
-              performance: {},
-              high_scores: gameHighScoreSeed,
-              best_streak: 0,
-              profile_details: {
-                ...sanitizeState(null).profileDetails,
-                agency: defaultAgency,
-              },
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'user_id' },
-          )
-        if (stateCreateError) throw stateCreateError
-
-        const requestId = await submitClassCreationRequest(pendingClassRequest)
-        await notifyDiscordForClassRequest(requestId)
-        window.localStorage.removeItem(pendingClassRequestKey)
-        window.localStorage.removeItem(pendingClassRequestSubmitKey)
-        setPendingSavedClassRequest(null)
-        setAuthClassRequestDraft({ ...emptyAuthClassRequestDraft })
-        await supabase.auth.signOut()
-        setCurrentUserId('')
-        setCurrentUserEmail('')
-        setCurrentUserProvider('email')
-        setCurrentUserMetadata({})
-        setProfile(null)
-        setProfileHydrated(false)
-        setStateHydrated(false)
-        setForceProfileSetup(false)
-        setAuthPassword('')
-        setAuthPasswordConfirm('')
-        setShowSignUpPassword(false)
-        setShowSignUpPasswordConfirm(false)
-        setAuthSuccess('Your request was sent. Come back in 24 hours to see your results.')
-        navigate('/signin', { replace: true })
-      } catch (classRequestError) {
-        setAuthError(classRequestError instanceof Error ? classRequestError.message : 'Could not send class request.')
-      } finally {
-        setAuthLoading(false)
+      window.localStorage.setItem(pendingProfileUsernameKey, normalizedUsername)
+      window.localStorage.setItem(pendingProfileEmailKey, normalizedEmail)
+      const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password: authPassword })
+      if (error) {
+        if (pendingClassRequest) window.localStorage.setItem(pendingClassRequestSubmitKey, '1')
+        rememberAuthNextPath('/classes/join')
+        navigateAfterAuth('/signin')
+        throw new Error(`Your account was created. Sign in to continue. ${error.message}`)
       }
-      return
+      if (pendingClassRequest && data.user) {
+        try {
+          await submitClassCreationRequest(pendingClassRequest)
+          window.localStorage.removeItem(pendingClassRequestKey)
+          window.localStorage.removeItem(pendingClassRequestSubmitKey)
+          setPendingSavedClassRequest(null)
+          setAuthClassRequestDraft({ ...emptyAuthClassRequestDraft })
+          await finishClassRequestPendingApproval()
+        } catch (requestError) {
+          // Keep the saved request and signed-in session so submission can be retried.
+          setAuthError(requestError instanceof Error ? requestError.message : 'Account created, but the class request could not be submitted. Please retry.')
+          navigateAfterAuth('/classes/request')
+        }
+        return
+      }
+      window.localStorage.setItem(pendingClassSelectionKey, '1')
+      setForceProfileSetup(false)
+      setAuthEmail(normalizedEmail)
+      setProfileUsername(normalizedUsername)
+      if (data.user) {
+        setCurrentUserId(data.user.id)
+        setCurrentUserEmail(data.user.email || '')
+        setCurrentUserProvider(String(data.user.app_metadata?.provider || 'email'))
+        setCurrentUserMetadata((data.user.user_metadata || {}) as AuthUserMetadata)
+        setAuthSessionVersion((version) => version + 1)
+      }
+      const savedInvite = window.localStorage.getItem(pendingInviteCodeKey)
+      navigateAfterAuth(savedInvite ? `/invite/${savedInvite}` : '/classes/join')
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not create your account. Check your connection and try again.')
+    } finally {
+      setAuthPassword('')
+      setAuthPasswordConfirm('')
+      setAuthLoading(false)
     }
+  }
 
-    window.localStorage.setItem(pendingClassSelectionKey, '1')
-    window.localStorage.setItem(pendingProfileUsernameKey, normalizedUsername)
-    window.localStorage.setItem(pendingProfileEmailKey, normalizedEmail)
-    window.localStorage.setItem('pending_dev_notice', '1')
+  const sendPasswordReset = async () => {
+    if (!supabase || authLoading) return
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authEmail.trim())) { setAuthError('Enter your account email first.'); return }
+    setAuthLoading(true)
+    setAuthError('')
+    setAuthSuccess('')
+    try {
+      const recoveryRedirect = new URL(buildAuthRedirectTo('/profile') || window.location.origin)
+      recoveryRedirect.searchParams.set('recovery', '1')
+      const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim().toLowerCase(), { redirectTo: recoveryRedirect.toString() })
+      if (error) throw error
+      setAuthSuccess('If an account uses this email, a password reset link is on its way. Open it to choose a new password.')
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not send the reset link. Please try again.')
+    } finally { setAuthLoading(false) }
+  }
+
+  const completePasswordRecovery = async (password: string) => {
+    if (!supabase || authLoading) return
+    setAuthLoading(true)
+    setAuthError('')
+    try {
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) throw error
+      setPasswordRecovery(false)
+      setAuthSuccess('Your password has been updated.')
+      navigateAfterAuth('/home')
+    } catch (error) { setAuthError(error instanceof Error ? error.message : 'Could not update your password. Please try again.') }
+    finally { setAuthLoading(false) }
+  }
+
+  const saveOnboardingProfile = async (input: OnboardingProfile) => {
+    if (!supabase || !currentUserId || !stateHydrated || !profileHydrated) throw new Error('Your account is still loading. Please try again in a moment.')
+    const validationError = validateOnboardingProfile(input)
+    if (validationError) throw new Error(validationError)
+    const displayName = input.displayName.trim() || `${input.firstName.trim()} ${input.lastName.trim()}`
+    const { data: existing, error: lookupError } = await supabase.from('profiles').select('user_id').ilike('username', displayName).neq('user_id', currentUserId).limit(1).maybeSingle()
+    if (lookupError) throw new Error('We couldn’t check your display name. Please try again.')
+    if (existing) throw new Error('That display name is already taken. Go back and choose a different display name.')
+    let avatarPath = profile?.avatarPath || ''
+    if (input.avatar) {
+      const extension = input.avatar.type === 'image/png' ? 'png' : input.avatar.type === 'image/webp' ? 'webp' : 'jpg'
+      const path = `${currentUserId}/${crypto.randomUUID()}.${extension}`
+      const { error } = await supabase.storage.from(avatarBucket).upload(path, input.avatar, { upsert: false, contentType: input.avatar.type })
+      if (error) throw new Error('Your photo could not be uploaded. Try a smaller image or continue without one.')
+      avatarPath = path
+    }
+    const nextDetails: ProfileDetails = { ...profileDetails, firstName: input.firstName.trim(), lastName: input.lastName.trim(), dailyGoalMinutes: sanitizeStudyGoal(input.dailyGoalMinutes), studyFocus: sanitizeStudyFocus(input.studyFocus), agency: input.departmentName, onboardingCompleted: false }
+    const { data: row, error: profileError } = await supabase.from('profiles').upsert({ user_id: currentUserId, username: displayName, avatar_path: avatarPath, supporter_tier: profile?.supporterTier || 'free', bio: profileDetails.bio, agency: input.departmentName, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at').single()
+    if (profileError) throw new Error(/unique|duplicate/i.test(profileError.message) ? 'That display name is already taken. Go back and choose a different display name.' : profileError.message)
+    const { error: stateError } = await supabase.from('app_state').upsert({ user_id: currentUserId, profile_details: nextDetails, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    if (stateError) throw new Error('Your profile was saved, but your study plan could not be saved. Please try again.')
+    setProfile(mapProfileRow(row as Record<string, unknown>, currentUserId))
+    setProfileUsername(displayName)
+    setProfileDetails(nextDetails)
+    onboardingDetailsRef.current = nextDetails
+    writeCachedProfileUsername(currentUserId, displayName)
+    clearPendingProfileUsername()
     setForceProfileSetup(false)
-    setAuthEmail(normalizedEmail)
-    setProfileUsername(normalizedUsername)
-    if (data.user) {
-      setCurrentUserId(data.user.id)
-      setCurrentUserEmail(data.user.email || '')
-      setCurrentUserProvider(String(data.user.app_metadata?.provider || 'email'))
-      setCurrentUserMetadata((data.user.user_metadata || {}) as AuthUserMetadata)
-      setAuthSessionVersion((version) => version + 1)
-    }
-    setAuthSuccess('Account created.')
-    setAuthPassword('')
-    setAuthPasswordConfirm('')
-    setShowSignUpPassword(false)
-    setShowSignUpPasswordConfirm(false)
-    navigate('/classes/join', { replace: true })
+  }
 
-    setAuthLoading(false)
+  const finishOnboarding = async () => {
+    if (!supabase || !currentUserId) throw new Error('Please sign in again to finish your profile.')
+    const nextDetails = { ...(onboardingDetailsRef.current || profileDetails), onboardingCompleted: true }
+    const { error } = await supabase.from('app_state').upsert({ user_id: currentUserId, profile_details: nextDetails, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    if (error) throw new Error('Your class is ready, but we couldn’t finish saving your profile. Please retry.')
+    setProfileDetails(nextDetails)
+    onboardingDetailsRef.current = null
+    window.localStorage.removeItem(pendingClassSelectionKey)
   }
 
   const submitGoogle = async () => {
@@ -10620,11 +10660,11 @@ function App() {
       window.localStorage.setItem(pendingClassSelectionKey, '1')
     }
 
-    const authNextPath = isSignUpPage
+    const authNextPath = window.localStorage.getItem(authCallbackNextPathKey) || (isSignUpPage
       ? '/classes/join'
       : isClassWorkspacePage
         ? currentPath
-        : '/home'
+        : '/home')
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -10877,7 +10917,9 @@ function App() {
 
   const signOut = async () => {
     if (!supabase) return
+    setAuthLoading(true)
     setProfileMenuOpen(false)
+    navigateAfterAuth('/signin')
     await supabase.auth.signOut()
     setCurrentUserId('')
     setCurrentUserEmail('')
@@ -10889,9 +10931,6 @@ function App() {
     setAuthEmail('')
     setAuthPassword('')
     setAuthPasswordConfirm('')
-    setShowSignInPassword(false)
-    setShowSignUpPassword(false)
-    setShowSignUpPasswordConfirm(false)
     setProfileAvatar(null)
     if (profileAvatarPreviewUrl) URL.revokeObjectURL(profileAvatarPreviewUrl)
     setProfileAvatarPreviewUrl('')
@@ -10907,9 +10946,10 @@ function App() {
     setShowAccountPassword(false)
     setProfileUsername('')
     setProfileDetails({
+      firstName: '', lastName: '', dailyGoalMinutes: 15, studyFocus: 'balanced', onboardingCompleted: false,
       bio: '',
       agency: defaultAgency,
-      displayMode: 'dark',
+      displayMode: 'light',
       homeLeaderboardRotationMs: defaultLeaderboardRotationMs,
       homeLeaderboardPreferences: { ...defaultHomeLeaderboardPreferences, visibleCards: [...defaultHomeLeaderboardPreferences.visibleCards] },
       themeId: appThemePresets[0].id,
@@ -10928,6 +10968,7 @@ function App() {
     setStudyFlashSessionOpen(false)
     setStudyTestSessionOpen(false)
     setStudyTestSessionDone(false)
+    setAuthLoading(false)
   }
 
   const resetEverything = async () => {
@@ -11065,11 +11106,6 @@ function App() {
   const scenarioFireParticles = useMemo(() => {
     return buildFireParticles(scenarioFireLevel)
   }, [scenarioFireLevel])
-
-  useEffect(() => {
-    const nextPath = normalizeRoutePath(location.pathname)
-    setRoutePath((current) => (current === nextPath ? current : nextPath))
-  }, [location.pathname])
 
   const currentPath = routePath
   const isSignInPage = currentPath === '/signin'
@@ -11249,12 +11285,16 @@ function App() {
     isSupportPage ||
     isProfilePage ||
     isStatsPage
-  const needsProfileSetup = Boolean(authReady && stateHydrated && profileHydrated && currentUserId && profile && !profile.username && forceProfileSetup)
+  const accountProfileIncomplete = Boolean(currentUserId && activeClass && requiresAccountProfileCompletion(currentUserMetadata, profileDetails.onboardingCompleted))
+  const needsAccountProfileCompletion = Boolean(authReady && stateHydrated && profileHydrated && accountProfileIncomplete)
+  const suggestedProfileName = splitProfileName(profileUsername || profileNameFromMetadata(currentUserMetadata))
+  useEffect(() => {
+    if (!isSignInPage && !isSignUpPage && !isClassRequestSignUpPage) authNavigationTargetRef.current = null
+  }, [isSignInPage, isSignUpPage, isClassRequestSignUpPage])
+  const needsProfileSetup = Boolean(!needsAccountProfileCompletion && !isClassesJoinPage && !isClassesRequestPage && authReady && stateHydrated && profileHydrated && currentUserId && profile && !profile.username && forceProfileSetup)
 
   const goToPath = useCallback(
     (path: string, options?: { tab?: AppTab; replace?: boolean }) => {
-      const normalizedPath = normalizeRoutePath(path)
-      setRoutePath(normalizedPath)
       if (options?.tab) {
         setActiveTab(options.tab)
       }
@@ -11274,53 +11314,47 @@ function App() {
   }, [authReady, currentUserId, goToPath, isAuthCallbackPage, location.search])
 
   useEffect(() => {
-    if (!authReady || !currentUserId || !activeClass) return
+    if (!authReady || !currentUserId || !activeClass || !stateHydrated || !profileHydrated) return
     window.localStorage.removeItem(pendingClassSelectionKey)
     if (typeof window !== 'undefined' && window.localStorage.getItem(pendingProfileSetupKey) === '1') return
-    if (!isClassesPage && !isClassesJoinPage) return
+    if (!isClassesJoinPage || needsAccountProfileCompletion) return
     goToPath('/home', { replace: true })
-  }, [activeClass, authReady, currentUserId, goToPath, isClassesJoinPage, isClassesPage])
+  }, [activeClass, authReady, currentUserId, goToPath, isClassesJoinPage, needsAccountProfileCompletion, stateHydrated, profileHydrated])
 
   useEffect(() => {
-    if (!authReady || !currentUserId || classWorkspaceLoading || activeClass || isClassesJoinPage || isInvitePage || isClassesRequestPage) return
+    if (authLoading || !needsAccountProfileCompletion || isClassesJoinPage || isOwnerClassesPage || passwordRecovery) return
     goToPath('/classes/join', { replace: true })
-  }, [activeClass, authReady, classWorkspaceLoading, currentUserId, goToPath, isClassesJoinPage, isClassesRequestPage, isInvitePage])
+  }, [authLoading, needsAccountProfileCompletion, isClassesJoinPage, isOwnerClassesPage, passwordRecovery, goToPath])
+
+  useEffect(() => {
+    if (!authReady || authLoading || !currentUserId || classWorkspaceLoading || activeClass || isClassesJoinPage || isInvitePage || isClassesRequestPage || isOwnerClassesPage || passwordRecovery) return
+    goToPath('/classes/join', { replace: true })
+  }, [activeClass, authReady, authLoading, classWorkspaceLoading, currentUserId, goToPath, isClassesJoinPage, isClassesRequestPage, isInvitePage, isOwnerClassesPage, passwordRecovery])
 
   useEffect(() => {
     if (!authReady || currentUserId || !isClassWorkspacePage) return
-    rememberAuthNextPath(currentPath)
-  }, [authReady, currentPath, currentUserId, isClassWorkspacePage])
+    rememberAuthNextPath(`${currentPath}${location.search}`)
+  }, [authReady, currentPath, currentUserId, isClassWorkspacePage, location.search])
 
   useEffect(() => {
-    if (!authReady || !currentUserId || pendingClassSubmission) return
+    if (!authReady || authLoading || !currentUserId || pendingClassSubmissionRef.current) return
     const pendingClassRequest = window.localStorage.getItem(pendingClassRequestKey)
     const shouldSubmitClassRequest = window.localStorage.getItem(pendingClassRequestSubmitKey) === '1'
     const pendingInviteCode = window.localStorage.getItem(pendingInviteCodeKey)
     if ((!pendingClassRequest || !shouldSubmitClassRequest) && !pendingInviteCode) return
 
     let cancelled = false
-    setPendingClassSubmission(true)
+    pendingClassSubmissionRef.current = true
     ;(async () => {
       try {
         if (pendingClassRequest && shouldSubmitClassRequest) {
           const payload = JSON.parse(pendingClassRequest) as ClassCreationRequestInput
-          const requestId = await submitClassCreationRequest(payload)
-          await notifyDiscordForClassRequest(requestId)
+          await submitClassCreationRequest(payload)
           window.localStorage.removeItem(pendingClassRequestKey)
           window.localStorage.removeItem(pendingClassRequestSubmitKey)
           if (!cancelled) {
             setPendingSavedClassRequest(null)
-            await supabase?.auth.signOut()
-            setCurrentUserId('')
-            setCurrentUserEmail('')
-            setCurrentUserProvider('email')
-            setCurrentUserMetadata({})
-            setProfile(null)
-            setProfileHydrated(false)
-            setStateHydrated(false)
-            setForceProfileSetup(false)
-            setAuthSuccess('Your request was sent. You are not approved yet. Come back later.')
-            goToPath('/signin', { replace: true })
+            await finishClassRequestPendingApproval()
             return
           }
         }
@@ -11332,16 +11366,22 @@ function App() {
           }
         }
       } catch (error) {
-        if (!cancelled) setAuthError(error instanceof Error ? error.message : 'Could not finish the saved class action.')
+        if (!cancelled) {
+          setAuthError(error instanceof Error ? error.message : 'Could not finish the saved class action.')
+          if (pendingClassRequest && shouldSubmitClassRequest) {
+            window.localStorage.removeItem(pendingClassRequestSubmitKey)
+            goToPath('/classes/request', { replace: true })
+          }
+        }
       } finally {
-        if (!cancelled) setPendingClassSubmission(false)
+        pendingClassSubmissionRef.current = false
       }
     })()
 
     return () => {
       cancelled = true
     }
-  }, [authReady, currentUserId, goToPath, pendingClassSubmission])
+  }, [authReady, authLoading, currentUserId, goToPath, finishClassRequestPendingApproval])
 
   // Flashcard keyboard controls: Space to flip, Arrow keys to navigate
   useEffect(() => {
@@ -13767,7 +13807,6 @@ function App() {
     setActiveTab('scenarios')
     navigate('/scenarios')
   }
-  const pendingSignupClassDepartments = pendingSavedClassRequest?.departments || []
   const updatePendingSavedClassRequestDepartment = (department: string) => {
     if (!pendingSavedClassRequest) return
     const nextRequest = { ...pendingSavedClassRequest, requesterDepartment: department }
@@ -13777,7 +13816,7 @@ function App() {
 
   return (
     <div
-      className={`app-shell ${isHomePage ? 'home-page' : ''} ${isUiLightMode ? 'ui-light-mode theme-light theme-glass' : ''} ${!isUiLightMode && selectedTheme.id === 'golden' ? 'theme-gold' : ''} ${reduceVisualEffects ? 'reduced-effects' : ''}`}
+      className={`app-shell professional-ui ${isHomePage ? 'home-page' : ''} ${isUiLightMode ? 'ui-light-mode theme-light theme-glass' : ''} ${!isUiLightMode && selectedTheme.id === 'golden' ? 'theme-gold' : ''} ${reduceVisualEffects ? 'reduced-effects' : ''}`}
       style={{ ['--global-banner-offset' as string]: `${globalBannerOffset}px` } as CSSProperties}
     >
       {deployRefreshNotice ? (
@@ -13808,6 +13847,8 @@ function App() {
           </button>
         </div>
       ) : null}
+
+      {authReady && currentUserId && passwordRecovery ? <PasswordRecovery loading={authLoading} error={authError} onSave={completePasswordRecovery} /> : null}
 
       {!isSupabaseConfigured ? (
         <div className="onboarding-overlay">
@@ -13853,331 +13894,21 @@ function App() {
         />
       ) : null}
 
-      {authReady && !currentUserId && isSignInPage ? (
-        <div className="onboarding-overlay">
-          <form
-            className="onboarding-card"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void submitSignIn()
-            }}
-          >
-            <p className="eyebrow">Welcome to</p>
-            <h1>LEO Study</h1>
-            <label>
-              Email
-              <input
-                value={authEmail}
-                onChange={(event) => setAuthEmail(event.target.value)}
-                onKeyDown={handleSignInEnterKey}
-                autoComplete="email"
-              />
-            </label>
-            <label>
-              Password
-              <div className="password-row">
-                <input
-                  type={showSignInPassword ? 'text' : 'password'}
-                  value={authPassword}
-                  onChange={(event) => setAuthPassword(event.target.value)}
-                  onKeyDown={handleSignInEnterKey}
-                  autoComplete="current-password"
-                />
-                <button type="button" className="password-eye" onClick={() => setShowSignInPassword((value) => !value)} aria-label="Toggle password visibility">
-                  {showSignInPassword ? (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M3 3l18 18" />
-                      <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
-                      <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
-                      <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </label>
-            <button type="submit" className="primary" disabled={authLoading}>
-              Sign In
-            </button>
-            <button type="button" className="secondary" onClick={submitGoogle} disabled={authLoading}>
-              <span className="google-mark" aria-hidden>
-                <svg viewBox="0 0 24 24" width="16" height="16">
-                  <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.24 1.26-.96 2.33-2.04 3.04l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.49 0-.71-.06-1.4-.18-2.06H12z" />
-                  <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.63-2.44l-3.3-2.56c-.9.61-2.06.97-3.33.97-2.56 0-4.73-1.73-5.5-4.05l-3.4 2.63C4.75 19.82 8.12 22 12 22z" />
-                  <path fill="#4A90E2" d="M6.5 13.92c-.2-.6-.32-1.24-.32-1.92s.12-1.32.32-1.92l-3.4-2.63A9.99 9.99 0 0 0 2 12c0 1.62.39 3.15 1.1 4.55l3.4-2.63z" />
-                  <path fill="#FBBC05" d="M12 6.03c1.47 0 2.8.5 3.85 1.48l2.89-2.9C16.96 2.95 14.7 2 12 2 8.12 2 4.75 4.18 3.1 7.45l3.4 2.63c.77-2.32 2.94-4.05 5.5-4.05z" />
-                </svg>
-              </span>
-              Continue with Google
-            </button>
-            <p className="muted tiny">Need an account? <Link to="/signup">Create one</Link></p>
-            <div className="auth-class-actions">
-              <button type="button" className="auth-class-request-link" onClick={() => navigate('/classes/request')}>Request to add your class</button>
-            </div>
-            {authError ? <p className="bad">{authError}</p> : null}
-            {authSuccess ? <p className="good">{authSuccess}</p> : null}
-          </form>
-        </div>
-      ) : null}
-
-      {authReady && !currentUserId && isSignUpPage ? (
-        <div className="onboarding-overlay">
-          <form
-            className="onboarding-card"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void submitSignUp()
-            }}
-          >
-            <p className="eyebrow">Create account</p>
-            <h1>LEO Study</h1>
-            <label>
-              Email
-              <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" />
-            </label>
-            <label>
-              Username
-              <input
-                value={profileUsername}
-                onChange={(event) => {
-                  setProfileUsername(event.target.value)
-                  if (authError.toLowerCase().includes('username')) setAuthError('')
-                }}
-                autoComplete="username"
-              />
-            </label>
-            <label>
-              Password
-              <div className="password-row">
-                <input
-                  type={showSignUpPassword ? 'text' : 'password'}
-                  value={authPassword}
-                  onChange={(event) => setAuthPassword(event.target.value)}
-                  autoComplete="new-password"
-                />
-                <button type="button" className="password-eye" onClick={() => setShowSignUpPassword((value) => !value)} aria-label="Toggle password visibility">
-                  {showSignUpPassword ? (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M3 3l18 18" />
-                      <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
-                      <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
-                      <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </label>
-            <label>
-              Verify Password
-              <div className="password-row">
-                <input
-                  type={showSignUpPasswordConfirm ? 'text' : 'password'}
-                  value={authPasswordConfirm}
-                  onChange={(event) => setAuthPasswordConfirm(event.target.value)}
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  className="password-eye"
-                  onClick={() => setShowSignUpPasswordConfirm((value) => !value)}
-                  aria-label="Toggle verify password visibility"
-                >
-                  {showSignUpPasswordConfirm ? (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M3 3l18 18" />
-                      <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
-                      <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
-                      <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </label>
-            {authPasswordConfirm.length > 0 && authPassword !== authPasswordConfirm ? <p className="bad">Passwords do not match.</p> : null}
-            <button
-              type="submit"
-              className="primary"
-              disabled={
-                authLoading ||
-                profileUsername.trim().length < 1 ||
-                authPassword.length === 0 ||
-                authPassword !== authPasswordConfirm
-              }
-            >
-              Create Account
-            </button>
-            <button type="button" className="secondary" onClick={submitGoogle} disabled={authLoading}>
-              <span className="google-mark" aria-hidden>
-                <svg viewBox="0 0 24 24" width="16" height="16">
-                  <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.24 1.26-.96 2.33-2.04 3.04l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.49 0-.71-.06-1.4-.18-2.06H12z" />
-                  <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.63-2.44l-3.3-2.56c-.9.61-2.06.97-3.33.97-2.56 0-4.73-1.73-5.5-4.05l-3.4 2.63C4.75 19.82 8.12 22 12 22z" />
-                  <path fill="#4A90E2" d="M6.5 13.92c-.2-.6-.32-1.24-.32-1.92s.12-1.32.32-1.92l-3.4-2.63A9.99 9.99 0 0 0 2 12c0 1.62.39 3.15 1.1 4.55l3.4-2.63z" />
-                  <path fill="#FBBC05" d="M12 6.03c1.47 0 2.8.5 3.85 1.48l2.89-2.9C16.96 2.95 14.7 2 12 2 8.12 2 4.75 4.18 3.1 7.45l3.4 2.63c.77-2.32 2.94-4.05 5.5-4.05z" />
-                </svg>
-              </span>
-              Continue with Google
-            </button>
-            <p className="muted tiny">Already have an account? <Link to="/signin">Sign in</Link></p>
-            <div className="auth-class-actions">
-              <button type="button" className="auth-class-request-link" onClick={() => navigate('/classes/request')}>Request to add your class</button>
-            </div>
-            {authError ? <p className="bad">{authError}</p> : null}
-            {authSuccess ? <p className="good">{authSuccess}</p> : null}
-          </form>
-        </div>
-      ) : null}
-
-      {authReady && !currentUserId && isClassRequestSignUpPage ? (
-        <div className="onboarding-overlay">
-          <form
-            className="onboarding-card"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void submitSignUp()
-            }}
-          >
-            <p className="eyebrow">Request a class</p>
-            <h1>Create request account</h1>
-            {pendingSavedClassRequest ? (
-              <div className="auth-pending-request-card">
-                <p className="eyebrow">Class request</p>
-                <h3>{pendingSavedClassRequest.className}</h3>
-                <div className="auth-pending-request-meta">
-                  <span>Academy: {pendingSavedClassRequest.academyName}</span>
-                  <span>Dates: {pendingSavedClassRequest.startDate || 'Not set'} to {pendingSavedClassRequest.endDate || 'Not set'}</span>
-                </div>
-                <label>
-                  Your department
-                  <select value={pendingSavedClassRequest.requesterDepartment} onChange={(event) => updatePendingSavedClassRequestDepartment(event.target.value)}>
-                    <option value="">Choose your department</option>
-                    {pendingSignupClassDepartments.map((department) => (
-                      <option key={`pending-class-request-signup-department-${department}`} value={department}>{department}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ) : (
-              <div className="auth-pending-request-card">
-                <p className="muted">No class request is saved yet.</p>
-                <button type="button" className="secondary" onClick={() => navigate('/classes/request')}>Start Class Request</button>
-              </div>
-            )}
-            <label>
-              Email
-              <input value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" />
-            </label>
-            <label>
-              Username
-              <input
-                value={profileUsername}
-                onChange={(event) => {
-                  setProfileUsername(event.target.value)
-                  if (authError.toLowerCase().includes('username')) setAuthError('')
-                }}
-                autoComplete="username"
-              />
-            </label>
-            <label>
-              Password
-              <div className="password-row">
-                <input
-                  type={showSignUpPassword ? 'text' : 'password'}
-                  value={authPassword}
-                  onChange={(event) => setAuthPassword(event.target.value)}
-                  autoComplete="new-password"
-                />
-                <button type="button" className="password-eye" onClick={() => setShowSignUpPassword((value) => !value)} aria-label="Toggle password visibility">
-                  {showSignUpPassword ? (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M3 3l18 18" />
-                      <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
-                      <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
-                      <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </label>
-            <label>
-              Verify Password
-              <div className="password-row">
-                <input
-                  type={showSignUpPasswordConfirm ? 'text' : 'password'}
-                  value={authPasswordConfirm}
-                  onChange={(event) => setAuthPasswordConfirm(event.target.value)}
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  className="password-eye"
-                  onClick={() => setShowSignUpPasswordConfirm((value) => !value)}
-                  aria-label="Toggle verify password visibility"
-                >
-                  {showSignUpPasswordConfirm ? (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M3 3l18 18" />
-                      <path d="M10.6 10.7A3 3 0 0013.3 13.4" />
-                      <path d="M9.5 4.6A11.3 11.3 0 0112 4.3c6.7 0 10.5 7.7 10.5 7.7a16.9 16.9 0 01-4 5.2" />
-                      <path d="M6.1 6.2A16.8 16.8 0 001.5 12s3.8 7.7 10.5 7.7a11 11 0 004.2-.8" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M1.5 12S5.3 4.3 12 4.3 22.5 12 22.5 12 18.7 19.7 12 19.7 1.5 12 1.5 12z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </label>
-            {authPasswordConfirm.length > 0 && authPassword !== authPasswordConfirm ? <p className="bad">Passwords do not match.</p> : null}
-            <button
-              type="submit"
-              className="primary"
-              disabled={
-                authLoading ||
-                !pendingSavedClassRequest ||
-                profileUsername.trim().length < 1 ||
-                authPassword.length === 0 ||
-                authPassword !== authPasswordConfirm ||
-                Boolean(pendingSavedClassRequest.departments.length && !pendingSavedClassRequest.requesterDepartment)
-              }
-            >
-              Create Account and Send Request
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              disabled={!pendingSavedClassRequest}
-              onClick={() => {
-                window.localStorage.setItem(pendingClassRequestSubmitKey, '1')
-                navigate('/signin')
-              }}
-            >
-              Sign In and Send Request
-            </button>
-            {authError ? <p className="bad">{authError}</p> : null}
-            {authSuccess ? <p className="good">{authSuccess}</p> : null}
-          </form>
-        </div>
+      {authReady && !currentUserId && (isSignInPage || isSignUpPage || isClassRequestSignUpPage) ? (
+        <AuthEntry
+          key={currentPath}
+          mode={isSignInPage ? 'signin' : isClassRequestSignUpPage ? 'request' : 'signup'}
+          email={authEmail} onEmailChange={setAuthEmail}
+          password={authPassword} onPasswordChange={setAuthPassword}
+          passwordConfirm={authPasswordConfirm} onPasswordConfirmChange={setAuthPasswordConfirm}
+          displayName={profileUsername} onDisplayNameChange={setProfileUsername}
+          loading={authLoading} error={authError} success={authSuccess}
+          onSubmit={isSignInPage ? submitSignIn : submitSignUp}
+          onGoogle={submitGoogle} onResetPassword={sendPasswordReset}
+          request={pendingSavedClassRequest}
+          onRequestDepartment={updatePendingSavedClassRequestDepartment}
+          onSignInForRequest={() => { window.localStorage.setItem(pendingClassRequestSubmitKey, '1'); navigate('/signin') }}
+        />
       ) : null}
 
       {authReady && !currentUserId && (isClassesRequestPage || isInvitePage) ? (
@@ -14286,17 +14017,17 @@ function App() {
           <div className="onboarding-card">
             <p className="eyebrow">Sign-in issue</p>
             <h1>LEO Study</h1>
-            <p className="muted">We could not finish that Google sign-in. Please try again.</p>
-            {authError ? <p className="bad">{authError}</p> : null}
+            <p className="muted">We could not finish that sign-in. Please try again.</p>
+            {authError ? <p className="bad" role="alert">{authError}</p> : null}
             <button type="button" className="primary" onClick={() => goToPath('/signin', { replace: true })}>
               Back to Sign In
             </button>
           </div>
         </div>
       ) : null}
-      {authReady && !currentUserId && !isSignInPage && !isSignUpPage && !isClassRequestSignUpPage && !isClassesRequestPage && !isInvitePage && !isAuthCallbackPage ? <Navigate to="/signup" replace /> : null}
-      {authReady && currentUserId && (isSignInPage || isSignUpPage || isClassRequestSignUpPage) ? <Navigate to="/home" replace /> : null}
-      {authReady && currentUserId && !isKnownAuthedPage ? <Navigate to="/home" replace /> : null}
+      {authReady && !authLoading && !currentUserId && !isSignInPage && !isSignUpPage && !isClassRequestSignUpPage && !isClassesRequestPage && !isInvitePage && !isAuthCallbackPage ? <Navigate to={isOwnerClassesPage ? "/signin" : "/signup"} replace /> : null}
+      {authReady && !authLoading && currentUserId && (isSignInPage || isSignUpPage || isClassRequestSignUpPage) ? <Navigate to={authNavigationTargetRef.current || '/home'} replace /> : null}
+      {authReady && !authLoading && currentUserId && !isKnownAuthedPage && !isSignInPage && !isSignUpPage && !isClassRequestSignUpPage ? <Navigate to="/home" replace /> : null}
       {needsProfileSetup ? (
         <div className="onboarding-overlay">
           <div className="onboarding-card">
@@ -14391,13 +14122,20 @@ function App() {
               onInviteNeedsAuth={continueInviteAfterAuth}
               onClassRequestSubmitted={() => { void finishClassRequestPendingApproval() }}
               onRefreshMemberships={refreshClassWorkspace}
+              onSaveOnboardingProfile={saveOnboardingProfile}
+              onFinishOnboarding={finishOnboarding}
+              initialError={authError}
+              profileOnly={accountProfileIncomplete}
+              profileSeed={{ firstName: profileDetails.firstName || (needsAccountProfileCompletion ? suggestedProfileName.firstName : ''), lastName: profileDetails.lastName || (needsAccountProfileCompletion ? suggestedProfileName.lastName : ''), displayName: profileUsername, dailyGoalMinutes: profileDetails.dailyGoalMinutes, studyFocus: profileDetails.studyFocus, avatarUrl: profile?.avatarUrl || '' }}
               embedded
             />
           </div>
         ) : null}
         {!isClassesJoinPage && !isClassesRequestPage && !isInvitePage ? (
         <div className="workspace-layout">
-          <aside className="left-taskbar">
+          <a className="professional-skip-link" href="#main-content">Skip to content</a>
+          <aside className="left-taskbar" aria-label="Main navigation">
+            <div className="academy-brand"><AcademyMark/><span><strong>180 Academy</strong><small>PREPARE WITH PURPOSE</small></span></div>
             <div className="taskbar-section">
               <button className={isHomePage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('home')}>
                 <AppIcon name="home" className="taskbar-icon" />
@@ -14422,6 +14160,10 @@ function App() {
               <button className={isChatPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('chat')}>
                 <AppIcon name="chat" className="taskbar-icon" />
                 Chat
+              </button>
+              <button className={isClassesPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => goToPath('/classes')}>
+                <AppIcon name="library" className="taskbar-icon" />
+                My class
               </button>
             </div>
 
@@ -14666,7 +14408,7 @@ function App() {
               </header>
             ) : null}
 
-            <main className="content-area" key={currentPath}>
+            <main id="main-content" tabIndex={-1} className="content-area" key={currentPath}>
         {contentWarning ? <p className="muted content-warning">{contentWarning}</p> : null}
         {isClassWorkspacePage ? (
           <ClassWorkspacePages
@@ -14682,6 +14424,42 @@ function App() {
         ) : null}
         {!isProfilePage && !isStatsPage && isHomePage && (
           <section className="home-section">
+            <HomeDashboard
+              name={profileDetails.firstName || activeProfileName}
+              className={activeClass?.className || ''}
+              department={activeClass?.departmentName || profileDetails.agency}
+              startDate={activeClass?.startDate}
+              endDate={activeClass?.endDate}
+              now={clockNowMs}
+              streak={profileDetails.stats.studyDayStreak}
+              bestStreak={profileDetails.stats.bestStudyDayStreak}
+              studySeconds={profileDetails.stats.studySeconds}
+              dailyGoalMinutes={profileDetails.dailyGoalMinutes || 15}
+              studyFocus={profileDetails.studyFocus || 'balanced'}
+              level={currentUserLevelProfile.level}
+              levelPercent={currentUserLevelProfile.progressPercent}
+              totalXp={currentUserLevelProfile.totalXp}
+              totalAttempts={statsAnalytics.totalAttempts}
+              accuracy={statsAnalytics.overallAccuracyPercent}
+              mastered={masteredSections.length}
+              totalCodes={sections.length}
+              sessions={profileDetails.stats.sessionTimeline}
+              subjects={statsAnalytics.codeSetBreakdown}
+              focusCodes={statsAnalytics.needsWorkCodes}
+              onStudy={(codeSet) => {
+                setStudyFlashFilter(codeSet || 'all')
+                openStudyFlashcardsPage()
+              }}
+              onPracticeTest={openStudyPracticeTestPage}
+              onStudyGuide={openStudyGuidePage}
+              onScenarios={() => navigateToTab('scenarios')}
+              onGames={() => navigateToTab('games')}
+              onStats={() => goToPath('/stats')}
+              onClass={() => goToPath('/classes')}
+            />
+            <details className="home-class-activity">
+              <summary>Class leaderboards &amp; activities<small>Your classmates, challenges, and announcements</small></summary>
+              <div className="home-class-activity-content">
             <div className="card home-hero">
               <div className="home-hero-head">
                 <div>
@@ -15269,6 +15047,8 @@ function App() {
               </div>
               ) : null}
             </div>
+              </div>
+            </details>
           </section>
         )}
 
@@ -17532,6 +17312,12 @@ function App() {
                     <span>{currentUserLevelProfile.totalXp.toLocaleString()} XP • {selectedProfileDecoration.title}</span>
                   </div>
                   {isOwner ? <p className="owner-pill">Owner</p> : null}
+                  <div className="settings-grid">
+                    <label>First name<input value={profileDetails.firstName} autoComplete="given-name" maxLength={80} onChange={(event) => setProfileDetails((previous) => ({ ...previous, firstName: event.target.value }))} /></label>
+                    <label>Last name<input value={profileDetails.lastName} autoComplete="family-name" maxLength={80} onChange={(event) => setProfileDetails((previous) => ({ ...previous, lastName: event.target.value }))} /></label>
+                    <label>Daily study goal<select value={profileDetails.dailyGoalMinutes} onChange={(event) => setProfileDetails((previous) => ({ ...previous, dailyGoalMinutes: sanitizeStudyGoal(event.target.value) }))}>{[10, 15, 30, 45].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes a day</option>)}</select></label>
+                    <label>Study focus<select value={profileDetails.studyFocus} onChange={(event) => setProfileDetails((previous) => ({ ...previous, studyFocus: sanitizeStudyFocus(event.target.value) }))}><option value="balanced">A balanced routine</option><option value="recall">Code recall & flashcards</option><option value="scenarios">Applying knowledge</option><option value="exam">Assessment preparation</option></select></label>
+                  </div>
                   <label>
                     Username
                     <input

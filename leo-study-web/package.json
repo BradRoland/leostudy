@@ -17,7 +17,15 @@
     "test": "node --test src/**/*.test.ts backend/*.test.mjs cloudflare/**/*.test.mjs",
     "build": "node scripts/write-build-version.mjs && tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:desktop": "playwright test --project=desktop",
+    "test:staging:seed": "node --env-file=.env.staging.local tests/e2e/seed-staging.mjs",
+    "dev:staging": "node scripts/staging/dev.mjs",
+    "test:staging:http": "node backend/staging-class-request-check.mjs",
+    "build:staging": "node scripts/write-build-version.mjs && tsc -b && vite build --mode staging",
+    "preview:staging": "vite preview --mode staging --host 127.0.0.1 --port 5177 --strictPort",
+    "test:staging:build": "node scripts/staging/build-smoke.mjs"
   },
   "dependencies": {
     "@9am/fire-flame-react": "^0.3.2",
@@ -25,6 +33,7 @@
     "@vercel/analytics": "^1.6.1",
     "@vercel/speed-insights": "^1.3.1",
     "dotenv": "^17.3.1",
+    "nodemailer": "10.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
@@ -32,6 +41,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "1.63.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
