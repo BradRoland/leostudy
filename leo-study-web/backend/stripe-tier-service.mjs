@@ -11,72 +11,48 @@ function requireEnv(name, fallback = '') {
 }
 
 function paymentLinkId(value) {
-  const raw = String(value || '').trim()
-  if (!raw) return ''
-  if (raw.startsWith('plink_')) return raw
-  const parts = raw.split('/')
-  return parts[parts.length - 1] || ''
+  return typeof value === 'string' ? value.trim() : String(value?.id || '').trim()
 }
 
-export function createTierResolver({ priceToTier = new Map(), amountToTier = new Map(), paymentLinkToTier = new Map(), retrieveSession }) {
+// Only configured Stripe objects identify a product. Dollar amounts, names and
+// arbitrary metadata can describe unrelated purchases in the same Stripe account.
+export function createTierResolver({ priceToTier = new Map(), paymentLinkToTier = new Map(), retrieveSession }) {
   async function resolveTierFromSession(session) {
-    const metadataTier = String(session.metadata?.tier || '').toLowerCase()
-    if (metadataTier === 'tier2' || metadataTier === 'tier5' || metadataTier === 'tier10') {
-      return metadataTier
-    }
-
-    const plinkId = paymentLinkId(session.payment_link)
-    if (plinkId && paymentLinkToTier.has(plinkId)) {
-      return paymentLinkToTier.get(plinkId)
-    }
-
-    const detailed = await retrieveSession(session.id)
-    const lineItems = detailed.line_items?.data || []
-    for (const lineItem of lineItems) {
-      const priceId = typeof lineItem.price === 'string' ? lineItem.price : lineItem.price?.id
-      if (priceId && priceToTier.has(priceId)) {
-        return priceToTier.get(priceId)
-      }
-
-      const unitAmount = Number(lineItem.price?.unit_amount || 0)
-      if (unitAmount && amountToTier.has(unitAmount)) {
-        return amountToTier.get(unitAmount)
-      }
-
-      const itemAmount = Number(lineItem.amount_subtotal || 0)
-      if (itemAmount && amountToTier.has(itemAmount)) {
-        return amountToTier.get(itemAmount)
-      }
-
-      const label = String(lineItem.description || lineItem.price?.nickname || '').toLowerCase()
-      if (label.includes('tier 10') || label.includes('$10') || label.includes('10 supporter')) return 'tier10'
-      if (label.includes('tier 5') || label.includes('$5') || label.includes('5 supporter')) return 'tier5'
-      if (label.includes('tier 2') || label.includes('$2') || label.includes('2 supporter')) return 'tier2'
-    }
-
-    const amountCandidates = [Number(session.amount_subtotal || 0), Number(session.amount_total || 0)]
-    for (const amount of amountCandidates) {
-      if (amountToTier.has(amount)) {
-        return amountToTier.get(amount)
-      }
-    }
-
-    console.warn('stripe webhook: tier resolution failed', {
-      sessionId: session.id,
-      paymentLink: session.payment_link || null,
-      amountSubtotal: session.amount_subtotal || null,
-      amountTotal: session.amount_total || null,
-      lineItems: lineItems.map((lineItem) => ({
-        priceId: typeof lineItem.price === 'string' ? lineItem.price : lineItem.price?.id || null,
-        unitAmount: lineItem.price?.unit_amount || null,
-        amountSubtotal: lineItem.amount_subtotal || null,
-        description: lineItem.description || lineItem.price?.nickname || null,
-      })),
-    })
-    return null
+    const linkTier = paymentLinkToTier.get(paymentLinkId(session.payment_link))
+    if (linkTier) return linkTier
+    const detailed = session.line_items ? session : await retrieveSession(session.id)
+    const tiers = (detailed.line_items?.data || []).map(item => priceToTier.get(typeof item.price === 'string' ? item.price : item.price?.id)).filter(Boolean)
+    return ['tier10', 'tier5', 'tier2'].find(tier => tiers.includes(tier)) || null
   }
-
   return { resolveTierFromSession }
+}
+
+export async function handleStripeEvent(event, fulfill) {
+  if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
+    return fulfill(event.data.object)
+  }
+  return { applied: false, reason: 'event_not_applicable' }
+}
+
+export function createCheckoutFulfillment({ retrieveSession, resolveTierFromSession, findUserByEmail, grantCheckout, expectedLivemode }) {
+  return async function applyTierFromCheckoutSession(eventSession) {
+    if (!eventSession?.id) throw new Error('Checkout session is missing')
+    // Stripe is authoritative, including when an older event arrives after a retry.
+    const session = await retrieveSession(eventSession.id)
+    if (session.id !== eventSession.id || session.livemode !== expectedLivemode) throw new Error('Checkout environment mismatch')
+    if (session.payment_status !== 'paid' || session.status !== 'complete') return { applied: false, reason: 'payment_not_paid' }
+    if (session.mode !== 'payment') throw new Error('Supporter checkout must be a one-time payment')
+    const tier = await resolveTierFromSession(session)
+    if (!tier) throw new Error('Paid checkout has no configured supporter product')
+    let userId = String(session.client_reference_id || '').trim()
+    if (!userId) {
+      const email = String(session.customer_details?.email || session.customer_email || '').trim().toLowerCase()
+      if (email) userId = (await findUserByEmail(email))?.id || ''
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) throw new Error('Paid checkout has no matching academy account')
+    // Persisting a grant and changing access are atomic and safe to retry.
+    return grantCheckout({ sessionId: session.id, userId, tier, livemode: session.livemode })
+  }
 }
 
 export function createStripeTierService() {
@@ -97,12 +73,6 @@ export function createStripeTierService() {
       [process.env.STRIPE_PRICE_ID_TIER10 || '', 'tier10'],
     ].filter(([priceId]) => Boolean(priceId)),
   )
-
-  const amountToTier = new Map([
-    [Number(process.env.STRIPE_AMOUNT_TIER2 || 200), 'tier2'],
-    [Number(process.env.STRIPE_AMOUNT_TIER5 || 500), 'tier5'],
-    [Number(process.env.STRIPE_AMOUNT_TIER10 || 1000), 'tier10'],
-  ])
 
   const paymentLinkToTier = new Map(
     [
@@ -132,59 +102,27 @@ export function createStripeTierService() {
     }
   }
 
-  const { resolveTierFromSession } = createTierResolver({
-    priceToTier,
-    amountToTier,
-    paymentLinkToTier,
-    retrieveSession: (sessionId) => {
-      if (!stripe) throw new Error('Stripe is disabled in this preview.')
-      return stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items.data.price'] })
-    },
+  const retrieveSession = (sessionId) => {
+    if (!stripe) throw new Error('Stripe is disabled in this preview.')
+    return stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items.data.price'] })
+  }
+  const { resolveTierFromSession } = createTierResolver({ priceToTier, paymentLinkToTier, retrieveSession })
+  const grantCheckout = async ({ sessionId, userId, tier, livemode }) => {
+    const { data, error } = await supabase.rpc('fulfill_supporter_checkout', {
+      p_session_id: sessionId, p_user_id: userId, p_tier: tier, p_livemode: livemode,
+    })
+    if (error) throw error
+    return data
+  }
+  const applyTierFromCheckoutSession = createCheckoutFulfillment({
+    retrieveSession, resolveTierFromSession, findUserByEmail, grantCheckout,
+    expectedLivemode: /^(sk|rk)_live_/.test(stripeSecretKey),
   })
 
   async function applyTierToUser(targetUserId, tier) {
-    if (stripeDisabled) throw new Error('Stripe is disabled in this preview.')
-    const { error } = await supabase.from('profiles').upsert(
-      {
-        user_id: targetUserId,
-        supporter_tier: tier,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' },
-    )
-
+    if (stripeDisabled || !/^(sk|rk)_test_/.test(stripeSecretKey)) throw new Error('Manual grants require Stripe test mode.')
+    const { error } = await supabase.from('profiles').upsert({ user_id: targetUserId, supporter_tier: tier }, { onConflict: 'user_id' })
     if (error) throw error
-  }
-
-  async function applyTierFromCheckoutSession(session) {
-    if (stripeDisabled) throw new Error('Stripe is disabled in this preview.')
-    const tier = await resolveTierFromSession(session)
-    if (!tier) {
-      console.warn('stripe webhook: could not resolve tier for session', session.id)
-      return { applied: false, reason: 'tier_not_resolved' }
-    }
-
-    const userId = String(session.client_reference_id || '').trim()
-    const email = String(session.customer_details?.email || session.customer_email || '').trim().toLowerCase()
-
-    let targetUserId = userId
-    if (!targetUserId && email) {
-      const user = await findUserByEmail(email)
-      targetUserId = user?.id || ''
-    }
-
-    if (!targetUserId) {
-      console.warn('stripe webhook: no matching Supabase user', {
-        sessionId: session.id,
-        clientReferenceId: userId || null,
-        email: email || null,
-      })
-      return { applied: false, reason: 'user_not_found' }
-    }
-
-    await applyTierToUser(targetUserId, tier)
-    console.log(`stripe webhook: upgraded ${targetUserId} to ${tier}`)
-    return { applied: true, userId: targetUserId, tier }
   }
 
   return {

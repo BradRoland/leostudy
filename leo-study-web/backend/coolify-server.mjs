@@ -6,7 +6,7 @@ import http from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
-import { createStripeTierService } from './stripe-tier-service.mjs'
+import { createStripeTierService, handleStripeEvent } from './stripe-tier-service.mjs'
 import { createClassRequestService } from './class-request-service.mjs'
 import { createClassRequestEmailService } from './class-request-email-service.mjs'
 import { liveIntegrationsDisabled, isLiveIntegrationPath } from './live-integrations.mjs'
@@ -182,9 +182,7 @@ async function handleStripeWebhook(req, res) {
     return
   }
 
-  if (event.type === 'checkout.session.completed') {
-    await applyTierFromCheckoutSession(event.data.object)
-  }
+  await handleStripeEvent(event, applyTierFromCheckoutSession)
 
   sendJson(res, 200, { received: true })
 }

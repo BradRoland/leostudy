@@ -4441,6 +4441,9 @@ function App() {
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false)
   const [resetConfirmText, setResetConfirmText] = useState('')
   const [authError, setAuthError] = useState('')
+  const [supportError, setSupportError] = useState('')
+  const [supportStatus, setSupportStatus] = useState('')
+  const [supportRefreshing, setSupportRefreshing] = useState(false)
   const [authSuccess, setAuthSuccess] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [authRedirectPending, setAuthRedirectPending] = useState(() => hasAuthRedirectParams())
@@ -7144,8 +7147,6 @@ function App() {
       const displayNameSeed = seededProfileName || cachedProfileName
       const saveSeededProfileName = async (sourceRow: Record<string, unknown> | null) => {
         if (!seededProfileName) return null
-        const sourceTier = String(sourceRow?.supporter_tier || '')
-        const supporterTier = ['free', 'tier2', 'tier5', 'tier10'].includes(sourceTier) ? sourceTier : 'free'
         const { data: savedProfileRow, error: seedProfileError } = await client
           .from('profiles')
           .upsert(
@@ -7153,7 +7154,6 @@ function App() {
               user_id: currentUserId,
               username: seededProfileName,
               avatar_path: String(sourceRow?.avatar_path || ''),
-              supporter_tier: supporterTier,
               bio: String(sourceRow?.bio || ''),
               agency: normalizeAgency(sourceRow?.agency || defaultAgency, agencyOptions),
               updated_at: new Date().toISOString(),
@@ -10403,7 +10403,7 @@ function App() {
       avatarPath = path
     }
     const nextDetails: ProfileDetails = { ...profileDetails, firstName: input.firstName.trim(), lastName: input.lastName.trim(), dailyGoalMinutes: sanitizeStudyGoal(input.dailyGoalMinutes), studyFocus: sanitizeStudyFocus(input.studyFocus), agency: input.departmentName, onboardingCompleted: false }
-    const { data: row, error: profileError } = await supabase.from('profiles').upsert({ user_id: currentUserId, username: displayName, avatar_path: avatarPath, supporter_tier: profile?.supporterTier || 'free', bio: profileDetails.bio, agency: input.departmentName, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at').single()
+    const { data: row, error: profileError } = await supabase.from('profiles').upsert({ user_id: currentUserId, username: displayName, avatar_path: avatarPath, bio: profileDetails.bio, agency: input.departmentName, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at').single()
     if (profileError) throw new Error(/unique|duplicate/i.test(profileError.message) ? 'That display name is already taken. Go back and choose a different display name.' : profileError.message)
     const { error: stateError } = await supabase.from('app_state').upsert({ user_id: currentUserId, profile_details: nextDetails, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
     if (stateError) throw new Error('Your profile was saved, but your study plan could not be saved. Please try again.')
@@ -10561,7 +10561,6 @@ function App() {
           user_id: currentUserId,
           username: normalizedUsername,
           avatar_path: avatarPath,
-          supporter_tier: profile?.supporterTier || 'free',
           bio: profileDetails.bio,
           agency: selectedAgencyName,
           updated_at: new Date().toISOString(),
@@ -10706,14 +10705,18 @@ function App() {
   }
 
   const startTierCheckout = (tier: Exclude<SupporterTier, 'free'>) => {
-    if (liveIntegrations.disabled) return
-    const checkoutUrl = stripeTierLinks[tier]
-    if (!checkoutUrl) {
-      setAuthError(`Missing checkout link for ${tierLabel[tier]}. Add it in .env.`)
-      return
+    setSupportError('')
+    if (liveIntegrations.disabled) { setSupportError('Payments are unavailable in this development preview.'); return }
+    if (!currentUserId) { setSupportError('Sign in before choosing a supporter tier.'); return }
+    try {
+      const checkoutUrl = stripeTierLinks[tier]
+      if (!checkoutUrl) throw new Error('Missing payment link')
+      const url = buildSupportCheckoutUrl({ checkoutUrl, currentUserEmail, currentUserId })
+      if (url.protocol !== 'https:' || url.hostname !== 'buy.stripe.com') throw new Error('Invalid payment link')
+      window.location.assign(url.toString())
+    } catch {
+      setSupportError('Checkout is temporarily unavailable. Please try again later.')
     }
-    const url = buildSupportCheckoutUrl({ checkoutUrl, currentUserEmail, currentUserId })
-    window.location.href = url.toString()
   }
 
   const signOut = async () => {
@@ -11606,21 +11609,46 @@ function App() {
     setLeaderboardViewFilter(leaderboardSelectedBoard.filter)
   }, [leaderboardSelectedBoard, leaderboardViewDuration, leaderboardViewFilter])
 
-  const refreshSupporterTier = async () => {
-    if (!supabase || !currentUserId || !profile) return
-    const { data: profileRow } = await supabase
-      .from('profiles')
-      .select('user_id,username,avatar_path,supporter_tier,bio,agency,created_at')
-      .eq('user_id', currentUserId)
-      .maybeSingle()
-
-    if (!profileRow) return
-    const mapped = mapProfileRow(profileRow as Record<string, unknown>, currentUserId)
-    setProfile(mapped)
-    if (mapped.username) {
-      setProfileUsername(mapped.username)
-      writeCachedProfileUsername(currentUserId, mapped.username)
+  // Returning from Stripe refreshes server-owned access without another sign-in.
+  // Poll only while the support screen is visible so delayed grants also appear.
+  useEffect(() => {
+    if (!supabase || !currentUserId || !stateHydrated) return
+    const client = supabase
+    let cancelled = false
+    let pending = false
+    const refresh = async () => {
+      if (pending || document.visibilityState === 'hidden') return
+      pending = true
+      try {
+        const { data, error } = await client.from('profiles').select('supporter_tier').eq('user_id', currentUserId).maybeSingle()
+        if (!cancelled && !error && data && ['free', 'tier2', 'tier5', 'tier10'].includes(data.supporter_tier)) {
+          setProfile(previous => previous?.userId === currentUserId && previous.supporterTier !== data.supporter_tier ? { ...previous, supporterTier: data.supporter_tier as SupporterTier } : previous)
+          if (data.supporter_tier !== 'free') setSupportStatus(`Your ${tierLabel[data.supporter_tier as SupporterTier]} access is active.`)
+        }
+      } catch { /* A later focus/poll retries transient connection failures. */ }
+      finally { pending = false }
     }
+    const onVisible = () => { void refresh() }
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
+    void refresh()
+    const interval = isSupportPage ? window.setInterval(onVisible, 15_000) : undefined
+    return () => { cancelled = true; window.removeEventListener('focus', onVisible); document.removeEventListener('visibilitychange', onVisible); window.clearInterval(interval) }
+  }, [currentUserId, stateHydrated, isSupportPage])
+
+  const refreshSupporterTier = async () => {
+    if (!supabase || !currentUserId || supportRefreshing) return
+    setSupportRefreshing(true)
+    setSupportError('')
+    setSupportStatus('')
+    try {
+      const { data, error } = await supabase.from('profiles').select('supporter_tier').eq('user_id', currentUserId).single()
+      if (error || !data || !['free', 'tier2', 'tier5', 'tier10'].includes(data.supporter_tier)) throw new Error('Refresh failed')
+      const tier = data.supporter_tier as SupporterTier
+      setProfile(previous => previous?.userId === currentUserId ? { ...previous, supporterTier: tier } : previous)
+      setSupportStatus(tier === 'free' ? 'No paid tier is confirmed yet. If you just paid, confirmation may take a moment.' : `Your ${tierLabel[tier]} access is active.`)
+    } catch { setSupportError('We could not refresh your supporter access. Please try again.') }
+    finally { setSupportRefreshing(false) }
   }
 
   const toggleDisplayMode = async () => {
@@ -14169,6 +14197,15 @@ function App() {
               onStats={() => goToPath('/stats')}
               onClass={() => goToPath('/classes')}
             />
+            <aside className="card academy-home-support" aria-label="Support 180 Academy">
+              <div>
+                <p className="eyebrow">Built for your next step</p>
+                <h2>Support 180 Academy</h2>
+                <p className="muted">Help grow the academy and unlock supporter badges, themes, and name styling. Study progress and earned ranks stay earned.</p>
+                {activeProfileTier !== 'free' ? <small>Thank you for being a {tierLabel[activeProfileTier]}.</small> : <small>Optional one-time support from $2. Tax may apply.</small>}
+              </div>
+              <button className="secondary" onClick={() => navigate('/support')}>Explore supporter benefits <span aria-hidden="true">→</span></button>
+            </aside>
             <details className="home-class-activity">
               <summary>Class leaderboards &amp; activities<small>Your classmates, challenges, and announcements</small></summary>
               <div className="home-class-activity-content">
@@ -15026,7 +15063,13 @@ function App() {
               <p className="eyebrow">Support 180 Academy</p>
               <h2>Choose a Supporter Tier</h2>
               <p className="muted">Support helps us keep building features, question banks, and new training tools.</p>
-              <p className="muted">Current tier: {tierLabel[activeProfileTier]}</p>
+              <p className="muted" aria-live="polite">Current tier: {tierLabel[activeProfileTier]}</p>
+              <p className="muted">Each tier is a separate one-time purchase, with no recurring subscription. Tax may apply. Higher tiers include the benefits below them.</p>
+              {liveIntegrations.disabled ? <p className="support-preview-note" role="status">Development preview — payments are disabled. You will not be charged.</p> : null}
+              <p className="muted">Already paid? Return here to see your access update after Stripe confirms payment.</p>
+              <button className="secondary" onClick={refreshSupporterTier} disabled={supportRefreshing}>{supportRefreshing ? 'Checking access…' : 'Refresh supporter access'}</button>
+              {supportError ? <p role="alert">{supportError}</p> : null}
+              {supportStatus ? <p role="status">{supportStatus}</p> : null}
             </div>
 
             <div className="support-grid">
@@ -15035,10 +15078,9 @@ function App() {
                 <ul>
                   <li>Support the project and roadmap</li>
                   <li>Supporter badge on your account</li>
-                  <li>More perks planned soon</li>
                 </ul>
-                <button className="primary" onClick={() => startTierCheckout('tier2')} disabled={tierRank(activeProfileTier) >= tierRank('tier2')}>
-                  {tierRank(activeProfileTier) >= tierRank('tier2') ? 'Included' : 'Upgrade'}
+                <button className="primary" onClick={() => startTierCheckout('tier2')} disabled={liveIntegrations.disabled || tierRank(activeProfileTier) >= tierRank('tier2')}>
+                  {tierRank(activeProfileTier) >= tierRank('tier2') ? 'Included' : liveIntegrations.disabled ? 'Unavailable in preview' : 'Continue to Stripe'}
                 </button>
               </article>
 
@@ -15047,11 +15089,9 @@ function App() {
                 <ul>
                   <li>Everything in $2 tier</li>
                   <li>Unlock all website themes</li>
-                  <li>Priority access to upcoming features</li>
-                  <li>More perks planned soon</li>
                 </ul>
-                <button className="primary" onClick={() => startTierCheckout('tier5')} disabled={tierRank(activeProfileTier) >= tierRank('tier5')}>
-                  {tierRank(activeProfileTier) >= tierRank('tier5') ? 'Included' : 'Upgrade'}
+                <button className="primary" onClick={() => startTierCheckout('tier5')} disabled={liveIntegrations.disabled || tierRank(activeProfileTier) >= tierRank('tier5')}>
+                  {tierRank(activeProfileTier) >= tierRank('tier5') ? 'Included' : liveIntegrations.disabled ? 'Unavailable in preview' : 'Continue to Stripe'}
                 </button>
               </article>
 
@@ -15060,10 +15100,9 @@ function App() {
                 <ul>
                   <li>Everything in $2 and $5 tiers</li>
                   <li>Name customization (color, font, glow)</li>
-                  <li>More perks planned soon</li>
                 </ul>
-                <button className="primary" onClick={() => startTierCheckout('tier10')} disabled={tierRank(activeProfileTier) >= tierRank('tier10')}>
-                  {tierRank(activeProfileTier) >= tierRank('tier10') ? 'Current Tier' : 'Upgrade'}
+                <button className="primary" onClick={() => startTierCheckout('tier10')} disabled={liveIntegrations.disabled || tierRank(activeProfileTier) >= tierRank('tier10')}>
+                  {tierRank(activeProfileTier) >= tierRank('tier10') ? 'Current Tier' : liveIntegrations.disabled ? 'Unavailable in preview' : 'Continue to Stripe'}
                 </button>
               </article>
             </div>
@@ -17981,6 +18020,8 @@ function App() {
               {settingsTab === 'support' ? (
                 <div className="settings-section-card">
                   <h3>Support Tiers</h3>
+                  <p className="muted">Optional one-time purchases. Tax may apply.</p>
+                  {supportError ? <p role="alert">{supportError}</p> : null}
                   <p className="muted">Current tier: {tierLabel[profile.supporterTier]}</p>
                   <div className="tier-upgrade-grid">
                     {(['tier2', 'tier5', 'tier10'] as Exclude<SupporterTier, 'free'>[]).map((tier) => (
@@ -18000,8 +18041,7 @@ function App() {
                             <>
                               <li>Everything in $2 tier</li>
                               <li>Unlock all website themes</li>
-                              <li>Priority access to upcoming features</li>
-                            </>
+                                        </>
                           ) : null}
                           {tier === 'tier10' ? (
                             <>
@@ -18078,13 +18118,15 @@ function App() {
                   </button>
                   </section>
                   <div className="academy-security-actions">
-                  <button className="secondary" onClick={refreshSupporterTier}>
+                  <button className="secondary" onClick={refreshSupporterTier} disabled={supportRefreshing}>
                     Refresh Tier
                   </button>
                   <button className="secondary" onClick={signOut}>
                     Sign Out
                   </button>
                   </div>
+                  {supportError ? <p role="alert">{supportError}</p> : null}
+                  {supportStatus ? <p role="status">{supportStatus}</p> : null}
                   <section className="academy-security-danger" aria-label="Reset study progress">
                   <h4>Reset study progress</h4>
                   <p>Start fresh only when you are ready. Review the reset details before confirming.</p>

@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import http from 'node:http'
-import { createStripeTierService } from './stripe-tier-service.mjs'
+import { createStripeTierService, handleStripeEvent } from './stripe-tier-service.mjs'
 import { liveIntegrationsDisabled } from './live-integrations.mjs'
 
 if (liveIntegrationsDisabled()) {
@@ -107,9 +107,7 @@ const server = http.createServer(async (req, res) => {
         return
       }
 
-      if (event.type === 'checkout.session.completed') {
-        await applyTierFromCheckoutSession(event.data.object)
-      }
+      await handleStripeEvent(event, applyTierFromCheckoutSession)
 
       res.writeHead(200, { 'content-type': 'application/json' })
       res.end(JSON.stringify({ received: true }))
