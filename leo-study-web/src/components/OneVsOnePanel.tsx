@@ -514,7 +514,7 @@ const duelCategoryOptions: Array<{ value: DuelCategory; label: string; quizOnly?
   { value: 'scenarios', label: 'SCENARIOS', quizOnly: true },
 ]
 
-const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.svg`
+const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar-academy-v1.svg`
 const defaultNameStyle: NameStyle = {
   color: '#f5fbff',
   fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',

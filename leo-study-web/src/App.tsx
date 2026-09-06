@@ -939,8 +939,8 @@ const gameHighScoreSeed = {
   gravity: 0,
 }
 const avatarBucket = (import.meta.env.VITE_SUPABASE_AVATAR_BUCKET || 'avatars').trim()
-const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.svg`
-const defaultAvatarPngUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.png`
+const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar-academy-v1.svg`
+const defaultAvatarPngUrl = `${import.meta.env.BASE_URL || '/'}default-avatar-academy-v1.png`
 const pendingProfileSetupKey = 'pending_profile_setup'
 const pendingClassSelectionKey = 'pending_class_selection'
 const pendingProfileUsernameKey = 'pending_profile_username'

@@ -84,7 +84,7 @@ test('earned avatars and frames save while locked rewards stay unavailable', asy
   await signIn(page)
   const claim = page.getByRole('button', { name: 'Collect 25 XP' })
   if (await claim.count()) { await expect(claim).toBeEnabled(); await claim.click(); await expect(page.locator('.academy-rewards')).toContainText('Collected today') }
-  await expect(page.locator('.taskbar-profile-image')).toHaveAttribute('src', /default-avatar\.svg/)
+  await expect(page.locator('.taskbar-profile-image')).toHaveAttribute('src', /default-avatar-academy-v1\.svg/)
   await page.goto('/profile')
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Locked Summit avatar, level 5' })).toBeDisabled()

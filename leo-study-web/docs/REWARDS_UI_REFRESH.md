@@ -38,6 +38,10 @@ node scripts/staging/public-rewards-smoke.mjs --run-approved-dev-check --expecte
 
 Public results and screenshots are written under ignored `artifacts/public-dev.local` and `artifacts/public-rewards.local`. Local reward screenshots are under ignored `.artifacts/rewards-refresh.local`. These artifacts can contain synthetic account details and are not published in GitHub.
 
+## Public delivery follow-up
+
+The first automatic development release (`70cd5c8c16108d130853be9214a5f22df7bd0631`, Coolify deployment83) passed GitHub checks and the public functional suites. Public inspection additionally found that the original default SVG URL remained in Cloudflare's immutable cache while the new PNG was delivered correctly. Both runtime defaults and the Academy avatar picker now use fresh `default-avatar-academy-v1` file names. The public reward test checks both actual SVG and PNG bytes and the rendered image URL. No broad cache purge or production change is needed.
+
 ## Release boundary
 
 The new SQL migration was applied only to the retained development clone. No automatic database migration step was added to deployment. Do not merge this release to main or apply its migration to production until the owner approves that separate rollout. Test mail remains captured in Mailpit and preview live integrations remain disabled.

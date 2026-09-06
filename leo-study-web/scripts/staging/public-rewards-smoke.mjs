@@ -54,12 +54,15 @@ try {
   assert.match(version.commit, /^[0-9a-f]{40}$/)
   if (expectedCommit) assert.equal(version.commit, expectedCommit, 'Wait for the expected development commit.')
   result.commit = version.commit
-  const defaultAvatar = await publicFetch(`${appUrl}/default-avatar.png`)
-  assert.equal(defaultAvatar.status, 200)
-  const actualHash = createHash('sha256').update(Buffer.from(await defaultAvatar.arrayBuffer())).digest('hex')
-  const expectedHash = createHash('sha256').update(await readFile(new URL('../../public/default-avatar.png', import.meta.url))).digest('hex')
-  assert.equal(actualHash, expectedHash, 'Published default avatar must match the reviewed new asset.')
-  result.checks.push('Public health, exact source commit, and new default avatar bytes')
+  for (const extension of ['svg', 'png']) {
+    const filename = `default-avatar-academy-v1.${extension}`
+    const defaultAvatar = await publicFetch(`${appUrl}/${filename}`)
+    assert.equal(defaultAvatar.status, 200)
+    const actualHash = createHash('sha256').update(Buffer.from(await defaultAvatar.arrayBuffer())).digest('hex')
+    const expectedHash = createHash('sha256').update(await readFile(new URL(`../../public/${filename}`, import.meta.url))).digest('hex')
+    assert.equal(actualHash, expectedHash, `Published default avatar ${extension} must match the reviewed versioned asset.`)
+  }
+  result.checks.push('Public health, exact source commit, and both versioned default avatar SVG/PNG bytes')
 
   stage = 'synthetic fixtures'
   academyId = check(await service.from('academies').insert({ name: `Reward QA ${marker}`, city: 'Synthetic', state: 'CA' }).select('id').single()).id
@@ -93,7 +96,7 @@ try {
   await page.getByRole('button', { name: 'Sign in', exact: false }).click()
   await expect(page.locator('.today-dashboard')).toBeVisible()
   const avatar = page.locator('.taskbar-profile-image')
-  await expect(avatar).toHaveAttribute('src', /default-avatar\.svg/)
+  await expect(avatar).toHaveAttribute('src', /default-avatar-academy-v1\.svg$/)
   await expect.poll(() => avatar.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true)
   const rewards = page.locator('.academy-rewards')
   await expect(rewards.getByRole('button', { name: 'Collect 25 XP', exact: true })).toBeEnabled()
@@ -137,6 +140,7 @@ try {
         if (path === '/games') await expect(page.locator('.academy-game-card')).toHaveCount(4)
         if (path === '/profile') {
           await expect(page.getByRole('button', { name: 'Select Academy avatar', exact: true })).toBeEnabled()
+          await expect(page.getByRole('button', { name: 'Select Academy avatar', exact: true }).locator('img')).toHaveAttribute('src', /default-avatar-academy-v1\.png$/)
           await expect(page.getByRole('button', { name: 'Locked Summit avatar, level 5', exact: true })).toBeDisabled()
         }
         await page.screenshot({ path: new URL(`${path.slice(1)}-${mode}-${name}.png`, output).pathname, fullPage: true, animations: 'disabled' })

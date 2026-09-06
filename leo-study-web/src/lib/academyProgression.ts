@@ -30,7 +30,7 @@ export function rankTone(level: number): string {
 }
 
 export const rewardAvatars = [
-  { key: 'academy', title: 'Academy', unlockLevel: 1, path: '/default-avatar.png' },
+  { key: 'academy', title: 'Academy', unlockLevel: 1, path: '/default-avatar-academy-v1.png' },
   { key: 'orbit', title: 'Orbit', unlockLevel: 3, path: '/reward-avatars/orbit.png' },
   { key: 'summit', title: 'Summit', unlockLevel: 5, path: '/reward-avatars/summit.png' },
   { key: 'bloom', title: 'Bloom', unlockLevel: 10, path: '/reward-avatars/bloom.png' },

@@ -23,7 +23,7 @@ type PendingDuelInvite = {
   expiresAt: string
 }
 
-const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar.svg`
+const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar-academy-v1.svg`
 
 function toPublicAvatarUrl(path: string) {
   const trimmed = path.trim()
