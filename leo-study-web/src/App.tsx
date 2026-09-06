@@ -14,6 +14,8 @@ import './FeatureRefresh.css'
 import './components/AcademyWorkspaceRefresh.css'
 import { AcademyGamesHub } from './components/AcademyGamesHub'
 import { RankBadge } from './components/RankBadge'
+import { SoloGameSetup } from './components/SoloGameSetup'
+import { FrameCollection } from './components/FrameCollection'
 import { RewardsPanel, RewardAvatarPicker } from './components/RewardsPanel'
 import { useDailyRewards } from './hooks/useDailyRewards'
 import { xpRequiredForLevel, levelFromXp, levelTierName, type RewardAvatar } from './lib/academyProgression'
@@ -2215,10 +2217,6 @@ function describeProfileCurrentActivity(
 function sanitizeProfileDecorationKey(value: unknown) {
   const key = typeof value === 'string' ? value : 'auto'
   return getProfileDecoration(key).key
-}
-
-function unlockedProfileDecorations(level: number) {
-  return profileDecorationCatalog.filter((decoration) => decoration.unlockLevel <= level)
 }
 
 function sanitizeHighScores(input: unknown): PersistedState['highScores'] {
@@ -7839,10 +7837,6 @@ function App() {
     weeklyLeaderboardAppearanceCountsByUser,
     weeklyTopPerformer,
   ])
-  const unlockedDecorationsForCurrentUser = useMemo(
-    () => unlockedProfileDecorations(currentUserLevelProfile.level),
-    [currentUserLevelProfile.level],
-  )
   useEffect(() => {
     if (!stateHydrated || !currentUserId) return
     // Keep the saved display snapshot until the separate reward ledger is known.
@@ -17091,24 +17085,8 @@ function App() {
               {settingsTab === 'progression' ? (
                 <div className="settings-section-card progression-card">
                   <RewardsPanel rewards={dailyRewards} level={currentUserLevelProfile.level} currentXp={currentUserLevelProfile.currentLevelXp} nextXp={currentUserLevelProfile.nextLevelXp} onStudy={openStudyFlashcardsPage} />
-                  <div className="progression-hero">
-                    <div className={`avatar-frame progression-avatar avatar-decoration-wrap level-halo-frame ${currentUserLevelProfile.haloClass}`}>
-                      <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={profile.username} className="avatar" onError={handleAvatarImageError} />
-                      {renderAvatarDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
-                    </div>
-                    <div>
-                      <p className="eyebrow">Progression</p>
-                      <h3>Level {currentUserLevelProfile.level} • {currentUserLevelProfile.tierName}</h3>
-                      <p className="muted">{currentUserLevelProfile.totalXp.toLocaleString()} XP earned from study time, mastered codes, games, high scores, 1v1s, score bonuses, streaks, and leaderboard bonuses.</p>
-                    </div>
-                  </div>
-                  <div className="level-progress-bar" aria-label={`Level progress ${currentUserLevelProfile.progressPercent}%`}>
-                    <span style={{ width: `${currentUserLevelProfile.progressPercent}%` }} />
-                  </div>
-                  <div className="level-progress-copy">
-                    <span>{currentUserLevelProfile.currentLevelXp.toLocaleString()} / {currentUserLevelProfile.nextLevelXp.toLocaleString()} XP to Level {currentUserLevelProfile.level + 1}</span>
-                    {currentUserLevelProfile.nextReward ? <span>Next: {currentUserLevelProfile.nextReward.title} at Lv {currentUserLevelProfile.nextReward.unlockLevel}</span> : <span>All planned rewards unlocked.</span>}
-                  </div>
+                  <p className="progression-total">{currentUserLevelProfile.totalXp.toLocaleString()} total XP from your practice, mastery, and earned rewards.</p>
+                  <h3 className="progression-achievement-heading">Learning milestones</h3>
                   <div className="study-guide-stats progression-achievement-stats">
                     <div className="study-guide-stat-pill">
                       <small>Bonus XP</small>
@@ -17137,57 +17115,7 @@ function App() {
                       ).toLocaleString()}</strong>
                     </div>
                   </div>
-                  <div className="profile-decoration-picker">
-                    <div className="profile-decoration-heading">
-                      <div>
-                        <h3>Your frame collection</h3>
-                        <p className="muted">Celebrate your progress with a frame you have earned. Automatic follows your latest unlock.</p>
-                      </div>
-                      <span className="level-badge level-badge-compact">{unlockedDecorationsForCurrentUser.length}/{profileDecorationCatalog.length} unlocked</span>
-                    </div>
-                    <div className="profile-decoration-grid">
-                      {profileDecorationCatalog.map((decoration) => {
-                        const unlocked = decoration.unlockLevel <= currentUserLevelProfile.level
-                        const active = profileDetails.profileDecorationKey === decoration.key
-                        const previewDecoration = decoration.key === 'auto' ? getEffectiveProfileDecoration(currentUserLevelProfile, 'auto') : decoration
-                        return (
-                          <button
-                            key={decoration.key}
-                            type="button"
-                            className={`profile-decoration-card ${active ? 'active' : ''} ${unlocked ? 'unlocked' : 'locked'}`}
-                            onClick={() => {
-                              if (!unlocked) return
-                              setProfileDetails((previous) => ({ ...previous, profileDecorationKey: decoration.key }))
-                            }}
-                            disabled={!unlocked}
-                            aria-pressed={active}
-                          >
-                            <span className="profile-decoration-preview avatar-decoration-wrap">
-                              <span className="profile-decoration-preview-face" aria-hidden>
-                                <img
-                                  src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)}
-                                  alt=""
-                                  className="profile-decoration-preview-avatar"
-                                  loading="lazy"
-                                  decoding="async"
-                                  onError={handleAvatarImageError}
-                                />
-                              </span>
-                              {renderDecorationLayer(previewDecoration)}
-                            </span>
-                            <span className="profile-decoration-copy">
-                              <strong>{decoration.title}</strong>
-                              <small>{unlocked ? active ? 'Selected' : 'Unlocked' : 'Locked'} · Level {decoration.unlockLevel}</small>
-                              <span>{unlocked ? decoration.description : `Unlocks at Level ${decoration.unlockLevel}`}</span>
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <button className="primary" onClick={submitProfile} disabled={authLoading || rewardAvatarLoading || profileUsername.trim().length < 1}>
-                      Save frame
-                    </button>
-                  </div>
+                  <FrameCollection level={currentUserLevelProfile.level} selectedKey={profileDetails.profileDecorationKey} avatarUrl={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} onAvatarError={handleAvatarImageError} onSelect={(key) => setProfileDetails(previous => ({ ...previous, profileDecorationKey: key }))} onSave={submitProfile} saving={authLoading} disabled={rewardAvatarLoading || profileUsername.trim().length < 1} error={authError} success={authSuccess} />
                 </div>
               ) : null}
 
@@ -18098,16 +18026,22 @@ function App() {
               ) : null}
 
               {settingsTab === 'security' ? (
-                <div className="settings-section-card">
+                <div className="settings-section-card academy-security-card">
+                  <h3>Account security</h3>
+                  <section className="academy-security-section" aria-label="Sign-in methods">
                   <p className="muted">Email: {currentUserEmail || 'Unknown'}</p>
                   <button className="secondary" onClick={linkGoogleAccount} disabled={liveIntegrations.disabled || authLoading || currentUserProvider.toLowerCase() === 'google'}>
                     {liveIntegrations.disabled ? 'Google linking unavailable in preview' : currentUserProvider.toLowerCase() === 'google' ? 'Google Linked' : 'Link Google Account'}
                   </button>
+                  </section>
+                  <section className="academy-security-section" aria-label="Change your password">
+                  <h4>Update your password</h4>
                   <label>
                     New password
                     <div className="password-row">
                       <input
                         type={showAccountPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
                         value={accountNewPassword}
                         onChange={(event) => setAccountNewPassword(event.target.value)}
                       />
@@ -18132,6 +18066,7 @@ function App() {
                     Verify new password
                     <input
                       type={showAccountPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       value={accountConfirmPassword}
                       onChange={(event) => setAccountConfirmPassword(event.target.value)}
                     />
@@ -18139,12 +18074,18 @@ function App() {
                   <button className="secondary" onClick={updateAccountPassword} disabled={authLoading || accountNewPassword.length === 0 || accountConfirmPassword.length === 0}>
                     Change Password
                   </button>
+                  </section>
+                  <div className="academy-security-actions">
                   <button className="secondary" onClick={refreshSupporterTier}>
                     Refresh Tier
                   </button>
                   <button className="secondary" onClick={signOut}>
                     Sign Out
                   </button>
+                  </div>
+                  <section className="academy-security-danger" aria-label="Reset study progress">
+                  <h4>Reset study progress</h4>
+                  <p>Start fresh only when you are ready. Review the reset details before confirming.</p>
                   <button
                     className="danger"
                     onClick={() => {
@@ -18154,6 +18095,7 @@ function App() {
                   >
                     Reset Progress and Data
                   </button>
+                  </section>
                   {authSuccess ? <p className="saved-pill">{authSuccess}</p> : null}
                   {authError ? <p className="bad">{authError}</p> : null}
                 </div>
@@ -18601,69 +18543,8 @@ function App() {
         </div>
       ) : null}
 
-      {showMatchSetupModal ? (
-        <div className="profile-modal-overlay game-setup-overlay" onClick={() => setShowMatchSetupModal(false)}>
-          <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
-            <h3>Matching Settings</h3>
-            <label className="game-control">
-              Code Set
-              <div className="segmented">
-                {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                  <button key={`match-setup-${filter}`} className={gamesSelection.filter === filter ? 'seg active' : 'seg'} onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}>
-                    {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <label className="game-control">
-              Time
-              <div className="segmented">
-                {[15, 30, 60].map((time) => (
-                  <button key={`match-setup-time-${time}`} className={gamesSelection.duration === time ? 'seg active' : 'seg'} onClick={() => setGamesSelection((prev) => ({ ...prev, duration: time as HomeDurationFilter }))}>
-                    {time}s
-                  </button>
-                ))}
-              </div>
-            </label>
-            <div className="actions-row">
-              <button className="secondary cancel-button" onClick={() => setShowMatchSetupModal(false)}>Cancel</button>
-              <button className="primary" onClick={beginMatchingFromSetup}>Start</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showSpeedSetupModal ? (
-        <div className="profile-modal-overlay game-setup-overlay" onClick={() => setShowSpeedSetupModal(false)}>
-          <div className="card game-settings-modal" onClick={(event) => event.stopPropagation()}>
-            <h3>Speed Test Settings</h3>
-            <label className="game-control">
-              Code Set
-              <div className="segmented">
-                {(['all', 'penal', 'hs', 'vehicle'] as CodeFilter[]).map((filter) => (
-                  <button key={`speed-setup-${filter}`} className={gamesSelection.filter === filter ? 'seg active' : 'seg'} onClick={() => setGamesSelection((prev) => ({ ...prev, filter }))}>
-                    {filter === 'all' ? 'All' : codeSetLabel[filter]}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <label className="game-control">
-              Time
-              <div className="segmented">
-                {[15, 30, 60].map((time) => (
-                  <button key={`speed-setup-time-${time}`} className={gamesSelection.duration === time ? 'seg active' : 'seg'} onClick={() => setGamesSelection((prev) => ({ ...prev, duration: time as HomeDurationFilter }))}>
-                    {time}s
-                  </button>
-                ))}
-              </div>
-            </label>
-            <div className="actions-row">
-              <button className="secondary cancel-button" onClick={() => setShowSpeedSetupModal(false)}>Cancel</button>
-              <button className="primary" onClick={beginSpeedFromSetup} disabled={speedQuestionBank.length === 0}>Start</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {showMatchSetupModal ? <SoloGameSetup mode="matching" selection={gamesSelection} onChange={setGamesSelection} onCancel={() => setShowMatchSetupModal(false)} onStart={beginMatchingFromSetup} /> : null}
+      {showSpeedSetupModal ? <SoloGameSetup mode="speed" selection={gamesSelection} onChange={setGamesSelection} onCancel={() => setShowSpeedSetupModal(false)} onStart={beginSpeedFromSetup} disabled={speedQuestionBank.length === 0} /> : null}
           </div>
         </div>
         ) : null}

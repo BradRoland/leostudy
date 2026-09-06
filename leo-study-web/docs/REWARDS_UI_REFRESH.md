@@ -45,3 +45,14 @@ The first automatic development release (`70cd5c8c16108d130853be9214a5f22df7bd06
 ## Release boundary
 
 The new SQL migration was applied only to the retained development clone. No automatic database migration step was added to deployment. Do not merge this release to main or apply its migration to production until the owner approves that separate rollout. Test mail remains captured in Mailpit and preview live integrations remain disabled.
+
+
+## Game setup and settings follow-up
+
+The solo Matching and Speed Test setup screens now share a responsive native dialog with labeled choices, visible selection states, a fixed action row, and keyboard focus cycling. Escape closes the setup and restores focus to the launch button; starting retains the existing game handlers and selected code/time values.
+
+Level & Rewards shows one level summary and an earned-first frame collection. Users can preview all frames, preserve their selection while filtering, and receive save feedback beside the collection. Locked frames remain unavailable. Account Security groups sign-in methods, password changes, account actions, and the separately confirmed progress reset.
+
+Browser coverage includes frame filter/save persistence, keyboard cancellation/focus restoration, both real game launches/exits, mobile dialog bounds, and password mismatch validation. Public checks additionally cover setup action visibility and security layouts at 1440, 390, and 320 pixels in both themes. This follow-up has no database migration or production configuration change.
+
+Follow-up validation: 88 unit tests passed; the full desktop/mobile run passed 33 cases and found an initial-focus issue in the scrollable mobile setup. After correcting it, both desktop and mobile setup tests passed, covering all 34 scenarios. TypeScript, staging compilation, and lint passed with the same nine existing hook warnings. No new warnings were introduced.

@@ -147,8 +147,26 @@ try {
       }
       await page.getByRole('button', { name: 'Level & Rewards', exact: true }).click()
       await expect(page.locator('.profile-decoration-grid')).toBeVisible()
+      await expect(page.locator('.profile-decoration-card.locked')).toHaveCount(0)
+      await page.screenshot({ path: new URL(`earned-frames-${mode}-${name}.png`, output).pathname, fullPage: true, animations: 'disabled' })
+      await page.getByRole('button', { name: 'All frames', exact: true }).click()
       await expect(page.locator('.profile-decoration-card').filter({ hasText: 'Academy Legend' })).toBeDisabled()
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Frame collection overflow at ${width}px in ${mode}`)
+      await page.getByRole('button', { name: 'Account Security', exact: true }).click()
+      await expect(page.getByRole('region', { name: 'Change your password' })).toBeVisible()
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Security overflow at ${width}px in ${mode}`)
+      for (const [path, opener, title] of [['matching', 'Start Matching', 'Matching Settings'], ['speed', 'Start Speed Test', 'Speed Test Settings']]) {
+        await page.goto(`${appUrl}/games/${path}`)
+        const start = page.getByRole('button', { name: opener, exact: true })
+        await start.click()
+        const dialog = page.getByRole('dialog', { name: title, exact: true })
+        await expect(dialog).toBeVisible()
+        await expect(dialog.getByRole('button', { name: 'Start', exact: true })).toBeInViewport({ ratio: 1 })
+        await page.screenshot({ path: new URL(`setup-${path}-${mode}-${name}.png`, output).pathname, animations: 'disabled' })
+        await page.keyboard.press('Escape')
+        await expect(dialog).toHaveCount(0)
+        await expect(start).toBeFocused()
+      }
     }
   }
   await page.setViewportSize({ width: 1440, height: 1000 })
