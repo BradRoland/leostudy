@@ -63,7 +63,7 @@ export function buildClassRequestEmail(event, config) {
     ['Departments', departments || 'Not provided'],
     ...(isReview ? [['Requester', `${request.requester_name || ''} (${request.requester_email})`], ['Requester department', request.requester_department], ['Notes', request.requester_note || 'None']] : []),
   ]
-  const actionLabel = isReview ? 'Review class request' : 'Sign in to Class 180'
+  const actionLabel = isReview ? 'Review class request' : 'Sign in to 180 Academy'
   const to = config.testRecipient || (isReview ? config.ownerEmail : request.requester_email)
   if (!to || /[\r\n]/.test(to)) throw emailError('A valid notification recipient is required')
   return {
@@ -71,7 +71,7 @@ export function buildClassRequestEmail(event, config) {
     to: [to],
     subject: `${isReview ? 'Class approval requested' : isApproved ? 'Class approved' : 'Class request update'}: ${String(request.class_name).replace(/[\r\n]/g, ' ')}`,
     text: `${title}\n\n${intro}\n\n${details.map(([label, value]) => `${label}: ${value || ''}`).join('\n')}\n\n${actionLabel}: ${actionUrl.href}\n\nRequest reference: ${event.request_id}`,
-    html: `<div style="background:#f3f5f9;padding:32px 16px;font-family:Arial,sans-serif;color:#18243b"><div style="max-width:580px;margin:auto;background:#fff;border:1px solid #e0e6ef;border-radius:18px;padding:32px"><p style="font-size:12px;letter-spacing:2px;color:#536888">CLASS 180 ACADEMY</p><h1 style="font-size:26px;line-height:1.25">${escapeHtml(title)}</h1><p style="line-height:1.65;color:#47566e">${escapeHtml(intro)}</p><table style="width:100%;border-collapse:collapse;font-size:14px">${details.map(([label, value]) => `<tr><td style="padding:10px 8px 10px 0;border-bottom:1px solid #edf0f5;color:#637189;vertical-align:top">${escapeHtml(label)}</td><td style="padding:10px 0;border-bottom:1px solid #edf0f5;line-height:1.5">${escapeHtml(value)}</td></tr>`).join('')}</table><p style="margin:28px 0"><a href="${escapeHtml(actionUrl.href)}" style="display:inline-block;background:#087f78;color:#fff;text-decoration:none;padding:14px 22px;border-radius:10px;font-weight:bold">${actionLabel}</a></p><p style="font-size:12px;color:#748198">Request reference: ${escapeHtml(event.request_id)}</p></div></div>`,
+    html: `<div style="background:#f3f5f9;padding:32px 16px;font-family:Arial,sans-serif;color:#18243b"><div style="max-width:580px;margin:auto;background:#fff;border:1px solid #e0e6ef;border-radius:18px;padding:32px"><p style="font-size:12px;letter-spacing:2px;color:#536888">180 ACADEMY</p><h1 style="font-size:26px;line-height:1.25">${escapeHtml(title)}</h1><p style="line-height:1.65;color:#47566e">${escapeHtml(intro)}</p><table style="width:100%;border-collapse:collapse;font-size:14px">${details.map(([label, value]) => `<tr><td style="padding:10px 8px 10px 0;border-bottom:1px solid #edf0f5;color:#637189;vertical-align:top">${escapeHtml(label)}</td><td style="padding:10px 0;border-bottom:1px solid #edf0f5;line-height:1.5">${escapeHtml(value)}</td></tr>`).join('')}</table><p style="margin:28px 0"><a href="${escapeHtml(actionUrl.href)}" style="display:inline-block;background:#3159ed;color:#fff;text-decoration:none;padding:14px 22px;border-radius:10px;font-weight:bold">${actionLabel}</a></p><p style="font-size:12px;color:#748198">Request reference: ${escapeHtml(event.request_id)}</p></div></div>`,
   }
 }
 

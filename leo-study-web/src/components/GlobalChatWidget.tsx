@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type SyntheticEvent } from 'react'
+import { Fragment, useEffect, useId, useRef, useState, useCallback, type SyntheticEvent } from 'react'
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
@@ -64,6 +64,7 @@ type Props = {
   userAgency?: string
   isOwner?: boolean
   classId?: string
+  classLabel?: string
   canModerateClass?: boolean
   leaderboardFirstSpotCounts?: {
     allTime: Record<string, number>
@@ -87,6 +88,33 @@ type ChatCacheEntry = {
 }
 
 const hotChatCacheByScope: Record<string, ChatCacheEntry> = {}
+
+function ChatIcon({ name, size = 20 }: { name: 'chat' | 'send' | 'smile' | 'close' | 'down' | 'flag' | 'trash'; size?: number }) {
+  const paths = {
+    chat: <><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" /><path d="M8 11h.01M12 11h.01M16 11h.01" /></>,
+    send: <><path d="m12 19 0-14M5 12l7-7 7 7" /></>,
+    smile: <><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M8 9h.01M16 9h.01" /></>,
+    close: <path d="m6 6 12 12M18 6 6 18" />,
+    down: <path d="M12 5v14m-7-7 7 7 7-7" />,
+    flag: <><path d="M4 22V3m0 1c5-4 11 4 16 0v10c-5 4-11-4-16 0" /></>,
+    trash: <><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" /></>,
+  }
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
+}
+
+function messageDayLabel(createdAt: string) {
+  const date = new Date(createdAt)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  if (date.toDateString() === today.toDateString()) return 'Today'
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric', ...(date.getFullYear() !== today.getFullYear() ? { year: 'numeric' as const } : {}) })
+}
+
+function messageInitials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => Array.from(part)[0] || '').join('').toUpperCase() || '?'
+}
 
 function chatCacheScope(classId?: string) {
   return classId ? `class:${classId}` : 'public'
@@ -197,6 +225,7 @@ export function GlobalChatWidget({
   onOpenProfile,
   mode = 'widget',
   classId,
+  classLabel,
   canModerateClass,
 }: Props) {
   const isFullMode = mode === 'full'
@@ -214,6 +243,10 @@ export function GlobalChatWidget({
   const [messages, setMessages] = useState<PublicMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
+  const [showQuickEmojis, setShowQuickEmojis] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'live' | 'reconnecting'>('connecting')
+  const [connectionAttempt, setConnectionAttempt] = useState(0)
   const [unreadCount, setUnreadCount] = useState(0)
   // Track if user has seen latest message
   const [hasNewMessages, setHasNewMessages] = useState(false)
@@ -239,6 +272,9 @@ export function GlobalChatWidget({
   const lastSentRef = useRef(0)
   const isNearBottomRef = useRef(true)
   const subscribedRef = useRef(false)
+  const channelInstanceId = useId()
+  const subscriptionNumberRef = useRef(0)
+  const closedRetryCountRef = useRef(0)
   const fullModeAutoScrolledRef = useRef(false)
   const reactionActionGuardRef = useRef<Record<string, number>>({})
   const reactionSyncInFlightRef = useRef(false)
@@ -485,6 +521,8 @@ export function GlobalChatWidget({
   useEffect(() => {
     if (!supabaseClient || subscribedRef.current) return
     subscribedRef.current = true
+    let active = true
+    let recoveryTimer: ReturnType<typeof setTimeout> | undefined
 
     const messageFilter = classId ? `class_id=eq.${classId}` : undefined
     const messageSubscription = messageFilter
@@ -498,7 +536,8 @@ export function GlobalChatWidget({
       : { event: 'DELETE' as const, schema: 'public', table: messageTable }
 
     const channel = supabaseClient
-      .channel(classId ? `class_chat_${classId}` : 'public_chat')
+      // A retiring popup/full-page subscription must not close its replacement.
+      .channel(`${classId ? `class_chat_${classId}` : 'public_chat'}:${channelInstanceId}:${++subscriptionNumberRef.current}`)
       .on(
         'postgres_changes',
         messageSubscription,
@@ -566,13 +605,31 @@ export function GlobalChatWidget({
           }, 220)
         },
       )
-      .subscribe(() => {})
+      .subscribe((status, error) => {
+        if (!active) return
+        if (error) console.warn('Chat realtime subscription:', error.message)
+        setConnectionStatus(status === 'SUBSCRIBED' ? 'live' : status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED' ? 'reconnecting' : 'connecting')
+        if (status === 'SUBSCRIBED') {
+          closedRetryCountRef.current = 0
+          clearTimeout(recoveryTimer)
+          recoveryTimer = undefined
+        } else if (status === 'CLOSED' && recoveryTimer === undefined) {
+          // The SDK retries errors/timeouts itself, but a CLOSED channel stops
+          // its rejoin timer. Recover only unexpected closes, with capped delay.
+          const delay = Math.min(1000 * 2 ** Math.min(closedRetryCountRef.current++, 5), 30_000)
+          recoveryTimer = setTimeout(() => {
+            if (active) setConnectionAttempt((attempt) => attempt + 1)
+          }, delay)
+        }
+      })
 
     return () => {
+      active = false
+      clearTimeout(recoveryTimer)
       subscribedRef.current = false
       supabaseClient.removeChannel(channel)
     }
-  }, [classId, ensureReactionUserNames, messageTable, reactionTable, refreshVisibleReactions, supabaseClient])
+  }, [channelInstanceId, classId, connectionAttempt, ensureReactionUserNames, messageTable, reactionTable, refreshVisibleReactions, supabaseClient])
 
   // Poll for new messages every 5 seconds (lightweight fallback)
   useEffect(() => {
@@ -718,27 +775,30 @@ export function GlobalChatWidget({
 
   // Send message
   const sendMessage = useCallback(async () => {
-    if (!supabaseClient || !isAuthenticated) return
+    if (!supabaseClient || !isAuthenticated || sending) return
     
     const trimmed = inputValue.trim()
     if (!trimmed || trimmed.length > MESSAGE_MAX_LENGTH) return
     
     const now = Date.now()
     if (now - lastSentRef.current < RATE_LIMIT_MS) {
+      setSendError('Give it a moment, then send your next message.')
       return
     }
     lastSentRef.current = now
 
     setSending(true)
+    setSendError('')
     setInputValue('')
 
     try {
-      await supabaseClient.from(messageTable).insert({
+      const { error } = await supabaseClient.from(messageTable).insert({
         ...(classId ? { class_id: classId, department_name: userAgency || null } : { agency: userAgency || null }),
         user_id: currentUserId,
         display_name: currentUsername,
         message: trimmed,
       })
+      if (error) throw error
       // Reload messages after sending
       const query = supabaseClient
         .from(messageTable)
@@ -764,13 +824,15 @@ export function GlobalChatWidget({
       }
     } catch (err) {
       console.error('Failed to send message:', err)
+      setInputValue(trimmed)
+      setSendError('Your message wasn’t sent. Your draft is saved here; try again.')
     } finally {
       setSending(false)
     }
-  }, [classId, inputValue, currentUserId, currentUsername, messageTable, userAgency, supabaseClient, isAuthenticated, refreshVisibleReactions])
+  }, [cacheScope, classId, inputValue, currentUserId, currentUsername, messageTable, userAgency, supabaseClient, isAuthenticated, refreshVisibleReactions, sending])
 
   const addEmojiToInput = useCallback((emoji: string) => {
-    setInputValue((previous) => `${previous}${emoji}`)
+    setInputValue((previous) => previous.length + emoji.length <= MESSAGE_MAX_LENGTH ? `${previous}${emoji}` : previous)
   }, [])
 
   const formatReactionHoverText = useCallback((users: string[]) => {
@@ -1036,17 +1098,9 @@ export function GlobalChatWidget({
     void fetchUserProfile(userId)
   }, [fetchUserProfile, onOpenProfile])
 
-  // Format timestamp
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    
-    if (diff < 60000) return 'now'
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`
-    if (diff < 86400000) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
-  }
+  const formatTime = (dateStr: string) => new Date(dateStr).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const conversationTitle = classLabel || (classId ? 'Class conversation' : 'Academy conversation')
+  const ConversationHeading = isFullMode ? 'h1' : 'h2'
 
   // Format study time in hours/minutes
   const formatStudyTime = (seconds: number) => {
@@ -1075,27 +1129,53 @@ export function GlobalChatWidget({
 
       {isOpen && (
         <div className={isFullMode ? 'global-chat-panel global-chat-panel-full' : 'global-chat-panel'}>
-          <div className="global-chat-header">
-            <span>Public Chat</span>
-            {!isFullMode ? (
-              <button className="global-chat-close" onClick={() => setIsOpen(false)} aria-label="Close chat">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            ) : null}
+          <header className="global-chat-header">
+            <div className="global-chat-room-mark"><ChatIcon name="chat" size={23} /></div>
+            <div className="global-chat-heading">
+              <span className="global-chat-eyebrow">180 Academy · Messages</span>
+              <ConversationHeading className="global-chat-title">{conversationTitle}</ConversationHeading>
+              <p>{classId ? 'Your class. One conversation.' : 'A place to learn together.'}</p>
+            </div>
+            <div className="global-chat-header-actions">
+              <span className={`global-chat-connection ${connectionStatus}`} role="status">
+                <i aria-hidden="true" />{connectionStatus === 'live' ? 'Live updates' : connectionStatus === 'connecting' ? 'Connecting' : 'Reconnecting'}
+              </span>
+              {!isFullMode && (
+                <button className="global-chat-close" onClick={() => setIsOpen(false)} aria-label="Close chat"><ChatIcon name="close" size={18} /></button>
+              )}
+            </div>
+          </header>
+          <div className="global-chat-context">
+            <span><span aria-hidden="true">#</span> general</span>
+            <p>Share a question. Help a classmate. Keep moving forward.</p>
           </div>
 
-          <div className="global-chat-messages" ref={containerRef} onScroll={handleScroll}>
-            {messages.map((msg) => {
+          <div className="global-chat-messages" ref={containerRef} onScroll={handleScroll} role="log" aria-label={`${conversationTitle} messages`} aria-live="polite" aria-relevant="additions">
+            {messages.length === 0 && (
+              <div className="global-chat-empty">
+                <span><ChatIcon name="chat" size={29} /></span>
+                <h3>Great progress starts with a conversation.</h3>
+                <p>Ask a study question, share a useful tip, or say hello to your class.</p>
+              </div>
+            )}
+            {messages.map((msg, index) => {
               const messageDisplayName = String(msg.display_name || '').trim().toLowerCase()
               const isSystemMessage = messageDisplayName === 'system' || messageDisplayName === '🔔 system'
               const isOwnMessage = msg.user_id === currentUserId && !isSystemMessage
               const messageLevel = userLevels?.[msg.user_id] || { level: 1, tierName: 'Recruit', totalXp: 0, haloClass: 'level-halo-recruit' }
 
               return (
-                <div key={msg.id} className={`global-chat-message ${isOwnMessage ? 'own' : ''} ${msg.is_deleted ? 'deleted' : ''}`}>
+                <Fragment key={msg.id}>
+                  {(index === 0 || new Date(messages[index - 1].created_at).toDateString() !== new Date(msg.created_at).toDateString()) && (
+                    <div className="global-chat-day"><span>{messageDayLabel(msg.created_at)}</span></div>
+                  )}
+                  <article className={`global-chat-message-row ${isOwnMessage ? 'own' : ''} ${isSystemMessage ? 'system' : ''}`}>
+                    {isSystemMessage ? (
+                      <span className="global-chat-message-avatar system" aria-hidden="true"><ChatIcon name="chat" size={16} /></span>
+                    ) : (
+                      <button className="global-chat-message-avatar" onClick={() => openUserProfile(msg.user_id)} aria-label={`View ${msg.display_name}'s profile`}>{messageInitials(msg.display_name)}</button>
+                    )}
+                    <div className={`global-chat-message ${isOwnMessage ? 'own' : ''} ${msg.is_deleted ? 'deleted' : ''}`}>
                   <div className="global-chat-message-header">
                     {isSystemMessage ? (
                       <span className="global-chat-name global-chat-name-system">{msg.display_name}</span>
@@ -1108,9 +1188,9 @@ export function GlobalChatWidget({
                       <span className={`global-chat-level ${messageLevel.haloClass}`}>Lv {messageLevel.level}</span>
                     ) : null}
                     {(msg.agency || msg.department_name) && <span className="global-chat-agency">{msg.agency || msg.department_name}</span>}
-                    <span className="global-chat-time">{formatTime(msg.created_at)}</span>
                   </div>
                   <p className="global-chat-text">{msg.message}</p>
+                  <div className="global-chat-message-footer">
                   <div className="global-chat-reactions">
                     {Object.entries(messageReactions[msg.id] || {})
                       .filter(([, users]) => users.length > 0)
@@ -1125,6 +1205,7 @@ export function GlobalChatWidget({
                             type="button"
                             className={active ? 'global-chat-reaction active' : 'global-chat-reaction'}
                             title={hoverLabel}
+                            aria-pressed={active}
                             aria-label={`${emoji} reaction • ${count} ${count === 1 ? 'person' : 'people'} • ${hoverLabel}`}
                             onMouseEnter={(event) => showReactionHover(event, msg.id, emoji, users)}
                             onMouseLeave={() => hideReactionHover(msg.id, emoji)}
@@ -1163,17 +1244,19 @@ export function GlobalChatWidget({
                       </button>
                     ) : null}
                   </div>
-                  {!msg.is_deleted && msg.user_id !== currentUserId && (
-                    <button className="global-chat-report" onClick={() => setReportModalOpen(msg.id)} aria-label="Report message">
-                      ⋯
-                    </button>
-                  )}
-                  {canModerateMessages && !msg.is_deleted && (
-                    <button className="global-chat-delete" onClick={() => handleDelete(msg.id)} aria-label="Delete message">
-                      🗑
-                    </button>
-                  )}
-                </div>
+                    <time className="global-chat-time" dateTime={msg.created_at} title={new Date(msg.created_at).toLocaleString()}>{formatTime(msg.created_at)}</time>
+                    <div className="global-chat-message-tools">
+                      {!msg.is_deleted && msg.user_id !== currentUserId && (
+                        <button className="global-chat-report" onClick={() => setReportModalOpen(msg.id)} aria-label="Report message" title="Report message"><ChatIcon name="flag" size={14} /></button>
+                      )}
+                      {canModerateMessages && !msg.is_deleted && (
+                        <button className="global-chat-delete" onClick={() => handleDelete(msg.id)} aria-label="Delete message" title="Delete message"><ChatIcon name="trash" size={14} /></button>
+                      )}
+                    </div>
+                  </div>
+                    </div>
+                  </article>
+                </Fragment>
               )
             })}
             <div ref={messagesEndRef} />
@@ -1197,7 +1280,7 @@ export function GlobalChatWidget({
                     key={`popular-${reactionPicker.messageId}-${emoji}`}
                     type="button"
                     className="global-chat-reaction-option"
-                    onMouseDown={(event) => {
+                    onClick={(event) => {
                       event.preventDefault()
                       event.stopPropagation()
                       void toggleReaction(reactionPicker.messageId, emoji)
@@ -1215,7 +1298,7 @@ export function GlobalChatWidget({
                     key={`all-${reactionPicker.messageId}-${emoji}`}
                     type="button"
                     className="global-chat-reaction-option"
-                    onMouseDown={(event) => {
+                    onClick={(event) => {
                       event.preventDefault()
                       event.stopPropagation()
                       void toggleReaction(reactionPicker.messageId, emoji)
@@ -1242,61 +1325,58 @@ export function GlobalChatWidget({
           ) : null}
 
           {hasNewMessages && (
-            <button className="global-chat-new-indicator" onClick={scrollToBottom}>
-              New messages ↓
-            </button>
+            <button className="global-chat-new-indicator" onClick={scrollToBottom}><ChatIcon name="down" size={15} /> New messages</button>
           )}
 
-          <div className="global-chat-input-row">
+          <div className="global-chat-composer">
             {isAuthenticated ? (
               <>
-                <input
-                  type="text"
-                  className="global-chat-input"
-                  placeholder="Type a message…"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      sendMessage()
-                    }
-                  }}
-                  maxLength={MESSAGE_MAX_LENGTH}
-                  disabled={sending}
-                />
-                <button
-                  className="global-chat-send"
-                  onClick={sendMessage}
-                  disabled={sending || !inputValue.trim()}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                  </svg>
-                </button>
+                {sendError && <p className="global-chat-send-error" role="alert">{sendError}</p>}
+                <div className="global-chat-input-row">
+                  <textarea
+                    className="global-chat-input"
+                    placeholder="Message your class…"
+                    aria-label="Message"
+                    rows={2}
+                    value={inputValue}
+                    onChange={(event) => { setInputValue(event.target.value); setSendError('') }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                        event.preventDefault()
+                        void sendMessage()
+                      }
+                    }}
+                    maxLength={MESSAGE_MAX_LENGTH}
+                    disabled={sending}
+                  />
+                  <div className="global-chat-composer-toolbar">
+                    <button type="button" className={`global-chat-emoji-toggle ${showQuickEmojis ? 'active' : ''}`} aria-label="Insert an emoji" aria-expanded={showQuickEmojis} onClick={() => setShowQuickEmojis((value) => !value)}><ChatIcon name="smile" /></button>
+                    <span className="global-chat-composer-hint">Enter to send · Shift + Enter for a new line</span>
+                    <span className={`global-chat-count ${inputValue.length >= MESSAGE_MAX_LENGTH ? 'limit' : ''}`} aria-label={`${inputValue.length} of ${MESSAGE_MAX_LENGTH} characters`}>{inputValue.length}/{MESSAGE_MAX_LENGTH}</span>
+                    <button type="button" className="global-chat-send" onClick={() => void sendMessage()} disabled={sending || !inputValue.trim()} aria-label={sending ? 'Sending message' : 'Send message'}>
+                      <span>{sending ? 'Sending' : 'Send'}</span><ChatIcon name="send" size={17} />
+                    </button>
+                  </div>
+                </div>
+                {showQuickEmojis && (
+                  <div className="global-chat-emoji-row" aria-label="Quick emojis">
+                    {quickInsertEmojis.map((emoji) => <button key={`insert-${emoji}`} type="button" className="global-chat-emoji-btn" disabled={sending} aria-label={`Insert ${emoji}`} onClick={() => addEmojiToInput(emoji)}>{emoji}</button>)}
+                  </div>
+                )}
+                <p className="global-chat-composer-note">{classId ? 'A shared space for your class. Keep it helpful and respectful.' : 'Keep the conversation supportive and respectful.'}</p>
               </>
-            ) : (
-              <span className="global-chat-signin">Sign in to chat</span>
-            )}
+            ) : <p className="global-chat-signin">Sign in to join the conversation.</p>}
           </div>
-          {isAuthenticated ? (
-            <div className="global-chat-emoji-row">
-              {quickInsertEmojis.map((emoji) => (
-                <button key={`insert-${emoji}`} type="button" className="global-chat-emoji-btn" onClick={() => addEmojiToInput(emoji)}>
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          ) : null}
         </div>
       )}
 
       {reportModalOpen && (
         <div className="global-chat-modal-overlay" onClick={() => setReportModalOpen(null)}>
-          <div className="global-chat-modal" onClick={(e) => e.stopPropagation()}>
-            <h4>Report Message</h4>
-            <select value={reportReason} onChange={(e) => setReportReason(e.target.value)}>
+          <div className="global-chat-modal" role="dialog" aria-modal="true" aria-labelledby="chat-report-title" onClick={(e) => e.stopPropagation()}>
+            <span className="global-chat-modal-symbol"><ChatIcon name="flag" size={22} /></span>
+            <h4 id="chat-report-title">Report a message</h4>
+            <p className="global-chat-modal-description">Help keep the conversation useful and respectful. Choose the reason for your report.</p>
+            <select aria-label="Report reason" value={reportReason} onChange={(e) => setReportReason(e.target.value)}>
               <option value="">Select a reason</option>
               <option value="spam">Spam</option>
               <option value="abuse">Abuse/Harassment</option>

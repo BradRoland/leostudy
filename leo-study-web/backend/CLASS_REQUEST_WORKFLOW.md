@@ -15,7 +15,7 @@ Set these **server-only** environment variables in the intended deployment:
 | Variable | Purpose |
 | --- | --- |
 | `CLASS_REQUEST_EMAIL_ENABLED` | Set to `true` after verifying the target database and mail transport. Defaults to disabled. |
-| `CLASS_REQUEST_EMAIL_FROM` | Verified sender address, optionally `Class 180 <address>`. Falls back to existing `SMTP_ADMIN_EMAIL`. |
+| `CLASS_REQUEST_EMAIL_FROM` | Verified sender address, optionally `180 Academy <address>`. Falls back to existing `SMTP_ADMIN_EMAIL`. |
 | `CLASS_REQUEST_OWNER_EMAIL` | Owner's actual review inbox. Falls back to the configured `VITE_OWNER_EMAIL`; no address is invented. |
 | `CLASS_REQUEST_APP_URL` | The deployment's full origin, e.g. its HTTPS staging/production origin. Used in both email links. Falls back to `VITE_AUTH_REDIRECT_BASE_URL`. |
 | `CLASS_REQUEST_SMTP_HOST`, `CLASS_REQUEST_SMTP_PORT` | Existing SMTP service. Fallbacks: `SMTP_HOST`, `SMTP_PORT`. |

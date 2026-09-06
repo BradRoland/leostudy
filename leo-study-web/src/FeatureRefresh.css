@@ -1,0 +1,308 @@
+/* Feature-page structure. All surfaces inherit the shared 180 Academy palette. */
+.professional-ui :is(.study-section,.games-section,.scenario-section,.library-section,.stats-section,.class-page) { gap:28px; }
+.professional-ui :is(.study-section,.games-section,.scenario-section) { display:grid; min-width:0; }
+.professional-ui :is(.study-section,.games-section,.scenario-section,.stats-section,.library-section,.class-page,.settings-panel,.study-guide-page,.study-practice-page) :is(h2,h3,h4) { color:var(--text-primary); }
+.professional-ui :is(.study-section,.games-section,.scenario-section,.stats-section,.library-section,.class-page,.settings-panel,.study-guide-page,.study-practice-page) :is(.muted,.tiny) { color:var(--text-secondary); }
+.professional-ui :is(.study-section,.games-section,.scenario-section,.stats-section,.library-section,.class-page,.settings-panel,.study-guide-page,.study-practice-page) :is(.card,.class-card,.settings-section-card) { box-shadow:0 4px 16px #00000003!important; }
+.professional-ui :is(.study-section,.games-section,.scenario-section,.class-page,.settings-panel,.study-guide-page,.study-practice-page) :is(.primary,.secondary) { padding:11px 18px; min-height:44px; font-size:13px; }
+.professional-ui :is(.study-section,.games-section,.scenario-section,.library-section,.study-session-page) .segmented { display:flex; flex-wrap:wrap; gap:4px; width:fit-content; max-width:100%; padding:5px; border-radius:11px; background:var(--panel-soft)!important; box-shadow:none; }
+.professional-ui :is(.study-section,.games-section,.scenario-section,.library-section,.study-session-page) .seg { min-height:36px; padding:8px 15px; border-radius:7px; color:var(--text-secondary); white-space:normal; }
+.professional-ui :is(.study-section,.games-section,.scenario-section,.library-section,.study-session-page) .seg.active { background:var(--card-bg)!important; color:var(--accent)!important; border-color:transparent; box-shadow:0 2px 5px #00000007; }
+
+/* Study hub: navigation choices first, then an analytical workspace. */
+.professional-ui .study-actions-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.professional-ui .study-action-card { position:relative; display:grid; grid-template-columns:58px minmax(0,1fr) 20px; align-items:start; gap:20px; min-height:176px; padding:27px!important; text-align:left; overflow:hidden; }
+.professional-ui .study-action-card::after { content:'↗'; font-size:22px; line-height:1.3; color:var(--text-muted); transition:color .15s; }
+.professional-ui .study-action-card:hover::after { color:var(--accent); }
+.professional-ui .study-action-card h3 { margin:1px 0 9px; font-size:20px; letter-spacing:-.035em; }
+.professional-ui .study-action-card p { margin:0; font-size:13px; line-height:1.7; max-width:35ch; }
+.professional-ui .study-action-icon { width:56px; height:56px; display:grid; place-items:center; border:1px solid color-mix(in srgb,var(--accent) 13%,var(--card-border)); border-radius:15px; background:color-mix(in srgb,var(--accent) 7%,var(--card-bg)); }
+.professional-ui .study-action-icon .button-icon { width:26px; height:26px; }
+.professional-ui :is(.study-focus-block,.study-momentum-card,.study-priority-card) { padding:26px!important; }
+.professional-ui :is(.study-focus-head,.study-momentum-head) { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:22px; }
+.professional-ui :is(.study-focus-head,.study-momentum-head) h3 { margin:0 0 6px; font-size:19px; }
+.professional-ui :is(.study-focus-head,.study-momentum-head) p { margin:0; font-size:12px; }
+.professional-ui .study-focus-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.professional-ui .study-focus-item { display:flex; gap:14px; align-items:center; padding:18px; background:var(--panel-soft); border:0; border-radius:12px; }
+.professional-ui .study-focus-rank { display:grid; place-items:center; flex:0 0 35px; height:35px; border-radius:10px; background:var(--card-bg); border:1px solid var(--card-border); color:var(--accent); font-size:12px; }
+.professional-ui .study-focus-title { margin:0 0 4px; font-size:13px; font-weight:650; }
+.professional-ui .study-focus-meta { margin:0; color:var(--text-muted); font-size:11px; }
+.professional-ui :is(.study-momentum-metrics,.study-analytics-grid) { gap:16px; }
+.professional-ui .study-momentum-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin-top:22px; }
+.professional-ui .study-momentum-item { display:flex; flex-direction:column; gap:7px; padding:18px; background:var(--panel-soft); border:0; border-radius:11px; }
+.professional-ui .study-momentum-item small { font-size:11px; color:var(--text-muted); }
+.professional-ui .study-momentum-item strong { font-size:25px; font-weight:650; letter-spacing:-.035em; color:var(--text-primary); }
+.professional-ui .study-priority-groups { display:grid; gap:14px; }
+.professional-ui .study-priority-group { padding:0; border:0; background:transparent; }
+.professional-ui .study-priority-item { display:flex; justify-content:space-between; gap:18px; padding:16px 0; border-bottom:1px solid var(--card-border); background:transparent; border-radius:0; }
+.professional-ui .study-priority-item:last-child { border-bottom:0; }
+.professional-ui .study-priority-item > span { font-size:13px; }
+.professional-ui .study-priority-item small { color:var(--text-muted); font-size:11px; white-space:nowrap; }
+.professional-ui .study-priority-recommendation { padding:16px 18px; margin:18px 0 0; border:0; border-left:3px solid var(--accent); border-radius:0 9px 9px 0; background:color-mix(in srgb,var(--accent) 6%,var(--card-bg)); color:var(--text-secondary); font-size:12px; line-height:1.75; }
+
+/* Setup screens and active study sessions keep the same controls and ordering. */
+.professional-ui .study-session-shell-page { max-width:1200px; margin-inline:auto; padding:0!important; border:0!important; border-radius:0!important; background:transparent!important; box-shadow:none!important; gap:24px; }
+.professional-ui .study-session-top { background:var(--card-bg)!important; border:1px solid var(--card-border)!important; border-radius:16px; padding:23px 26px; box-shadow:none; }
+.professional-ui .study-session-top-copy strong { font-size:22px; font-weight:650; letter-spacing:-.035em; }
+.professional-ui .study-session-top-copy small { display:block; margin-top:6px; font-size:12px; color:var(--text-muted); }
+.professional-ui .study-session-top-action-start { min-height:45px; border-radius:10px; }
+.professional-ui .study-setup-card-rich { display:grid; gap:22px; border-radius:16px!important; }
+.professional-ui .study-setup-card-rich > h3 { font-size:20px; margin:0; }
+.professional-ui .study-setup-divider { height:1px; background:var(--card-border); margin:0; }
+.professional-ui .study-setup-focus > h3 { font-size:17px; margin:0 0 6px; }
+.professional-ui .study-session-controls { padding:20px; border:1px solid var(--card-border); border-radius:14px; background:var(--card-bg); gap:14px; }
+.professional-ui .study-session-flashcard { border-radius:20px; box-shadow:0 10px 30px #00000006; }
+.professional-ui :is(.study-session-face-front,.study-session-face-back) { border-color:var(--card-border); background:var(--card-bg); }
+.professional-ui :is(.study-test-question,.study-practice-session-card,.scenario-card) { border-radius:18px!important; padding:clamp(22px,3vw,38px)!important; }
+.professional-ui :is(.study-test-question,.study-practice-session-card,.scenario-card) h3 { font-size:clamp(19px,2vw,25px); line-height:1.6; font-weight:550; letter-spacing:-.025em; }
+.professional-ui :is(.choices,.scenario-actions) { gap:12px; }
+.professional-ui :is(.choice,.scenario-answer-btn):not(.choice-selected):not(.choice-correct):not(.choice-incorrect):not(.scenario-correct):not(.scenario-wrong):not(.scenario-selected) { background:var(--card-bg); border-color:var(--card-border); color:var(--text-primary); box-shadow:none; }
+.professional-ui :is(.study-session-page,.scenario-section) :is(.choice,.scenario-answer-btn) { padding:17px 19px; min-height:58px; border-radius:11px; line-height:1.6; font-size:14px; }
+.professional-ui :is(.study-session-page,.scenario-section) :is(.choice-correct,.scenario-correct) { background:color-mix(in srgb,var(--success) 9%,var(--card-bg))!important; border-color:var(--success)!important; color:var(--text-primary)!important; }
+.professional-ui :is(.study-session-page,.scenario-section) :is(.choice-incorrect,.scenario-wrong) { background:color-mix(in srgb,var(--danger) 8%,var(--card-bg))!important; border-color:var(--danger)!important; color:var(--text-primary)!important; }
+.professional-ui .study-session-page .choice-selected:not(.choice-correct):not(.choice-incorrect),.professional-ui .scenario-selected { background:color-mix(in srgb,var(--accent) 8%,var(--card-bg))!important; border-color:var(--accent)!important; }
+.professional-ui .choice-key { display:inline-grid; place-items:center; min-width:29px; height:29px; border-radius:8px; background:var(--panel-soft); color:var(--text-muted); font-size:11px; border:1px solid var(--card-border); }
+.professional-ui .scenario-section-switcher { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:14px; padding:15px 18px!important; border-radius:14px; }
+.professional-ui .scenario-section-meta { margin:0; font-size:12px; }
+.professional-ui .scenario-series-label { color:var(--accent); font-size:11px; font-weight:650; letter-spacing:.08em; text-transform:uppercase; }
+.professional-ui .scenario-card .quiz-top { padding-bottom:18px; margin-bottom:22px; border-bottom:1px solid var(--card-border); color:var(--text-muted); font-size:12px; }
+
+/* Long-form guides and practice setup: calm reading panels, compact navigation. */
+.professional-ui :is(.study-guide-hero,.study-practice-hero) { padding:28px!important; border-radius:18px!important; background:var(--card-bg)!important; color:var(--text-primary); }
+.professional-ui :is(.study-guide-hero,.study-practice-hero) h1 { font-size:clamp(25px,3vw,35px); letter-spacing:-.04em; margin:8px 0 12px; line-height:1.2; color:var(--text-primary); }
+.professional-ui :is(.study-guide-hero-copy,.study-practice-hero-copy) > p { max-width:74ch; line-height:1.8; color:var(--text-secondary); font-size:13px; }
+.professional-ui .study-guide-kicker { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:700; }
+.professional-ui .study-guide-stats { display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
+.professional-ui :is(.study-guide-stat-pill,.study-guide-badge) { border:1px solid var(--card-border); border-radius:8px; background:var(--panel-soft); color:var(--text-secondary); padding:8px 11px; font-size:11px; box-shadow:none; }
+.professional-ui .study-guide-layout { display:grid; grid-template-columns:minmax(230px,.28fr) minmax(0,1fr); gap:24px; align-items:start; }
+.professional-ui .study-guide-sidebar { gap:18px; min-width:0; }
+.professional-ui .study-guide-panel { padding:20px!important; border-radius:14px!important; }
+.professional-ui .study-guide-panel-head { margin-bottom:17px; }
+.professional-ui .study-guide-panel-head h2 { font-size:16px; }
+.professional-ui .study-guide-search { width:100%; }
+.professional-ui :is(.study-guide-scope-list,.study-guide-top-chapter-list,.study-guide-chapter-list) { gap:7px; }
+.professional-ui :is(.study-guide-scope-btn,.study-guide-top-chapter-btn,.study-guide-chapter-btn) { padding:12px 14px; border:1px solid var(--card-border); border-radius:9px; background:var(--card-bg); text-align:left; }
+.professional-ui :is(.study-guide-scope-btn,.study-guide-chapter-btn).active { background:color-mix(in srgb,var(--accent) 7%,var(--card-bg)); border-color:color-mix(in srgb,var(--accent) 32%,var(--card-border)); }
+.professional-ui :is(.study-guide-domain-hero,.study-guide-chapter-guide,.study-guide-context-card,.study-guide-chapter-nav-card) { padding:26px!important; border-radius:15px!important; }
+.professional-ui .study-guide-chapter-body { line-height:1.85; }
+.professional-ui :is(.study-guide-objective-item,.study-guide-synopsis-item,.study-guide-topic-brief,.study-guide-exam-detail-card) { padding:20px; background:var(--panel-soft); border:1px solid var(--card-border); border-radius:11px; box-shadow:none; }
+.professional-ui .study-guide-objective-id { display:inline-block; padding:5px 9px; background:var(--card-bg); color:var(--accent); border:1px solid var(--card-border); border-radius:6px; font-size:10px; }
+.professional-ui .study-practice-setup-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(280px,.8fr); gap:24px; align-items:start; }
+.professional-ui :is(.study-practice-setup-card,.study-practice-source-card) { padding:26px!important; border-radius:16px!important; }
+.professional-ui .study-practice-card-head { padding-bottom:18px; margin-bottom:20px; border-bottom:1px solid var(--card-border); }
+.professional-ui .study-practice-card-head h2 { font-size:18px; margin-bottom:6px; }
+.professional-ui .study-practice-length-grid { gap:10px; }
+.professional-ui .study-practice-length-button { padding:17px; border:1px solid var(--card-border); border-radius:12px; background:var(--card-bg); }
+.professional-ui .study-practice-length-button.active { border-color:var(--accent); background:color-mix(in srgb,var(--accent) 6%,var(--card-bg)); }
+.professional-ui :is(.study-practice-quick-stat,.study-practice-format-box,.study-practice-progress-card) { padding:18px; border:1px solid var(--card-border); border-radius:12px; background:var(--panel-soft); }
+.professional-ui .study-practice-breakdown-list { gap:10px; }
+.professional-ui .study-practice-results-card { border-radius:18px; }
+
+/* Games: distinct launch cards and compact filters; playfield dimensions stay intact. */
+.professional-ui .games-hub-leaderboards { gap:20px; }
+.professional-ui .games-hub-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:17px; }
+.professional-ui .games-hub-game-card { position:relative; min-height:205px; display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; padding:24px!important; gap:14px; border-radius:17px!important; text-align:left; overflow:hidden; }
+.professional-ui .games-hub-game-card::after { content:'↗'; position:absolute; top:20px; right:21px; font-size:20px; color:var(--text-muted); }
+.professional-ui .games-hub-game-card .game-mode-title { display:flex; flex-direction:column; align-items:flex-start; gap:21px; font-size:18px; font-weight:650; letter-spacing:-.025em; color:var(--text-primary); }
+.professional-ui .games-hub-game-card .button-icon { width:43px; height:43px; padding:10px; box-sizing:content-box; border-radius:14px; color:var(--accent); background:color-mix(in srgb,var(--accent) 7%,var(--card-bg)); }
+.professional-ui .games-hub-game-card .tiny { font-size:12px; line-height:1.6; }
+.professional-ui .games-hub-filter-card { padding:17px 22px!important; border-radius:13px; }
+.professional-ui .game-leaderboard-filters { gap:20px; flex-wrap:wrap; }
+.professional-ui .game-filter-group { display:flex; gap:12px; align-items:center; }
+.professional-ui .game-filter-label { text-transform:uppercase; letter-spacing:.09em; font-size:9px; color:var(--text-muted); }
+.professional-ui :is(.game-leader-panel,.leaderboard-card) { padding:24px!important; border-radius:15px!important; }
+.professional-ui .leaderboard-card-head { padding-bottom:18px; margin-bottom:18px; border-bottom:1px solid var(--card-border); }
+.professional-ui .leaderboard-card-head h3 { font-size:18px; margin:0 0 6px; }
+.professional-ui .leaderboard-card-subtitle { margin:0; font-size:12px; color:var(--text-muted); }
+.professional-ui .leader-row { min-height:62px; padding:11px 13px; border-radius:10px; background:var(--panel-soft); border:1px solid transparent; gap:12px; box-shadow:none!important; }
+.professional-ui .leader-row-button:hover { border-color:var(--card-border); background:var(--card-bg); }
+.professional-ui :is(.leader-name,.leader-score) { font-size:13px; }
+.professional-ui .leader-rank { color:var(--text-muted); font-weight:600; }
+.professional-ui .game-settings-modal { padding:28px; border-radius:20px; }
+.professional-ui .game-control { display:grid; gap:11px; font-size:12px; color:var(--text-secondary); }
+.professional-ui :is(.game-start-panel,.game-mode-hero,.game-settings-card) { padding:26px; border-radius:16px; background:var(--card-bg); border:1px solid var(--card-border); }
+.professional-ui .onevone-lobby-layout { gap:24px; grid-template-columns:minmax(0,1fr) minmax(245px,.34fr); align-items:start; }
+.professional-ui :is(.onevone-entry-card,.onevone-rail-card,.onevone-activity-card) { padding:24px!important; border-radius:16px!important; }
+.professional-ui .onevone-entry-top { padding-bottom:18px; border-bottom:1px solid var(--card-border); margin-bottom:20px; }
+.professional-ui .onevone-entry-top h3 { font-size:22px; margin-bottom:7px; }
+.professional-ui .onevone-entry-grid { gap:16px; }
+.professional-ui :is(.onevone-online-list-wrap,.onevone-public-list,.onevone-my-summary,.onevone-bot-lab,.onevone-join-block) { border:1px solid var(--card-border); background:var(--panel-soft); border-radius:12px; box-shadow:none; }
+.professional-ui :is(.onevone-online-row,.onevone-activity-item,.onevone-rail-row) { border-color:var(--card-border); background:var(--card-bg); border-radius:9px; padding:13px; box-shadow:none; }
+.professional-ui .onevone-lobby-settings-strip { display:flex; flex-wrap:wrap; gap:12px; padding:15px; border-radius:11px; background:var(--panel-soft); border:1px solid var(--card-border); }
+.professional-ui .onevone-waiting-room { border-radius:18px; background:var(--card-bg); border:1px solid var(--card-border); padding:26px; }
+.professional-ui .onevone-waiting-chat { border:1px solid var(--card-border); border-radius:12px; background:var(--panel-soft); }
+.professional-ui .onevone-result-summary { border-radius:14px; border-color:var(--card-border); background:var(--panel-soft); }
+
+/* Library and stats: readable data rows with a consistent metric hierarchy. */
+.professional-ui .library-section { display:grid; gap:22px; }
+.professional-ui .library-section .list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; margin:0; }
+.professional-ui .library-section .section-row { padding:23px; display:flex; align-items:flex-start; gap:18px; min-height:151px; border-radius:13px; }
+.professional-ui .library-section .section-row > div { flex:1; min-width:0; }
+.professional-ui .library-section .section-row h3 { font-size:14px; color:var(--accent); margin:0 0 12px; letter-spacing:.015em; font-weight:700; }
+.professional-ui .library-section .section-row p { margin:0; color:var(--text-primary); font-size:15px; font-weight:550; line-height:1.55; }
+.professional-ui .library-section .section-row .section-row-meta { margin-top:12px; color:var(--text-muted); font-size:11px; font-weight:400; }
+.professional-ui .library-section .badge { font-size:9px; padding:5px 8px; border-radius:6px; white-space:nowrap; }
+.professional-ui .stats-section > .profile-page-card { padding:0!important; background:transparent!important; border:0!important; box-shadow:none!important; }
+.professional-ui .stats-heading { margin-bottom:24px; gap:13px; }
+.professional-ui .stats-heading h3 { font-size:21px; }
+.professional-ui .stats-heading-icon { display:grid; place-items:center; width:43px; height:43px; padding:10px; border:1px solid var(--card-border); border-radius:12px; color:var(--accent); background:var(--card-bg); }
+.professional-ui .stats-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
+.professional-ui .stats-item { display:grid; gap:9px; padding:22px 19px; text-align:left; align-content:start; border-radius:13px; }
+.professional-ui .stats-item .stats-icon { margin:0 0 7px; color:var(--accent); }
+.professional-ui .stats-label { margin:0; font-size:11px; font-weight:500; color:var(--text-muted); line-height:1.6; }
+.professional-ui .stats-value { margin:0; font-size:27px; font-weight:650; letter-spacing:-.04em; color:var(--text-primary); }
+.professional-ui .stats-highlight-row { gap:16px; margin-block:22px; }
+.professional-ui .stats-highlight { display:grid; gap:8px; padding:24px; text-align:left; border-radius:14px; }
+.professional-ui .stats-highlight-icon { color:var(--accent); }
+.professional-ui :is(.stats-analytics-grid,.stats-code-list-grid) { gap:20px; margin-block:22px; }
+.professional-ui :is(.stats-chart-card,.stats-focus-card) { padding:25px!important; border-radius:15px!important; }
+.professional-ui .stats-chart-head { padding-bottom:18px; margin-bottom:20px; border-bottom:1px solid var(--card-border); }
+.professional-ui .stats-chart-head h3 { margin:0 0 7px; font-size:18px; }
+.professional-ui .stats-focus-meta { font-size:12px; line-height:1.7; color:var(--text-muted); }
+.professional-ui .stats-bar-list { display:grid; gap:19px; }
+.professional-ui .stats-bar-meta { display:flex; justify-content:space-between; gap:12px; font-size:12px; margin-bottom:8px; }
+.professional-ui .stats-bar-meta small { color:var(--text-muted); font-size:11px; }
+.professional-ui .stats-bar-track { height:7px; background:var(--panel-soft); border-radius:9px; }
+.professional-ui .stats-bar-fill { background:var(--accent); border-radius:9px; }
+.professional-ui .stats-mode-item { padding:18px; border-radius:11px; background:var(--panel-soft); border:0; }
+.professional-ui :is(.stats-code-item,.stats-focus-item) { padding:16px 0; border:0; border-bottom:1px solid var(--card-border); border-radius:0; background:transparent; }
+.professional-ui :is(.stats-code-item,.stats-focus-item):last-child { border-bottom:0; }
+.professional-ui :is(.stats-code-title,.stats-focus-title) { font-size:13px; font-weight:550; }
+
+/* Class and account management: clear grouping, ample labels and quieter chrome. */
+.professional-ui .class-page .panel-block { border:0; }
+.professional-ui .class-page .panel-block > :is(h1,h2) { font-size:26px; margin:0; letter-spacing:-.035em; }
+.professional-ui .class-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:18px; }
+.professional-ui .class-card { padding:25px; border-radius:15px; gap:12px; }
+.professional-ui .class-card h3 { font-size:18px; }
+.professional-ui .class-card .button-row { padding-top:16px; margin-top:5px; border-top:1px solid var(--card-border); gap:10px; }
+.professional-ui .department-chip-list { gap:7px; }
+.professional-ui .department-chip-list > span { padding:7px 10px; border-radius:7px; font-size:10px; }
+.professional-ui :is(.class-invite-card,.join-request-box,.settings-feature-toggle-card) { padding:24px; border:1px solid var(--card-border); border-radius:14px; background:var(--card-bg); box-shadow:none; }
+.professional-ui .class-page :is(input,select,textarea) { width:100%; max-width:100%; }
+.professional-ui .class-page input[type='checkbox'] { width:auto; }
+.professional-ui :is(.settings-layout,.profile-page-shell) { display:grid; grid-template-columns:210px minmax(0,1fr); gap:24px; align-items:start; }
+.professional-ui :is(.settings-nav,.settings-sidebar) { background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; padding:9px; gap:4px; }
+.professional-ui .settings-nav-btn { min-height:45px; padding:12px 14px; border:0!important; border-radius:9px; text-align:left; color:var(--text-secondary); font-size:12px; box-shadow:none!important; }
+.professional-ui .settings-panel { min-width:0; }
+.professional-ui .settings-section-card { padding:28px!important; border-radius:16px!important; display:grid; gap:21px; }
+.professional-ui .settings-section-card > label { display:grid; gap:9px; }
+.professional-ui .settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:19px; }
+.professional-ui .settings-grid label { display:grid; gap:8px; font-size:12px; }
+.professional-ui .settings-inline-head { gap:20px; padding-bottom:18px; border-bottom:1px solid var(--card-border); margin-bottom:5px; }
+.professional-ui .settings-inline-head h3 { font-size:18px; margin-bottom:6px; }
+.professional-ui .owner-admin-layout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
+.professional-ui .owner-admin-panel { display:grid; gap:23px; }
+.professional-ui .owner-admin-section { display:grid; gap:18px; padding:24px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; }
+.professional-ui .owner-admin-section h4 { font-size:16px; margin:0; }
+.professional-ui .owner-admin-member-list { display:grid; gap:11px; }
+.professional-ui .owner-admin-member-row { gap:18px; align-items:center; padding:18px; background:var(--panel-soft); border:1px solid var(--card-border); border-radius:11px; }
+.professional-ui .owner-admin-member-row strong { font-size:13px; }
+.professional-ui .owner-admin-member-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.professional-ui .owner-admin-member-actions :is(button,select) { min-height:36px; padding:7px 11px; font-size:11px; }
+.professional-ui .owner-admin-stats { display:flex; flex-wrap:wrap; gap:9px; }
+.professional-ui .owner-admin-stats > span { border:1px solid var(--card-border); border-radius:8px; padding:8px 12px; background:var(--panel-soft); font-size:12px; }
+.professional-ui .support-grid { gap:22px; }
+.professional-ui .support-card { padding:28px; display:flex; flex-direction:column; gap:20px; border-radius:16px; }
+.professional-ui .support-card h3 { font-size:22px; margin:0; }
+.professional-ui .support-card ul { padding-left:19px; margin:0; line-height:2; color:var(--text-secondary); font-size:13px; }
+.professional-ui .support-card .primary { margin-top:auto; }
+
+@media (max-width:1200px) {
+ .professional-ui .games-hub-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .professional-ui .stats-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+ .professional-ui .study-action-card { grid-template-columns:46px minmax(0,1fr); padding:23px!important; gap:16px; }
+ .professional-ui .study-action-card::after { display:none; }
+ .professional-ui .study-action-icon { width:46px; height:46px; }
+ .professional-ui .study-focus-grid { grid-template-columns:1fr; }
+ .professional-ui .study-guide-layout { grid-template-columns:225px minmax(0,1fr); gap:18px; }
+ .professional-ui .onevone-lobby-layout { grid-template-columns:1fr; }
+ .professional-ui .onevone-leaderboard-rail { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+}
+@media (max-width:900px) {
+ .professional-ui .study-practice-setup-grid { grid-template-columns:1fr; }
+ .professional-ui .study-guide-layout { grid-template-columns:1fr; }
+ .professional-ui .study-guide-sidebar { position:static; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+ .professional-ui :is(.settings-layout,.profile-page-shell) { grid-template-columns:1fr; }
+ .professional-ui :is(.settings-nav,.settings-sidebar) { display:flex; flex-wrap:wrap; }
+ .professional-ui .settings-nav-btn { flex:1 1 120px; text-align:center; }
+ .professional-ui .owner-admin-layout { grid-template-columns:1fr; }
+}
+@media (max-width:600px) {
+ .professional-ui :is(.study-section,.games-section,.scenario-section,.library-section,.stats-section,.class-page) { gap:20px; }
+ .professional-ui .study-actions-grid { grid-template-columns:1fr; gap:12px; }
+ .professional-ui .study-action-card { min-height:138px; padding:21px!important; }
+ .professional-ui .study-action-card h3 { font-size:18px; }
+ .professional-ui .study-action-card p { font-size:12px; }
+ .professional-ui .games-hub-grid { grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:12px!important; }
+ .professional-ui .games-hub-game-card { min-height:190px; padding:19px!important; }
+ .professional-ui .games-hub-game-card .button-icon { width:29px; height:29px; padding:10px; }
+ .professional-ui .games-hub-game-card .game-mode-title { font-size:16px; gap:16px; }
+ .professional-ui .games-hub-game-card .tiny { font-size:10px; }
+ .professional-ui .games-hub-game-card::after { top:15px; right:15px; font-size:17px; }
+ .professional-ui .library-section .list { grid-template-columns:1fr; }
+ .professional-ui .library-section .section-row { min-height:135px; padding:20px; }
+ .professional-ui .stats-grid { grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:12px!important; }
+ .professional-ui .stats-item { padding:18px; }
+ .professional-ui .stats-value { font-size:24px; }
+ .professional-ui :is(.stats-analytics-grid,.stats-code-list-grid,.stats-highlight-row,.study-guide-sidebar,.onevone-leaderboard-rail) { grid-template-columns:1fr; }
+ .professional-ui :is(.study-focus-block,.study-momentum-card,.study-priority-card,.study-guide-hero,.study-practice-hero,.study-guide-domain-hero,.study-guide-chapter-guide,.study-guide-context-card,.study-guide-chapter-nav-card,.study-practice-setup-card,.study-practice-source-card,.stats-chart-card,.stats-focus-card,.settings-section-card,.owner-admin-section) { padding:21px!important; }
+ .professional-ui :is(.study-focus-head,.study-momentum-head,.study-session-top,.settings-inline-head) { align-items:flex-start; flex-wrap:wrap; gap:16px; }
+ .professional-ui .study-session-top { padding:21px; }
+ .professional-ui .study-session-top-copy strong { font-size:19px; }
+ .professional-ui .study-session-top-actions { width:100%; }
+ .professional-ui .study-session-top-action-start { width:100%; }
+ .professional-ui .game-filter-group { flex-wrap:wrap; gap:8px; }
+ .professional-ui .game-leaderboard-filters { gap:15px; }
+ .professional-ui .study-priority-item { flex-direction:column; gap:5px; }
+ .professional-ui .study-priority-item small { white-space:normal; }
+ .professional-ui .owner-admin-member-row { align-items:flex-start; }
+ .professional-ui .owner-admin-member-actions { width:100%; }
+ .professional-ui .class-page .panel-block > :is(h1,h2) { font-size:23px; }
+ .professional-ui .class-card { padding:21px; }
+}
+@media (max-width:360px) {
+ .professional-ui .games-hub-grid { grid-template-columns:1fr!important; }
+ .professional-ui .games-hub-game-card { min-height:160px; }
+ .professional-ui .stats-item { padding:16px 13px; }
+ .professional-ui .library-section .section-row { flex-direction:column; gap:12px; }
+}
+
+/* Compact rows retain enough room for names, even beside a score. */
+.professional-ui .games-section .leader-row { grid-template-columns:25px minmax(0,1fr) 76px; padding:12px; gap:9px; }
+.professional-ui .games-section .leader-player { gap:8px; }
+.professional-ui .games-section .leader-avatar-wrap { flex:0 0 34px; width:34px; height:34px; }
+.professional-ui .games-section .leader-avatar { width:34px; height:34px; }
+.professional-ui .games-section .leader-player-name-text { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+.professional-ui .games-section .leader-result { min-width:0; width:auto; }
+.professional-ui .games-section .leader-result strong { font-size:13px; }
+.professional-ui .games-section .leader-result small { font-size:10px; }
+.professional-ui .study-practice-module-switch { display:flex!important; flex-direction:row!important; flex-wrap:nowrap!important; width:fit-content; min-width:0; max-width:100%; }
+.professional-ui .study-practice-module-switch .seg { flex:1 1 auto; min-width:0!important; width:auto!important; white-space:nowrap; }
+.professional-ui .study-guide-stats { display:grid!important; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+.professional-ui .study-guide-stat-pill { min-width:0; width:auto; padding:12px; }
+.professional-ui .study-guide-stat-pill span { font-size:9px; letter-spacing:.05em; }
+.professional-ui .onevone-lobby-main { min-width:0; }
+.professional-ui .onevone-rail-row { display:grid!important; grid-template-columns:25px minmax(0,1fr) auto!important; align-items:center; gap:9px!important; }
+.professional-ui .onevone-rail-name-wrap { display:flex; align-items:center; gap:9px; min-width:0; }
+.professional-ui .onevone-rail-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+@media (max-width:600px) {
+ .professional-ui .study-guide-stats { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+ .professional-ui .study-guide-shell,.professional-ui .study-practice-shell { padding:0!important; border:0!important; }
+ .professional-ui .study-practice-module-switch { width:100%; }
+ .professional-ui .settings-grid { grid-template-columns:1fr!important; }
+ .professional-ui .study-guide-hero h2,.professional-ui .study-practice-hero h2 { font-size:22px; line-height:1.4; }
+ .professional-ui .study-guide-source-note { font-size:11px; line-height:1.7; }
+}
+/* Remove the previous theme's fixed blue metric backgrounds. */
+.app-shell.professional-ui :is(.stats-item,.stats-highlight,.onevone-compare-card,.study-guide-read-metric) { background:var(--card-bg)!important; border:1px solid var(--card-border)!important; box-shadow:none!important; }
+.app-shell.professional-ui :is(.study-focus-item,.study-momentum-item,.stats-mode-item) { background:var(--panel-soft)!important; border-color:var(--card-border)!important; box-shadow:none!important; }
+
+.app-shell.professional-ui .profile-page-shell { padding:0!important; background:transparent!important; border:0!important; box-shadow:none!important; }
+@media (max-width:900px) { .professional-ui .settings-sidebar { display:flex!important; flex-direction:row!important; flex-wrap:nowrap!important; overflow:auto; } .professional-ui .settings-sidebar .settings-nav-btn { flex:0 0 auto; min-width:fit-content; white-space:nowrap; } }
+.app-shell.professional-ui .settings-sidebar { background:var(--card-bg)!important; border:1px solid var(--card-border)!important; border-radius:14px; padding:9px; box-shadow:none!important; }
+.app-shell.professional-ui .settings-sidebar .settings-nav-btn { box-shadow:none!important; }
+@media (max-width:900px) {
+ .app-shell.professional-ui .settings-sidebar { width:100%; display:flex!important; flex-wrap:nowrap!important; flex-direction:row!important; overflow-x:auto; }
+ .app-shell.professional-ui .settings-sidebar .settings-nav-btn { width:auto!important; flex:0 0 auto!important; min-width:fit-content!important; max-width:none; padding:11px 15px; white-space:nowrap; }
+}

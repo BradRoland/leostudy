@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { AcademyLogo } from './AcademyBrand'
 import { buildWeeklyActivity, formatDashboardTime, graduationProgress } from '../lib/dashboard'
 import './HomeDashboard.css'
 
@@ -34,9 +35,6 @@ type Props = {
   onClass: () => void
 }
 
-export function AcademyMark() {
-  return <svg viewBox="0 0 32 36" fill="none" aria-hidden="true"><path d="M16 2 29 7v11c0 8-13 16-13 16S3 26 3 18V7L16 2Z" stroke="currentColor" strokeWidth="1.8"/><path d="m9 20 7-10 7 10M12 16h8M11 24h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-}
 
 function Icon({ kind }: { kind: 'arrow' | 'book' | 'target' | 'clock' | 'bolt' | 'check' | 'chart' | 'spark' }) {
   const paths: Record<typeof kind, ReactNode> = {
@@ -69,34 +67,36 @@ export function HomeDashboard(props: Props) {
 
   return <div className="today-dashboard">
     <header className="today-heading">
-      <div><p className="today-eyebrow">YOUR ACADEMY WORKSPACE</p><h1>{greeting}, {firstName}<span className="today-greeting-dot">.</span></h1><p>A little progress today. A more confident you tomorrow.</p></div>
-      <button className="today-class-chip" onClick={props.onClass}><span className="today-status-dot"/><span><strong>{props.className || 'Your class'}</strong><small>{props.department || 'Academy training'}</small></span><Icon kind="arrow"/></button>
+      <div><p className="today-eyebrow">YOUR PERSONAL DASHBOARD</p><h1>{greeting}, {firstName}<span className="today-greeting-dot">.</span></h1><p>Here’s your progress. Let’s keep it moving.</p></div>
+      <div className="today-date"><Icon kind="clock"/><span>{new Date(now).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span></div>
     </header>
-
-    <div className="today-hero-grid">
-      <section className="today-focus-card" aria-labelledby="today-focus-title">
-        <div className="today-focus-top"><span className="today-pill"><Icon kind="spark"/>YOUR NEXT STEP</span><span className="today-duration"><Icon kind="clock"/>{goal} min daily goal</span></div>
-        <div className="today-focus-content"><div><h2 id="today-focus-title">Build confidence.<br/>One session at a time.</h2><p>{props.studyFocus === 'exam' ? 'Your focus is assessment preparation. Put your knowledge to the test, then review the areas where you can grow.' : props.studyFocus === 'scenarios' ? 'Your focus is putting knowledge into practice. Build confidence with realistic training scenarios.' : focus ? `Your next focus: ${subjectLabels[focus.section.codeSet]}. Revisit the codes that need a little more practice.` : 'Start with a few flashcards. As you practice, your study plan will adapt to the areas that need you most.'}</p><button className="today-start" onClick={startPreferredSession}>{primaryLabel}<Icon kind="arrow"/></button></div><div className="today-hero-emblem"><AcademyMark/><span>PREPARE WITH PURPOSE</span></div></div>
-        <div className="today-focus-foot"><span className="today-status-dot"/> {props.studyFocus === 'exam' || props.studyFocus === 'scenarios' ? 'Selected for your personal study focus' : focus ? 'Recommended from your practice history' : 'Your first step toward a stronger foundation'}</div>
-      </section>
-      <section className="today-streak-card" aria-labelledby="streak-title">
-        <div className="today-section-head"><h2 id="streak-title">Keep showing up</h2><span className="today-icon-tile amber"><Icon kind="bolt"/></span></div>
-        <div className="today-streak-value">{streak}<span>day{streak === 1 ? '' : 's'} in a row</span></div>
-        <p>{streak > 0 ? 'Consistency is your advantage. Make time for a little practice today.' : 'Every streak starts with day one. Your next study session counts.'}</p>
-        <div className="today-streak-bottom"><span>Personal best</span><strong>{props.bestStreak} days</strong></div>
-      </section>
-    </div>
 
     <div className="today-metrics" aria-label="Your learning statistics">
       <Metric icon="target" label="Practice accuracy" value={totalAttempts ? `${props.accuracy}%` : '—'} detail={totalAttempts ? `${totalAttempts.toLocaleString()} answers recorded` : 'Complete a session to begin'} tone="teal"/>
       <Metric icon="book" label="Codes mastered" value={String(props.mastered)} detail={`Of ${props.totalCodes.toLocaleString()} codes in your library`} tone="blue"/>
-      <Metric icon="clock" label="Time invested" value={formatDashboardTime(props.studySeconds)} detail="Total active study time" tone="purple"/>
+      <Metric icon="clock" label="Study time" value={formatDashboardTime(props.studySeconds)} detail="Total active study time" tone="purple"/>
       <Metric icon="chart" label="Your level" value={`Level ${props.level}`} detail={`${props.totalXp.toLocaleString()} XP earned`} tone="amber"/>
     </div>
 
+
+    <div className="today-hero-grid">
+      <section className="today-focus-card" aria-labelledby="today-focus-title">
+        <div className="today-focus-top"><span className="today-pill"><Icon kind="spark"/>YOUR NEXT MOVE</span><span className="today-duration"><Icon kind="clock"/>{goal} min daily goal</span></div>
+        <div className="today-focus-content"><div><h2 id="today-focus-title">Make today<br/><span>count.</span></h2><p>{props.studyFocus === 'exam' ? 'Your focus is assessment preparation. Put your knowledge to the test, then review the areas where you can grow.' : props.studyFocus === 'scenarios' ? 'Your focus is putting knowledge into practice. Build confidence with realistic training scenarios.' : focus ? `Your next focus: ${subjectLabels[focus.section.codeSet]}. Revisit the codes that need a little more practice.` : 'Start with a few flashcards. As you practice, your study plan will adapt to the areas that need you most.'}</p><button className="today-start" onClick={startPreferredSession}>{primaryLabel}<Icon kind="arrow"/></button></div><div className="today-hero-emblem" aria-hidden="true"><div className="today-emblem-orbit"><AcademyLogo label=""/></div><span>180 ACADEMY</span></div></div>
+        <div className="today-focus-foot"><Icon kind="check"/> {props.studyFocus === 'exam' || props.studyFocus === 'scenarios' ? 'Selected for your personal study focus' : focus ? 'Recommended from your practice history' : 'Your first step toward a stronger foundation'}</div>
+      </section>
+      <section className="today-streak-card" aria-labelledby="streak-title">
+        <div className="today-section-head"><h2 id="streak-title">Your momentum</h2><span className="today-icon-tile amber"><Icon kind="bolt"/></span></div>
+        <div className="today-streak-value">{streak}<span>day{streak === 1 ? '' : 's'} in a row</span></div>
+        <p>{streak > 0 ? 'One day at a time. Keep your streak going with a session today.' : 'Day one starts with your next session. You’ve got this.'}</p><div className="today-streak-week" role="img" aria-label={`Completed sessions this week: ${activity.map(day => `${day.dateLabel}: ${day.count} completed sessions`).join(', ')}`}>{activity.map(day => <span key={day.key} className={day.count ? 'is-done' : ''} title={`${day.label}: ${day.count} sessions`}><i>{day.count ? <Icon kind="check"/> : day.isToday ? '•' : ''}</i><small>{day.label.slice(0,1)}</small></span>)}</div>
+        <div className="today-streak-bottom"><span>Personal best</span><strong>{props.bestStreak} days</strong></div>
+      </section>
+    </div>
+
+
     <div className="today-learning-grid">
       <section className="today-panel today-plan" aria-labelledby="study-plan-title">
-        <div className="today-section-head"><div><p className="today-eyebrow">MAKE IT COUNT</p><h2 id="study-plan-title">Your study plan</h2></div><span className="today-soft-badge">Made for you</span></div>
+        <div className="today-section-head"><div><p className="today-eyebrow">A LITTLE FOCUS GOES A LONG WAY</p><h2 id="study-plan-title">Your study plan</h2></div><span className="today-soft-badge">Made for you</span></div>
         <p className="today-panel-intro">{focus ? 'A clear place to start, based on your recent answers.' : 'Build a foundation, then put your knowledge to work.'}</p>
         <button className="today-plan-row" onClick={() => props.onStudy(focus?.section.codeSet)}><span className="today-plan-number">01</span><span><strong>{focus ? `Review ${focus.section.sectionNumber}` : 'Warm up with flashcards'}</strong><small>{focus ? `${focus.section.title} · ${focus.accuracyPercent}% accuracy` : 'Recall the essentials across all code sets'}</small></span><Icon kind="arrow"/></button>
         <button className="today-plan-row" onClick={props.onScenarios}><span className="today-plan-number">02</span><span><strong>Put it into practice</strong><small>Apply what you know to training scenarios</small></span><Icon kind="arrow"/></button>
@@ -104,7 +104,7 @@ export function HomeDashboard(props: Props) {
       </section>
 
       <section className="today-panel" aria-labelledby="weekly-activity-title">
-        <div className="today-section-head"><div><p className="today-eyebrow">SMALL STEPS ADD UP</p><h2 id="weekly-activity-title">This week</h2></div><span className="today-soft-badge">Mon – Sun</span></div>
+        <div className="today-section-head"><div><p className="today-eyebrow">YOUR WEEK AT A GLANCE</p><h2 id="weekly-activity-title">This week</h2></div><span className="today-soft-badge">Mon – Sun</span></div>
         <div className="today-activity-total"><strong>{weeklySessions}</strong><span>completed session{weeklySessions === 1 ? '' : 's'}</span></div>
         <div className="today-activity-chart" role="img" aria-label={`Completed sessions this week: ${activity.map((day) => `${day.label} ${day.count}`).join(', ')}`}>
           {activity.map((day) => <div className={`today-chart-day${day.isToday ? ' is-today' : ''}${day.isFuture ? ' is-future' : ''}`} key={day.key} title={`${day.dateLabel}: ${day.count} completed sessions`}><span className="today-chart-count">{day.count || ''}</span><div className="today-chart-track"><span style={{ height: day.count ? `${Math.max(8, day.count / maxSessions * 100)}%` : '3px' }}/></div><span className="today-chart-label">{day.label}</span><span className="today-chart-dot"/></div>)}
@@ -115,21 +115,21 @@ export function HomeDashboard(props: Props) {
 
     <div className="today-learning-grid">
       <section className="today-panel" aria-labelledby="subject-progress-title">
-        <div className="today-section-head"><div><p className="today-eyebrow">KNOW WHERE YOU STAND</p><h2 id="subject-progress-title">Your subject progress</h2></div><button className="today-text-link" onClick={props.onStats}>View progress<Icon kind="arrow"/></button></div>
+        <div className="today-section-head"><div><p className="today-eyebrow">BUILD YOUR FOUNDATION</p><h2 id="subject-progress-title">Your subject progress</h2></div><button className="today-text-link" onClick={props.onStats}>View progress<Icon kind="arrow"/></button></div>
         <div className="today-subjects">{(['penal', 'hs', 'vehicle'] as CodeSet[]).map((codeSet) => {
           const subject = props.subjects.find((item) => item.codeSet === codeSet)
           const accuracy = subject?.accuracyPercent || 0
           return <button className="today-subject-row" onClick={() => props.onStudy(codeSet)} key={codeSet}><div><strong>{subjectLabels[codeSet]}</strong><span>{subject?.attempts ? `${accuracy}% accuracy` : 'Ready to begin'}</span></div><div className="today-progress-track"><span style={{ width: `${accuracy}%` }}/></div></button>
         })}</div>
       </section>
-      <section className="today-panel today-journey" aria-labelledby="journey-title"><div className="today-section-head"><div><p className="today-eyebrow">THE BIGGER PICTURE</p><h2 id="journey-title">Your academy journey</h2></div><span className="today-icon-tile teal"><AcademyMark/></span></div>
-        {graduation ? <><div className="today-journey-value"><strong>{graduation.daysRemaining}</strong><span>{graduation.daysRemaining === 1 ? 'day' : 'days'} until graduation</span></div><div className="today-progress-track" role="progressbar" aria-label="Class timeline progress" aria-valuenow={graduation.percent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${graduation.percent}%` }}/></div><p>{graduation.hasStarted ? 'Keep building the habits you will carry beyond the academy.' : 'Get a head start before your first day at the academy.'}</p></> : <><p>Each session is an investment in the cadet you are becoming. Keep building your foundation.</p><div className="today-level-line"><strong>Level {props.level}</strong><span>{props.levelPercent}% to next level</span></div><div className="today-progress-track" role="progressbar" aria-label="Progress to next level" aria-valuenow={props.levelPercent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${props.levelPercent}%` }}/></div></>}
+      <section className="today-panel today-journey" aria-labelledby="journey-title"><div className="today-section-head"><div><p className="today-eyebrow">YOUR NEXT MILESTONE</p><h2 id="journey-title">Your academy journey</h2></div><span className="today-icon-tile teal"><AcademyLogo label=""/></span></div>
+        {graduation ? <><div className="today-journey-value"><strong>{graduation.daysRemaining ? graduation.daysRemaining : 'Complete'}</strong><span>{graduation.daysRemaining ? `${graduation.daysRemaining === 1 ? 'day' : 'days'} until graduation` : 'Class timeline'}</span></div><div className="today-progress-track" role="progressbar" aria-label="Class timeline progress" aria-valuenow={graduation.percent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${graduation.percent}%` }}/></div><p>{graduation.daysRemaining === 0 ? 'Your class has reached its graduation date. Keep sharpening your skills for what comes next.' : graduation.hasStarted ? 'Keep building the habits you will carry beyond the academy.' : 'Get a head start before your first day at the academy.'}</p></> : <><p>Each session is an investment in the cadet you are becoming. Keep building your foundation.</p><div className="today-level-line"><strong>Level {props.level}</strong><span>{props.levelPercent}% to next level</span></div><div className="today-progress-track" role="progressbar" aria-label="Progress to next level" aria-valuenow={props.levelPercent} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${props.levelPercent}%` }}/></div></>}
         <button className="today-text-link" onClick={props.onClass}>View your class<Icon kind="arrow"/></button>
       </section>
     </div>
 
-    <section className="today-toolkit" aria-label="Explore your study tools"><div><p className="today-eyebrow">A DIFFERENT WAY TO LEARN</p><h2>Find your focus</h2></div><div className="today-toolkit-links"><button onClick={props.onStudyGuide}><Icon kind="book"/><span>Study guide</span><Icon kind="arrow"/></button><button onClick={props.onPracticeTest}><Icon kind="target"/><span>Practice tests</span><Icon kind="arrow"/></button><button onClick={props.onGames}><Icon kind="bolt"/><span>Training games</span><Icon kind="arrow"/></button></div></section>
-    <footer className="today-footer"><AcademyMark/><span>Progress takes practice. You are in the right place.</span></footer>
+    <section className="today-toolkit" aria-label="Explore your study tools"><div><p className="today-eyebrow">YOUR TOOLKIT</p><h2>Make it your kind of session.</h2></div><div className="today-toolkit-links"><button onClick={props.onStudyGuide}><Icon kind="book"/><span><strong>Study guide</strong><small>Understand the essentials</small></span><Icon kind="arrow"/></button><button onClick={props.onPracticeTest}><Icon kind="target"/><span><strong>Practice tests</strong><small>See what you know</small></span><Icon kind="arrow"/></button><button onClick={props.onGames}><Icon kind="bolt"/><span><strong>Training games</strong><small>A challenge worth taking</small></span><Icon kind="arrow"/></button></div></section>
+    <footer className="today-footer"><AcademyLogo label=""/><span>Progress takes practice. You are in the right place.</span></footer>
   </div>
 }
 

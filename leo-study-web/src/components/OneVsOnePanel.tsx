@@ -6873,6 +6873,114 @@ export function OneVsOnePanel(props: {
         <>
           <h2>1v1 Multiplayer</h2>
           <div className="onevone-lobby-layout">
+            <div className="onevone-lobby-main">
+              <div className="card onevone-card onevone-entry-card">
+                <div className="onevone-entry-top">
+                  <h3>Start a Match</h3>
+                  <p className="muted">Create your own room or join with a private code.</p>
+                </div>
+                <div className="onevone-entry-grid">
+                  <button
+                    className="primary onevone-create-button"
+                    type="button"
+                    onClick={() => setShowCreateRoomModal(true)}
+                    disabled={loading || !supabase}
+                  >
+                    <span>Create your own room</span>
+                    <small>Choose game mode, category, privacy, and question count.</small>
+                  </button>
+                  <button
+                    className="secondary onevone-invite-cta"
+                    type="button"
+                    onClick={() => openInviteModal()}
+                    disabled={loading || !supabase}
+                  >
+                    <span>Invite a Classmate</span>
+                    <small>Send a direct 1v1 invite to someone online in your class.</small>
+                  </button>
+                  <button
+                    className="secondary onevone-invite-cta onevone-bot-cta"
+                    type="button"
+                    onClick={() => openBotSetupModal()}
+                  >
+                    <span>1v1 Versus Bot</span>
+                    <small>Practice Quiz, Matching, Rope Blaster, or Connect 4 with adaptive bots.</small>
+                  </button>
+                  <div className="onevone-join-block">
+                    <p className="muted tiny">Join Private Room</p>
+                    <div className="onevone-join-row">
+                      <input
+                        value={joinCodeInput}
+                        maxLength={6}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        onChange={(event) => setJoinCodeInput(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="6-digit code"
+                      />
+                      <button className="primary" onClick={joinByCode} disabled={loading || !supabase}>
+                        Join
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card onevone-card">
+                <div className="onevone-list-head">
+                  <h3>Public Rooms {publicRooms.length > 0 ? `(${publicRooms.length})` : ''}</h3>
+                  <button className="secondary" onClick={() => void loadPublicRooms()} disabled={loading || !supabase}>
+                    Refresh
+                  </button>
+                </div>
+                {publicRooms.length === 0 ? <p className="muted">No public rooms available right now.</p> : null}
+                <div className="onevone-public-list">
+                  {publicRooms.map((item) => {
+                    const isActive = item.status === 'in_progress'
+                    const hasPlayers = item.player_count > 0
+                    const playersList = item.players || []
+                    const canDeleteRoom = item.host_user_id === currentUserId || isOwner
+                    const canJoin = item.player_count < 2 && !isActive
+                    const canSpectate = hasPlayers && isActive
+
+                    // Build player display
+                    const playerDisplay = playersList.map(p => p.display_name).join(' vs ') || 'Waiting for players'
+                    const statusLabel = isActive ? '🔴 Live' : '🟢 Waiting'
+
+                    return (
+                      <div key={item.id} className={`onevone-public-item ${isActive ? 'active-room' : ''}`}>
+                        <div>
+                          <strong>{playerDisplay}</strong>
+                          <p className="muted tiny">
+                            {statusLabel} • {duelGameTypeLabels[item.game_type]} • {item.category.toUpperCase()} • {formatDuelRoomRuleLabel(item)}
+                          </p>
+                        </div>
+                        <div className="onevone-public-actions">
+                          {canSpectate ? (
+                            <button className="primary" onClick={() => void joinPublicRoom(item.id, true)} disabled={loading}>
+                              Spectate
+                            </button>
+                          ) : (
+                            <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading || !canJoin}>
+                              Join
+                            </button>
+                          )}
+                          {canDeleteRoom ? (
+                            <button
+                              className="secondary"
+                              onClick={() => void deleteRoomById(item.id)}
+                              disabled={loading || deletingRoomId === item.id}
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
             <aside className="onevone-leaderboard-rail">
               <div className="card onevone-card onevone-rail-card">
 	                <div className="onevone-rail-head">
@@ -7030,114 +7138,6 @@ export function OneVsOnePanel(props: {
                 </div>
               </div>
             </aside>
-
-            <div className="onevone-lobby-main">
-              <div className="card onevone-card onevone-entry-card">
-                <div className="onevone-entry-top">
-                  <h3>Start a Match</h3>
-                  <p className="muted">Create your own room or join with a private code.</p>
-                </div>
-                <div className="onevone-entry-grid">
-                  <button
-                    className="primary onevone-create-button"
-                    type="button"
-                    onClick={() => setShowCreateRoomModal(true)}
-                    disabled={loading || !supabase}
-                  >
-                    <span>Create your own room</span>
-                    <small>Choose game mode, category, privacy, and question count.</small>
-                  </button>
-                  <button
-                    className="secondary onevone-invite-cta"
-                    type="button"
-                    onClick={() => openInviteModal()}
-                    disabled={loading || !supabase}
-                  >
-                    <span>Invite a Classmate</span>
-                    <small>Send a direct 1v1 invite to someone online in your class.</small>
-                  </button>
-                  <button
-                    className="secondary onevone-invite-cta onevone-bot-cta"
-                    type="button"
-                    onClick={() => openBotSetupModal()}
-                  >
-                    <span>1v1 Versus Bot</span>
-                    <small>Practice Quiz, Matching, Rope Blaster, or Connect 4 with adaptive bots.</small>
-                  </button>
-                  <div className="onevone-join-block">
-                    <p className="muted tiny">Join Private Room</p>
-                    <div className="onevone-join-row">
-                      <input
-                        value={joinCodeInput}
-                        maxLength={6}
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        onChange={(event) => setJoinCodeInput(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="6-digit code"
-                      />
-                      <button className="primary" onClick={joinByCode} disabled={loading || !supabase}>
-                        Join
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card onevone-card">
-                <div className="onevone-list-head">
-                  <h3>Public Rooms {publicRooms.length > 0 ? `(${publicRooms.length})` : ''}</h3>
-                  <button className="secondary" onClick={() => void loadPublicRooms()} disabled={loading || !supabase}>
-                    Refresh
-                  </button>
-                </div>
-                {publicRooms.length === 0 ? <p className="muted">No public rooms available right now.</p> : null}
-                <div className="onevone-public-list">
-                  {publicRooms.map((item) => {
-                    const isActive = item.status === 'in_progress'
-                    const hasPlayers = item.player_count > 0
-                    const playersList = item.players || []
-                    const canDeleteRoom = item.host_user_id === currentUserId || isOwner
-                    const canJoin = item.player_count < 2 && !isActive
-                    const canSpectate = hasPlayers && isActive
-
-                    // Build player display
-                    const playerDisplay = playersList.map(p => p.display_name).join(' vs ') || 'Waiting for players'
-                    const statusLabel = isActive ? '🔴 Live' : '🟢 Waiting'
-
-                    return (
-                      <div key={item.id} className={`onevone-public-item ${isActive ? 'active-room' : ''}`}>
-                        <div>
-                          <strong>{playerDisplay}</strong>
-                          <p className="muted tiny">
-                            {statusLabel} • {duelGameTypeLabels[item.game_type]} • {item.category.toUpperCase()} • {formatDuelRoomRuleLabel(item)}
-                          </p>
-                        </div>
-                        <div className="onevone-public-actions">
-                          {canSpectate ? (
-                            <button className="primary" onClick={() => void joinPublicRoom(item.id, true)} disabled={loading}>
-                              Spectate
-                            </button>
-                          ) : (
-                            <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading || !canJoin}>
-                              Join
-                            </button>
-                          )}
-                          {canDeleteRoom ? (
-                            <button
-                              className="secondary"
-                              onClick={() => void deleteRoomById(item.id)}
-                              disabled={loading || deletingRoomId === item.id}
-                            >
-                              Delete
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
           </div>
         </>
       ) : null}

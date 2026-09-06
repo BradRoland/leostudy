@@ -1,22 +1,34 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { ClassCreationRequestInput } from '../lib/classApi'
+import { AcademyBrand, AcademyLogo } from './AcademyBrand'
 import './Onboarding.css'
 
 export function AcademyWelcome({ children, step, steps = ['Account', 'Class', 'Department', 'Profile', 'Study plan'] }: { children: ReactNode; step?: number; steps?: string[] }) {
   return <div className="academy-welcome">
-    <aside className="academy-welcome-story" aria-label="Welcome to Class 180">
-      <Link className="academy-brand" to="/signin"><span className="academy-brand-mark" aria-hidden>180</span><span>CLASS 180<span className="academy-brand-sub">THE ACADEMY STUDY SPACE</span></span></Link>
-      <div className="academy-story-copy"><span className="academy-eyebrow">A little progress. Every day.</span><h1>Prepare with purpose.<br /><em>Show up confident.</em></h1><p>Your class, your study plan, and your next milestone. Together in one focused space.</p></div>
-      <div className="academy-story-path" aria-hidden><span className="academy-story-dot" /><span>Build knowledge</span><span className="academy-story-line" /><span className="academy-story-dot" /><span>Build confidence</span></div>
-      <p className="academy-story-footer">Made for the journey from cadet to graduation.</p>
-    </aside>
-    <main className="academy-welcome-main"><div className="academy-mobile-brand">CLASS <strong>180</strong><span>YOUR ACADEMY COMPANION</span></div>
-      <div className="academy-form-wrap">
-        {step !== undefined ? <ol className="academy-progress" aria-label="Account setup progress">{steps.map((label, index) => <li key={label} className={index === step ? 'is-current' : index < step ? 'is-complete' : ''} aria-current={index === step ? 'step' : undefined}><span>{index < step ? '✓' : index + 1}</span><small>{label}</small></li>)}</ol> : null}
-        {children}
-      </div><p className="academy-form-footer">Small steps today. Stronger performance tomorrow.</p>
-    </main>
+    <header className="academy-welcome-header">
+      <Link className="academy-welcome-brand" to="/signin" aria-label="180 Academy sign in"><AcademyBrand /></Link>
+      <span className="academy-header-note">Built for academy life.</span>
+    </header>
+    <div className="academy-welcome-body">
+      <aside className="academy-welcome-story" aria-label="Welcome to 180 Academy">
+        <div className="academy-story-copy"><span className="academy-eyebrow"><span aria-hidden />YOUR NEXT CHAPTER STARTS HERE</span><h1>A focused start.<br /><span>A stronger finish.</span></h1><p>Make room for what matters. Your class, your study routine, and your progress—all together.</p></div>
+        <div className="academy-story-preview" aria-hidden="true">
+          <div className="academy-story-preview-top"><span>THE 180 APPROACH</span><AcademyLogo /></div>
+          <p>Show up.<br />Put in the work.<br /><strong>Move forward.</strong></p>
+          <div className="academy-story-track"><span /><span /><span /><span /><span /><span /></div>
+          <div className="academy-story-preview-bottom"><span>One focused session at a time.</span><span>↗</span></div>
+        </div>
+        <div className="academy-story-benefits"><div><span>01</span><strong>Study with direction</strong><p>Know what to practice next.</p></div><div><span>02</span><strong>Grow with your class</strong><p>Keep your people close.</p></div></div>
+      </aside>
+      <main className="academy-welcome-main">
+        <div className="academy-form-wrap">
+          {step !== undefined ? <div className="academy-setup-progress"><div className="academy-progress-caption"><strong>{steps[step]}</strong><span>Step {step + 1} of {steps.length}</span></div><ol className="academy-progress" aria-label="Account setup progress">{steps.map((label, index) => <li key={label} className={index === step ? 'is-current' : index < step ? 'is-complete' : ''} aria-current={index === step ? 'step' : undefined}><span className="visually-hidden">{label}{index < step ? ', completed' : ''}</span></li>)}</ol></div> : null}
+          {children}
+        </div>
+        <p className="academy-form-footer"><span aria-hidden>↗</span> A little progress today. More confidence tomorrow.</p>
+      </main>
+    </div>
   </div>
 }
 
@@ -49,7 +61,7 @@ export function AuthEntry(props: AuthEntryProps) {
   const [resetMode, setResetMode] = useState(false)
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => { heading.current?.focus() }, [props.mode, resetMode])
-  return <AcademyWelcome step={isSignIn ? undefined : 0}>
+  return <AcademyWelcome step={isSignIn ? undefined : isRequest ? 1 : 0} steps={isRequest ? ['Class details', 'Your account', 'Owner approval'] : undefined}>
     <header className="academy-form-heading"><p className="academy-eyebrow">{resetMode ? 'ACCOUNT RECOVERY' : isSignIn ? 'WELCOME BACK' : isRequest ? 'YOUR CLASS STARTS HERE' : 'LET’S GET YOU READY'}</p><h2 ref={heading} tabIndex={-1}>{resetMode ? 'Reset your password' : isSignIn ? 'Back to your next milestone.' : isRequest ? 'Create your class account.' : 'Your academy journey starts here.'}</h2><p>{resetMode ? 'Enter your account email and we’ll send a secure reset link.' : isSignIn ? 'Sign in to pick up where you left off.' : isRequest ? 'Your request will go to the site owner for review. Once approved, you’ll become your class admin.' : 'Create an account, then choose your class and make this space yours.'}</p></header>
     <form className="academy-form" onSubmit={(event) => { event.preventDefault(); void (resetMode ? props.onResetPassword() : props.onSubmit()) }}>
       {isRequest ? props.request ? <div className="academy-selection-summary"><strong>{props.request.academyName} · {props.request.className}</strong><span>{props.request.startDate} — {props.request.endDate}</span><label>Your department<select aria-label="Your department" required value={props.request.requesterDepartment} onChange={(event) => props.onRequestDepartment(event.target.value)}><option value="">Choose your department</option>{props.request.departments.map((department) => <option key={department}>{department}</option>)}</select></label><Link to="/classes/request">Edit class details</Link></div> : <p className="academy-feedback is-error">Start by <Link to="/classes/request">adding your class details</Link>.</p> : null}

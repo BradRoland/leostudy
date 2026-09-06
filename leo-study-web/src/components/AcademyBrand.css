@@ -1,0 +1,7 @@
+.academy-logo { display: inline-block; width: 42px; height: 42px; flex: 0 0 auto; background: currentColor; mask: url('/brand/180-academy-mark.png') center / contain no-repeat; -webkit-mask: url('/brand/180-academy-mark.png') center / contain no-repeat; }
+.academy-brand-lockup { display: inline-flex; align-items: center; gap: 9px; color: var(--academy-ink, #181c25); text-align: left; }
+.academy-brand-lockup .academy-logo { color: var(--academy-accent, #3159ed); }
+.academy-brand-wordmark { display: flex; flex-direction: column; gap: 3px; }
+.academy-brand-wordmark strong { font-size: 19px; font-weight: 760; line-height: 1.2; letter-spacing: -.05em; white-space: nowrap; }
+.academy-brand-wordmark strong > span { font-weight: 550; }
+.academy-brand-wordmark small { font-size: 9px; color: var(--academy-muted, #6b7280); letter-spacing: .04em; line-height: 1.4; }

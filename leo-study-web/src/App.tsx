@@ -5,7 +5,11 @@ import { SpeedInsights } from '@vercel/speed-insights/react'
 import { Analytics } from '@vercel/analytics/react'
 import './App.css'
 import './Professional.css'
-import { AcademyMark, HomeDashboard } from './components/HomeDashboard'
+import { HomeDashboard } from './components/HomeDashboard'
+import { AcademyBrand, AcademyLogo } from './components/AcademyBrand'
+import { AcademyIcon } from './components/AcademyIcon'
+import { academyThemeOverrides } from './lib/academyTheme'
+import './FeatureRefresh.css'
 import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem, type ScenarioBankSubQuestion, type ScenarioTrainingSection } from './content'
 import { useOwner } from './hooks/useOwner'
 import { useClassWorkspace } from './hooks/useClassWorkspace'
@@ -1841,8 +1845,8 @@ const nameColorPalette = ['#ffd76e', '#f0f4ff', '#ff6f78', '#44de8e', '#65b7ff',
 const appThemePresets: AppThemePreset[] = [
   {
     id: 'midnight',
-    name: 'Midnight Blue',
-    swatch: 'linear-gradient(120deg, #152441, #0b1328)',
+    name: 'Academy Blue',
+    swatch: 'linear-gradient(120deg, #f7f8fa, #3159ed 55%, #111318)',
     vars: {
       bg: '#091224',
       panel: 'rgba(31, 47, 79, 0.76)',
@@ -3835,165 +3839,7 @@ function LeaderboardPlayerName({ entry }: { entry: LeaderNameEntry }) {
 }
 
 function AppIcon({ name, className = '' }: { name: AppIconName; className?: string }) {
-  const commonProps = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
-  if (name === 'study') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M4 5.5h7a3 3 0 0 1 3 3V19H7a3 3 0 0 0-3 3Z" />
-        <path d="M20 5.5h-7a3 3 0 0 0-3 3V19h7a3 3 0 0 1 3 3Z" />
-      </svg>
-    )
-  }
-  if (name === 'games') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M8 10h8a4 4 0 0 1 3.7 5.5l-1.4 3.3a2 2 0 0 1-3 .9l-2.3-1.6a2 2 0 0 0-2.3 0l-2.3 1.6a2 2 0 0 1-3-.9L4.3 15.5A4 4 0 0 1 8 10Z" />
-        <path d="M8 14h2" />
-        <path d="M9 13v2" />
-        <circle cx="15.5" cy="14.5" r="0.8" fill="currentColor" />
-        <circle cx="17.8" cy="16.1" r="0.8" fill="currentColor" />
-      </svg>
-    )
-  }
-  if (name === 'scenarios') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M12 3 4 7v5c0 5 3.4 8.7 8 9.9 4.6-1.2 8-4.9 8-9.9V7Z" />
-        <path d="m9.3 12 1.9 1.9 3.8-3.8" />
-      </svg>
-    )
-  }
-  if (name === 'support') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M12 21s-7-4.3-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.7-7 10-7 10Z" />
-      </svg>
-    )
-  }
-  if (name === 'library') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M4 5h4v15H4zM10 3h4v17h-4zM16 7h4v13h-4z" />
-      </svg>
-    )
-  }
-  if (name === 'warning') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M12 3 1.8 20.5a1.4 1.4 0 0 0 1.2 2.1h18a1.4 1.4 0 0 0 1.2-2.1L12 3Z" />
-        <path d="M12 9v5" />
-        <path d="M12 17.3h.01" />
-      </svg>
-    )
-  }
-  if (name === 'chat') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-      </svg>
-    )
-  }
-  if (name === 'leaderboards') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M4 18h16" />
-        <path d="M6 18V10" />
-        <path d="M12 18V6" />
-        <path d="M18 18V13" />
-      </svg>
-    )
-  }
-  if (name === 'settings') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <circle cx="12" cy="12" r="3.2" />
-        <path d="M19.2 15a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1.1 1.1a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a1 1 0 0 1-1 1h-1.6a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1 1 0 0 1-1.4 0l-1.1-1.1a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a1 1 0 0 1-1-1v-1.6a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1 1 0 0 1 0-1.4l1.1-1.1a1 1 0 0 1 1.4 0l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1.1 1.1a1 1 0 0 1 0 1.4l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2a1 1 0 0 1 1 1v1.6a1 1 0 0 1-1 1H20a1 1 0 0 0-.8.6Z" />
-      </svg>
-    )
-  }
-  if (name === 'stats') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M4 20V8" />
-        <path d="M10 20V4" />
-        <path d="M16 20v-7" />
-        <path d="M22 20v-4" />
-      </svg>
-    )
-  }
-  if (name === 'speed') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M5 15a7 7 0 1 1 14 0" />
-        <path d="M12 15l3.6-3.6" />
-        <path d="M12 20v-1" />
-      </svg>
-    )
-  }
-  if (name === 'duel') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <circle cx="8" cy="8" r="3" />
-        <circle cx="16" cy="8" r="3" />
-        <path d="M3.5 19c.8-3 2.4-4.5 4.5-4.5S11.7 16 12.5 19" />
-        <path d="M11.5 19c.8-3 2.4-4.5 4.5-4.5s3.7 1.5 4.5 4.5" />
-      </svg>
-    )
-  }
-  if (name === 'blaster') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M12 3 7.5 14.5 12 12l4.5 2.5Z" />
-        <path d="M9.2 13.8 7 20l5-2 5 2-2.2-6.2" />
-        <path d="M4 7.5h2" />
-        <path d="M18 7.5h2" />
-        <path d="M12 20.5v1" />
-      </svg>
-    )
-  }
-  if (name === 'updates') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <path d="M12 3.8v3.1" />
-        <path d="M12 17.1v3.1" />
-        <path d="m6.7 6.7 2.2 2.2" />
-        <path d="m15.1 15.1 2.2 2.2" />
-        <path d="M3.8 12h3.1" />
-        <path d="M17.1 12h3.1" />
-        <path d="m6.7 17.3 2.2-2.2" />
-        <path d="m15.1 8.9 2.2-2.2" />
-        <circle cx="12" cy="12" r="2.2" />
-      </svg>
-    )
-  }
-  if (name === 'flashcards') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <rect x="3.5" y="8" width="13" height="10" rx="2.2" />
-        <rect x="7.5" y="4.5" width="13" height="10" rx="2.2" />
-        <path d="M10 8h6" />
-        <path d="M10 11h8" />
-      </svg>
-    )
-  }
-  if (name === 'test') {
-    return (
-      <svg {...commonProps} className={className} aria-hidden>
-        <rect x="5" y="3.5" width="14" height="17" rx="2.5" />
-        <path d="M9 8h6" />
-        <path d="M9 12h2.5" />
-        <path d="m14.4 12 1.2 1.2 2.2-2.2" />
-        <path d="M9 16h2.5" />
-        <path d="m14.4 16 1.2 1.2 2.2-2.2" />
-      </svg>
-    )
-  }
-  return (
-    <svg {...commonProps} className={className} aria-hidden>
-      <path d="M3 11.5 12 4l9 7.5" />
-      <path d="M5.5 10.5V20h13v-9.5" />
-    </svg>
-  )
+  return <AcademyIcon name={name} className={className} />
 }
 
 function StatsIcon({ name, className = '' }: { name: StatsIconName; className?: string }) {
@@ -5865,7 +5711,7 @@ function App() {
   }
 
   useEffect(() => {
-    document.title = 'LEO Study'
+    document.title = '180 Academy'
   }, [])
 
   useEffect(() => {
@@ -10743,7 +10589,7 @@ function App() {
       return
     }
 
-    if (activeClassId && selectedClassDepartment) {
+    if (activeClassId && selectedClassDepartment && selectedClassDepartment.id !== activeClass?.departmentId) {
       try {
         await updateOwnClassDepartment(activeClassId, selectedClassDepartment.id)
         await refreshClassWorkspace()
@@ -12483,9 +12329,7 @@ function App() {
       </span>
     </span>
   )
-  useEffect(() => {
-    const root = document.documentElement
-    const vars = isUiLightMode
+  const resolvedThemeVars = useMemo(() => (isUiLightMode
       ? {
         ...lightModeVars,
         bg: `color-mix(in srgb, ${selectedTheme.vars.bodyBase} 10%, #f6f9ff)`,
@@ -12510,6 +12354,10 @@ function App() {
         textMuted: selectedTheme.vars.muted,
         gold: selectedTheme.vars.accent,
       }
+  ), [isUiLightMode, selectedTheme])
+  useEffect(() => {
+    const root = document.documentElement
+    const vars = resolvedThemeVars
     root.style.setProperty('--bg-main', vars.bg)
     root.style.setProperty('--bg-panel', vars.panelStrong)
     root.style.setProperty('--bg-sidebar', vars.sidebar)
@@ -12532,7 +12380,7 @@ function App() {
     root.style.setProperty('--bad', vars.bad)
     root.style.setProperty('--body-radial', vars.bodyRadial)
     root.style.setProperty('--body-base', vars.bodyBase)
-  }, [isUiLightMode, selectedTheme])
+  }, [resolvedThemeVars])
 
   useEffect(() => {
     if (!isOwner) return
@@ -13817,7 +13665,7 @@ function App() {
   return (
     <div
       className={`app-shell professional-ui ${isHomePage ? 'home-page' : ''} ${isUiLightMode ? 'ui-light-mode theme-light theme-glass' : ''} ${!isUiLightMode && selectedTheme.id === 'golden' ? 'theme-gold' : ''} ${reduceVisualEffects ? 'reduced-effects' : ''}`}
-      style={{ ['--global-banner-offset' as string]: `${globalBannerOffset}px` } as CSSProperties}
+      style={{ ...academyThemeOverrides(canUseThemes, selectedTheme.id, resolvedThemeVars), ['--global-banner-offset' as string]: `${globalBannerOffset}px` } as CSSProperties}
     >
       {deployRefreshNotice ? (
         <div className="deploy-refresh-banner" role="status" aria-live="polite">
@@ -13853,7 +13701,7 @@ function App() {
       {!isSupabaseConfigured ? (
         <div className="onboarding-overlay">
           <div className="onboarding-card">
-            <h1>LEO Study</h1>
+            <h1>180 Academy</h1>
             <p className="bad">Supabase is not configured.</p>
             <p className="muted">Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env`.</p>
           </div>
@@ -13864,7 +13712,7 @@ function App() {
         <div className="onboarding-overlay">
           <div className="onboarding-card">
             <p className="eyebrow">Welcome to</p>
-            <h1>LEO Study</h1>
+            <h1>180 Academy</h1>
             <p className="muted">{authRedirectPending ? 'Finishing secure sign-in...' : 'Checking session...'}</p>
           </div>
         </div>
@@ -13874,7 +13722,7 @@ function App() {
         <div className="onboarding-overlay">
           <div className="onboarding-card">
             <p className="eyebrow">Welcome back</p>
-            <h1>LEO Study</h1>
+            <h1>180 Academy</h1>
             <p className="muted">Loading your progress...</p>
             {authError ? <p className="bad">{authError}</p> : null}
           </div>
@@ -14016,7 +13864,7 @@ function App() {
         <div className="onboarding-overlay">
           <div className="onboarding-card">
             <p className="eyebrow">Sign-in issue</p>
-            <h1>LEO Study</h1>
+            <h1>180 Academy</h1>
             <p className="muted">We could not finish that sign-in. Please try again.</p>
             {authError ? <p className="bad" role="alert">{authError}</p> : null}
             <button type="button" className="primary" onClick={() => goToPath('/signin', { replace: true })}>
@@ -14135,140 +13983,39 @@ function App() {
         <div className="workspace-layout">
           <a className="professional-skip-link" href="#main-content">Skip to content</a>
           <aside className="left-taskbar" aria-label="Main navigation">
-            <div className="academy-brand"><AcademyMark/><span><strong>180 Academy</strong><small>PREPARE WITH PURPOSE</small></span></div>
+            <button type="button" className="academy-sidebar-brand" onClick={() => navigateToTab('home')} aria-label="180 Academy home"><AcademyBrand caption="Your academy. Your momentum." /></button>
             <div className="taskbar-section">
-              <button className={isHomePage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('home')}>
-                <AppIcon name="home" className="taskbar-icon" />
-                Home
-              </button>
-              <button className={isLeaderboardsPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('leaderboards')}>
-                <AppIcon name="leaderboards" className="taskbar-icon" />
-                Leaderboards
-              </button>
-              <button className={isLibraryPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('library')}>
-                <AppIcon name="library" className="taskbar-icon" />
-                Library
-              </button>
-              <button className={isScenariosPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('scenarios')}>
-                <AppIcon name="scenarios" className="taskbar-icon" />
-                Scenarios
-              </button>
-              <button className={isStatsPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => goToPath('/stats')}>
-                <AppIcon name="stats" className="taskbar-icon" />
-                Stats
-              </button>
-              <button className={isChatPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('chat')}>
-                <AppIcon name="chat" className="taskbar-icon" />
-                Chat
-              </button>
-              <button className={isClassesPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => goToPath('/classes')}>
-                <AppIcon name="library" className="taskbar-icon" />
-                My class
-              </button>
+              <p className="academy-nav-section-label">Workspace</p>
+              <button className={isHomePage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} aria-current={isHomePage ? 'page' : undefined} onClick={() => navigateToTab('home')}><AppIcon name="home" className="taskbar-icon" />Home</button>
+              <button className={isStatsPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} aria-current={isStatsPage ? 'page' : undefined} onClick={() => goToPath('/stats')}><AppIcon name="stats" className="taskbar-icon" />My progress</button>
             </div>
-
             <div className="taskbar-section">
-              <button
-                className="taskbar-section-toggle"
-                type="button"
-                aria-expanded={!taskbarCollapsedGroups.study}
-                onClick={() => setTaskbarCollapsedGroups((current) => ({ ...current, study: !current.study }))}
-              >
-                <span className="taskbar-label">Study</span>
-                <span className={`taskbar-section-chevron ${taskbarCollapsedGroups.study ? 'collapsed' : ''}`} aria-hidden>
-                  ▾
-                </span>
-              </button>
-              <button className={isStudyPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('study')}>
-                <AppIcon name="study" className="taskbar-icon" />
-                Study Hub
-              </button>
+              <button className="taskbar-section-toggle" type="button" aria-expanded={!taskbarCollapsedGroups.study} onClick={() => setTaskbarCollapsedGroups((current) => ({ ...current, study: !current.study }))}><span className="taskbar-label">Learn & practice</span><span className={`taskbar-section-chevron ${taskbarCollapsedGroups.study ? 'collapsed' : ''}`} aria-hidden>⌄</span></button>
+              <button className={isStudyHubPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} aria-current={isStudyHubPage ? 'page' : undefined} onClick={() => navigateToTab('study')}><AppIcon name="study" className="taskbar-icon" />Study Hub</button>
               <div className={`taskbar-submenu ${taskbarCollapsedGroups.study ? 'collapsed' : ''}`}>
-                <button
-                  className={isStudyGuidePage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
-                  onClick={openStudyGuidePage}
-                >
-                  <AppIcon name="study" className="taskbar-sub-icon" />
-                  Study Guide
-                </button>
-                <button
-                  className={isStudyPracticeTestPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
-                  onClick={openStudyPracticeTestPage}
-                >
-                  <AppIcon name="test" className="taskbar-sub-icon" />
-                  Practice Test
-                </button>
-                <button
-                  className={isStudyFlashcardsPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
-                  onClick={openStudyFlashcardsPage}
-                >
-                  <AppIcon name="flashcards" className="taskbar-sub-icon" />
-                  Flashcards
-                </button>
-                <button
-                  className={isStudyTestPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
-                  onClick={openStudyTestPage}
-                >
-                  <AppIcon name="test" className="taskbar-sub-icon" />
-                  Test
-                </button>
+                <button className={isStudyFlashcardsPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'} aria-current={isStudyFlashcardsPage ? 'page' : undefined} onClick={openStudyFlashcardsPage}><AppIcon name="flashcards" className="taskbar-sub-icon" />Flashcards</button>
+                <button className={isStudyPracticeTestPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'} aria-current={isStudyPracticeTestPage ? 'page' : undefined} onClick={openStudyPracticeTestPage}><AppIcon name="test" className="taskbar-sub-icon" />Practice Test</button>
+                <button className={isStudyGuidePage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'} aria-current={isStudyGuidePage ? 'page' : undefined} onClick={openStudyGuidePage}><AppIcon name="study" className="taskbar-sub-icon" />Study Guide</button>
+                <button className={isStudyTestPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'} aria-current={isStudyTestPage ? 'page' : undefined} onClick={openStudyTestPage}><AppIcon name="test" className="taskbar-sub-icon" />Quick quiz</button>
+              </div>
+              <button className={isLibraryPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} aria-current={isLibraryPage ? 'page' : undefined} onClick={() => navigateToTab('library')}><AppIcon name="library" className="taskbar-icon" />Code library</button>
+              <button className={isScenariosPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} aria-current={isScenariosPage ? 'page' : undefined} onClick={() => navigateToTab('scenarios')}><AppIcon name="scenarios" className="taskbar-icon" />Scenarios</button>
+            </div>
+            <div className="taskbar-section">
+              <button className="taskbar-section-toggle" type="button" aria-expanded={!taskbarCollapsedGroups.games} onClick={() => setTaskbarCollapsedGroups((current) => ({ ...current, games: !current.games }))}><span className="taskbar-label">Challenge yourself</span><span className={`taskbar-section-chevron ${taskbarCollapsedGroups.games ? 'collapsed' : ''}`} aria-hidden>⌄</span></button>
+              <button className={isGamesHubPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} aria-current={isGamesHubPage ? 'page' : undefined} onClick={() => navigateToTab('games')}><AppIcon name="games" className="taskbar-icon" />Games Hub</button>
+              <div className={`taskbar-submenu ${taskbarCollapsedGroups.games ? 'collapsed' : ''}`}>
+                <button className={isGamesSpeedPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'} aria-current={isGamesSpeedPage ? 'page' : undefined} onClick={() => goToPath('/games/speed', { tab: 'games' })}><AppIcon name="speed" className="taskbar-sub-icon" />Speed Test</button>
+                <button className={isGamesMatchingPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'} aria-current={isGamesMatchingPage ? 'page' : undefined} onClick={() => goToPath('/games/matching', { tab: 'games' })}><AppIcon name="games" className="taskbar-sub-icon" />Matching</button>
+                <button className={isGamesBlasterPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'} aria-current={isGamesBlasterPage ? 'page' : undefined} onClick={() => goToPath('/games/blaster', { tab: 'games' })}><AppIcon name="blaster" className="taskbar-sub-icon" />Code Blaster</button>
+                <button className={isGamesDuelPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'} aria-current={isGamesDuelPage ? 'page' : undefined} onClick={() => goToPath('/games/duel', { tab: 'games' })}><AppIcon name="duel" className="taskbar-sub-icon" />1v1</button>
               </div>
             </div>
-
             <div className="taskbar-section">
-              <button
-                className="taskbar-section-toggle"
-                type="button"
-                aria-expanded={!taskbarCollapsedGroups.games}
-                onClick={() => setTaskbarCollapsedGroups((current) => ({ ...current, games: !current.games }))}
-              >
-                <span className="taskbar-label">Games</span>
-                <span className={`taskbar-section-chevron ${taskbarCollapsedGroups.games ? 'collapsed' : ''}`} aria-hidden>
-                  ▾
-                </span>
-              </button>
-              <button className={isGamesPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} onClick={() => navigateToTab('games')}>
-                <AppIcon name="games" className="taskbar-icon" />
-                Games Hub
-              </button>
-              <div className={`taskbar-submenu ${taskbarCollapsedGroups.games ? 'collapsed' : ''}`}>
-                <button
-                  className={isGamesSpeedPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
-                  onClick={() => {
-                    goToPath('/games/speed', { tab: 'games' })
-                  }}
-                >
-                  <AppIcon name="speed" className="taskbar-sub-icon" />
-                  Speed Test
-                </button>
-                <button
-                  className={isGamesMatchingPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
-                  onClick={() => {
-                    goToPath('/games/matching', { tab: 'games' })
-                  }}
-                >
-                  <AppIcon name="games" className="taskbar-sub-icon" />
-                  Matching
-                </button>
-                <button
-                  className={isGamesBlasterPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
-                  onClick={() => {
-                    goToPath('/games/blaster', { tab: 'games' })
-                  }}
-                >
-                  <AppIcon name="blaster" className="taskbar-sub-icon" />
-                  Code Blaster
-                </button>
-                <button
-                  className={isGamesDuelPage ? 'taskbar-sub-btn active' : 'taskbar-sub-btn'}
-                  onClick={() => {
-                    goToPath('/games/duel', { tab: 'games' })
-                  }}
-                >
-                  <AppIcon name="duel" className="taskbar-sub-icon" />
-                  1v1
-                </button>
-              </div>
+              <p className="academy-nav-section-label">Your class</p>
+              <button className={isClassesPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} aria-current={isClassesPage ? 'page' : undefined} onClick={() => goToPath('/classes')}><AcademyIcon name="class" className="taskbar-icon" />My class</button>
+              <button className={isChatPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} aria-current={isChatPage ? 'page' : undefined} onClick={() => navigateToTab('chat')}><AppIcon name="chat" className="taskbar-icon" />Class chat</button>
+              <button className={isLeaderboardsPage ? 'taskbar-nav-btn active' : 'taskbar-nav-btn'} aria-current={isLeaderboardsPage ? 'page' : undefined} onClick={() => navigateToTab('leaderboards')}><AppIcon name="leaderboards" className="taskbar-icon" />Leaderboards</button>
             </div>
 
             <div className="taskbar-online-wrap" ref={onlineStudyPanelRef}>
@@ -14342,9 +14089,8 @@ function App() {
             {profile ? (
               <div className="taskbar-profile-wrap" ref={profileMenuRef}>
                 <button className="taskbar-profile" onClick={() => setProfileMenuOpen((value) => !value)} aria-label="Open profile menu">
-                  <span className={`avatar-decoration-wrap taskbar-profile-avatar-wrap level-halo-frame ${currentUserLevelProfile.haloClass}`}>
+                  <span className="taskbar-profile-avatar-wrap">
                     <img src={avatarFor(profileAvatarPreviewUrl || profile.avatarUrl)} alt={activeProfileName} className="taskbar-profile-image" onError={handleAvatarImageError} />
-                    {renderAvatarDecoration(currentUserLevelProfile, profileDetails.profileDecorationKey)}
                   </span>
                   <span className="taskbar-profile-info">
                     <span className={`taskbar-profile-name ${displayNameClass(profile.supporterTier, true)}`} style={displayNameStyle(profileDetails.nameStyle, profile.supporterTier)}>
@@ -14391,7 +14137,16 @@ function App() {
           </aside>
 
           <div className="workspace-main">
-            {!isHomePage ? (
+            <div className="academy-workspace-bar">
+              <div className="academy-workspace-breadcrumb"><AcademyLogo label=""/><span>My workspace</span><span aria-hidden>/</span><strong>{isHomePage ? 'Overview' : pageTitle}</strong></div>
+              <AcademyBrand className="academy-mobile-wordmark" />
+              <div className="academy-workspace-actions">
+                <button className="academy-workspace-class" onClick={() => goToPath('/classes')}><AcademyIcon name="class"/><span>{activeClass?.className || 'Your class'}</span></button>
+                <button type="button" className="academy-icon-button" onClick={() => void toggleDisplayMode()} aria-label={isUiLightMode ? 'Switch to dark mode' : 'Switch to light mode'}><AcademyIcon name={isUiLightMode ? 'moon' : 'sun'}/></button>
+                <button type="button" className="academy-icon-button" onClick={() => openSettingsTab('profile')} aria-label="Account settings"><AcademyIcon name="settings"/></button>
+              </div>
+            </div>
+            {!isHomePage && !isChatPage ? (
               <header className="top-header app-page-header">
                 <div className="header-left">
                   <h1>{pageTitle}</h1>
@@ -15294,6 +15049,7 @@ function App() {
                 userAgency={profileDetails?.agency}
                 isOwner={isOwner}
                 classId={activeClassId}
+                classLabel={activeClass?.className}
                 canModerateClass={canModerateActiveClass}
                 leaderboardFirstSpotCounts={{
                   allTime: allTimeFirstSpotCountsByUser,
@@ -15310,7 +15066,7 @@ function App() {
         {!isProfilePage && !isStatsPage && isSupportPage && profile ? (
           <section className="support-section">
             <div className="card support-intro">
-              <p className="eyebrow">Support LEO Study</p>
+              <p className="eyebrow">Support 180 Academy</p>
               <h2>Choose a Supporter Tier</h2>
               <p className="muted">Support helps us keep building features, question banks, and new training tools.</p>
               <p className="muted">Current tier: {tierLabel[activeProfileTier]}</p>
@@ -15358,7 +15114,7 @@ function App() {
         ) : null}
 
         {!isProfilePage && !isStatsPage && !isHomePage && !isSupportPage && isLibraryPage && (
-          <section>
+          <section className="library-section">
             <div className="segmented">
               {(['penal', 'hs', 'vehicle'] as CodeSet[]).map((filter) => (
                 <button
@@ -16941,7 +16697,7 @@ function App() {
         )}
 
         {isStatsPage && profile ? (
-          <section>
+          <section className="stats-section">
             <div className="card profile-page-card">
               <div className="stats-heading">
                 <span className="stats-heading-icon" aria-hidden>
@@ -19034,7 +18790,7 @@ function App() {
             onClick={() => setMobileNavMenuOpen((value) => !value)}
           >
             <AppIcon name="settings" className="mobile-bottom-icon" />
-            <span>Menu</span>
+            <span>More</span>
           </button>
         </nav>
         ) : null}
@@ -19132,6 +18888,7 @@ function App() {
           userAgency={profileDetails?.agency}
           isOwner={isOwner}
           classId={activeClassId}
+          classLabel={activeClass?.className}
           canModerateClass={canModerateActiveClass}
           leaderboardFirstSpotCounts={{
             allTime: allTimeFirstSpotCountsByUser,

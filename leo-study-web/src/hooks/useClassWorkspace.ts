@@ -23,7 +23,7 @@ export function useClassWorkspace(userId: string | null) {
     setLoading(true)
     setError('')
     try {
-      const rows = await loadClassMemberships()
+      const rows = await loadClassMemberships(userId)
       if (version !== requestVersion.current) return
       setMemberships(rows)
     } catch (err) {

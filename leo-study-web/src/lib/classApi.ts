@@ -172,8 +172,8 @@ function academyLocation(row: { city?: string | null; state?: string | null } | 
   return [row?.city, row?.state].map((value) => String(value || '').trim()).filter(Boolean).join(', ')
 }
 
-export async function loadClassMemberships(): Promise<ClassMembership[]> {
-  if (!supabase) return []
+export async function loadClassMemberships(userId: string): Promise<ClassMembership[]> {
+  if (!supabase || !userId) return []
   const { data, error } = await supabase
     .from('class_memberships')
     .select(`
@@ -186,6 +186,9 @@ export async function loadClassMemberships(): Promise<ClassMembership[]> {
       class_departments(id,name),
       academy_classes(id,class_name,start_date,end_date,status,academies(name,city,state))
     `)
+    // Owners and class admins can read other members through RLS. This query
+    // chooses the signed-in person's workspace, so it must remain personal.
+    .eq('user_id', userId)
     .eq('status', 'active')
     .order('joined_at', { ascending: false })
 
@@ -345,7 +348,7 @@ export async function updateOwnClassDepartment(classId: string, departmentId: st
     p_class_id: classId,
     p_department_id: departmentId,
   })
-  if (error) throw error
+  if (error) throw new Error(error.message || 'Could not update your class agency.')
 }
 
 export async function submitClassCreationRequest(input: ClassCreationRequestInput) {
