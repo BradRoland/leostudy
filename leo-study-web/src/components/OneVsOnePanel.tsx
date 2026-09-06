@@ -6,6 +6,7 @@ import { applyConnect4Move, chooseConnect4BotMove, connect4Columns, connect4Rows
 import { getEffectiveProfileDecorationForLevel } from '../lib/profileDecorationData'
 import { ProfileAvatarDecoration } from '../lib/profileDecorations'
 import { supabase } from '../lib/supabase'
+import { getLiveIntegrations } from '../lib/liveIntegrations'
 
 type DuelGameType = 'quiz' | 'matching' | 'blaster' | 'connect4'
 type DuelCategory = 'all' | 'pc' | 'vc' | 'hs' | 'scenarios'
@@ -457,12 +458,7 @@ const duelBlasterSuddenDeathMinimumRopeLimit = 260
 const duelBlasterMissPenalty = 85
 const connect4WinAnimationHoldMs = 1400
 const duelStartSyncMaxFutureMs = 12_000
-const defaultRopeBlasterWorkerUrl = 'https://leo-rope-blaster.brad-e22.workers.dev'
-const ropeBlasterWorkerUrl = String(
-  import.meta.env.VITE_ROPE_BLASTER_WORKER_URL ||
-  import.meta.env.VITE_CLOUDFLARE_ROPE_BLASTER_URL ||
-  defaultRopeBlasterWorkerUrl,
-).replace(/\/+$/, '')
+const ropeBlasterWorkerUrl = getLiveIntegrations(import.meta.env).ropeBlasterWorkerUrl
 const duelGameTypeLabels: Record<DuelGameType, string> = {
   quiz: 'Quiz',
   matching: 'Matching',
@@ -2209,7 +2205,7 @@ export function OneVsOnePanel(props: {
     }
 
     const { data: appStateRows } = await supabase
-      .from('app_state')
+      .from('public_study_profiles')
       .select('user_id,profile_details')
       .in('user_id', userIds)
 
@@ -2400,7 +2396,7 @@ export function OneVsOnePanel(props: {
         .select('user_id,username,avatar_path,supporter_tier')
         .in('user_id', spotlightUserIds),
       supabase
-        .from('app_state')
+        .from('public_study_profiles')
         .select('user_id,profile_details')
         .in('user_id', spotlightUserIds),
     ])
@@ -2613,7 +2609,7 @@ export function OneVsOnePanel(props: {
         .select('user_id,username,avatar_path,supporter_tier')
         .in('user_id', uniqueUserIds),
       supabase
-        .from('app_state')
+        .from('public_study_profiles')
         .select('user_id,profile_details')
         .in('user_id', uniqueUserIds),
     ])

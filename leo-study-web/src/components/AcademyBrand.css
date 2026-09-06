@@ -5,3 +5,4 @@
 .academy-brand-wordmark strong { font-size: 19px; font-weight: 760; line-height: 1.2; letter-spacing: -.05em; white-space: nowrap; }
 .academy-brand-wordmark strong > span { font-weight: 550; }
 .academy-brand-wordmark small { font-size: 9px; color: var(--academy-muted, #6b7280); letter-spacing: .04em; line-height: 1.4; }
+.academy-brand-wordmark .academy-development-label { color: var(--academy-accent, #3159ed); font-size: 10px; font-weight: 650; letter-spacing: .02em; }

@@ -161,7 +161,21 @@ test('password recovery delivers to the local sink and saves a working new passw
     const recoveryLink = links.find(link => link.includes('/auth/v1/verify'))
     expect(recoveryLink).toBeTruthy()
     const recoveryUrl = new URL(recoveryLink!)
-    expect(['localhost', '127.0.0.1']).toContain(recoveryUrl.hostname)
+    if (recoveryUrl.origin === 'https://dev.180.academy') {
+      // The clone now issues public preview emails. Exercise the exact same
+      // verification endpoint locally without allowing public browser traffic.
+      expect(recoveryUrl.pathname).toBe('/supabase/auth/v1/verify')
+      recoveryUrl.protocol = 'http:'
+      recoveryUrl.hostname = '127.0.0.1'
+      recoveryUrl.port = '55431'
+      recoveryUrl.pathname = '/auth/v1/verify'
+    }
+    expect(['http://localhost:55431', 'http://127.0.0.1:55431']).toContain(recoveryUrl.origin)
+    expect(recoveryUrl.pathname).toBe('/auth/v1/verify')
+    const callback = new URL(recoveryUrl.searchParams.get('redirect_to') || '')
+    expect(callback.origin).toBe('http://127.0.0.1:5176')
+    expect(callback.pathname).toBe('/auth/callback')
+    expect(callback.searchParams.get('recovery')).toBe('1')
     await page.goto(recoveryUrl.toString())
     await expect(page.getByRole('heading', { name: 'Choose a fresh password.', exact: true })).toBeVisible({ timeout: 30000 })
     await page.getByLabel('New password', { exact: true }).fill(replacementPassword)

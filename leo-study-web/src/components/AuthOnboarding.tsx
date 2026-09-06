@@ -1,8 +1,11 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { ClassCreationRequestInput } from '../lib/classApi'
+import { getLiveIntegrations } from '../lib/liveIntegrations'
 import { AcademyBrand, AcademyLogo } from './AcademyBrand'
 import './Onboarding.css'
+
+const developmentPreview = getLiveIntegrations(import.meta.env).disabled
 
 export function AcademyWelcome({ children, step, steps = ['Account', 'Class', 'Department', 'Profile', 'Study plan'] }: { children: ReactNode; step?: number; steps?: string[] }) {
   return <div className="academy-welcome">
@@ -70,7 +73,8 @@ export function AuthEntry(props: AuthEntryProps) {
       {!resetMode ? <><PasswordField label="Password" value={props.password} onChange={props.onPasswordChange} create={!isSignIn} />{!isSignIn ? <><p className="academy-field-hint">Use at least 8 characters.</p><PasswordField label="Confirm password" value={props.passwordConfirm} onChange={props.onPasswordConfirmChange} create /></> : <button className="academy-text-button academy-forgot" type="button" onClick={() => setResetMode(true)}>Forgot password?</button>}</> : null}
       <OnboardingStatus error={props.error} success={props.success} />
       <button className="academy-primary" type="submit" disabled={props.loading || (isRequest && !props.request)}>{props.loading ? 'Please wait…' : resetMode ? 'Send reset link' : isSignIn ? 'Sign in' : isRequest ? 'Create account & submit request' : 'Create account'}<span aria-hidden> →</span></button>
-      {!resetMode && !isRequest ? <><div className="academy-divider"><span>or</span></div><button className="academy-secondary academy-google" type="button" onClick={() => void props.onGoogle()} disabled={props.loading}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden><path fill="#4285F4" d="M21.8 12.2c0-.7-.1-1.4-.2-2.1H12v4h5.5c-.2 1.3-1 2.3-2 3v2.5h3.3c1.9-1.8 3-4.4 3-7.4Z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.8-2.4l-3.3-2.5c-.9.6-2.1 1-3.5 1-2.6 0-4.8-1.8-5.6-4.1H3v2.6A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 14c-.4-1.3-.4-2.7 0-4V7.4H3a10 10 0 0 0 0 9.2L6.4 14Z"/><path fill="#EA4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5L18.7 4A9.9 9.9 0 0 0 3 7.4L6.4 10c.8-2.3 3-4.1 5.6-4.1Z"/></svg>Continue with Google</button></> : null}
+      {!developmentPreview && !resetMode && !isRequest ? <><div className="academy-divider"><span>or</span></div><button className="academy-secondary academy-google" type="button" onClick={() => void props.onGoogle()} disabled={props.loading}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden><path fill="#4285F4" d="M21.8 12.2c0-.7-.1-1.4-.2-2.1H12v4h5.5c-.2 1.3-1 2.3-2 3v2.5h3.3c1.9-1.8 3-4.4 3-7.4Z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.8-2.4l-3.3-2.5c-.9.6-2.1 1-3.5 1-2.6 0-4.8-1.8-5.6-4.1H3v2.6A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 14c-.4-1.3-.4-2.7 0-4V7.4H3a10 10 0 0 0 0 9.2L6.4 14Z"/><path fill="#EA4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5L18.7 4A9.9 9.9 0 0 0 3 7.4L6.4 10c.8-2.3 3-4.1 5.6-4.1Z"/></svg>Continue with Google</button></> : null}
+      {developmentPreview && !resetMode ? <p className="academy-field-hint">Use email and password in this development preview.</p> : null}
       <p className="academy-auth-switch">{resetMode ? <button className="academy-text-button" type="button" onClick={() => setResetMode(false)}>Back to sign in</button> : isRequest ? <button className="academy-text-button" type="button" onClick={props.onSignInForRequest}>Already have an account? Sign in to submit</button> : isSignIn ? <>New here? <Link to="/signup">Create an account</Link></> : <>Already have an account? <Link to="/signin">Sign in</Link></>}</p>
       {!resetMode ? <div className="academy-request-link"><span>Bring your class together.</span><Link to="/classes/request">Request to add your class <span aria-hidden>↗</span></Link></div> : null}
     </form>

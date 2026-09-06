@@ -1,6 +1,12 @@
 import 'dotenv/config'
 import http from 'node:http'
 import { createStripeTierService } from './stripe-tier-service.mjs'
+import { liveIntegrationsDisabled } from './live-integrations.mjs'
+
+if (liveIntegrationsDisabled()) {
+  console.log('Stripe webhook service is disabled in this preview.')
+  process.exit(0)
+}
 
 const port = Number(process.env.STRIPE_WEBHOOK_PORT || 8788)
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ''

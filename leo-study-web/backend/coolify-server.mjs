@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createStripeTierService } from './stripe-tier-service.mjs'
 import { createClassRequestService } from './class-request-service.mjs'
 import { createClassRequestEmailService } from './class-request-email-service.mjs'
+import { liveIntegrationsDisabled, isLiveIntegrationPath } from './live-integrations.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.resolve(__dirname, '..')
@@ -17,6 +18,7 @@ const indexPath = path.join(distRoot, 'index.html')
 const port = Number(process.env.PORT || 80)
 const host = process.env.HOST || '0.0.0.0'
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
+const disableLiveIntegrations = liveIntegrationsDisabled()
 
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -29,8 +31,8 @@ const contentTypes = new Map([
   ['.webp', 'image/webp'],
 ])
 
-if (!stripeWebhookSecret || !process.env.STRIPE_SECRET_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY || !(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL)) {
-  console.error('Missing env vars. Required: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
+if ((!disableLiveIntegrations && (!stripeWebhookSecret || !process.env.STRIPE_SECRET_KEY)) || !process.env.SUPABASE_SERVICE_ROLE_KEY || !(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL)) {
+  console.error(`Missing env vars. Required: ${disableLiveIntegrations ? '' : 'STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, '}SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY`)
   process.exit(1)
 }
 
@@ -508,6 +510,10 @@ async function handleCreateClassInvite(req, res) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if (disableLiveIntegrations && isLiveIntegrationPath(req.url)) {
+      sendJson(res, 404, { ok: false, error: 'This integration is disabled in this preview.' })
+      return
+    }
     if (req.method === 'GET' && (req.url === '/health' || req.url === '/api/health')) {
       sendJson(res, 200, { ok: true, service: 'leo-study-web' })
       return

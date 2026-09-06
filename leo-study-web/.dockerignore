@@ -10,3 +10,6 @@ logs
 .env.*
 !.env.example
 coverage
+*.local
+playwright-report
+test-results

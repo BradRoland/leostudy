@@ -120,7 +120,7 @@ export function DuelInviteBanner(props: DuelInviteBannerProps) {
     const senderIds = [...new Set(mappedBase.map((invite) => invite.senderUserId).filter(Boolean))]
     const { data: appStateRows } = senderIds.length > 0
       ? await supabase
-        .from('app_state')
+        .from('public_study_profiles')
         .select('user_id,profile_details')
         .in('user_id', senderIds)
       : { data: [] }

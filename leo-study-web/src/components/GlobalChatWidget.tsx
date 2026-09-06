@@ -989,10 +989,10 @@ export function GlobalChatWidget({
         .eq('user_id', userId)
         .maybeSingle()
       
-      // Get app_state for study stats
+      // Read only the permitted public classmate study summary
       const { data: appState } = await supabaseClient
-        .from('app_state')
-        .select('profile_details, performance')
+        .from('public_study_profiles')
+        .select('profile_details,mastered_codes')
         .eq('user_id', userId)
         .maybeSingle()
       
@@ -1004,19 +1004,8 @@ export function GlobalChatWidget({
         .eq('game_type', 'all')
         .maybeSingle()
       
-      // Calculate mastered codes from performance (same logic as App.tsx)
-      let masteredCodes = 0
-      if (appState?.performance) {
-        const perf = appState.performance as Record<string, { correctCount?: number; incorrectCount?: number; correctStreak?: number }>
-        Object.values(perf).forEach(item => {
-          const streak = item?.correctStreak ?? 0
-          
-          // Mastered = streak >= 20 (exact match to App.tsx)
-          if (streak >= 20) {
-            masteredCodes++
-          }
-        })
-      }
+      // Only the aggregate mastery count is shared with classmates.
+      const masteredCodes = Math.max(0, Number(appState?.mastered_codes) || 0)
       
       // Extract study stats from profile_details
       let studySeconds = 0

@@ -9,6 +9,7 @@ import { HomeDashboard } from './components/HomeDashboard'
 import { AcademyBrand, AcademyLogo } from './components/AcademyBrand'
 import { AcademyIcon } from './components/AcademyIcon'
 import { academyThemeOverrides } from './lib/academyTheme'
+import { getLiveIntegrations } from './lib/liveIntegrations'
 import './FeatureRefresh.css'
 import { loadLocalContentBundle, type ContentBankItem, type ScenarioBankItem, type ScenarioBankSubQuestion, type ScenarioTrainingSection } from './content'
 import { useOwner } from './hooks/useOwner'
@@ -131,11 +132,8 @@ const deployRefreshPollMs = 60000
 const deployRefreshQuietReloadDelayMs = 8000
 const deployRefreshActiveReloadDelayMs = 45000
 const deployRefreshGameRetryMs = 5000
-const enableVercelTelemetry = String(
-  import.meta.env.VITE_ENABLE_VERCEL_TELEMETRY ||
-  import.meta.env.VITE_ENABLE_VERCEL_ANALYTICS ||
-  '',
-).toLowerCase() === 'true'
+const liveIntegrations = getLiveIntegrations(import.meta.env)
+const enableVercelTelemetry = liveIntegrations.telemetryEnabled
 const priorityTmas2ExamStartMs = Date.parse('2026-03-24T07:00:00-07:00')
 const priorityTmas3ExamStartMs = Date.parse('2026-05-18T13:00:00-07:00')
 
@@ -2153,11 +2151,7 @@ function profileDecorationAssetPath(decorationKey: string) {
   return profileDecorationAssetByKey[decorationKey] || ''
 }
 
-const stripeTierLinks: Partial<Record<Exclude<SupporterTier, 'free'>, string>> = {
-  tier2: (import.meta.env.VITE_STRIPE_LINK_TIER2 || '').trim(),
-  tier5: (import.meta.env.VITE_STRIPE_LINK_TIER5 || '').trim(),
-  tier10: (import.meta.env.VITE_STRIPE_LINK_TIER10 || '').trim(),
-}
+const stripeTierLinks = liveIntegrations.stripeLinks
 const appContentSource = String(import.meta.env.VITE_CONTENT_SOURCE || 'supabase')
   .trim()
   .toLowerCase()
@@ -3252,7 +3246,7 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
   }
   if (!input || typeof input !== 'object') return fallback
 
-  const value = input as Partial<ProfileDetails>
+  const value = input as Partial<ProfileDetails> & { publicMasteredCodes?: unknown }
   const statsRaw = value.stats && typeof value.stats === 'object' ? (value.stats as Record<string, unknown>) : {}
   const studyModeCountsRaw =
     statsRaw.studyModeCounts && typeof statsRaw.studyModeCounts === 'object'
@@ -3287,7 +3281,7 @@ function parseLeaderboardProfileSnapshot(input: unknown): LeaderboardProfileSnap
       hs: normalizeCount(studyModeCountsRaw.hs),
       vehicle: normalizeCount(studyModeCountsRaw.vehicle),
     },
-    masteredCodes: lifetimeMasteredCodes > 0 || snapshotMasteredCodes !== null
+    masteredCodes: typeof value.publicMasteredCodes === 'number' ? normalizeCount(value.publicMasteredCodes) : lifetimeMasteredCodes > 0 || snapshotMasteredCodes !== null
       ? Math.max(lifetimeMasteredCodes, snapshotMasteredCodes ?? 0)
       : null,
     currentActivity: sanitizeCurrentUserActivity(value.currentActivity),
@@ -6363,7 +6357,7 @@ function App() {
         }, {})
 
         const { data: appStates } = await supabase
-          .from('app_state')
+          .from('public_study_profiles')
           .select('user_id,profile_details')
           .in('user_id', userIds)
 
@@ -6448,13 +6442,13 @@ function App() {
         const uniqueFallbackMasteryUserIds = [...new Set(fallbackMasteryUserIds)]
         if (uniqueFallbackMasteryUserIds.length > 0) {
           const { data: fallbackRows } = await supabase
-            .from('app_state')
-            .select('user_id,performance')
+            .from('public_study_profiles')
+            .select('user_id,mastered_codes')
             .in('user_id', uniqueFallbackMasteryUserIds)
           for (const row of fallbackRows || []) {
             const userId = String(row.user_id || '')
             if (!userId) continue
-            masteredCodesByUserId[userId] = countMasteredCodesFromPerformanceMap((row as Record<string, unknown>).performance)
+            masteredCodesByUserId[userId] = Math.max(0, Number((row as Record<string, unknown>).mastered_codes) || 0)
           }
           for (const userId of uniqueFallbackMasteryUserIds) {
             if (typeof masteredCodesByUserId[userId] !== 'number') masteredCodesByUserId[userId] = 0
@@ -6567,7 +6561,7 @@ function App() {
 
     const refreshPromise = (async () => {
       const { data: states, error } = await supabase
-        .from('app_state')
+        .from('public_study_profiles')
         .select('user_id,profile_details,high_scores,best_streak')
         .limit(400)
       if (error || !states) return
@@ -6683,13 +6677,13 @@ function App() {
       const uniqueFallbackMasteryUserIds = [...new Set(fallbackMasteryUserIds)]
       if (uniqueFallbackMasteryUserIds.length > 0) {
         const { data: fallbackRows } = await supabase
-          .from('app_state')
-          .select('user_id,performance')
+          .from('public_study_profiles')
+          .select('user_id,mastered_codes')
           .in('user_id', uniqueFallbackMasteryUserIds)
         for (const row of fallbackRows || []) {
           const userId = String(row.user_id || '')
           if (!userId) continue
-          masteredCodesByUserId[userId] = countMasteredCodesFromPerformanceMap((row as Record<string, unknown>).performance)
+          masteredCodesByUserId[userId] = Math.max(0, Number((row as Record<string, unknown>).mastered_codes) || 0)
         }
         for (const userId of uniqueFallbackMasteryUserIds) {
           if (typeof masteredCodesByUserId[userId] !== 'number') masteredCodesByUserId[userId] = 0
@@ -10376,7 +10370,7 @@ function App() {
       if (!createResponse.ok) {
         const payload = await createResponse.json().catch(() => null)
         const message = String(payload?.error || 'Could not create account.')
-        throw new Error(/already registered|already exists/i.test(message) ? 'This email is already in use. Sign in to continue, or use Google if that’s how you created your account.' : message)
+        throw new Error(/already registered|already exists/i.test(message) ? liveIntegrations.disabled ? 'This email is already in use. Sign in with your email and password, or reset your password.' : 'This email is already in use. Sign in to continue, or use Google if that’s how you created your account.' : message)
       }
       window.localStorage.setItem(pendingProfileUsernameKey, normalizedUsername)
       window.localStorage.setItem(pendingProfileEmailKey, normalizedEmail)
@@ -10716,7 +10710,7 @@ function App() {
   }
 
   const linkGoogleAccount = async () => {
-    if (!supabase) return
+    if (!supabase || liveIntegrations.disabled) return
     if (currentUserProvider.toLowerCase() === 'google') {
       setAuthSuccess('Google is already linked to this account.')
       setTimeout(() => setAuthSuccess(''), 1600)
@@ -10752,6 +10746,7 @@ function App() {
   }
 
   const startTierCheckout = (tier: Exclude<SupporterTier, 'free'>) => {
+    if (liveIntegrations.disabled) return
     const checkoutUrl = stripeTierLinks[tier]
     if (!checkoutUrl) {
       setAuthError(`Missing checkout link for ${tierLabel[tier]}. Add it in .env.`)
@@ -12884,8 +12879,8 @@ function App() {
         .eq('user_id', userId)
         .maybeSingle(),
       supabase
-        .from('app_state')
-        .select('profile_details,high_scores,performance,best_streak')
+        .from('public_study_profiles')
+        .select('profile_details,high_scores,best_streak')
         .eq('user_id', userId)
         .maybeSingle(),
       profileDuelStatsQuery.maybeSingle(),
@@ -12898,7 +12893,7 @@ function App() {
     ])
 
     const details = parseLeaderboardProfileSnapshot((stateRow as Record<string, unknown> | null)?.profile_details)
-    const masteredCodes = details.masteredCodes ?? countMasteredCodesFromPerformanceMap((stateRow as Record<string, unknown> | null)?.performance)
+    const masteredCodes = details.masteredCodes ?? 0
     const rawTier = String((profileRow as Record<string, unknown> | null)?.supporter_tier || 'free')
     const supporterTier = (['free', 'tier2', 'tier5', 'tier10'].includes(rawTier) ? rawTier : 'free') as SupporterTier
     const duelWins = Number((duelStats as Record<string, unknown> | null)?.wins || 0)
@@ -18160,13 +18155,13 @@ function App() {
                         <button
                           className="primary"
                           onClick={() => startTierCheckout(tier)}
-                          disabled={tierRank(profile.supporterTier) >= tierRank(tier)}
+                          disabled={liveIntegrations.disabled || tierRank(profile.supporterTier) >= tierRank(tier)}
                         >
                           {tierRank(profile.supporterTier) > tierRank(tier)
                             ? 'Included'
                             : tierRank(profile.supporterTier) === tierRank(tier)
                               ? 'Current Tier'
-                              : 'Upgrade with Stripe'}
+                              : liveIntegrations.disabled ? 'Unavailable in preview' : 'Upgrade with Stripe'}
                         </button>
                       </div>
                     ))}
@@ -18177,8 +18172,8 @@ function App() {
               {settingsTab === 'security' ? (
                 <div className="settings-section-card">
                   <p className="muted">Email: {currentUserEmail || 'Unknown'}</p>
-                  <button className="secondary" onClick={linkGoogleAccount} disabled={authLoading || currentUserProvider.toLowerCase() === 'google'}>
-                    {currentUserProvider.toLowerCase() === 'google' ? 'Google Linked' : 'Link Google Account'}
+                  <button className="secondary" onClick={linkGoogleAccount} disabled={liveIntegrations.disabled || authLoading || currentUserProvider.toLowerCase() === 'google'}>
+                    {liveIntegrations.disabled ? 'Google linking unavailable in preview' : currentUserProvider.toLowerCase() === 'google' ? 'Google Linked' : 'Link Google Account'}
                   </button>
                   <label>
                     New password

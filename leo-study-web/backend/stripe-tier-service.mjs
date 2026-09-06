@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import { liveIntegrationsDisabled } from './live-integrations.mjs'
 
 function requireEnv(name, fallback = '') {
   const value = process.env[name] || fallback
@@ -79,11 +80,12 @@ export function createTierResolver({ priceToTier = new Map(), amountToTier = new
 }
 
 export function createStripeTierService() {
-  const stripeSecretKey = requireEnv('STRIPE_SECRET_KEY')
+  const stripeDisabled = liveIntegrationsDisabled()
+  const stripeSecretKey = stripeDisabled ? '' : requireEnv('STRIPE_SECRET_KEY')
   const supabaseUrl = requireEnv('SUPABASE_URL', process.env.VITE_SUPABASE_URL || '')
   const supabaseServiceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 
-  const stripe = new Stripe(stripeSecretKey)
+  const stripe = stripeDisabled ? null : new Stripe(stripeSecretKey)
   const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
@@ -134,12 +136,14 @@ export function createStripeTierService() {
     priceToTier,
     amountToTier,
     paymentLinkToTier,
-    retrieveSession: (sessionId) => stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['line_items.data.price'],
-    }),
+    retrieveSession: (sessionId) => {
+      if (!stripe) throw new Error('Stripe is disabled in this preview.')
+      return stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items.data.price'] })
+    },
   })
 
   async function applyTierToUser(targetUserId, tier) {
+    if (stripeDisabled) throw new Error('Stripe is disabled in this preview.')
     const { error } = await supabase.from('profiles').upsert(
       {
         user_id: targetUserId,
@@ -153,6 +157,7 @@ export function createStripeTierService() {
   }
 
   async function applyTierFromCheckoutSession(session) {
+    if (stripeDisabled) throw new Error('Stripe is disabled in this preview.')
     const tier = await resolveTierFromSession(session)
     if (!tier) {
       console.warn('stripe webhook: could not resolve tier for session', session.id)
