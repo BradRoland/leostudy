@@ -135,7 +135,11 @@ test('roster reads beyond the first membership page', async ({ page }) => {
   const firstPage = Array.from({ length: 100 }, () => ({ user_id: randomUUID(), department_id: departmentId, department_name: 'Pagination fixture' }))
   const offsets: number[] = []
   await page.route('**/rest/v1/rpc/list_class_member_departments*', route => {
-    const offset = Number(new URL(route.request().url()).searchParams.get('offset') || 0)
+    const params = new URL(route.request().url()).searchParams
+    // Other workspace widgets also refresh class membership in the background.
+    // Only intercept the roster's explicitly paginated requests.
+    if (params.get('limit') !== '100' || !params.has('offset')) return route.continue()
+    const offset = Number(params.get('offset'))
     offsets.push(offset)
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(offset === 0 ? firstPage : [{ user_id: peerId, department_id: departmentId, department_name: 'Academy Training Department' }]) })
   })

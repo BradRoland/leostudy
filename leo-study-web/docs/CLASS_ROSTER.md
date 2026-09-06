@@ -31,3 +31,5 @@ CLASS_ROSTER_PUBLIC_CHECK=true CLASS_ROSTER_EXPECTED_COMMIT=<full-dev-commit> np
 ```
 
 This mode is pinned to `https://dev.180.academy`; it verifies the expected source commit before creating fixtures. Fixture administration stays on localhost, and browser traffic is restricted to the development origin. It does not authorize a production deployment or database change.
+
+Validation on September 6, 2026: 88 unit tests and all 30 local browser scenarios passed; staging compilation and lint passed with the nine existing hook warnings. Public desktop/mobile checks passed after narrowing the pagination fixture to roster requests (other workspace widgets also refresh membership). The public suite verified both themes, narrow layouts, accurate stats, cross-class denial, and profile dialog behavior. No production database or main-branch change was made.
