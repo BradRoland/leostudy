@@ -33,6 +33,7 @@ import { requiresAccountProfileCompletion, splitProfileName, safeAuthNextPath, s
 import { OwnerAdminPanel } from './components/OwnerAdminPanel'
 import { StudyGuidePage } from './components/StudyGuidePage'
 import { StudyPracticeTestPage } from './components/StudyPracticeTestPage'
+import { StudyProgressPreview } from './components/StudyMembershipPreview'
 import { MembershipPage, MembershipGate } from './components/MembershipPage'
 import { MembershipBadge } from './components/MembershipBadge'
 import { useMembership } from './lib/useMembership'
@@ -11745,7 +11746,7 @@ function App() {
   const pageTitle = isProfilePage
     ? 'Settings'
     : isStatsPage
-    ? 'Stats'
+    ? 'Your progress'
     : isSupportPage
         ? 'Memberships'
         : isStudyGuidePage
@@ -12051,7 +12052,7 @@ function App() {
         },
         {
           key: 'stats',
-          label: 'Stats',
+          label: 'Your progress',
           icon: 'stats' as AppIconName,
           active: isStatsPage,
           onClick: () => {
@@ -14225,13 +14226,14 @@ function App() {
               onScenarios={() => navigateToTab('scenarios')}
               onGames={() => navigateToTab('games')}
               onStats={() => goToPath('/stats')}
+              onMembership={() => goToPath('/support')}
               onClass={() => goToPath('/classes')}
             />
             <aside className="card academy-home-support" aria-label="Support 180 Academy">
               <div>
-                <p className="eyebrow">Built for your next step</p>
-                <h2>Support 180 Academy</h2>
-                <p className="muted">Unlock T-MAS practice, study analytics, and a toolkit that grows with your goals. Compare Plus and Pro memberships.</p>
+                <p className="eyebrow">A community worth building</p>
+                <h2>More tools for you. More possibilities for the academy.</h2>
+                <p className="muted">Membership helps support 180 Academy while adding practice, personal insights, and ways to make this space your own.</p>
                 {activeProfileTier !== 'free' ? <small>Thank you for being a {tierLabel[activeProfileTier]}.</small> : <small>Memberships from $5/month. Tax may apply.</small>}
               </div>
               <button className="secondary" onClick={() => navigate('/support')}>Explore memberships <span aria-hidden="true">→</span></button>
@@ -16639,7 +16641,7 @@ function App() {
           </section>
         )}
 
-        {isStatsPage && profile && !hasMembership ? <MembershipGate title="Your study analytics" onExplore={() => navigate('/support')} /> : null}
+        {isStatsPage && profile && !hasMembership ? <StudyProgressPreview onExplore={() => navigate('/support')} onStudy={openStudyFlashcardsPage} /> : null}
         {isStatsPage && profile && hasMembership ? (
           <section className="stats-section">
             {hasProMembership ? <ProStudyTools preferences={profileDetails.proStudyPreferences} onPreferences={value => setProfileDetails(previous => ({ ...previous, proStudyPreferences: value }))} onPractice={setup => { window.sessionStorage.setItem('practice-test-module-target', setup.module); window.sessionStorage.setItem('practice-test-length-target', String(setup.length)); openStudyPracticeTestPage() }} onDrill={(codeSet, sectionNumber) => { const matches = sections.filter(section => section.codeSet === codeSet && section.sectionNumber === sectionNumber); setStudyFlashFilter(codeSet); setStudyFlashSessionFilter(codeSet); setStudyFlashSessionOrder(matches.map(section => section.id)); setStudyFlashSessionIndex(0); setStudyFlashSessionFlipped(false); setStudyFlashSessionOpen(matches.length > 0); openStudyFlashcardsPage() }} /> : <MembershipGate title="Build your personal study plan" pro onExplore={() => navigate('/support')} />}

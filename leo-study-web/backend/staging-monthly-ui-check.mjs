@@ -33,6 +33,40 @@ try {
   await page.getByRole('button', { name: 'Sign in', exact: false }).click()
 
   await expect(page.locator('.academy-home-support')).toBeVisible()
+  // Free home cards go directly to plans; progress offers a useful, non-blocking comparison.
+  for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport)
+    for (const dark of [false, true]) {
+      await page.goto(`${origin}/home`)
+      await expect(page.locator('.today-metrics-free')).toBeVisible()
+      if (dark) await page.locator('.academy-workspace-actions').getByRole('button', { name: 'Switch to dark mode', exact: true }).click()
+      await expect(page.getByText('Your study toolkit', { exact: true })).toHaveCount(0)
+      await expect(page.getByText('Unlock your study insights', { exact: true })).toHaveCount(0)
+      const insightButtons = page.getByRole('button', { name: 'Explore your analytics', exact: true })
+      await expect(insightButtons).toHaveCount(2)
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2), 'free home overflow')
+      await page.screenshot({ path: `/tmp/academy-home-polish-${viewport.width}-${dark ? 'dark' : 'light'}.png`, fullPage: true })
+      for (const index of [0, 1]) {
+        await insightButtons.nth(index).click()
+        await expect(page).toHaveURL(/\/support$/)
+        await expect(page.getByRole('heading', { name: 'Academy Plus', exact: true })).toBeVisible()
+        await page.goBack()
+        await expect(page.locator('.today-metrics-free')).toBeVisible()
+      }
+      await page.goto(`${origin}/stats`)
+      await expect(page.locator('.study-progress-preview')).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Academy Pro', exact: true })).toBeVisible()
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2), 'free progress overflow')
+      await page.screenshot({ path: `/tmp/academy-progress-polish-${viewport.width}-${dark ? 'dark' : 'light'}.png`, fullPage: true })
+      await page.getByRole('button', { name: 'Compare memberships', exact: true }).click()
+      await expect(page).toHaveURL(/\/support$/)
+      await page.goBack()
+      await page.getByRole('button', { name: 'Keep studying', exact: true }).click()
+      await expect(page).toHaveURL(/\/study\/flashcards$/)
+      if (dark) await page.locator('.academy-workspace-actions').getByRole('button', { name: 'Switch to light mode', exact: true }).click()
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 })
   const sessionClient=createClient(env.SUPABASE_URL,env.SUPABASE_ANON_KEY||env.VITE_SUPABASE_ANON_KEY,{auth:{persistSession:false}})
   const session=check(await sessionClient.auth.signInWithPassword({email,password})).session
   const headers={Authorization:`Bearer ${session.access_token}`}
@@ -51,7 +85,7 @@ try {
   await expect(page.getByRole('tabpanel')).toContainText('Full collection')
   await page.screenshot({path:'/tmp/academy-monthly-pricing-desktop.png',fullPage:true})
   for(const route of ['/stats','/study/practice-test','/scenarios']) {
-   await page.goto(`${origin}${route}`);await expect(page.locator('.membership-gate')).toBeVisible()
+   await page.goto(`${origin}${route}`);await expect(page.locator('.membership-gate, .study-progress-preview')).toBeVisible()
   }
   const customize=async()=>{await page.goto(`${origin}/profile`);await page.getByRole('button',{name:'Customization',exact:true}).click()}
   await customize();await expect(page.getByRole('button',{name:'Pastel Rose',exact:true})).toBeDisabled()
@@ -67,6 +101,11 @@ try {
   const content=await fetch('http://127.0.0.1:8791/api/membership/content',{headers});assert.equal(content.status,200)
   assert.equal((await content.json()).modules.length,4)
   assert.equal((await fetch('http://127.0.0.1:8791/api/membership/analytics',{headers})).status,403)
+  await page.goto(`${origin}/home`)
+  await expect(page.getByRole('button', { name: 'Explore your analytics', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'View progress', exact: true }).click()
+  await expect(page).toHaveURL(/\/stats$/)
+  await expect(page.locator('.stats-section')).toBeVisible()
   await page.goto(`${origin}/study/practice-test`)
   await expect(page.getByText('Loading your practice toolkit…')).toHaveCount(0)
   await expect(page.getByRole('button',{name:'Start 20-Question Practice Test',exact:true})).toBeVisible()
@@ -134,7 +173,7 @@ try {
   check(await admin.from('academy_subscriptions').update({paid_through:expired}).eq('user_id',id))
   check(await admin.from('academy_membership_badges').update({plus_until:expired,pro_until:expired}).eq('user_id',id))
   await page.goto(`${origin}/stats`);await page.evaluate(()=>window.dispatchEvent(new Event('focus')))
-  await expect(page.locator('.membership-gate')).toBeVisible()
+  await expect(page.locator('.membership-gate, .study-progress-preview')).toBeVisible()
   assert.equal((await fetch('http://127.0.0.1:8791/api/membership/content',{headers})).status,403)
   assert.equal((await fetch('http://127.0.0.1:8791/api/membership/analytics',{headers})).status,403)
   await customize();await expect(page.getByRole('button',{name:'Pastel Rose',exact:true})).toBeDisabled()

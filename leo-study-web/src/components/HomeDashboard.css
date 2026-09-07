@@ -10,6 +10,7 @@
 .today-date { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: var(--academy-muted); padding: 9px 12px; border: 1px solid var(--academy-line); border-radius: 8px; background: var(--academy-surface); white-space: nowrap; }
 .today-date svg { width: 14px; height: 14px; }
 .today-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.today-metrics-free { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .today-metric { padding: 20px 21px; border: 1px solid var(--academy-line); border-radius: 12px; background: var(--academy-surface); position: relative; }
 .today-metric > div { display: flex; align-items: center; gap: 9px; }
 .today-metric-label { font-size: 11px; color: var(--academy-muted); font-weight: 500; }
