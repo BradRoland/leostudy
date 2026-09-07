@@ -10,6 +10,7 @@ import { createStripeTierService } from './stripe-tier-service.mjs'
 import { createStripeMembershipService } from './stripe-membership-service.mjs'
 import { buildKnowledgeInsights } from './knowledge-insights.mjs'
 import { createStudyCoach } from './study-coach.mjs'
+import { createRolandMembershipTest } from './roland-membership-test.mjs'
 import { buildMembershipAnalytics } from './membership-analytics.mjs'
 import { createClassRequestService } from './class-request-service.mjs'
 import { createClassRequestEmailService } from './class-request-email-service.mjs'
@@ -42,6 +43,7 @@ if ((!disableLiveIntegrations && (!stripeWebhookSecret || !process.env.STRIPE_SE
 
 const { stripe, supabase, applyTierFromCheckoutSession, verifySupabaseServiceAccess } = createStripeTierService()
 const membershipService = createStripeMembershipService({ stripe, supabase, legacyCheckout: applyTierFromCheckoutSession })
+const rolandMembershipTest = createRolandMembershipTest({ supabase })
 const studyCoach = createStudyCoach({ apiKey: process.env.OPENAI_API_KEY, enabled: process.env.STUDY_COACH_ENABLED === 'true', reserve: async userId => {
   const { data, error } = await supabase.rpc('reserve_academy_coach_usage', { p_user: userId })
   if (error) throw Object.assign(new Error('Your daily AI allowance has been reached, or access is unavailable. Try again tomorrow.'), { status: 429 })
@@ -534,6 +536,19 @@ const server = http.createServer(async (req, res) => {
         const result = req.url.endsWith('/checkout') ? await membershipService.checkout(data.user, body.tier) : await membershipService.portal(data.user)
         sendJson(res, 200, result)
       } catch (error) { sendJson(res, error.status || 400, { error: error.message || 'Membership request failed' }) }
+      return
+    }
+    if (req.url === '/api/membership/roland-test') {
+      res.setHeader('cache-control', 'private, no-store')
+      if (!['GET','POST'].includes(req.method)) { sendJson(res,405,{error:'Method not allowed'});return }
+      const token=String(req.headers.authorization || '').replace(/^Bearer /i,'')
+      const {data,error}=await supabase.auth.getUser(token)
+      if(error || !data.user){sendJson(res,401,{error:'Sign in to continue'});return}
+      try {
+        const body=req.method==='POST'?JSON.parse((await readRawBody(req,1024)).toString('utf8')||'{}'):null
+        const result=req.method==='POST'?await rolandMembershipTest.set(data.user.id,body?.tier):await rolandMembershipTest.read(data.user.id)
+        sendJson(res,200,result)
+      } catch(error) { sendJson(res,error instanceof SyntaxError?400:error.status||503,{error:error.status?error.message:'Test membership could not be updated. Please try again.'}) }
       return
     }
     if (['/api/membership/knowledge', '/api/membership/coach'].includes(req.url)) {

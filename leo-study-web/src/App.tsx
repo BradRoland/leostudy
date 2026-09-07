@@ -29,6 +29,7 @@ import { DuelInviteBanner } from './components/DuelInviteBanner'
 import { DirectMessageDock } from './components/DirectMessageDock'
 import { openDirectMessage } from './lib/directMessages'
 import { KnowledgeInsights } from './components/KnowledgeInsights'
+import { RolandMembershipTest } from './components/RolandMembershipTest'
 import { GlobalChatWidget } from './components/GlobalChatWidget'
 import { ClassWorkspacePages } from './components/ClassWorkspacePages'
 import { AuthEntry, PasswordRecovery } from './components/AuthOnboarding'
@@ -637,6 +638,7 @@ type SessionPerformanceReport = {
 }
 
 type SettingsTab =
+  | 'roland_testing'
   | 'profile'
   | 'progression'
   | 'customization'
@@ -16965,6 +16967,7 @@ function App() {
                     Class Requests
                   </button>
                 ) : null}
+                {isOwner && liveIntegrations.disabled && currentUserId === '90f1b543-e768-4d48-95da-bec61dd9a193' ? <button className={settingsTab === 'roland_testing' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('roland_testing')}>Roland</button> : null}
                 <button className={settingsTab === 'support' ? 'settings-nav-btn active' : 'settings-nav-btn'} onClick={() => setSettingsTab('support')}>
                   Memberships
                 </button>
@@ -17979,6 +17982,7 @@ function App() {
                 )
               ) : null}
 
+              {settingsTab === 'roland_testing' && isOwner && liveIntegrations.disabled && currentUserId === '90f1b543-e768-4d48-95da-bec61dd9a193' ? <RolandMembershipTest onChange={async () => { await membership.refresh(); window.dispatchEvent(new Event('focus')) }} /> : null}
               {settingsTab === 'support' ? <MembershipPage access={membership.access} preview={liveIntegrations.disabled} busy={supportRefreshing} error={supportError || membership.error} status={supportStatus} onCheckout={startTierCheckout} onManage={() => void openMembershipBilling('portal')} onRefresh={() => void membership.refresh().catch(() => {})} onStudy={openStudyFlashcardsPage} /> : null}
 
               {settingsTab === 'security' ? (
