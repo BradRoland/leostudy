@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import { assertDevelopmentComposeIsolation } from '../development/compose-isolation.mjs'
 
 assert.ok(process.argv.includes('--deploy-approved-dev'), 'Explicit development deployment authorization is required.')
 const release = process.argv[process.argv.indexOf('--release') + 1]
@@ -25,10 +26,31 @@ const environment = {
 }
 const credential = spawnSync('/usr/bin/security', ['find-generic-password', '-s', environment.CLASS180_TEST_KEYCHAIN_SERVICE, '-a', environment.CLASS180_TEST_SSH_USER, '-w'], { encoding: 'utf8' })
 assert.equal(credential.status, 0, 'Existing server credential is unavailable.')
+const sshArguments = ['-o', 'PreferredAuthentications=password', '-o', 'PubkeyAuthentication=no', '-o', 'NumberOfPasswordPrompts=1', 'truenas_admin@192.168.1.1', "sudo -S -p '' python3 -"]
+const topologySource = `import hashlib,json,pathlib,urllib.parse
+path=pathlib.Path('/mnt/tank2/stacks/class180-ui-test-20260906/compose.json');raw=path.read_bytes();compose=json.loads(raw)
+def http_targets(environment):
+ if isinstance(environment,list): environment=dict(value.split('=',1) for value in environment if '=' in value)
+ return {key:urllib.parse.urlparse(str(value).strip()).hostname for key,value in (environment or {}).items() if str(value).strip().lower().startswith(('http://','https://'))}
+services={name:{**{key:service[key] for key in ['networks','container_name','hostname','network_mode'] if key in service},'http_targets':http_targets(service.get('environment'))} for name,service in compose.get('services',{}).items()}
+print(json.dumps({'name':compose.get('name'),'networks':compose.get('networks',{}),'services':services,'sha256':hashlib.sha256(raw).hexdigest()}))
+`
+const topologyResult = spawnSync('ssh', sshArguments, {
+  cwd: root, env: environment, encoding: 'utf8',
+  input: credential.stdout.trim() + '\n' + topologySource,
+})
+assert.equal(topologyResult.status, 0, 'Could not verify development Compose isolation.')
+let topology
+try { topology = JSON.parse(topologyResult.stdout) } catch { throw new Error('Invalid development topology response.') }
+assert.match(topology.sha256 || '', /^[a-f0-9]{64}$/)
+assertDevelopmentComposeIsolation(topology)
+
 const source = `import base64,hashlib,io,json,os,pathlib,subprocess,tarfile
-root=pathlib.Path('/mnt/tank2/stacks/class180-ui-test-20260906');compose_path=root/'compose.json';compose=json.loads(compose_path.read_text())
+root=pathlib.Path('/mnt/tank2/stacks/class180-ui-test-20260906');compose_path=root/'compose.json';compose_bytes=compose_path.read_bytes()
+assert hashlib.sha256(compose_bytes).hexdigest()==${JSON.stringify(topology.sha256)},'Development Compose changed after isolation check; retry.'
+compose=json.loads(compose_bytes)
 assert compose['name']=='class180-ui-test-20260906'
-assert 'codex_class180_ui_test_20260906' in compose['services']['auth']['environment']['GOTRUE_DB_DATABASE_URL']
+assert 'codex_class180_ui_test_20260906' in compose['services']['academy-test-auth']['environment']['GOTRUE_DB_DATABASE_URL']
 runtime=(root/'web/runtime.env').read_text();assert 'DISABLE_LIVE_INTEGRATIONS=true' in runtime and 'SUPABASE_URL=http://gateway' in runtime
 release_id=${JSON.stringify(release)};release=root/'web/releases'/release_id;release.mkdir(parents=True,exist_ok=False,mode=0o700)
 payload=base64.b64decode(${JSON.stringify(artifact.toString('base64'))});assert hashlib.sha256(payload).hexdigest()==${JSON.stringify(artifactSha256)}
@@ -50,7 +72,7 @@ metadata.update({'previousImage':old_image,'releaseId':release_id,'artifactSha25
 (root/'web/deployment-metadata.json').write_text(json.dumps(metadata,indent=2)+'\\n')
 print(json.dumps({'deployedRelease':release_id,'artifactSha256':metadata['artifactSha256'],'previousImage':old_image}))
 `
-const child = spawn('ssh', ['-o', 'PreferredAuthentications=password', '-o', 'PubkeyAuthentication=no', '-o', 'NumberOfPasswordPrompts=1', 'truenas_admin@192.168.1.1', "sudo -S -p '' python3 -"], { cwd: root, env: environment, stdio: ['pipe', 'inherit', 'inherit'] })
+const child = spawn('ssh', sshArguments, { cwd: root, env: environment, stdio: ['pipe', 'inherit', 'inherit'] })
 child.stdin.end(credential.stdout.trim() + '\n' + source)
 child.on('error', error => { console.error(error.message); process.exit(1) })
 child.on('exit', code => process.exit(code ?? 1))

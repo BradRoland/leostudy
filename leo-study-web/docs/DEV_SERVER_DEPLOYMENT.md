@@ -4,6 +4,8 @@ This deployment serves the separate GitHub `dev` branch at `dev.180.academy`, in
 
 **Public status:** [https://dev.180.academy](https://dev.180.academy) is live as of September 6, 2026. After the development-only DNS/tunnel cutover, four public requests verified healthy JSON and the exact final build ID, all with uncached Cloudflare `DYNAMIC` responses. The synthetic public browser checks are recorded in the rollout report.
 
+**September 6 isolation correction:** A later audit found shared Docker service names intermittently routed production requests to development despite unchanged production containers. The four development services now use namespaced service keys and private-only compatibility aliases. See [Development service network isolation](DEV_NETWORK_ISOLATION.md) for the cause, repair, verification and rollback constraints.
+
 ## Server layout
 
 - Host: TrueNAS `192.168.1.1`.
@@ -16,7 +18,7 @@ This deployment serves the separate GitHub `dev` branch at `dev.180.academy`, in
 - Active runtime source: [Dockerfile.github](../ops/dev-preview/Dockerfile.github); retained manual artifact template: [Dockerfile.runtime](../ops/dev-preview/Dockerfile.runtime). Both use the verified Node 22.22.0 Alpine image digest.
 - Reverse-proxy template: [nginx.conf](../ops/dev-preview/nginx.conf).
 
-The native application uses the existing isolated `edge` Docker network, which connects the development proxy, test gateway and mail sink. The original private `test` network retains the other cloned services. The application does not join the production database network. Auth/REST/Storage/Realtime retain their previous database-network attachment solely to reach the separately named clone. No production container was restarted or reconfigured.
+The native application uses the existing isolated `edge` Docker network, which connects the development proxy, test gateway and mail sink. The original private `test` network retains the other cloned services. The application does not join the production database network. The namespaced `academy-test-auth`, `academy-test-rest`, `academy-test-storage` and `academy-test-realtime` services retain a database-network attachment to reach the separately named clone. Their short aliases exist only on the private test network, and shared-network callers use namespaced development HTTP targets. See [Development service network isolation](DEV_NETWORK_ISOLATION.md). No production container was restarted or reconfigured.
 
 ## Retained releases and configuration
 
