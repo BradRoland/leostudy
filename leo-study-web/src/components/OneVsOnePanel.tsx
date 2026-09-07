@@ -1,3 +1,5 @@
+import { hasGameUnlock, normalizeRoomCode } from '../lib/gameUnlocks'
+import './ChallengePanel.css'
 import { type CSSProperties, type MouseEvent, type ReactNode, type SyntheticEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type RealtimeChannel } from '@supabase/supabase-js'
 import { loadLocalContentBundle, type ContentBankItem } from '../content'
@@ -1826,6 +1828,7 @@ function mapDuelResultSnapshot(row: Record<string, unknown>): DuelRoomResultRow 
 export function OneVsOnePanel(props: {
   currentUserId: string
   currentUsername: string
+  progressionLevel?: number
   activeClassId?: string | null
   isOwner?: boolean
   externalJoinRoomId?: string | null
@@ -1850,6 +1853,7 @@ export function OneVsOnePanel(props: {
   const {
     currentUserId,
     currentUsername,
+    progressionLevel = 1,
     activeClassId = null,
     isOwner = false,
     externalJoinRoomId = null,
@@ -1862,6 +1866,12 @@ export function OneVsOnePanel(props: {
     onDuelPerformanceReward,
     sessionXpReward,
   } = props
+  const canTimers = hasGameUnlock(progressionLevel, 'timers')
+  const canHostRooms = hasGameUnlock(progressionLevel, 'rooms')
+  const canConnect4 = hasGameUnlock(progressionLevel, 'connect4')
+  const canPowerups = hasGameUnlock(progressionLevel, 'powerups')
+  const canOvertime = hasGameUnlock(progressionLevel, 'overtime')
+  const canKnockout = hasGameUnlock(progressionLevel, 'knockout')
   const activeDuelClassId = String(activeClassId || '').trim()
 
   const availableDuelGameTypeOptions = useMemo(
@@ -1873,7 +1883,7 @@ export function OneVsOnePanel(props: {
   const [selectedPowerupsEnabled, setSelectedPowerupsEnabled] = useState(duelBlasterDefaultPowerupsEnabled)
   const [selectedBlasterMode, setSelectedBlasterMode] = useState<DuelBlasterMode>('timed')
   const [selectedBlasterDurationSeconds, setSelectedBlasterDurationSeconds] = useState(duelBlasterDefaultDurationSeconds)
-  const [selectedBlasterOvertimeEnabled, setSelectedBlasterOvertimeEnabled] = useState(duelBlasterDefaultOvertimeEnabled)
+  const [selectedBlasterOvertimeEnabled, setSelectedBlasterOvertimeEnabled] = useState(false)
   const [selectedBlasterOvertimeAfterSeconds, setSelectedBlasterOvertimeAfterSeconds] = useState(duelBlasterDefaultOvertimeAfterSeconds)
   const [isPublicRoom, setIsPublicRoom] = useState(true)
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -1884,7 +1894,7 @@ export function OneVsOnePanel(props: {
   const [invitePowerupsEnabled, setInvitePowerupsEnabled] = useState(duelBlasterDefaultPowerupsEnabled)
   const [inviteBlasterMode, setInviteBlasterMode] = useState<DuelBlasterMode>('timed')
   const [inviteBlasterDurationSeconds, setInviteBlasterDurationSeconds] = useState(duelBlasterDefaultDurationSeconds)
-  const [inviteBlasterOvertimeEnabled, setInviteBlasterOvertimeEnabled] = useState(duelBlasterDefaultOvertimeEnabled)
+  const [inviteBlasterOvertimeEnabled, setInviteBlasterOvertimeEnabled] = useState(false)
   const [inviteBlasterOvertimeAfterSeconds, setInviteBlasterOvertimeAfterSeconds] = useState(duelBlasterDefaultOvertimeAfterSeconds)
   const [onlineInviteUsers, setOnlineInviteUsers] = useState<OnlineInviteUser[]>([])
   const [onlineInviteLoading, setOnlineInviteLoading] = useState(false)
@@ -1910,7 +1920,7 @@ export function OneVsOnePanel(props: {
   const [lobbyEditPowerupsEnabled, setLobbyEditPowerupsEnabled] = useState(duelBlasterDefaultPowerupsEnabled)
   const [lobbyEditBlasterMode, setLobbyEditBlasterMode] = useState<DuelBlasterMode>('timed')
   const [lobbyEditBlasterDurationSeconds, setLobbyEditBlasterDurationSeconds] = useState(duelBlasterDefaultDurationSeconds)
-  const [lobbyEditBlasterOvertimeEnabled, setLobbyEditBlasterOvertimeEnabled] = useState(duelBlasterDefaultOvertimeEnabled)
+  const [lobbyEditBlasterOvertimeEnabled, setLobbyEditBlasterOvertimeEnabled] = useState(false)
   const [lobbyEditBlasterOvertimeAfterSeconds, setLobbyEditBlasterOvertimeAfterSeconds] = useState(duelBlasterDefaultOvertimeAfterSeconds)
   const [lobbySettingsSaving, setLobbySettingsSaving] = useState(false)
   const lockGameSetupPageScroll = showInviteModal || showBotSetupModal || showCreateRoomModal || showChangeModeModal || showPowerupGlossary
@@ -3161,21 +3171,22 @@ export function OneVsOnePanel(props: {
     setSelectedPowerupsEnabled(duelBlasterDefaultPowerupsEnabled)
     setSelectedBlasterMode('timed')
     setSelectedBlasterDurationSeconds(duelBlasterDefaultDurationSeconds)
-    setSelectedBlasterOvertimeEnabled(duelBlasterDefaultOvertimeEnabled)
+    setSelectedBlasterOvertimeEnabled(false)
     setSelectedBlasterOvertimeAfterSeconds(duelBlasterDefaultOvertimeAfterSeconds)
     setInviteGameType('blaster')
     setInviteCategory('all')
     setInvitePowerupsEnabled(duelBlasterDefaultPowerupsEnabled)
     setInviteBlasterMode('timed')
     setInviteBlasterDurationSeconds(duelBlasterDefaultDurationSeconds)
-    setInviteBlasterOvertimeEnabled(duelBlasterDefaultOvertimeEnabled)
+    setInviteBlasterOvertimeEnabled(false)
     setInviteBlasterOvertimeAfterSeconds(duelBlasterDefaultOvertimeAfterSeconds)
-    setShowInviteModal(true)
+    setShowInviteModal(canHostRooms)
+    if (!canHostRooms) setShowBotSetupModal(true)
     setError('')
     setNotice('')
     void loadOnlineInviteUsers()
     onInvitePresetHandled?.()
-  }, [invitePreset, isSignedIn, loadOnlineInviteUsers, onInvitePresetHandled])
+  }, [invitePreset, isSignedIn, loadOnlineInviteUsers, onInvitePresetHandled, canHostRooms])
 
   useEffect(() => {
     if (invitePreset !== 'bot-practice') return
@@ -4136,6 +4147,8 @@ export function OneVsOnePanel(props: {
   }, [recordBotMatchResult])
 
   const startBotMatch = useCallback(async () => {
+    if (inviteGameType === 'connect4' && !canConnect4) { setError('Connect Four unlocks at Level 5.'); return }
+    if (inviteGameType === 'blaster' && ((inviteBlasterDurationSeconds !== duelBlasterDefaultDurationSeconds && !canTimers) || (invitePowerupsEnabled && !canPowerups) || (inviteBlasterOvertimeEnabled && !canOvertime) || (inviteBlasterMode === 'death' && !canKnockout))) { setError('Reach the required level to use these modifiers.'); return }
     setBotStarting(true)
     setError('')
     setNotice('')
@@ -4256,7 +4269,7 @@ export function OneVsOnePanel(props: {
     setRoundStartedAt(startedAt)
     roundStartedAtRef.current = startedAt
     markStudyActivity()
-  }, [
+  }, [canTimers, canConnect4, canPowerups, canOvertime, canKnockout, 
     botDifficulty,
     inviteBlasterDurationSeconds,
     inviteBlasterMode,
@@ -4634,6 +4647,7 @@ export function OneVsOnePanel(props: {
 
   const createRoom = async () => {
     if (!supabase || !isSignedIn) return
+    if (!canHostRooms) { setError('Custom room hosting unlocks at Level 10.'); return }
     if (selectedGameType === 'connect4' && !connect4Enabled) {
       setError('Connect 4 is disabled.')
       return
@@ -4812,6 +4826,7 @@ export function OneVsOnePanel(props: {
   }
 
   const openInviteModal = (sourceRoom?: DuelRoomRow | null, presetGameType?: DuelGameType) => {
+    if (!canHostRooms) { setError('Inviting a classmate to a custom room unlocks at Level 10. You can join their room at any level.'); return }
     const sourceGameType = presetGameType || sourceRoom?.game_type || selectedGameType
     const sourceCategory = sourceRoom?.category || selectedCategory
     const sourceSettings = sourceRoom?.settings || null
@@ -4832,7 +4847,7 @@ export function OneVsOnePanel(props: {
 
   const openBotSetupModal = (presetGameType?: DuelGameType) => {
     const requestedGameType = presetGameType || selectedGameType
-    const sourceGameType = requestedGameType
+    const sourceGameType = requestedGameType === 'connect4' && !canConnect4 ? 'quiz' : requestedGameType
     setInviteGameType(sourceGameType)
     setInviteCategory(sourceGameType !== 'quiz' && selectedCategory === 'scenarios' ? 'all' : selectedCategory)
     setInviteQuizRounds(selectedQuizRounds)
@@ -4959,7 +4974,7 @@ export function OneVsOnePanel(props: {
 
   const joinByCode = async () => {
     if (!supabase || !isSignedIn) return
-    const code = joinCodeInput.trim()
+    const code = normalizeRoomCode(joinCodeInput)
     if (!/^[0-9]{6}$/.test(code)) {
       setError('Enter a valid 6-digit room code.')
       return
@@ -4972,7 +4987,7 @@ export function OneVsOnePanel(props: {
       setError(rpcError.message || 'Could not join room.')
       return
     }
-    setRoomId(String(data || ''))
+    enterFreshRoom(String(data || ''))
     setJoinCodeInput('')
     setNotice('Joined room.')
   }
@@ -6899,6 +6914,7 @@ export function OneVsOnePanel(props: {
               <div><strong>{myDuelStats?.best_win_streak ?? '—'}</strong><span>Best streak</span></div>
             </div>
           </header>
+          <p className="game-unlock-note">Level {progressionLevel} · Timers at 3 · Connect Four at 5 · Power-ups at 6 · Overtime at 8 · Host rooms at 10 · Knockout at 12. Earn XP through practice and Home challenges.</p>
           <div className="onevone-lobby-layout">
             <div className="onevone-lobby-main">
               <div className="card onevone-card onevone-entry-card">
@@ -6911,10 +6927,10 @@ export function OneVsOnePanel(props: {
                     className="primary onevone-create-button multiplayer-action-card multiplayer-action-featured"
                     type="button"
                     onClick={() => setShowCreateRoomModal(true)}
-                    disabled={loading || !supabase}
+                    disabled={loading || !supabase || !canHostRooms}
                   >
                     <span className="multiplayer-action-icon"><AcademyIcon name="duel" /></span>
-                    <span>Create your own room</span>
+                    <span>{canHostRooms ? 'Create your own room' : 'Custom rooms · Level 10'}</span>
                     <small>Your game, your pace. Pick the mode and codes you want to practice.</small>
                     <span className="multiplayer-action-footer">Set up a match <AcademyIcon name="arrow" /></span>
                   </button>
@@ -6922,10 +6938,10 @@ export function OneVsOnePanel(props: {
                     className="secondary onevone-invite-cta multiplayer-action-card"
                     type="button"
                     onClick={() => openInviteModal()}
-                    disabled={loading || !supabase}
+                    disabled={loading || !supabase || !canHostRooms}
                   >
                     <span className="multiplayer-action-icon"><AcademyIcon name="class" /></span>
-                    <span>Invite a Classmate</span>
+                    <span>{canHostRooms ? 'Invite a Classmate' : 'Classmate invites · Level 10'}</span>
                     <small>Find someone from your class and turn practice into a shared challenge.</small>
                     <span className="multiplayer-action-footer">Find your opponent <AcademyIcon name="arrow" /></span>
                   </button>
@@ -6948,13 +6964,13 @@ export function OneVsOnePanel(props: {
                       <input
                         id="multiplayer-room-code"
                         value={joinCodeInput}
-                        maxLength={6}
+                        maxLength={12}
                         inputMode="numeric"
                         pattern="[0-9]*"
-                        onChange={(event) => setJoinCodeInput(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                        onChange={(event) => setJoinCodeInput(normalizeRoomCode(event.target.value))}
                         placeholder="6-digit code"
                       />
-                      <button className="primary" onClick={joinByCode} disabled={loading || !supabase}>
+                      <button className="primary" onClick={joinByCode} disabled={loading || !supabase || !/^[0-9]{6}$/.test(joinCodeInput)}>
                         Join
                       </button>
                     </div>
@@ -6973,7 +6989,7 @@ export function OneVsOnePanel(props: {
                   <div className="multiplayer-empty-state">
                     <span className="multiplayer-state-icon"><AcademyIcon name="class" /></span>
                     <strong>The next match could be yours.</strong>
-                    <p className="muted">No public rooms available right now. Create a room to get things started, or warm up against a bot.</p>
+                    <p className="muted">No public rooms available right now. Join with a classmate’s code, or warm up against a bot.</p>
                   </div>
                 ) : null}
                 <div className="onevone-public-list">
@@ -7005,8 +7021,8 @@ export function OneVsOnePanel(props: {
                               Spectate
                             </button>
                           ) : (
-                            <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading || !canJoin}>
-                              Join
+                            <button className="primary" onClick={() => void joinPublicRoom(item.id)} disabled={loading || !canJoin || (item.game_type === 'connect4' && !canConnect4)}>
+                              {item.game_type === 'connect4' && !canConnect4 ? 'Level 5' : 'Join'}
                             </button>
                           )}
                           {canDeleteRoom ? (
@@ -7193,6 +7209,7 @@ export function OneVsOnePanel(props: {
           onClick={() => setShowCreateRoomModal(false)}
         >
           <div className="card game-settings-modal multiplayer-create-modal" role="dialog" aria-modal="true" aria-label="Create Room" onClick={(event) => event.stopPropagation()}>
+            {error ? <p role="alert">{error}</p> : null}
             <div className="multiplayer-modal-intro"><span className="multiplayer-state-icon"><AcademyIcon name="duel" /></span><div><p className="multiplayer-eyebrow">Make it your match</p><h3>Create Room</h3><p className="muted tiny">Choose your challenge. Invite someone when you’re ready.</p></div></div>
             <label className="game-control">
               Game Mode
@@ -7204,6 +7221,7 @@ export function OneVsOnePanel(props: {
                     className={selectedGameType === option.value ? 'seg active' : 'seg'}
                       aria-pressed={selectedGameType === option.value}
                       aria-label={option.label}
+                      disabled={option.value === 'connect4' && !canConnect4}
                     onClick={() => {
                       setSelectedGameType(option.value)
                       if (option.value === 'connect4') setSelectedCategory('all')
@@ -7212,7 +7230,7 @@ export function OneVsOnePanel(props: {
                   >
                     <AcademyIcon name={duelGameIcons[option.value]} />
                     <span>{option.label}</span>
-                    <small>{option.subtitle}</small>
+                    <small>{option.value === 'connect4' && !canConnect4 ? 'Unlocks at Level 5' : option.subtitle}</small>
                   </button>
                 ))}
               </div>
@@ -7272,7 +7290,9 @@ export function OneVsOnePanel(props: {
                         key={`duel-blaster-duration-${seconds}`}
                         type="button"
                         className={selectedBlasterMode === 'timed' && selectedBlasterDurationSeconds === seconds ? 'seg active' : 'seg'}
-                        onClick={() => {
+                        aria-label={`${seconds} second match`}
+                        disabled={!canTimers && seconds !== duelBlasterDefaultDurationSeconds}
+                      onClick={() => {
                           setSelectedBlasterMode('timed')
                           setSelectedBlasterDurationSeconds(seconds)
                         }}
@@ -7283,25 +7303,27 @@ export function OneVsOnePanel(props: {
                     <button
                       type="button"
                       className={selectedBlasterMode === 'death' ? 'seg active' : 'seg'}
+                      disabled={!canKnockout}
                       onClick={() => setSelectedBlasterMode('death')}
                     >
-                      To the Death
+                      {canKnockout ? 'To the Death' : 'To the Death · Level 12'}
                     </button>
 	                  </div>
-	                  <small className="muted">Timed matches end on the clock or by rope KO. To the Death removes the clock and ends by rope KO.</small>
+	                  <small className="muted">{!canTimers ? 'Extra timer options unlock at Level 3. ' : ''}Timed matches end on the clock or by rope KO. To the Death removes the clock and ends by rope KO.</small>
                     <button className="secondary onevone-glossary-button" type="button" onClick={() => setShowPowerupGlossary(true)}>
                       View Power-Up Glossary
                     </button>
 	                </label>
                 <label className={`game-control onevone-powerup-toggle ${selectedPowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
                   <span>
-                    Enable Power-Ups
+                    {canPowerups ? 'Enable Power-Ups' : 'Power-Ups · Level 6'}
                     <small>{selectedBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Correct power shots tug harder and build streak pressure.'}</small>
                   </span>
                   <span className="onevone-toggle-action">
                     <input
                       type="checkbox"
                       checked={selectedPowerupsEnabled}
+                      disabled={!canPowerups}
                       onChange={(event) => setSelectedPowerupsEnabled(event.target.checked)}
                       aria-label="Enable power-ups"
                     />
@@ -7311,14 +7333,15 @@ export function OneVsOnePanel(props: {
                 <div className="game-control onevone-overtime-control">
                   <label className={`onevone-powerup-toggle ${selectedBlasterOvertimeEnabled ? 'is-enabled' : 'is-disabled'}`}>
                     <span>
-                      Enable Overtime
+                      {canOvertime ? 'Enable Overtime' : 'Overtime · Level 8'}
                       <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
                     </span>
                     <span className="onevone-toggle-action">
                       <input
                         type="checkbox"
                         checked={selectedBlasterOvertimeEnabled}
-                        onChange={(event) => setSelectedBlasterOvertimeEnabled(event.target.checked)}
+                        disabled={!canOvertime}
+                      onChange={(event) => setSelectedBlasterOvertimeEnabled(event.target.checked)}
                         aria-label="Enable overtime"
                       />
                       <strong className="onevone-toggle-state">{selectedBlasterOvertimeEnabled ? 'ON ✓' : 'OFF'}</strong>
@@ -7413,6 +7436,7 @@ export function OneVsOnePanel(props: {
                       className={lobbyEditGameType === option.value ? 'seg active' : 'seg'}
                       aria-pressed={lobbyEditGameType === option.value}
                       aria-label={option.label}
+                      disabled={option.value === 'connect4' && !canConnect4}
                       onClick={() => {
                         setLobbyEditGameType(option.value)
                         if (option.value === 'connect4') setLobbyEditCategory('all')
@@ -7421,7 +7445,7 @@ export function OneVsOnePanel(props: {
                   >
                     <AcademyIcon name={duelGameIcons[option.value]} />
                     <span>{option.label}</span>
-                    <small>{option.subtitle}</small>
+                    <small>{option.value === 'connect4' && !canConnect4 ? 'Unlocks at Level 5' : option.subtitle}</small>
                   </button>
                 ))}
               </div>
@@ -7470,7 +7494,9 @@ export function OneVsOnePanel(props: {
                         key={`lobby-blaster-duration-${seconds}`}
                         type="button"
                         className={lobbyEditBlasterMode === 'timed' && lobbyEditBlasterDurationSeconds === seconds ? 'seg active' : 'seg'}
-                        onClick={() => {
+                        aria-label={`${seconds} second match`}
+                        disabled={!canTimers && seconds !== duelBlasterDefaultDurationSeconds}
+                      onClick={() => {
                           setLobbyEditBlasterMode('timed')
                           setLobbyEditBlasterDurationSeconds(seconds)
                         }}
@@ -7481,25 +7507,27 @@ export function OneVsOnePanel(props: {
                     <button
                       type="button"
                       className={lobbyEditBlasterMode === 'death' ? 'seg active' : 'seg'}
+                      disabled={!canKnockout}
                       onClick={() => setLobbyEditBlasterMode('death')}
                     >
-                      To the Death
+                      {canKnockout ? 'To the Death' : 'To the Death · Level 12'}
                     </button>
                   </div>
-                  <small className="muted">Timed matches end on the clock or by rope KO. To the Death removes the clock and ends by rope KO.</small>
+                  <small className="muted">{!canTimers ? 'Extra timer options unlock at Level 3. ' : ''}Timed matches end on the clock or by rope KO. To the Death removes the clock and ends by rope KO.</small>
                   <button className="secondary onevone-glossary-button" type="button" onClick={() => setShowPowerupGlossary(true)}>
                     View Power-Up Glossary
                   </button>
                 </label>
                 <label className={`game-control onevone-powerup-toggle ${lobbyEditPowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
                   <span>
-                    Enable Power-Ups
+                    {canPowerups ? 'Enable Power-Ups' : 'Power-Ups · Level 6'}
                     <small>{lobbyEditBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Correct power shots tug harder and build streak pressure.'}</small>
                   </span>
                   <span className="onevone-toggle-action">
                     <input
                       type="checkbox"
                       checked={lobbyEditPowerupsEnabled}
+                      disabled={!canPowerups}
                       onChange={(event) => setLobbyEditPowerupsEnabled(event.target.checked)}
                       aria-label="Enable power-ups"
                     />
@@ -7509,14 +7537,15 @@ export function OneVsOnePanel(props: {
                 <div className="game-control onevone-overtime-control">
                   <label className={`onevone-powerup-toggle ${lobbyEditBlasterOvertimeEnabled ? 'is-enabled' : 'is-disabled'}`}>
                     <span>
-                      Enable Overtime
+                      {canOvertime ? 'Enable Overtime' : 'Overtime · Level 8'}
                       <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
                     </span>
                     <span className="onevone-toggle-action">
                       <input
                         type="checkbox"
                         checked={lobbyEditBlasterOvertimeEnabled}
-                        onChange={(event) => setLobbyEditBlasterOvertimeEnabled(event.target.checked)}
+                        disabled={!canOvertime}
+                      onChange={(event) => setLobbyEditBlasterOvertimeEnabled(event.target.checked)}
                         aria-label="Enable overtime"
                       />
                       <strong className="onevone-toggle-state">{lobbyEditBlasterOvertimeEnabled ? 'ON ✓' : 'OFF'}</strong>
@@ -7702,6 +7731,7 @@ export function OneVsOnePanel(props: {
                           className={inviteGameType === option.value ? 'seg active' : 'seg'}
                       aria-pressed={inviteGameType === option.value}
                       aria-label={option.label}
+                      disabled={option.value === 'connect4' && !canConnect4}
                           onClick={() => {
                             setInviteGameType(option.value)
                             if (option.value === 'connect4') setInviteCategory('all')
@@ -7710,7 +7740,7 @@ export function OneVsOnePanel(props: {
                         >
                           <AcademyIcon name={duelGameIcons[option.value]} />
                     <span>{option.label}</span>
-                          <small>{option.subtitle}</small>
+                          <small>{option.value === 'connect4' && !canConnect4 ? 'Unlocks at Level 5' : option.subtitle}</small>
                         </button>
                       ))}
                     </div>
@@ -7759,7 +7789,9 @@ export function OneVsOnePanel(props: {
                               key={`bot-blaster-duration-${seconds}`}
                               type="button"
                               className={inviteBlasterMode === 'timed' && inviteBlasterDurationSeconds === seconds ? 'seg active' : 'seg'}
-                              onClick={() => {
+                              aria-label={`${seconds} second match`}
+                        disabled={!canTimers && seconds !== duelBlasterDefaultDurationSeconds}
+                      onClick={() => {
                                 setInviteBlasterMode('timed')
                                 setInviteBlasterDurationSeconds(seconds)
                               }}
@@ -7770,9 +7802,10 @@ export function OneVsOnePanel(props: {
                           <button
                             type="button"
                             className={inviteBlasterMode === 'death' ? 'seg active' : 'seg'}
-                            onClick={() => setInviteBlasterMode('death')}
+                            disabled={!canKnockout}
+                      onClick={() => setInviteBlasterMode('death')}
                           >
-                            To the Death
+                            {canKnockout ? 'To the Death' : 'To the Death · Level 12'}
                           </button>
                         </div>
                         <small className="muted">Default is 30 seconds. Rope KO can still end either mode early.</small>
@@ -7782,14 +7815,15 @@ export function OneVsOnePanel(props: {
                       </label>
                       <label className={`game-control onevone-powerup-toggle ${invitePowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
                         <span>
-                          Enable Power-Ups
+                          {canPowerups ? 'Enable Power-Ups' : 'Power-Ups · Level 6'}
                           <small>{inviteBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Power shots make the tug-of-war swing harder.'}</small>
                         </span>
                         <span className="onevone-toggle-action">
                           <input
                             type="checkbox"
                             checked={invitePowerupsEnabled}
-                            onChange={(event) => setInvitePowerupsEnabled(event.target.checked)}
+                            disabled={!canPowerups}
+                      onChange={(event) => setInvitePowerupsEnabled(event.target.checked)}
                             aria-label="Enable power-ups"
                           />
                           <strong className="onevone-toggle-state">{invitePowerupsEnabled ? 'ON ✓' : 'OFF'}</strong>
@@ -7798,14 +7832,15 @@ export function OneVsOnePanel(props: {
                       <div className="game-control onevone-overtime-control">
                         <label className={`onevone-powerup-toggle ${inviteBlasterOvertimeEnabled ? 'is-enabled' : 'is-disabled'}`}>
                           <span>
-                            Enable Overtime
+                            {canOvertime ? 'Enable Overtime' : 'Overtime · Level 8'}
                             <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
                           </span>
                           <span className="onevone-toggle-action">
                             <input
                               type="checkbox"
                               checked={inviteBlasterOvertimeEnabled}
-                              onChange={(event) => setInviteBlasterOvertimeEnabled(event.target.checked)}
+                              disabled={!canOvertime}
+                      onChange={(event) => setInviteBlasterOvertimeEnabled(event.target.checked)}
                               aria-label="Enable overtime"
                             />
                             <strong className="onevone-toggle-state">{inviteBlasterOvertimeEnabled ? 'ON ✓' : 'OFF'}</strong>
@@ -7931,6 +7966,7 @@ export function OneVsOnePanel(props: {
                         className={inviteGameType === option.value ? 'seg active' : 'seg'}
                       aria-pressed={inviteGameType === option.value}
                       aria-label={option.label}
+                      disabled={option.value === 'connect4' && !canConnect4}
                         onClick={() => {
                           setInviteGameType(option.value)
                           if (option.value !== 'quiz' && inviteCategory === 'scenarios') setInviteCategory('all')
@@ -7938,7 +7974,7 @@ export function OneVsOnePanel(props: {
                       >
                         <AcademyIcon name={duelGameIcons[option.value]} />
                     <span>{option.label}</span>
-                        <small>{option.subtitle}</small>
+                        <small>{option.value === 'connect4' && !canConnect4 ? 'Unlocks at Level 5' : option.subtitle}</small>
                       </button>
                     ))}
                   </div>
@@ -7987,7 +8023,9 @@ export function OneVsOnePanel(props: {
                             key={`invite-blaster-duration-${seconds}`}
                             type="button"
                             className={inviteBlasterMode === 'timed' && inviteBlasterDurationSeconds === seconds ? 'seg active' : 'seg'}
-                            onClick={() => {
+                            aria-label={`${seconds} second match`}
+                        disabled={!canTimers && seconds !== duelBlasterDefaultDurationSeconds}
+                      onClick={() => {
                               setInviteBlasterMode('timed')
                               setInviteBlasterDurationSeconds(seconds)
                             }}
@@ -7998,9 +8036,10 @@ export function OneVsOnePanel(props: {
                         <button
                           type="button"
                           className={inviteBlasterMode === 'death' ? 'seg active' : 'seg'}
-                          onClick={() => setInviteBlasterMode('death')}
+                          disabled={!canKnockout}
+                      onClick={() => setInviteBlasterMode('death')}
                         >
-                          To the Death
+                          {canKnockout ? 'To the Death' : 'To the Death · Level 12'}
                         </button>
 	                      </div>
 	                      <small className="muted">Default is 30 seconds. Rope KO can still end either mode early.</small>
@@ -8010,14 +8049,15 @@ export function OneVsOnePanel(props: {
 	                    </label>
                     <label className={`game-control onevone-powerup-toggle ${invitePowerupsEnabled ? 'is-enabled' : 'is-disabled'}`}>
                       <span>
-                        Enable Power-Ups
+                        {canPowerups ? 'Enable Power-Ups' : 'Power-Ups · Level 6'}
                         <small>{inviteBlasterMode === 'death' ? 'No clock-based power-ups in To the Death.' : 'Power shots make the tug-of-war swing harder.'}</small>
                       </span>
                       <span className="onevone-toggle-action">
                         <input
                           type="checkbox"
                           checked={invitePowerupsEnabled}
-                          onChange={(event) => setInvitePowerupsEnabled(event.target.checked)}
+                          disabled={!canPowerups}
+                      onChange={(event) => setInvitePowerupsEnabled(event.target.checked)}
                           aria-label="Enable power-ups"
                         />
                         <strong className="onevone-toggle-state">{invitePowerupsEnabled ? 'ON ✓' : 'OFF'}</strong>
@@ -8026,14 +8066,15 @@ export function OneVsOnePanel(props: {
                     <div className="game-control onevone-overtime-control">
                       <label className={`onevone-powerup-toggle ${inviteBlasterOvertimeEnabled ? 'is-enabled' : 'is-disabled'}`}>
                         <span>
-                          Enable Overtime
+                          {canOvertime ? 'Enable Overtime' : 'Overtime · Level 8'}
                           <small>When on, the rope shrinks after the selected time so close matches end fast.</small>
                         </span>
                         <span className="onevone-toggle-action">
                           <input
                             type="checkbox"
                             checked={inviteBlasterOvertimeEnabled}
-                            onChange={(event) => setInviteBlasterOvertimeEnabled(event.target.checked)}
+                            disabled={!canOvertime}
+                      onChange={(event) => setInviteBlasterOvertimeEnabled(event.target.checked)}
                             aria-label="Enable overtime"
                           />
                           <strong className="onevone-toggle-state">{inviteBlasterOvertimeEnabled ? 'ON ✓' : 'OFF'}</strong>
@@ -8123,6 +8164,11 @@ export function OneVsOnePanel(props: {
                   ) : null}
                 </div>
               </div>
+
+              {!room.is_public && room.join_code && myPlayer ? <section className="private-room-code" aria-label="Private room code">
+                <div><strong>Private room · Invite with a code</strong><output aria-label="Your room code">{room.join_code}</output><p>Share these six digits with someone in your class. They can enter them under “Have a room code?” This room is hidden from the public list.</p></div>
+                <button type="button" className="secondary" onClick={async () => { try { await navigator.clipboard.writeText(room.join_code || ''); setNotice('Room code copied. Share it with your classmate.'); } catch { setNotice('Select the six-digit code above to copy it.'); } }}>Copy code</button>
+              </section> : null}
 
               <div className="onevone-waiting-players">
                 <div className={`onevone-player-slot ${myPlayer ? 'filled' : ''}`}>

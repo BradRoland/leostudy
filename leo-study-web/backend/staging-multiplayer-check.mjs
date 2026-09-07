@@ -61,6 +61,7 @@ try {
     users.push({ id: created.data.user.id, client })
     assert.ifError((await service.from('profiles').insert({ user_id: created.data.user.id, username: `Synthetic ${suffix} ${index}`, last_active: new Date().toISOString() })).error)
     assert.ifError((await service.from('class_memberships').insert({ class_id: classIds[index === 2 ? 1 : 0], user_id: created.data.user.id, role: index === 1 ? 'cadet' : 'class_admin', status: 'active', is_active: true })).error)
+    assert.ifError((await service.from('app_state').upsert({ user_id: created.data.user.id, profile_details: { stats: { achievementXp: 12000 } } })).error)
     const login = await client.auth.signInWithPassword({ email, password })
     assert.ifError(login.error)
     await client.realtime.setAuth(login.data.session.access_token)

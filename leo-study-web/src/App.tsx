@@ -17,6 +17,8 @@ import { RankBadge } from './components/RankBadge'
 import { SoloGameSetup } from './components/SoloGameSetup'
 import { FrameCollection } from './components/FrameCollection'
 import { RewardsPanel, RewardAvatarPicker } from './components/RewardsPanel'
+import { useAcademyProgression } from './hooks/useAcademyProgression'
+import { ChallengePanel } from './components/ChallengePanel'
 import { useDailyRewards } from './hooks/useDailyRewards'
 import { xpRequiredForLevel, levelFromXp, levelTierName, type RewardAvatar } from './lib/academyProgression'
 import { profileDecorationCatalog, profileDecorationAssetPath, getProfileDecoration, autoDecorationKeyForLevel, type ProfileDecoration } from './lib/profileDecorationData'
@@ -867,6 +869,7 @@ type UserLevelProfile = {
 }
 
 type UserLevelInput = {
+  confirmedTotalXp?: number
   pendingRewardXpFloor?: number
   studySeconds: number
   studyDayStreak: number
@@ -2314,7 +2317,7 @@ function buildUserLevelProfile(input: UserLevelInput): UserLevelProfile {
     input.duelWins * duelWinXpValue +
     input.duelLosses * duelLossXpValue +
     competitiveXp
-  const totalXp = Math.max(0, Math.round(xp), input.pendingRewardXpFloor || 0)
+  const totalXp = Math.max(0, input.confirmedTotalXp ?? Math.max(Math.round(xp), input.pendingRewardXpFloor || 0))
   const level = levelFromXp(totalXp)
   const levelFloor = xpRequiredForLevel(level)
   const levelCeiling = xpRequiredForLevel(level + 1)
@@ -7830,6 +7833,11 @@ function App() {
   }, [currentMasteredCodeCount, currentUserId, profileDetails.stats.lifetimeMasteredCodes, stateHydrated])
 
   const dailyRewards = useDailyRewards(currentUserId || '', activeClassId)
+  const academyProgression = useAcademyProgression(currentUserId || '', activeClassId)
+  const refreshAcademyProgression = academyProgression.refresh
+  useEffect(() => {
+    if (dailyRewards.status) void refreshAcademyProgression()
+  }, [dailyRewards.status, refreshAcademyProgression])
   const currentUserLevelProfile = useMemo(() => {
     const currentLeaderboardEntry = currentUserId
       ? duelHubLeaderboard.find((entry) => entry.userId === currentUserId) || leaderboard.find((entry) => entry.userId === currentUserId)
@@ -7840,6 +7848,7 @@ function App() {
     const weeklyDepartmentKey = bestWeeklyDepartment ? normalizeAgencyKey(bestWeeklyDepartment.agency) : ''
     const currentDepartmentKey = normalizeAgencyKey(canonicalAgencyName(profileDetails.agency || '') || '')
     return buildUserLevelProfile({
+      confirmedTotalXp: academyProgression.status?.totalXp,
       studySeconds: profileDetails.stats.studySeconds,
       studyDayStreak: profileDetails.stats.studyDayStreak,
       bestStudyDayStreak: Math.max(profileDetails.stats.bestStudyDayStreak, bestStreak),
@@ -7865,6 +7874,7 @@ function App() {
   }, [
     activeClassId,
     dailyRewards.status,
+    academyProgression.status,
     profileDetails.levelSnapshot?.totalXp,
     allTimeFirstSpotCountsByUser,
     allTimeLeaderboardAppearanceCountsByUser,
@@ -7886,7 +7896,7 @@ function App() {
   useEffect(() => {
     if (!stateHydrated || !currentUserId) return
     // Keep the saved display snapshot until the separate reward ledger is known.
-    if (activeClassId && !dailyRewards.status) return
+    if (activeClassId && (!dailyRewards.status || !academyProgression.status)) return
     const nextLevelSnapshot: ProfileLevelSnapshot = {
       level: currentUserLevelProfile.level,
       totalXp: currentUserLevelProfile.totalXp,
@@ -7916,6 +7926,7 @@ function App() {
     currentUserId,
     activeClassId,
     dailyRewards.status,
+    academyProgression.status,
     currentUserLevelProfile.autoDecorationKey,
     currentUserLevelProfile.currentLevelXp,
     currentUserLevelProfile.haloClass,
@@ -8708,7 +8719,7 @@ function App() {
         .then(({ error }) => {
           if (error) {
             console.error('Could not persist game attempt history:', error)
-          }
+          } else { window.dispatchEvent(new Event('academy-practice-saved')) }
         })
     }
   }, [activeClassId, currentUserId])
@@ -14197,7 +14208,7 @@ function App() {
           <section className="home-section">
             <HomeDashboard
               hasAnalytics={hasMembership}
-              rewards={<RewardsPanel rewards={dailyRewards} level={currentUserLevelProfile.level} currentXp={currentUserLevelProfile.currentLevelXp} nextXp={currentUserLevelProfile.nextLevelXp} onOpenRewards={() => openSettingsTab('progression')} onStudy={openStudyFlashcardsPage} />}
+              rewards={<><ChallengePanel progression={academyProgression} onPractice={openStudyTestPage} /><RewardsPanel rewards={dailyRewards} level={currentUserLevelProfile.level} currentXp={currentUserLevelProfile.currentLevelXp} nextXp={currentUserLevelProfile.nextLevelXp} onOpenRewards={() => openSettingsTab('progression')} onStudy={openStudyFlashcardsPage} /></>}
               name={profileDetails.firstName || activeProfileName}
               className={activeClass?.className || ''}
               department={activeClass?.departmentName || profileDetails.agency}
@@ -16457,6 +16468,7 @@ function App() {
 
             {isGamesDuelPage ? (
               <OneVsOnePanel
+                progressionLevel={academyProgression.status?.level || 1}
                 currentUserId={currentUserId}
                 currentUsername={profileDisplayName || 'You'}
                 activeClassId={activeClassId}

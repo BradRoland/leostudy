@@ -29,7 +29,7 @@ try {
   classId=check(await service.from('academy_classes').insert({academy_id:academyId,class_name:`Practice ${marker}`,status:'active',visibility:'unlisted',join_mode:'open'}).select('id').single()).id
   const departmentId=check(await service.from('class_departments').insert({class_id:classId,name:'Practice Department'}).select('id').single()).id
   check(await service.from('profiles').upsert({user_id:userId,username:`Casey Match ${marker}`,agency:'Practice Department',supporter_tier:'free'}))
-  check(await service.from('app_state').upsert({user_id:userId,profile_details:{firstName:'Casey',lastName:`Match ${marker}`,onboardingCompleted:true,displayMode:'light',themeId:'midnight',agency:'Practice Department',dailyGoalMinutes:15}}))
+  check(await service.from('app_state').upsert({user_id:userId,profile_details:{firstName:'Casey',lastName:`Match ${marker}`,onboardingCompleted:true,displayMode:'light',themeId:'midnight',agency:'Practice Department',dailyGoalMinutes:15,stats:{achievementXp:12000}}}))
   check(await service.from('class_memberships').insert({user_id:userId,class_id:classId,department_id:departmentId,role:'class_admin',status:'active',is_active:true}))
   browser=await chromium.launch()
   const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'})
