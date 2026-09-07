@@ -30,13 +30,13 @@ export function rankTone(level: number): string {
 }
 
 export const rewardAvatars = [
-  { key: 'academy', title: 'Academy', unlockLevel: 1, path: '/default-avatar-academy-v1.png' },
-  { key: 'orbit', title: 'Orbit', unlockLevel: 3, path: '/reward-avatars/orbit.png' },
-  { key: 'summit', title: 'Summit', unlockLevel: 5, path: '/reward-avatars/summit.png' },
-  { key: 'bloom', title: 'Bloom', unlockLevel: 10, path: '/reward-avatars/bloom.png' },
-  { key: 'compass', title: 'Compass', unlockLevel: 20, path: '/reward-avatars/compass.png' },
-  { key: 'nova', title: 'Nova', unlockLevel: 35, path: '/reward-avatars/nova.png' },
-  { key: 'legacy', title: 'Legacy', unlockLevel: 50, path: '/reward-avatars/legacy.png' },
+  { key: 'academy', title: 'Patrol Cadet', unlockLevel: 1, path: '/reward-avatars/patrol-v2.webp', description: 'First on scene.' },
+  { key: 'orbit', title: 'K9 Partner', unlockLevel: 3, path: '/reward-avatars/k9-v2.webp', description: 'Loyal, alert, ready.' },
+  { key: 'summit', title: 'Motor Unit', unlockLevel: 5, path: '/reward-avatars/motor-v2.webp', description: 'Precision on patrol.' },
+  { key: 'bloom', title: 'Detective', unlockLevel: 10, path: '/reward-avatars/detective-v2.webp', description: 'Follow every detail.' },
+  { key: 'compass', title: 'Air Support', unlockLevel: 20, path: '/reward-avatars/aviation-v2.webp', description: 'A wider perspective.' },
+  { key: 'nova', title: 'Watch Commander', unlockLevel: 35, path: '/reward-avatars/commander-v2.webp', description: 'Lead with confidence.' },
+  { key: 'legacy', title: 'Guardian', unlockLevel: 50, path: '/reward-avatars/guardian-v2.webp', description: 'Earned through dedication.' },
 ] as const
 
 export type RewardAvatar = typeof rewardAvatars[number]

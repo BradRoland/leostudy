@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-export type AcademyChallenge = { id: string; cadence: 'daily' | 'weekly'; title: string; target: number; progress: number; xp: number; claimed: boolean; resetsAt: string }
-export type AcademyProgression = { totalXp: number; level: number; challenges: AcademyChallenge[]; awardedXp?: number }
+export type AcademyChallenge = { id: string; cadence: 'daily' | 'weekly'; title: string; description?: string; category?: string; practicePath?: string; codeFilter?: 'all' | 'penal' | 'hs' | 'vehicle' | null; target: number; progress: number; xp: number; claimed: boolean; resetsAt: string }
+export type AcademyProgression = { totalXp: number; level: number; challenges: AcademyChallenge[]; awardedXp?: number; dailyCatalogSize?: number; dailyCycleDays?: number; dailyRotationStartsAt?: string; serverDate?: string }
 export function useAcademyProgression(userId: string, classId: string | null) {
   const identity = `${userId}:${classId || ''}`
   const current = useRef(identity)

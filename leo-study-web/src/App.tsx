@@ -961,7 +961,7 @@ const gameHighScoreSeed = {
   gravity: 0,
 }
 const avatarBucket = (import.meta.env.VITE_SUPABASE_AVATAR_BUCKET || 'avatars').trim()
-const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}default-avatar-academy-v1.svg`
+const defaultAvatarUrl = `${import.meta.env.BASE_URL || '/'}reward-avatars/patrol-v2.webp`
 const defaultAvatarPngUrl = `${import.meta.env.BASE_URL || '/'}default-avatar-academy-v1.png`
 const pendingProfileSetupKey = 'pending_profile_setup'
 const pendingClassSelectionKey = 'pending_class_selection'
@@ -10525,9 +10525,9 @@ function App() {
       const response = await fetch(avatar.path)
       if (!response.ok) throw new Error('Could not load this avatar. Please try again.')
       const blob = await response.blob()
-      if (!blob.type.startsWith('image/png')) throw new Error('Could not load this avatar. Please try again.')
+      if (!['image/png', 'image/webp'].includes(blob.type)) throw new Error('Could not load this avatar. Please try again.')
       if (request !== rewardAvatarRequest.current) return
-      const file = new File([blob], `academy-${avatar.key}.png`, { type: 'image/png' })
+      const file = new File([blob], `academy-${avatar.key}.${blob.type === 'image/webp' ? 'webp' : 'png'}`, { type: blob.type })
       if (profileAvatarPreviewUrl) URL.revokeObjectURL(profileAvatarPreviewUrl)
       setProfileAvatar(file)
       setProfileAvatarPreviewUrl(URL.createObjectURL(file))
@@ -14208,7 +14208,15 @@ function App() {
           <section className="home-section">
             <HomeDashboard
               hasAnalytics={hasMembership}
-              rewards={<><ChallengePanel progression={academyProgression} onPractice={openStudyTestPage} /><RewardsPanel rewards={dailyRewards} level={currentUserLevelProfile.level} currentXp={currentUserLevelProfile.currentLevelXp} nextXp={currentUserLevelProfile.nextLevelXp} onOpenRewards={() => openSettingsTab('progression')} onStudy={openStudyFlashcardsPage} /></>}
+              rewards={<><ChallengePanel progression={academyProgression} onPractice={(challenge) => {
+                const codeSet = challenge.codeFilter || 'all'
+                if (['/games/matching', '/games/speed', '/games/blaster'].includes(challenge.practicePath || '')) {
+                  setGamesSelection(previous => ({ ...previous, filter: codeSet }))
+                  goToPath(challenge.practicePath!, { tab: 'games' })
+                } else {
+                  setStudyTestFilter(codeSet); setStudyTestWrongness('balanced'); setStudyTestQuestionCount(20); openStudyTestPage()
+                }
+              }} /><RewardsPanel rewards={dailyRewards} level={currentUserLevelProfile.level} currentXp={currentUserLevelProfile.currentLevelXp} nextXp={currentUserLevelProfile.nextLevelXp} onOpenRewards={() => openSettingsTab('progression')} onStudy={openStudyFlashcardsPage} /></>}
               name={profileDetails.firstName || activeProfileName}
               className={activeClass?.className || ''}
               department={activeClass?.departmentName || profileDetails.agency}
@@ -17024,7 +17032,7 @@ function App() {
                       onChange={(event) => openAvatarCropper(event.target.files?.[0] || null)}
                     />
                   </label>
-                  <RewardAvatarPicker level={currentUserLevelProfile.level} busy={rewardAvatarLoading || authLoading} selectedKey={profileAvatar?.name.match(/^academy-(.+)\.png$/)?.[1]} onSelect={(avatar) => { void selectRewardAvatar(avatar) }} />
+                  <RewardAvatarPicker level={currentUserLevelProfile.level} busy={rewardAvatarLoading || authLoading} selectedKey={profileAvatar?.name.match(/^academy-(.+)\.(?:png|webp)$/)?.[1]} onSelect={(avatar) => { void selectRewardAvatar(avatar) }} />
                   <label>
                     About me
                     <textarea

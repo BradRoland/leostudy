@@ -22,6 +22,12 @@ async function setXp(index, xp) {
   check(await service.from('app_state').upsert({user_id:u.id,profile_details:{firstName:'Practice',lastName:`Member ${index}`,onboardingCompleted:true,agency:'Training',displayMode:'light',themeId:'midnight',stats:{achievementXp:xp}}}))
   return rpc(u.client,'get_academy_progression')
 }
+async function completeDaily(index) {
+ for(const mode of ['study_test','matching','speed','blaster'])for(const filter of ['all','penal','hs','vehicle'])for(const round of [0,1,2]) {
+  const correct=round===0?3:15,incorrect=round===0?2:0
+  check(await users[index].client.from('game_attempt_history').insert({user_id:users[index].id,class_id:classes[0],mode,filter,track_key:`${mode}|${filter}|${randomUUID()}`,duration:60,score:correct,correct,incorrect,accuracy:0,created_at:round===0?'2000-01-01T00:00:00Z':'2099-01-01T00:00:00Z'}))
+ }
+}
 async function create(args={}) {
   const id=await rpc(users[0].client,'create_1v1_room_v2',{p_game_type:'quiz',p_category:'all',p_is_public:false,p_rounds:10,...args});rooms.push(id);return id
 }
@@ -89,21 +95,20 @@ try {
  const reward=await rpc(users[0].client,'claim_daily_reward')
  assert.equal((await rpc(users[0].client,'get_academy_progression')).totalXp,beforeReward+reward.awardedXp)
  console.log('PASS: concurrent final-seat join, closed rooms, Connect Four unlock, Level 12 knockout, permanent earned unlocks and additive daily rewards.')
- await denied(users[2].client,'claim_academy_challenge',{p_challenge:'daily_sessions'},/Complete/)
+ const daily=(await rpc(users[2].client,'get_academy_progression')).challenges.filter(c=>c.cadence==='daily')
+ await denied(users[2].client,'claim_academy_challenge',{p_challenge:daily[0].id},/Complete/)
  await denied(users[2].client,'claim_academy_challenge',{p_challenge:'invented'},/Unknown/)
  await attempt(2,0,0)
  assert.ok((await rpc(users[2].client,'get_academy_progression')).challenges.every(c=>c.progress===0))
- await attempt(2,10,0,'2000-01-01T00:00:00Z')
- await attempt(2,10,0,'2099-01-01T00:00:00Z')
+ await completeDaily(2)
  const ready=await rpc(users[2].client,'get_academy_progression')
- assert.equal(ready.challenges.find(c=>c.id==='daily_sessions').progress,2)
- const claims=await Promise.all([1,2,3].map(()=>rpc(users[2].client,'claim_academy_challenge',{p_challenge:'daily_sessions'})))
- assert.equal(claims.reduce((sum,c)=>sum+c.awardedXp,0),60)
- assert.equal((await rpc(users[2].client,'claim_academy_challenge',{p_challenge:'daily_correct'})).awardedXp,80)
- for(let i=0;i<8;i++)await attempt(2)
+ for(const goal of ready.challenges.filter(c=>c.cadence==='daily'))assert.equal(goal.progress,goal.target)
+ const claims=await Promise.all([1,2,3].map(()=>rpc(users[2].client,'claim_academy_challenge',{p_challenge:daily[0].id})))
+ assert.equal(claims.reduce((sum,c)=>sum+c.awardedXp,0),daily[0].xp)
+ assert.equal((await rpc(users[2].client,'claim_academy_challenge',{p_challenge:daily[1].id})).awardedXp,daily[1].xp)
  assert.equal((await rpc(users[2].client,'claim_academy_challenge',{p_challenge:'weekly_sessions'})).awardedXp,250)
- assert.equal((await rpc(users[2].client,'get_academy_progression')).totalXp,390)
- assert.equal((await rpc(users[1].client,'get_academy_progression')).challenges.find(c=>c.id==='daily_sessions').progress,0)
+ assert.equal((await rpc(users[2].client,'get_academy_progression')).totalXp,250+daily[0].xp+daily[1].xp)
+ assert.ok((await rpc(users[1].client,'get_academy_progression')).challenges.every(c=>c.progress===0))
  await denied(users[2].client,'claim_academy_challenge',{p_challenge:'weekly_days'},/Complete/)
  console.log('PASS: empty attempt excluded, server-date periods despite forged timestamps, premature/unknown claims denied, concurrent claims award once, daily/weekly XP added exactly once and account isolation.')
  if(process.env.ACADEMY_SKIP_BROWSER==='1')process.exitCode=0
@@ -121,13 +126,13 @@ try {
   await host.goto(`${origin}/home`)
   const panel=host.getByRole('region',{name:'Practice challenges'})
   await expect(panel).toBeVisible();await expect(panel.getByRole('button',{name:'Continue practice'}).first()).toBeVisible()
-  await panel.getByRole('button',{name:'Continue practice'}).first().click();await expect(host).toHaveURL(`${origin}/study/test`)
-  await attempt(0);await attempt(0)
+  await panel.getByRole('button',{name:'Continue practice'}).first().click();await expect(host).toHaveURL(`${origin}${daily[0].practicePath || '/study/test'}`)
+  await completeDaily(0)
   const claimBefore=(await rpc(users[0].client,'get_academy_progression')).totalXp
   await host.goto(`${origin}/home`)
-  await panel.getByRole('button',{name:'Claim 60 XP',exact:true}).click()
-  await expect(panel.getByRole('status')).toContainText('+60 XP earned')
-  assert.equal((await rpc(users[0].client,'get_academy_progression')).totalXp,claimBefore+60)
+  await panel.locator('.challenge-card').filter({has:host.getByRole('heading',{name:daily[0].title,exact:true})}).getByRole('button',{name:`Claim ${daily[0].xp} XP`,exact:true}).click()
+  await expect(panel.getByRole('status')).toContainText(`+${daily[0].xp} XP earned`)
+  assert.equal((await rpc(users[0].client,'get_academy_progression')).totalXp,claimBefore+daily[0].xp)
   await host.reload();await expect(panel.getByRole('button',{name:'XP added ✓',exact:true})).toBeDisabled()
   await panel.getByRole('button',{name:'Weekly challenges',exact:true}).click();await expect(panel.getByRole('heading',{name:'Complete ten practice sessions'})).toBeVisible()
   await host.screenshot({path:'/tmp/academy-challenges-desktop.png'})

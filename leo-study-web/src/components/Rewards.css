@@ -71,3 +71,15 @@
 @media(max-width:1050px) { .academy-rewards { grid-template-columns:1fr; } }
 @media(max-width:520px) { .reward-daily-card,.reward-level-card { padding:19px 15px; }.reward-week { gap:4px; }.reward-week li { border-radius:7px; }.reward-week li > strong { font-size:11px; }.reward-section-heading h2 { font-size:18px; }.reward-rank-row { flex-wrap:wrap; }.reward-avatar-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(prefers-reduced-motion:reduce) { .reward-success { animation:none; }.reward-progress > span { transition:none; } }
+
+/* Blender collectible series: show the sculpt, materials and equipment clearly. */
+.professional-ui .reward-avatar-grid { grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:14px; }
+.professional-ui .reward-avatar-choice { padding:12px 12px 16px; gap:8px; border-radius:17px; overflow:hidden; transition:transform .18s ease,border-color .18s ease; }
+.professional-ui .reward-avatar-choice img { width:100%;height:auto;aspect-ratio:1;object-fit:cover;border-radius:12px;background:#102037; }
+.professional-ui .reward-avatar-choice strong { font-size:13px; }
+.reward-avatar-story { font-size:10px;color:var(--academy-muted);line-height:1.5; }
+.professional-ui .reward-avatar-choice small { padding:4px 9px;border-radius:20px;background:var(--academy-accent-soft);color:var(--academy-ink);font-size:10px;font-weight:700; }
+.professional-ui .reward-avatar-choice:disabled { opacity:.8; }
+.professional-ui .reward-avatar-choice:not(:disabled):hover { transform:translateY(-3px);border-color:var(--academy-accent); }
+@media(max-width:520px){.professional-ui .reward-avatar-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}.professional-ui .reward-avatar-choice {padding:9px 9px 13px;}}
+@media(prefers-reduced-motion:reduce){.professional-ui .reward-avatar-choice {transition:none;}.professional-ui .reward-avatar-choice:not(:disabled):hover {transform:none;}}
