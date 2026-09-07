@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { createStripeTierService } from './stripe-tier-service.mjs'
 import { createStripeMembershipService } from './stripe-membership-service.mjs'
+import { buildKnowledgeInsights } from './knowledge-insights.mjs'
+import { createStudyCoach } from './study-coach.mjs'
 import { buildMembershipAnalytics } from './membership-analytics.mjs'
 import { createClassRequestService } from './class-request-service.mjs'
 import { createClassRequestEmailService } from './class-request-email-service.mjs'
@@ -40,6 +42,12 @@ if ((!disableLiveIntegrations && (!stripeWebhookSecret || !process.env.STRIPE_SE
 
 const { stripe, supabase, applyTierFromCheckoutSession, verifySupabaseServiceAccess } = createStripeTierService()
 const membershipService = createStripeMembershipService({ stripe, supabase, legacyCheckout: applyTierFromCheckoutSession })
+const studyCoach = createStudyCoach({ apiKey: process.env.OPENAI_API_KEY, enabled: process.env.STUDY_COACH_ENABLED === 'true', reserve: async userId => {
+  const { data, error } = await supabase.rpc('reserve_academy_coach_usage', { p_user: userId })
+  if (error) throw Object.assign(new Error('Your daily AI allowance has been reached, or access is unavailable. Try again tomorrow.'), { status: 429 })
+  return data
+} })
+
 const classRequestService = createClassRequestService({
   supabase,
   userClient: (token) => createClient(
@@ -58,10 +66,11 @@ try {
   process.exit(1)
 }
 
-function readRawBody(req) {
+function readRawBody(req, maxBytes = Infinity) {
   return new Promise((resolve, reject) => {
     const chunks = []
-    req.on('data', (chunk) => chunks.push(chunk))
+    let size = 0
+    req.on('data', (chunk) => { size += chunk.length; if (size > maxBytes) { reject(Object.assign(new Error('Request too large'), { status: 413 })); return } chunks.push(chunk) })
     req.on('end', () => resolve(Buffer.concat(chunks)))
     req.on('error', reject)
   })
@@ -525,6 +534,27 @@ const server = http.createServer(async (req, res) => {
         const result = req.url.endsWith('/checkout') ? await membershipService.checkout(data.user, body.tier) : await membershipService.portal(data.user)
         sendJson(res, 200, result)
       } catch (error) { sendJson(res, error.status || 400, { error: error.message || 'Membership request failed' }) }
+      return
+    }
+    if (['/api/membership/knowledge', '/api/membership/coach'].includes(req.url)) {
+      res.setHeader('cache-control', 'private, no-store')
+      res.setHeader('vary', 'Authorization')
+      const isCoach = req.url.endsWith('/coach')
+      if (req.method !== (isCoach ? 'POST' : 'GET')) { sendJson(res, 405, { error: 'Method not allowed' }); return }
+      const token = String(req.headers.authorization || '').replace(/^Bearer /i, '')
+      const { data, error } = await supabase.auth.getUser(token)
+      if (error || !data.user) { sendJson(res, 401, { error: 'Sign in to view your insights' }); return }
+      try {
+        await membershipService.requireMembership(data.user.id)
+        const { data: state, error: stateError } = await supabase.from('app_state').select('performance,profile_details').eq('user_id', data.user.id).maybeSingle()
+        if (stateError) throw stateError
+        const content = JSON.parse(await readFile(path.join(__dirname, 'data/membership-content.json'), 'utf8'))
+        const insights = buildKnowledgeInsights(state, content.codeItems || [])
+        if (isCoach) {
+          const body = JSON.parse((await readRawBody(req, 30000)).toString('utf8') || '{}')
+          sendJson(res, 200, await studyCoach.respond(data.user.id, 'member', insights, body))
+        } else sendJson(res, 200, { ...insights, coachAvailable: studyCoach.available })
+      } catch (error) { sendJson(res, error.status || 503, { error: error.status ? error.message : 'Your insights are temporarily unavailable. Please try again.' }) }
       return
     }
     if (req.url === '/api/membership/analytics') {

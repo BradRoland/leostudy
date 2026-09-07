@@ -255,6 +255,8 @@ export function GlobalChatWidget({
   const [hasNewMessages, setHasNewMessages] = useState(false)
   const [reportModalOpen, setReportModalOpen] = useState<string | null>(null)
   const [reportReason, setReportReason] = useState('')
+  const [messageSearch, setMessageSearch] = useState('')
+  useEffect(() => { const open = () => setIsOpen(true); window.addEventListener('academy:open-class-chat', open); return () => window.removeEventListener('academy:open-class-chat', open) }, [])
   const [selectedProfile, setSelectedProfile] = useState<UserProfileStats | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [reactionPicker, setReactionPicker] = useState<{ messageId: string; left: number; top: number } | null>(null)
@@ -1143,6 +1145,7 @@ export function GlobalChatWidget({
             <p>Share a question. Help a classmate. Keep moving forward.</p>
           </div>
 
+          <label className="global-chat-search"><span className="sr-only">Search recent class messages</span><input value={messageSearch} onChange={event => setMessageSearch(event.target.value)} placeholder="Search recent messages"/></label>
           <div className="global-chat-messages" ref={containerRef} onScroll={handleScroll} role="log" aria-label={`${conversationTitle} messages`} aria-live="polite" aria-relevant="additions">
             {messages.length === 0 && (
               <div className="global-chat-empty">
@@ -1151,7 +1154,8 @@ export function GlobalChatWidget({
                 <p>Ask a study question, share a useful tip, or say hello to your class.</p>
               </div>
             )}
-            {messages.map((msg, index) => {
+            {messageSearch && !messages.some(msg => `${msg.display_name} ${msg.message}`.toLowerCase().includes(messageSearch.toLowerCase())) ? <p className="global-chat-empty">No recent messages match your search.</p> : null}
+            {messages.filter(msg => !messageSearch || `${msg.display_name} ${msg.message}`.toLowerCase().includes(messageSearch.toLowerCase())).map((msg, index, visibleMessages) => {
               const messageDisplayName = String(msg.display_name || '').trim().toLowerCase()
               const isSystemMessage = messageDisplayName === 'system' || messageDisplayName === '🔔 system'
               const isOwnMessage = msg.user_id === currentUserId && !isSystemMessage
@@ -1159,7 +1163,7 @@ export function GlobalChatWidget({
 
               return (
                 <Fragment key={msg.id}>
-                  {(index === 0 || new Date(messages[index - 1].created_at).toDateString() !== new Date(msg.created_at).toDateString()) && (
+                  {(index === 0 || new Date(visibleMessages[index - 1].created_at).toDateString() !== new Date(msg.created_at).toDateString()) && (
                     <div className="global-chat-day"><span>{messageDayLabel(msg.created_at)}</span></div>
                   )}
                   <article className={`global-chat-message-row ${isOwnMessage ? 'own' : ''} ${isSystemMessage ? 'system' : ''}`}>

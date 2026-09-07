@@ -20,6 +20,8 @@ const features: { label: string; free: boolean | string; tier5: boolean | string
   { label: 'Answer explanations & practice review', free: false, tier5: true, tier10: true },
   { label: 'Accuracy trends & subject breakdowns', free: false, tier5: true, tier10: true },
   { label: 'Mastery, strengths & weakness tracking', free: false, tier5: true, tier10: true },
+  { label: 'Knowledge coverage & evidence-aware insights', free: false, tier5: true, tier10: true },
+  { label: 'AI study coach · daily requests', free: false, tier5: '20 per day', tier10: '60 per day' },
   { label: 'Session history & weekly activity', free: false, tier5: true, tier10: true },
   { label: 'Website themes', free: 'Classic', tier5: 'Selected collection', tier10: 'Full collection' },
   { label: 'Membership badge across your profile', free: false, tier5: 'Plus badge', tier10: 'Pro badge' },
@@ -33,8 +35,8 @@ const features: { label: string; free: boolean | string; tier5: boolean | string
 ]
 const plans = [
   { id: 'free' as const, price: 0, name: 'Free', tagline: 'Build your foundation.', items: ['Core study tools and games', 'Your class community', 'Earned levels, streaks and rewards'], action: 'Continue studying' },
-  { id: 'tier5' as const, price: 5, name: 'Academy Plus', tagline: 'Know where you stand.', items: ['T-MAS practice and answer review', 'Your complete study analytics', 'Mastery and weakness breakdowns', 'Selected themes and Plus badge'], action: 'Get Academy Plus' },
-  { id: 'tier10' as const, price: 10, name: 'Academy Pro', tagline: 'Turn insight into a study plan.', items: ['Everything in Academy Plus', 'Personal plan and weakness drills', 'Saved practice setups', 'Study calendar and weekly comparisons', 'Downloadable progress report', 'All themes, name styling and Pro frames'], action: 'Get Academy Pro' },
+  { id: 'tier5' as const, price: 5, name: 'Academy Plus', tagline: 'Know where you stand.', items: ['T-MAS practice and answer review', 'Your complete study analytics', 'AI study coach · 20 requests/day', 'Mastery and weakness breakdowns', 'Selected themes and Plus badge'], action: 'Get Academy Plus' },
+  { id: 'tier10' as const, price: 10, name: 'Academy Pro', tagline: 'Turn insight into a study plan.', items: ['Everything in Academy Plus', 'AI study coach · 60 requests/day', 'Personal plan and weakness drills', 'Saved practice setups', 'Study calendar and weekly comparisons', 'Downloadable progress report', 'All themes, name styling and Pro frames'], action: 'Get Academy Pro' },
 ]
 function FeatureValue({ value }: { value: boolean | string }) {
   return typeof value === 'string' ? <span>{value}</span> : value ? <span className="membership-check"><span aria-hidden="true">✓</span><span className="sr-only">Included</span></span> : <span className="membership-unavailable"><span aria-hidden="true">—</span><span className="sr-only">Not included</span></span>

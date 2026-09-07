@@ -26,6 +26,9 @@ import { useClassWorkspace } from './hooks/useClassWorkspace'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { OneVsOnePanel } from './components/OneVsOnePanel'
 import { DuelInviteBanner } from './components/DuelInviteBanner'
+import { DirectMessageDock } from './components/DirectMessageDock'
+import { openDirectMessage } from './lib/directMessages'
+import { KnowledgeInsights } from './components/KnowledgeInsights'
 import { GlobalChatWidget } from './components/GlobalChatWidget'
 import { ClassWorkspacePages } from './components/ClassWorkspacePages'
 import { AuthEntry, PasswordRecovery } from './components/AuthOnboarding'
@@ -54,6 +57,7 @@ import {
 } from './lib/classApi'
 import { formatAcademyClassLabel, normalizeInviteCode } from './lib/classWorkspace'
 import './components/GlobalChatWidget.css'
+import './components/CompetitionPolish.css'
 
 type CodeSet = 'penal' | 'hs' | 'vehicle'
 type CodeFilter = CodeSet | 'all'
@@ -135,7 +139,6 @@ const achievementAwardLedgerLimit = 320
 const leaderboardRefreshThrottleMs = 5000
 const homeLeaderboardRefreshThrottleMs = 12000
 const leaderboardRealtimeDebounceMs = 450
-const homeLeaderboardRealtimeDebounceMs = 2600
 const activitySyncIntervalMs = 45000
 const activitySyncMinGapMs = 40000
 const historyHydrateLimit = 4000
@@ -4087,7 +4090,7 @@ function InteractiveTrendChart({
   )
 }
 
-function SessionPerformanceReportCard({ report }: { report: SessionPerformanceReport }) {
+function SessionPerformanceReportCard({ report, hasAnalytics = false }: { report: SessionPerformanceReport; hasAnalytics?: boolean }) {
   const trendValues = useMemo(
     () => compressTrendPoints(report.scoreTrend.length > 0 ? report.scoreTrend : [report.score], 64),
     [report.scoreTrend, report.score],
@@ -4102,12 +4105,12 @@ function SessionPerformanceReportCard({ report }: { report: SessionPerformanceRe
     <div className="card session-report-card">
       <div className="session-report-head">
         <div>
-          <h3>{sessionModeLabel(report.mode)} Performance</h3>
+          <p className="eyebrow">Your round at a glance</p><h3>{sessionModeLabel(report.mode)} recap</h3>
           <p className="muted">{report.contextLabel} • Score: {report.score} pts</p>
         </div>
       </div>
 
-      <div className="session-trend-wrap">
+      {hasAnalytics ? <div className="session-trend-wrap">
         <InteractiveTrendChart
           chartId={`session-report-${report.mode}-${report.contextLabel}`}
           values={trendValues}
@@ -4121,7 +4124,7 @@ function SessionPerformanceReportCard({ report }: { report: SessionPerformanceRe
             return 'Stable score. Focus on speed and consistency.'
           }}
         />
-      </div>
+      </div> : null}
 
       <div className="session-metrics-grid">
         <div>
@@ -4138,14 +4141,16 @@ function SessionPerformanceReportCard({ report }: { report: SessionPerformanceRe
         </div>
       </div>
 
-      <p className="session-summary-line">
+      {hasAnalytics ? <p className="session-summary-line">
         {report.deltaScore === null
           ? 'First tracked attempt for this mode. Keep building consistency.'
-          : report.deltaScore >= 0
+          : report.deltaScore === 0
+            ? 'You matched your previous score. Keep building consistency.'
+          : report.deltaScore > 0
             ? `You improved ${report.deltaScore} points since your last attempt.`
-            : `You are down ${Math.abs(report.deltaScore)} points from your last attempt. Bounce back next run.`}
-      </p>
-      {report.focusTips.length > 0 ? (
+            : `You are down ${Math.abs(report.deltaScore)} points from your last attempt. Review a few codes before your next round.`}
+      </p> : <p className="session-summary-line">Every completed round adds experience. Take a moment to review your answers, then try again when you’re ready.</p>}
+      {hasAnalytics && report.focusTips.length > 0 ? (
         <p className="session-focus-line">
           Focus next: {report.focusTips.join(' • ')}
         </p>
@@ -4174,6 +4179,8 @@ function SessionPerformanceReportCard({ report }: { report: SessionPerformanceRe
 }
 
 type GameStartInsightsPanelProps = {
+  hasAnalytics?: boolean
+  onMembership: () => void
   title: ScoreGameName
   icon: 'games' | 'study' | 'blaster'
   startLabel: string
@@ -4244,6 +4251,10 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
   return (
     <div className="game-start-panel">
       <div className="card game-start-cta-card">
+        <span className="game-launch-emblem"><AppIcon name={icon}/></span>
+        <p className="eyebrow">Focused practice · Your pace</p>
+        <h3>{title === 'Matching' ? 'Make the connection.' : title === 'Speed Test' ? 'Think clearly. Build speed.' : 'Stay sharp under pressure.'}</h3>
+        <p className="game-launch-description">{title === 'Matching' ? 'Pair each code with its definition. Build your recall one match at a time.' : title === 'Speed Test' ? 'Choose the correct answer before time runs out. A clear answer is better than a rushed guess.' : 'Recognize the right codes as you work through the playfield. Build accuracy with each round.'}</p>
         <button className="primary game-start-button" onClick={onStart} disabled={disabled}>
           <AppIcon name={icon} className="button-icon" />
           {startLabel}
@@ -4256,7 +4267,7 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
         {disabled && disabledHint ? <p className="muted tiny game-start-note">{disabledHint}</p> : null}
       </div>
 
-      <div className="card game-start-stats-card">
+      {props.hasAnalytics ? <div className="card game-start-stats-card">
         <div className="game-insight-grid">
           <article className="game-insight-card">
             <p className="game-insight-label">Last attempt</p>
@@ -4383,7 +4394,7 @@ function GameStartInsightsPanel(props: GameStartInsightsPanelProps) {
             ? `${codeSetLabel[bestCategory.codeSet]} is currently your strongest set. Keep pushing consistency in weaker areas.`
             : 'Start a session to unlock personalized coaching insights.'}
         </p>
-      </div>
+      </div> : <aside className="card game-membership-note"><h3>See what each round teaches you.</h3><p>Plus and Pro add your score history, subject insights and a personal AI study coach.</p><button className="secondary" onClick={props.onMembership}>Explore memberships →</button></aside>}
     </div>
   )
 }
@@ -7533,7 +7544,6 @@ function App() {
     if (!supabase) return
     const client = supabase
     let leaderboardRefreshTimer: number | null = null
-    let homeRefreshTimer: number | null = null
 
     const queueLeaderboardRefresh = (delayMs = leaderboardRealtimeDebounceMs) => {
       if (leaderboardRefreshTimer !== null) window.clearTimeout(leaderboardRefreshTimer)
@@ -7544,25 +7554,15 @@ function App() {
       }, delayMs)
     }
 
-    const queueHomeRefresh = (delayMs = homeLeaderboardRealtimeDebounceMs) => {
-      if (homeRefreshTimer !== null) window.clearTimeout(homeRefreshTimer)
-      homeRefreshTimer = window.setTimeout(() => {
-        homeRefreshTimer = null
-        void refreshHomeLeaderboards()
-      }, delayMs)
-    }
-
     const channel = client
-      .channel('leaderboard-live')
+      .channel(`leaderboard-live:${activeClassId}:${crypto.randomUUID()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, () => queueLeaderboardRefresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_leaderboard' }, () => queueLeaderboardRefresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_player_stats' }, () => queueLeaderboardRefresh(900))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, () => queueHomeRefresh())
       .subscribe()
 
     return () => {
       if (leaderboardRefreshTimer !== null) window.clearTimeout(leaderboardRefreshTimer)
-      if (homeRefreshTimer !== null) window.clearTimeout(homeRefreshTimer)
       client.removeChannel(channel)
     }
   }, [activeClassId, currentUserId])
@@ -14835,6 +14835,7 @@ function App() {
 
         {!isProfilePage && !isStatsPage && isLeaderboardsPage && (
           <section className="leaderboards-section">
+            <header className="competition-heading"><div><p className="eyebrow">Progress is better together</p><h2>Your class. Your benchmarks.</h2><p>Compare the same game, code set and round length. Find your place, celebrate your classmates, and work toward your next personal best.</p></div><span className="competition-label">Class leaderboards</span></header>
             <div className="leaderboards-overview-grid">
               <article className="card leaderboard-summary-card leaderboard-summary-card-condensed">
                 <div className="leaderboard-card-head">
@@ -14885,7 +14886,7 @@ function App() {
                 <div className="card-menu-head">
                   <div className="leaderboard-card-head">
                     <h3>Best Department This Week</h3>
-                    <p className="leaderboard-card-subtitle">Ranked by normalized Top-K player performance (fair by department size)</p>
+                    <p className="leaderboard-card-subtitle">Balanced results across each department’s leading players</p>
                   </div>
                   <button
                     className="assisted-learning-info-button"
@@ -14976,47 +14977,11 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="leaderboards-mode-matrix">
-                    {leaderboardModeMatrix.map((group) => (
-                      <div key={`leaderboard-mode-group-${group.duration}`} className="leaderboards-duration-group">
-                        <p className="leaderboards-duration-label">
-                          {leaderboardViewGame === 'Code Blaster' ? 'Fixed Run' : `${group.duration}s`}
-                        </p>
-                        <div className="leaderboards-duration-modes">
-                          {group.modes.map(({ filter, stat }) => {
-                            const isSelected = Boolean(
-                              leaderboardSelectedBoard &&
-                                leaderboardSelectedBoard.duration === group.duration &&
-                                leaderboardSelectedBoard.filter === filter &&
-                                leaderboardSelectedBoard.game === leaderboardViewGame,
-                            )
-                            return (
-                              <button
-                                key={`leaderboard-mode-${leaderboardViewGame}-${group.duration}-${filter}`}
-                                type="button"
-                                className={
-                                  isSelected
-                                    ? 'leaderboards-mode-chip leaderboards-mode-chip-active'
-                                    : stat
-                                      ? 'leaderboards-mode-chip'
-                                      : 'leaderboards-mode-chip leaderboards-mode-chip-empty'
-                                }
-                                disabled={!stat}
-                                onClick={() => {
-                                  if (!stat) return
-                                  setLeaderboardViewDuration(group.duration)
-                                  setLeaderboardViewFilter(filter)
-                                }}
-                              >
-                                <span>{leaderboardCodeSetLabel(filter)}</span>
-                                <small>{stat ? `${stat.attempts} run${stat.attempts === 1 ? '' : 's'}` : 'No scores'}</small>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <label className="competition-mode-picker"><span id="competition-mode-label">Code set &amp; round length</span>
+                    <select aria-labelledby="competition-mode-label" value={leaderboardSelectedBoard ? `${leaderboardSelectedBoard.duration}|${leaderboardSelectedBoard.filter}` : ''} onChange={event => { const [duration, filter] = event.target.value.split('|'); setLeaderboardViewDuration(Number(duration) as HomeDurationFilter); setLeaderboardViewFilter(filter as CodeFilter) }}>
+                      {leaderboardModeMatrix.flatMap(group => group.modes.filter(({stat}) => stat).map(({filter,stat}) => <option key={`${group.duration}|${filter}`} value={`${group.duration}|${filter}`}>{leaderboardCodeSetLabel(filter)} · {leaderboardViewGame === 'Code Blaster' ? 'Fixed run' : `${group.duration} seconds`} · {stat!.attempts} recorded runs</option>))}
+                    </select>
+                  </label>
 
                   <div className="leaderboards-mode-card">
                     <div className="leaderboards-mode-head">
@@ -15034,11 +14999,12 @@ function App() {
                         key={`leaderboard-selected-${leaderboardsScope}-${leaderboardViewGame}-${leaderboardSelectedBoard?.duration}-${leaderboardSelectedBoard?.filter}`}
                         className="leaderboards-mode-list"
                       >
+                        <div className="competition-list-heading"><span>Rank</span><span>Classmate</span><span>Score</span></div>
                         {leaderboardSelectedEntries.map((entry, index) => (
                           <button
                             key={`leaderboard-selected-entry-${entry.id}-${index}`}
                             type="button"
-                            className="leader-row leader-row-button leader-row-compact"
+                            className={`leader-row leader-row-button leader-row-compact${entry.userId === currentUserId ? ' is-current-user' : ''}`}
                             onClick={() => {
                               setSelectedLeaderboardEntry(entry)
                               setSelectedLeaderboardIsTop(index === 0)
@@ -15687,7 +15653,7 @@ function App() {
                       </div>
                       {renderSessionXpReward()}
                     </div>
-                    <SessionPerformanceReportCard report={studyTestReport} />
+                    <SessionPerformanceReportCard hasAnalytics={hasMembership} report={studyTestReport} />
                     <div className="actions-row study-test-complete-actions">
                       <button className="primary" onClick={beginStudyTest}>Retake Test</button>
                     </div>
@@ -15980,7 +15946,7 @@ function App() {
                   )}
                 </div>
 
-                <GameStartInsightsPanel
+                <GameStartInsightsPanel hasAnalytics={hasMembership} onMembership={() => navigate('/support')}
                   title="Matching"
                   icon="games"
                   startLabel="Start Matching"
@@ -16061,7 +16027,7 @@ function App() {
                         <span>Round: {matchRound}</span>
                         <span>Score: {matchScore}</span>
                       </div>
-                      {matchingReport ? <SessionPerformanceReportCard report={matchingReport} /> : (
+                      {matchingReport ? <SessionPerformanceReportCard hasAnalytics={hasMembership} report={matchingReport} /> : (
                         <>
                           <p>Your score: {matchScore}</p>
                           <p>High score: {Math.max(highScores.matching, matchScore)}</p>
@@ -16176,7 +16142,7 @@ function App() {
                   )}
                 </div>
 
-                <GameStartInsightsPanel
+                <GameStartInsightsPanel hasAnalytics={hasMembership} onMembership={() => navigate('/support')}
                   title="Speed Test"
                   icon="study"
                   startLabel="Start Speed Test"
@@ -16250,7 +16216,7 @@ function App() {
                         <span>Score: {speedScore}</span>
                         <span>Answered: {speedAnsweredCount}</span>
                       </div>
-                      {speedReport ? <SessionPerformanceReportCard report={speedReport} /> : (
+                      {speedReport ? <SessionPerformanceReportCard hasAnalytics={hasMembership} report={speedReport} /> : (
                         <>
                           <p>Your score: {speedScore}</p>
                           <p>Questions answered: {speedAnsweredCount}</p>
@@ -16346,7 +16312,7 @@ function App() {
                       )}
                     </div>
 
-                    <GameStartInsightsPanel
+                    <GameStartInsightsPanel hasAnalytics={hasMembership} onMembership={() => navigate('/support')}
                       title="Code Blaster"
                       icon="blaster"
                       startLabel="Launch Code Blaster"
@@ -16469,7 +16435,7 @@ function App() {
                             <span>Level: {blasterLevel}</span>
                             <span>Hits: {blasterCorrectCount}</span>
                           </div>
-                          {blasterReport ? <SessionPerformanceReportCard report={blasterReport} /> : (
+                          {blasterReport ? <SessionPerformanceReportCard hasAnalytics={hasMembership} report={blasterReport} /> : (
                             <>
                               <p>Your score: {blasterScore}</p>
                               <p>Targets hit: {blasterCorrectCount}</p>
@@ -16644,8 +16610,10 @@ function App() {
         {isStatsPage && profile && !hasMembership ? <StudyProgressPreview onExplore={() => navigate('/support')} onStudy={openStudyFlashcardsPage} /> : null}
         {isStatsPage && profile && hasMembership ? (
           <section className="stats-section">
+            <KnowledgeInsights key={currentUserId} onStudy={(codeSet, sectionNumber) => { const matches = sections.filter(section => section.codeSet === codeSet && section.sectionNumber === sectionNumber); setStudyFlashFilter(codeSet); setStudyFlashSessionFilter(codeSet); setStudyFlashSessionOrder(matches.map(section => section.id)); setStudyFlashSessionIndex(0); setStudyFlashSessionFlipped(false); setStudyFlashSessionOpen(matches.length > 0); openStudyFlashcardsPage() }} />
             {hasProMembership ? <ProStudyTools preferences={profileDetails.proStudyPreferences} onPreferences={value => setProfileDetails(previous => ({ ...previous, proStudyPreferences: value }))} onPractice={setup => { window.sessionStorage.setItem('practice-test-module-target', setup.module); window.sessionStorage.setItem('practice-test-length-target', String(setup.length)); openStudyPracticeTestPage() }} onDrill={(codeSet, sectionNumber) => { const matches = sections.filter(section => section.codeSet === codeSet && section.sectionNumber === sectionNumber); setStudyFlashFilter(codeSet); setStudyFlashSessionFilter(codeSet); setStudyFlashSessionOrder(matches.map(section => section.id)); setStudyFlashSessionIndex(0); setStudyFlashSessionFlipped(false); setStudyFlashSessionOpen(matches.length > 0); openStudyFlashcardsPage() }} /> : <MembershipGate title="Build your personal study plan" pro onExplore={() => navigate('/support')} />}
 
+            <details className="knowledge-history"><summary>Activity and game history<span>Study time, sessions, streaks and learning patterns</span></summary>
             <div className="card profile-page-card">
               <div className="stats-heading">
                 <span className="stats-heading-icon" aria-hidden>
@@ -16870,10 +16838,10 @@ function App() {
                   <h4>Strongest Codes</h4>
                   <p className="stats-focus-meta">Codes you currently know best, based on accuracy and attempts.</p>
                   <div className="stats-code-list">
-                    {statsAnalytics.strongestCodes.length === 0 ? (
+                    {statsAnalytics.strongestCodes.filter(item => item.accuracyPercent >= 80 && item.attempts >= 5).length === 0 ? (
                       <p className="muted">No strong-code data yet.</p>
                     ) : (
-                      statsAnalytics.strongestCodes.map((item) => (
+                      statsAnalytics.strongestCodes.filter(item => item.accuracyPercent >= 80 && item.attempts >= 5).map((item) => (
                         <article key={`stats-strong-${item.section.id}`} className="stats-code-item">
                           <div>
                             <p className="stats-code-title">{item.section.sectionNumber} • {item.section.title}</p>
@@ -16942,6 +16910,7 @@ function App() {
                 <p className="stats-focus-meta">{statsAnalytics.recommendation}</p>
               </div>
             </div>
+            </details>
           </section>
         ) : null}
 
@@ -18462,6 +18431,7 @@ function App() {
                       : selectedLeaderboardEntry.score}`}
               </p>
               <p className="leader-theme-pill">Theme: {selectedLeaderboardTheme.name}</p>
+              {selectedLeaderboardEntry.userId !== currentUserId && activeClassId ? <button className="primary" onClick={() => { openDirectMessage(selectedLeaderboardEntry.userId, selectedLeaderboardEntry.playerName); setSelectedLeaderboardEntry(null); setSelectedLeaderboardIsTop(false) }}>Message {selectedLeaderboardEntry.playerName}</button> : null}
             </div>
           </div>
         </div>
@@ -18674,8 +18644,9 @@ function App() {
         </>
       ) : null}
 
-      {authReady && currentUserId && stateHydrated && !isChatPage && !isClassesJoinPage && !isClassesRequestPage && !isInvitePage ? (
-        <GlobalChatWidget
+      {authReady && currentUserId && activeClassId && stateHydrated && !isClassesJoinPage && !isClassesRequestPage && !isInvitePage ? (
+        <DirectMessageDock key={`${currentUserId}:${activeClassId}`} userId={currentUserId} classId={activeClassId}>
+        {!isChatPage ? <GlobalChatWidget
           currentUserId={currentUserId}
           currentUsername={profileDisplayName || 'You'}
           userAgency={profileDetails?.agency}
@@ -18689,7 +18660,8 @@ function App() {
           }}
           userLevels={chatLevelProfiles}
           onOpenProfile={(userId) => void openLeaderboardStyleProfileByUserId(userId)}
-        />
+        /> : null}
+        </DirectMessageDock>
       ) : null}
       {enableVercelTelemetry ? (
         <>

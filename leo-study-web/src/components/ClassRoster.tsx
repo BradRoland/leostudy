@@ -1,3 +1,4 @@
+import { openDirectMessage } from '../lib/directMessages'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { loadClassRoster, formatRosterStudyTime, rosterDefaultAvatar, type ClassRosterMember } from '../lib/classRoster'
 import { formatAcademyClassLabel } from '../lib/classWorkspace'
@@ -28,7 +29,7 @@ function MemberStats({ member, expanded = false }: { member: ClassRosterMember; 
   return <dl className="classmate-stats">{stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
 }
 
-function ClassmateProfile({ member, onClose }: { member: ClassRosterMember; onClose: () => void }) {
+function ClassmateProfile({ member, onClose, canMessage }: { member: ClassRosterMember; onClose: () => void; canMessage: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const element = dialog.current
@@ -52,6 +53,7 @@ function ClassmateProfile({ member, onClose }: { member: ClassRosterMember; onCl
     <div className="classmate-profile-scroll" tabIndex={0} role="region" aria-label="Classmate study and game statistics">
       <div className="classmate-profile-identity"><Avatar member={member}/><div><h2 id="classmate-profile-name">{member.name} <MembershipBadge tier={member.membershipTier}/></h2><p>{member.department}</p></div></div>
       {member.bio ? <p className="classmate-bio">{member.bio}</p> : null}
+      {canMessage ? <button className="primary" onClick={() => { openDirectMessage(member.userId, member.name); onClose() }}>Message {member.name}</button> : null}
       <h3>Study &amp; game stats</h3>
       <MemberStats member={member} expanded/>
       <p className="classmate-stats-note">Study totals reflect their academy progress. Multiplayer results are from this class.</p>
@@ -91,6 +93,6 @@ export function ClassRoster({ activeClass, currentUserId }: { activeClass: Class
         <button type="button" className="classmate-view" aria-label={`Open stats for ${member.name}`} onClick={() => setSelection({ scope, member })}>View stats<AcademyIcon name="arrow"/></button>
       </li>)}</ul>
     </div> : null}
-    {selection?.scope === scope ? <ClassmateProfile member={selection.member} onClose={() => setSelection(null)}/> : null}
+    {selection?.scope === scope ? <ClassmateProfile canMessage={selection.member.userId !== currentUserId} member={selection.member} onClose={() => setSelection(null)}/> : null}
   </section>
 }
