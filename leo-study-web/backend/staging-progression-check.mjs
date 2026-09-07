@@ -106,10 +106,13 @@ try {
  const claims=await Promise.all([1,2,3].map(()=>rpc(users[2].client,'claim_academy_challenge',{p_challenge:daily[0].id})))
  assert.equal(claims.reduce((sum,c)=>sum+c.awardedXp,0),daily[0].xp)
  assert.equal((await rpc(users[2].client,'claim_academy_challenge',{p_challenge:daily[1].id})).awardedXp,daily[1].xp)
- assert.equal((await rpc(users[2].client,'claim_academy_challenge',{p_challenge:'weekly_sessions'})).awardedXp,250)
- assert.equal((await rpc(users[2].client,'get_academy_progression')).totalXp,250+daily[0].xp+daily[1].xp)
+ let weeklyXp=0
+ for(const goal of ready.challenges.filter(c=>c.cadence==='weekly')) {
+  if(goal.progress>=goal.target){assert.equal((await rpc(users[2].client,'claim_academy_challenge',{p_challenge:goal.id})).awardedXp,goal.xp);weeklyXp+=goal.xp}
+  else await denied(users[2].client,'claim_academy_challenge',{p_challenge:goal.id},/Complete/)
+ }
+ assert.equal((await rpc(users[2].client,'get_academy_progression')).totalXp,weeklyXp+daily[0].xp+daily[1].xp)
  assert.ok((await rpc(users[1].client,'get_academy_progression')).challenges.every(c=>c.progress===0))
- await denied(users[2].client,'claim_academy_challenge',{p_challenge:'weekly_days'},/Complete/)
  console.log('PASS: empty attempt excluded, server-date periods despite forged timestamps, premature/unknown claims denied, concurrent claims award once, daily/weekly XP added exactly once and account isolation.')
  if(process.env.ACADEMY_SKIP_BROWSER==='1')process.exitCode=0
  else {
@@ -134,7 +137,7 @@ try {
   await expect(panel.getByRole('status')).toContainText(`+${daily[0].xp} XP earned`)
   assert.equal((await rpc(users[0].client,'get_academy_progression')).totalXp,claimBefore+daily[0].xp)
   await host.reload();await expect(panel.getByRole('button',{name:'XP added ✓',exact:true})).toBeDisabled()
-  await panel.getByRole('button',{name:'Weekly challenges',exact:true}).click();await expect(panel.getByRole('heading',{name:'Complete ten practice sessions'})).toBeVisible()
+  await panel.getByRole('button',{name:'Weekly challenges',exact:true}).click();await expect(panel.getByRole('heading',{name:ready.challenges.find(c=>c.cadence==='weekly').title,exact:true})).toBeVisible()
   await host.screenshot({path:'/tmp/academy-challenges-desktop.png'})
   await host.setViewportSize({width:390,height:844});assert.ok(await host.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2));await host.screenshot({path:'/tmp/academy-challenges-mobile.png'})
   await guest.goto(`${origin}/games/duel`)

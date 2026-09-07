@@ -11,7 +11,6 @@ export function ChallengePanel({ progression, onPractice }: { progression: Retur
   const next = gameUnlocks.find(item => item.level > (status?.level || 1))
   return <section className="academy-challenges" aria-label="Practice challenges">
     <header><div><p className="challenge-eyebrow">BUILD YOUR MOMENTUM</p><h2>A little practice. Real progress.</h2><p>Small goals that move your knowledge forward.</p></div><AcademyIcon name="leaderboards" /></header>
-    {status?.dailyCatalogSize ? <p className="challenge-pool-note"><strong>{status.dailyCatalogSize} daily challenges</strong><span>Two fresh goals each day · No repeats for {status.dailyCycleDays} days</span></p> : null}
     <div className="challenge-tabs" role="group" aria-label="Challenge schedule">
       <button type="button" aria-pressed={cadence === 'daily'} onClick={() => setCadence('daily')}>Daily challenges</button>
       <button type="button" aria-pressed={cadence === 'weekly'} onClick={() => setCadence('weekly')}>Weekly challenges</button>
@@ -24,8 +23,7 @@ export function ChallengePanel({ progression, onPractice }: { progression: Retur
       <progress value={item.progress} max={item.target} aria-label={item.title} />
       <button className={item.progress >= item.target && !item.claimed ? 'primary' : 'secondary'} type="button" disabled={item.claimed || Boolean(claiming)} onClick={() => item.progress >= item.target ? void progression.claim(item.id) : onPractice(item)}>{item.claimed ? 'XP added ✓' : claiming === item.id ? 'Saving…' : item.progress >= item.target ? `Claim ${item.xp} XP` : 'Continue practice'}</button>
     </article>)}</div>
-    <p className="challenge-footnote">Complete at least five questions per session in a practice test or solo game. {cadence === 'daily' ? 'New goals every day at 00:00 UTC.' : 'New goals every Monday at 00:00 UTC.'} Claimed XP never expires.</p>
-    {status?.serverDate && status.dailyRotationStartsAt && status.serverDate < status.dailyRotationStartsAt.slice(0,10) ? <p className="challenge-footnote">Your current goals stay available today. The new rotation begins at the next daily reset.</p> : null}
+    <p className="challenge-footnote">Complete at least five questions per session in a practice test or solo game. Claimed XP never expires.</p>
     {message ? <p className="challenge-feedback" role="status">{message}</p> : null}
     <div className="challenge-unlock"><span className="challenge-unlock-icon"><AcademyIcon name="games" /></span><div><span className="challenge-eyebrow">{next ? 'YOUR NEXT GAME UNLOCK' : 'YOUR GAME TOOLKIT'}</span><h3>{next ? next.title : 'Every game feature unlocked'}</h3><p>{next ? `${Math.max(0, xpRequiredForLevel(next.level) - (status?.totalXp || 0)).toLocaleString()} XP to Level ${next.level} · ${next.detail}` : 'Keep building your knowledge and collecting profile rewards.'}</p></div></div>
     <details className="challenge-roadmap"><summary>See your unlock journey</summary><ol>{gameUnlocks.map(item => <li key={item.key}><strong>Level {item.level}</strong><span>{item.title}</span><span>{status && status.level >= item.level ? 'Unlocked ✓' : 'Upcoming'}</span></li>)}</ol><p>Joining a classmate’s room is available at every level. Both players need Level 5 for Connect Four.</p></details>

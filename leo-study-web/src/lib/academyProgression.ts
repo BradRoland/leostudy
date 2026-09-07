@@ -30,13 +30,13 @@ export function rankTone(level: number): string {
 }
 
 export const rewardAvatars = [
-  { key: 'academy', title: 'Patrol Cadet', unlockLevel: 1, path: '/reward-avatars/patrol-v2.webp', description: 'First on scene.' },
-  { key: 'orbit', title: 'K9 Partner', unlockLevel: 3, path: '/reward-avatars/k9-v2.webp', description: 'Loyal, alert, ready.' },
-  { key: 'summit', title: 'Motor Unit', unlockLevel: 5, path: '/reward-avatars/motor-v2.webp', description: 'Precision on patrol.' },
-  { key: 'bloom', title: 'Detective', unlockLevel: 10, path: '/reward-avatars/detective-v2.webp', description: 'Follow every detail.' },
-  { key: 'compass', title: 'Air Support', unlockLevel: 20, path: '/reward-avatars/aviation-v2.webp', description: 'A wider perspective.' },
-  { key: 'nova', title: 'Watch Commander', unlockLevel: 35, path: '/reward-avatars/commander-v2.webp', description: 'Lead with confidence.' },
-  { key: 'legacy', title: 'Guardian', unlockLevel: 50, path: '/reward-avatars/guardian-v2.webp', description: 'Earned through dedication.' },
+  { key: 'academy', title: 'Police Cadet', unlockLevel: 1, path: '/reward-avatars/patrol-v3.webp', description: 'Polished badge. Ready for the first watch.' },
+  { key: 'orbit', title: 'K9 Sentinel', unlockLevel: 3, path: '/reward-avatars/k9-v3.webp', description: 'An alert shepherd with a working K9 harness.' },
+  { key: 'summit', title: 'Highway Patrol', unlockLevel: 5, path: '/reward-avatars/motor-v3.webp', description: 'Chrome, cobalt and a highway patrol motorcycle.' },
+  { key: 'bloom', title: 'Major Crimes Detective', unlockLevel: 10, path: '/reward-avatars/detective-v3.webp', description: 'Trench coat, case notes and an eye for evidence.' },
+  { key: 'compass', title: 'Helicopter Pilot', unlockLevel: 20, path: '/reward-avatars/aviation-v3.webp', description: 'Flight helmet, radio checks and rotorcraft ready.' },
+  { key: 'nova', title: 'Watch Commander', unlockLevel: 35, path: '/reward-avatars/commander-v3.webp', description: 'Service ribbons and the confidence to lead.' },
+  { key: 'legacy', title: 'Honor Guard Eagle', unlockLevel: 50, path: '/reward-avatars/guardian-v3.webp', description: 'Sculpted feathers, gold laurels and earned honor.' },
 ] as const
 
 export type RewardAvatar = typeof rewardAvatars[number]

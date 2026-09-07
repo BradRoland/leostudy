@@ -13,6 +13,8 @@ begin
  perform set_config('request.jwt.claim.sub',u::text,true);
  insert into public.game_attempt_history(user_id,class_id,mode,track_key,filter,score,correct,incorrect,accuracy)
  select u,c,'study_test','calendar_'||i,'all',10,10,0,100 from generate_series(1,3) i;
+ -- Freeze the legacy weekly definition only inside this rolled-back calendar fixture.
+ update academy_progression_private.rotation_config set weekly_starts_on=w+7;
  -- Evaluate a completed historical week, without counting future dates in this week.
  with ranked as(select attempt_id,row_number() over(order by attempt_id)-1 as n from academy_progression_private.events where user_id=u)
  update academy_progression_private.events e set recorded_at=(w-7+ranked.n::int)::timestamp at time zone 'UTC' from ranked where e.attempt_id=ranked.attempt_id;
